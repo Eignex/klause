@@ -41,19 +41,10 @@ internal class ClausePropagator(
     override val initialBoolWatcherBlockers: IntArray? =
         if (literals.size == 1) null else intArrayOf(literals[1], literals[0])
 
-    /**
-     * Two-watched-literal propagation (Moskewicz et al., "Chaff: engineering an efficient SAT solver",
-     * DAC 2001, https://doi.org/10.1145/378239.379017). Caches a pair of literal indices on
-     * [PropagationState.refPayload]; each fire checks at most those two before looking further. Common
-     * case (both watches non-false): O(1) regardless of clause arity. Slow case (a watch turned false):
-     * scans for a non-false replacement, O(arity) worst-case but amortised across many fires.
-     *
-     * Soundness across `PropagationSession` push/pop: watches deliberately aren't snapshotted (see
-     * [PropagationState.refPayload]). After a pop, watches may point at literals that are again
-     * unassigned at the restored level, which is valid since the invariant is "watches point at
-     * non-false literals". If a restored state leaves a watch on a false literal, the first propagate
-     * call re-validates and moves it.
-     */
+    // Two-watched-literal propagation (Moskewicz et al., "Chaff: engineering an efficient SAT solver",
+    // DAC 2001, https://doi.org/10.1145/378239.379017). Watches are not snapshotted across push/pop: the
+    // invariant is only that they point at non-false literals, and the first propagate after a restore
+    // moves a watch left on a false literal.
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (literals.size == 1) {
             val lit = literals[0]
@@ -107,6 +98,5 @@ internal class ClausePropagator(
         }
     }
 
-    /** When [propagate] returns false, every literal is false, giving a clause-form nogood. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray = literals
 }

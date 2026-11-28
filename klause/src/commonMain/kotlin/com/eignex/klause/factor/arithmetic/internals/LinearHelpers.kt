@@ -21,19 +21,9 @@ internal fun initLinearSum(state: LocalSearchState, factorId: Int, coeffs: LongA
     state.longPayload[factorId] = sum
 }
 
-/**
- * Hole-aware antecedent collection for propagators that prune interior values (matching-based
- * AllDifferent, GlobalCardinality, Regular, Table, Inverse, Element and others). When any variable sits
- * above the root, only those variables are cited. Cites:
- *   - bound atoms when current min/max are tighter than initial,
- *   - positive `[v == value]` atom-lits (the negation of the `v ≠ value` premise) for every
- *     value in the original domain that's currently excluded from the live domain.
- *
- * Together these literals describe the exact filtered domains the propagator reasoned over,
- * so the resulting conflict clause is a Hall-style reason rather than a bound-only one.
- * Allocates `atomVarEq` atoms on demand for each cited hole. Returns `null` when nothing is
- * tighter than the original (caller falls back to default antecedents).
- */
+// For propagators that prune interior values. Cites bounds tighter than the root and `[v == value]` for every
+// excluded root value, so the reason describes the filtered domains exactly rather than only their bounds. When
+// any variable sits above the root, only those are cited. Null when nothing is tighter than the root.
 internal fun collectHoleAndBoundAntecedents(
     state: PropagationState,
     vars: IntArray,
@@ -69,10 +59,8 @@ internal fun collectHoleAndBoundAntecedents(
         }
         val lo = maxOf(d.min, orig.min)
         val hi = minOf(d.max, orig.max)
-        // Cite [v == value] for each originally-present value now carved out of the live domain within
-        // its bounds. Enumerate whichever side is smaller: a survivor set over a wide span has span-many
-        // holes but few members, so walking holes would be O(span) — iterate the original's members
-        // instead. Both paths visit the same values ascending, so the cited literal set is identical.
+        // Enumerate the smaller side: walking the holes of a sparse root domain is O(span). Both paths visit
+        // the same values in ascending order.
         val members = orig.spanOrNull(d.holeCount)
         if (members != null) {
             members.forEach { value ->
@@ -94,20 +82,8 @@ internal fun collectHoleAndBoundAntecedents(
     return out.toIntArray()
 }
 
-/**
- * Direction-aware LCG antecedents for a linear deduction. A deduction (a bound tighten, or
- * the whole-constraint conflict) is driven by exactly one of the two reachable sum extremes:
- *   - **lo side** (`Σ rLo`, used by `LE` upper-bounds and the `sumLo > bound` conflict):
- *     each var's contribution is `c·min` for `c>0` (cite `[v ≥ min]`) or `c·max` for `c<0`
- *     (cite `[v ≤ max]`).
- *   - **hi side** (`Σ rHi`, used by `GE` lower-bounds and the `sumHi < bound` conflict):
- *     mirror — `c·max` for `c>0` (cite `[v ≤ max]`), `c·min` for `c<0` (cite `[v ≥ min]`).
- *
- * Only the literals on the driving side are cited (and only when tighter than the original
- * domain — root-level bounds are global facts the analyzer minimises out). Sharper than
- * [collectLinearTightenAntecedents] (which cites both bounds of every var), so learned clauses
- * generalise and prune across more of the search.
- */
+// A linear deduction is driven by one sum extreme, so only the bounds on that side are cited, and only when
+// tighter than the root. Sharper than [collectLinearTightenAntecedents], so learned clauses generalise further.
 internal fun collectLinearDirAntecedents(
     state: PropagationState,
     coeffs: LongArray,
@@ -158,19 +134,11 @@ internal fun collectLinearDirAntecedents(
     return out.toIntArray()
 }
 
-/**
- * The reason [collectLinearDirAntecedents] builds, with each cited bound weakened as far as the deduction
- * allows: [slack] is how far the driving side may loosen before the conflict, or the bound on the variable at
- * [excludeIdx], no longer follows, and it is spent loosening the cited bounds, latest decision level first. A
- * reason citing exact bounds refutes one value per conflict, so a
- * search that tries `x ≤ min` refutes `min`, then `min + 1`, and so on across the domain; the lifted reason
- * refutes every value the conflict rules out at once. A bound loosened to its root value is a global fact and
- * drops out.
- *
- * A literal below the conflict level only ever enters the learned clause, so any weaker atom that still holds
- * serves. One at the conflict level may be resolved, and only a decision's bound needs no reason there, so the
- * conflict level loosens only its decision.
- */
+// [collectLinearDirAntecedents] with each bound weakened as far as the deduction allows. [slack] is how far the
+// driving side may loosen before the deduction stops following; it is spent latest level first, so one conflict
+// refutes every value it rules out instead of one value per conflict. A bound loosened to its root value drops out.
+// Below the conflict level any weaker atom that still holds serves; at it, a literal may be resolved, so only the
+// decision's bound loosens.
 internal fun collectLinearLiftedAntecedents(
     state: PropagationState,
     coeffs: LongArray,
@@ -212,12 +180,8 @@ internal fun collectLinearLiftedAntecedents(
     )
 }
 
-/**
- * The reason [collectLinearLiftedAntecedents] would have built for a deduction made at undo-log position
- * [atTrail] and level [atLevel], from the bounds as they stood then. A deduction on a sum records
- * [linearLazyReason] instead of building it, and its propagator's [com.eignex.klause.propagation.Propagator.explain]
- * lands here. Each term's bound then and the move that established it are read once.
- */
+// The [collectLinearLiftedAntecedents] reason for a deduction recorded by [linearLazyReason], rebuilt from the
+// bounds as they stood at undo-log position [atTrail] and level [atLevel].
 internal fun explainLinearBound(
     state: PropagationState,
     coeffs: LongArray,
@@ -269,7 +233,6 @@ internal fun explainLinearBound(
     )
 }
 
-/** A lazily recorded linear bound, whose payload [explainLinearBound] decodes. */
 @Suppress("LongParameterList")
 internal fun linearLazyReason(
     state: PropagationState,
@@ -292,9 +255,8 @@ internal fun linearLazyReason(
 
 private const val LINEAR_PAYLOAD_SIZE = 6
 
-// Spend [slack] loosening the cited side of each term, latest-established first, given per term its [bound], the
-// [level] that bound was established at, whether it may be cited weaker ([lift]), and whether the variable sits
-// above the root at all ([aboveRoot]).
+// Per term: its cited [bound], the [level] that established it, whether it may be cited weaker ([lift]), and
+// whether the variable sits above the root ([aboveRoot]).
 @Suppress("LongParameterList")
 private fun liftedAntecedents(
     state: PropagationState,
@@ -311,8 +273,7 @@ private fun liftedAntecedents(
     aboveRoot: BooleanArray,
 ): IntArray? {
     val cited = citedTerms(state, coeffs, vars, useLo, excludeIdx, bound, aboveRoot)
-    // Latest level first: those are the bounds worth loosening, since only they could be resolved. Without slack
-    // nothing loosens, so the order is moot.
+    // Latest level first, since only those bounds could be resolved. Without slack the order is moot.
     val order = if (slack > 0) argsortByIntKey(cited.size) { -level[cited[it]] } else IntArray(cited.size) { it }
     val seen = IntHashSet(order.size * 2)
     val out = IntArrayList()
@@ -375,7 +336,6 @@ private fun citedTerms(
     return cited
 }
 
-// The false literal of [v]'s cited bound [b] loosened by [step].
 private fun boundLiteralLiftedBy(state: PropagationState, v: Int, citeMin: Boolean, b: Long, step: Long): Int =
     if (citeMin) {
         Lit.make(state.atomVarGe(v, b - step), false)
@@ -383,7 +343,6 @@ private fun boundLiteralLiftedBy(state: PropagationState, v: Int, citeMin: Boole
         Lit.make(state.atomVarLe(v, b + step), false)
     }
 
-// Whether the bound on [v]'s [citeMin] side, established at [level], may be cited weaker than it stands.
 private fun liftable(state: PropagationState, v: Int, citeMin: Boolean, level: Int): Boolean {
     if (level <= 0) return false
     if (level < state.currentLevel) return true
@@ -434,12 +393,8 @@ internal fun collectLinearTightenAntecedents(
     return out.toIntArray()
 }
 
-/**
- * Exact 128-bit feasibility check for a linear row whose 64-bit bound arithmetic overflowed.
- * Detects definite violation only — no tightening — so wide-domain (and fully pinned) states are
- * still rejected exactly rather than silently passed; the missed tightenings re-run once the
- * domains narrow back into 64-bit range. Returns `false` iff the row is definitely infeasible.
- */
+// Detects definite violation only, so an overflowing state is still rejected exactly; tightening resumes once
+// the domains narrow back into 64 bits.
 private fun linearFeasible128(
     state: PropagationState,
     coeffs: LongArray,
@@ -461,7 +416,6 @@ private fun linearFeasible128(
             hi.addProduct(c, d.min)
         }
     }
-    // Shift both extremes by -bound so feasibility reduces to sign tests.
     lo.addProduct(-1L, bound)
     hi.addProduct(-1L, bound)
     if (lo.overflow || hi.overflow) return true
@@ -481,11 +435,9 @@ private fun int128Sign(v: Int128): Int = when {
     else -> 1
 }
 
-/**
- * How far the other terms' cited side may loosen while `c·x ⟨op⟩ s` still yields the bound [t] on x, in sum
- * units: `c·t + |c| − 1 + offset`, where [offset] is `−s` for a `≤` row and `s` for a `≥` row (with [c] negated,
- * the same algebra). Zero when the arithmetic would overflow, which lifts nothing.
- */
+// How far the other terms' cited side may loosen while `c·x ⟨op⟩ s` still yields the bound [t] on x, in sum
+// units: `c·t + |c| − 1 + offset`, where [offset] is `−s` for a `≤` row and `s` for a `≥` row (with [c] negated).
+// Zero on overflow, which lifts nothing.
 private fun liftBudget(c: Long, t: Long, offset: Long): Long {
     if (mulOverflows(c, t)) return 0L
     val ct = c * t
@@ -496,8 +448,7 @@ private fun liftBudget(c: Long, t: Long, offset: Long): Long {
     return (head + offset).coerceAtLeast(0L)
 }
 
-/** True iff `a * b` wraps 64-bit range. Both-magnitudes-below-2^31 short-circuits before the
- *  division so the propagation hot loop pays two xors, not an idiv, on ordinary domains. */
+// The magnitude check spares the propagation hot loop a division on ordinary domains.
 private fun mulOverflows(a: Long, b: Long): Boolean {
     if (((a xor (a shr 63)) or (b xor (b shr 63))) ushr 31 == 0L) return false
     if (a == 0L || b == 0L) return false
@@ -509,17 +460,9 @@ private fun addOverflows(a: Long, b: Long): Boolean = ((a xor (a + b)) and (b xo
 
 private fun subOverflows(a: Long, b: Long): Boolean = ((a xor b) and (a xor (a - b))) < 0L
 
-/**
- * Shared bounds-propagation routine for `Σ coeffs(i)·vars(i) ⟨op⟩ bound`. Used by `Linear`
- * directly and by `ReifiedLinear` when its aux Boolean is pinned. Returns `false` iff the
- * domains became jointly infeasible.
- *
- * Overflow-safe on wide (up to full-`Long`) domains: a coefficient-times-bound product that wraps
- * reduces the round to the exact 128-bit feasibility check, and a directional sum that wraps disables only that
- * side's infeasibility test and tightenings. Wrapped arithmetic must never *strengthen* a bound or
- * declare a conflict — either would be unsound — so every overflow degrades to weaker propagation.
- * Bound-split search stays complete regardless: the skipped pruning re-runs on narrower domains.
- */
+// Wrapped arithmetic must never strengthen a bound or declare a conflict, so overflow only weakens propagation:
+// a wrapped product reduces the round to the exact 128-bit check, and a wrapped side skips its own test and
+// tightenings. The skipped pruning re-runs on narrower domains.
 internal fun propagateLinearBounds(
     state: PropagationState,
     coeffs: LongArray,
@@ -558,8 +501,7 @@ internal fun propagateLinearBounds(
         sumHi += hi
     }
     if (loOverflow || hiOverflow) {
-        // The wrapped side's infeasibility test is meaningless in 64-bit; re-check exactly so a
-        // violated row (in particular at a fully pinned leaf) is still rejected.
+        // Re-check exactly so a violated row is still rejected, in particular at a fully pinned leaf.
         if (!linearFeasible128(state, coeffs, vars, op, bound)) return false
     }
     when (op) {
@@ -568,12 +510,8 @@ internal fun propagateLinearBounds(
         LinearOp.EQ -> if ((!loOverflow && sumLo > bound) || (!hiOverflow && sumHi < bound)) return false
         LinearOp.NE -> if (!loOverflow && !hiOverflow && sumLo == bound && sumHi == bound) return false
     }
-    // At the root (level 0) a bound move is a permanent fact whose antecedents are never consumed:
-    // conflict analysis runs only above the root, and it drops level-0 literals by their level rather
-    // than resolving through their reason. Collecting the reason there is pure waste — and on a wide
-    // domain a slow-converging linear bound narrows ~1 per round for O(span) rounds, each round citing
-    // (and materializing) a fresh order atom whose sorted-index insert is O(n): O(span²) overall, which
-    // hangs the root bake. Skip it at the root, leaving the actual bound tightening untouched.
+    // Conflict analysis never reads a root reason. Building one is costly: on a wide domain a slow-converging
+    // bound narrows about one value per round, each citing a fresh order atom, O(span²) overall.
     val rootFact = state.currentLevel == 0
     if (op == LinearOp.NE) {
         if (loOverflow || hiOverflow) return true
@@ -723,9 +661,6 @@ private fun tightenLinearTerms(
     return true
 }
 
-/**
- * Range `[sumLo, sumHi]` reachable by `Σ coeffs(i)·vars(i)` given current domains.
- */
 internal fun linearSumRange(state: PropagationState, coeffs: LongArray, vars: IntArray): LongArray {
     var lo = 0L
     var hi = 0L
@@ -783,13 +718,11 @@ internal fun unreachableEqualityReason(
     }
 }
 
-/** floor(a / b) with correct handling of negative operands. */
 internal fun floorDivLong(a: Long, b: Long): Long {
     val q = a / b
     return if (a % b != 0L && (a xor b) < 0L) q - 1 else q
 }
 
-/** ceil(a / b) with correct handling of negative operands. */
 internal fun ceilDivLong(a: Long, b: Long): Long {
     val q = a / b
     return if (a % b != 0L && (a xor b) >= 0L) q + 1 else q

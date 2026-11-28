@@ -12,15 +12,11 @@ import com.eignex.util.collections.toSortedIntArray
 import com.eignex.util.collections.toSortedLongArray
 
 /**
- * The presolve-derived narrowings that ride alongside an [Assumptions]' exact pins: non-singleton
- * lower/upper bound tightenings, interior holes (`v ≠ value`), and compact set-restrictions
- * (`v ∈ {survivors}`). These are produced by SAC-at-root and bake-time probing (see the root baker)
- * and applied at seed time; they never originate from the Session / portfolio pin API
- * ([Assumptions.withBool] / [Assumptions.withInt]), which is why they live in a separate carrier that
- * [Assumptions] holds as a single field.
+ * Presolve-derived narrowings that ride alongside an [Assumptions]' exact pins: bound tightenings, interior
+ * holes (`v ≠ value`) and set restrictions (`v ∈ {survivors}`). They never originate from the pin API
+ * ([Assumptions.withBool] / [Assumptions.withInt]), hence the separate carrier.
  *
- * Storage is parallel primitive arrays sorted ascending by key — no autoboxing, binary-search lookup.
- * Every builder returns a fresh instance; the receiver is untouched.
+ * Storage is parallel arrays sorted by key. Every builder returns a fresh instance.
  */
 class DeducedRestrictions internal constructor(
     /** Int var ids with an additional `≥ minValue` lower-bound tightening (no exact pin), ascending. */
@@ -36,9 +32,7 @@ class DeducedRestrictions internal constructor(
     val intHoleVarIds: IntArray = emptyIntArray(),
     /** Forbidden values aligned with [intHoleVarIds]. */
     val intHoleValues: LongArray = emptyLongArray(),
-    /** Set-restrictions `v ∈ {survivors}`, var ids ascending. CSR layout: variable `intSetKeys[i]`'s
-     *  ascending survivors are `intSetValues[intSetOffsets[i] until intSetOffsets[i + 1]]`.
-     *  [intSetOffsets] has size `intSetKeys.size + 1` (or is empty when there are none). */
+    /** Set-restricted var ids, ascending; survivors are `intSetValues[intSetOffsets[i] until intSetOffsets[i + 1]]`. */
     val intSetKeys: IntArray = emptyIntArray(),
     /** CSR row offsets into [intSetValues]; size `intSetKeys.size + 1`, or empty when there are none. */
     val intSetOffsets: IntArray = emptyIntArray(),
@@ -85,7 +79,6 @@ class DeducedRestrictions internal constructor(
         return if (idx >= 0) intMaxValues[idx] else null
     }
 
-    /** Rebuild with a subset of fields replaced; every unspecified field is carried over unchanged. */
     private fun copy(
         intMinKeys: IntArray = this.intMinKeys,
         intMinValues: LongArray = this.intMinValues,
@@ -101,8 +94,7 @@ class DeducedRestrictions internal constructor(
         intHoleVarIds, intHoleValues, intSetKeys, intSetOffsets, intSetValues,
     )
 
-    /** Drop any lower/upper bound tightening on [id] (an exact pin on it subsumes the bound), keeping
-     *  holes and set-restrictions. Backs [Assumptions.withInt]. */
+    /** Drop any bound tightening on [id], which an exact pin subsumes, keeping holes and set-restrictions. */
     fun withoutBounds(id: Int): DeducedRestrictions {
         val minIdx = intMinKeys.binarySearchInt(id)
         val maxIdx = intMaxKeys.binarySearchInt(id)
@@ -136,8 +128,7 @@ class DeducedRestrictions internal constructor(
         return copy(intMinKeys = newMinK, intMinValues = newMinV, intMaxKeys = newMaxK, intMaxValues = newMaxV)
     }
 
-    /** Drop all set-restrictions, keeping bound tightenings and holes. Dropping a restriction only
-     *  loosens the seed, so it is sound; backs the pin-removal helpers in `SatisfyResult`. */
+    /** Drop all set-restrictions, keeping bound tightenings and holes; sound because it only loosens the seed. */
     fun withoutSetRestrictions(): DeducedRestrictions = if (intSetKeys.isEmpty()) {
         this
     } else {
@@ -213,11 +204,8 @@ class DeducedRestrictions internal constructor(
         return copy(intHoleVarIds = nk, intHoleValues = nv)
     }
 
-    /**
-     * Merge `this` with [other] under the merged exact-pin set [pinned]: mins take the max, maxes take
-     * the min, holes union, set-restrictions take [other] on overlap (last-write) — and every deduction
-     * whose var is in [pinned] is dropped, since the exact pin subsumes it.
-     */
+    // Mins take the max, maxes the min, holes union, set-restrictions take [other] on overlap; deductions on a
+    // var in [pinned] are dropped because the exact pin subsumes them.
     internal fun mergedWith(other: DeducedRestrictions, pinned: IntHashSet): DeducedRestrictions {
         val minMap = MutableIntLongMap()
         forEachIntMin { k, v -> if (k !in pinned) minMap.put(k, v) }

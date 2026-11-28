@@ -106,7 +106,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         }
 
     companion object {
-        /** Request parameters the planner copies verbatim into every case's parameters. */
+        // The planner copies these verbatim into every case's parameters.
         internal fun passedThrough(key: String): Boolean = key.startsWith("param.") || key in PASSED_THROUGH
 
         internal fun runtimeTags(

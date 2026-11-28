@@ -12,24 +12,12 @@ import com.eignex.klause.ir.materializeKey
 
 /**
  * `value_precede(s, t, xs)`: value [t] may appear in [xs] only at a position after value [s]
- * has appeared — i.e. the first occurrence of [s] precedes the first occurrence of [t] (or [t] never
- * occurs). The building block of `value_precede_chain` (one per consecutive value pair) and of the
- * interchangeable-value symmetry break.
+ * has appeared, or never.
  *
- * Native GAC propagator (Y. C. Law and J. H. M. Lee, "Global Constraints for Integer and Set Value
- * Precedence", CP 2004, https://doi.org/10.1007/978-3-540-30201-8_28); the reified-equality prefix-OR
- * decomposition is only sub-GAC. The constraint is "no [t] before the first feasible [s]", so GAC is an
- * O(n) scan:
- *  - **Prune [t] early.** Let `α` be the first index where [s] is still possible. No position `≤ α`
- *    can be [t] (nothing before it can be [s]); prune [t] there. If [s] is impossible everywhere,
- *    [t] is impossible everywhere.
- *  - **Force [s] before a forced [t].** If some position is fixed to [t], [s] must occur strictly
- *    before the *earliest* such position; if exactly one position before it can still be [s], fix it
- *    to [s]. (After the prune, `α` is always one such candidate, so a forced [t] with no possible
- *    preceding [s] is a conflict.)
- *
- * Only [t] is ever removed and only the unique pre-forced-[t] candidate is fixed to [s] — [s] is
- * never forbidden and other values are never touched, which is exactly GAC for this constraint.
+ * Propagation is GAC in one O(n) scan (Y. C. Law and J. H. M. Lee, "Global Constraints for Integer and Set
+ * Value Precedence", CP 2004, https://doi.org/10.1007/978-3-540-30201-8_28): [t] is pruned up to the first
+ * position that can still be [s], and when exactly one position before the earliest forced [t] can be [s],
+ * it is fixed to [s].
  */
 class ValuePrecede(val s: Long, val t: Long, val xs: IntArray) : Factor {
 
@@ -47,7 +35,6 @@ class ValuePrecede(val s: Long, val t: Long, val xs: IntArray) : Factor {
         sink.intVars(xs)
     }
 
-    /** Maps `value_precede(s, t)` to `value_precede(π(s), π(t))` under a value permutation π. */
     override fun remapValues(valueMap: (Long) -> Long): Factor = ValuePrecede(valueMap(s), valueMap(t), xs)
 
     override val variables: VarList = SpanIntVars(xs)

@@ -3,14 +3,9 @@ package com.eignex.klause.solver.search
 import com.eignex.util.collections.MutableIntIntMap
 
 /**
- * Unverified branch-order steering from candidate producers and live component-owned partial points.
- *
- * A hint is a guess — a local-search assignment, a partial theory point, a cached solution or a caller annotation.
- * It carries no proof, so it is never an assumption, a sample, or a model value. Its only effect is which side of
- * a split is tried first. The complement stays on the frame, propagation may fix the variable the other
- * way before the split is reached, and a hint that is missing, contradictory, or inapplicable leaves the
- * default order alone. Completeness therefore never depends on the producer being right, and only the
- * composed [SearchSession] decides what the hinted order actually proves.
+ * Unverified branch-order steering from candidate producers such as local search, partial theory points
+ * or cached solutions. A hint only chooses which side of a split is tried first; it is never an
+ * assumption or a model value, so completeness never depends on it being right.
  */
 fun interface SearchCandidateHints {
     /** Preferred first value for source Boolean [variable], or null when no hint applies to it. */
@@ -29,12 +24,8 @@ fun interface SearchCandidateHints {
         private const val CONTRADICTED = 3
 
         /**
-         * Hints from encoded Boolean [literals], in the encoding [SearchDecision.Bool] uses.
-         *
-         * The hint is partial by construction: a producer that assigned only part of the problem passes
-         * only what it assigned. Repeating a literal is harmless, while a variable hinted both ways is
-         * dropped rather than resolved, since a producer that could not decide a variable is exactly the
-         * case the default order already covers.
+         * Hints from encoded Boolean [literals], in the encoding [SearchDecision.Bool] uses. A variable
+         * hinted both ways is left unhinted.
          */
         fun ofLiterals(literals: IntArray): SearchCandidateHints {
             if (literals.isEmpty()) return None
@@ -59,13 +50,9 @@ fun interface SearchCandidateHints {
 }
 
 /**
- * A [BooleanBranching] that tries the hinted polarity of a split first.
- *
- * Ordering is the entire effect. [delegate] still chooses which variable is split and still supplies
- * both of its alternatives, so refuting the hinted branch resumes the ordinary traversal on the
- * complement and the search space is unchanged. A hint applies only to a split that is exactly the two
- * polarities of one Boolean variable; anything else — a component-shaped split, a one-sided list, or a
- * variable [hints] declines — keeps the delegate's own order.
+ * A [BooleanBranching] that tries the hinted polarity of a split first. [delegate] still chooses the
+ * variable and both alternatives; only a split over exactly the two polarities of one Boolean variable is
+ * reordered.
  */
 class HintedBooleanBranching(private val delegate: BooleanBranching, private val hints: SearchCandidateHints) :
     BooleanBranching {
@@ -82,7 +69,6 @@ class HintedBooleanBranching(private val delegate: BooleanBranching, private val
     }
 }
 
-/** Steer this branching with [hints], or keep it as it is when the producer supplied none. */
 internal fun BooleanBranching.preferring(hints: SearchCandidateHints): BooleanBranching =
     if (hints === SearchCandidateHints.None) this else HintedBooleanBranching(this, hints)
 

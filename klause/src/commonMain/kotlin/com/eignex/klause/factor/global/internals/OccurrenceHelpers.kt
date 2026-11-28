@@ -10,12 +10,8 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongHashSet
 
-/**
- * Reason that the variables of [hall] take values only among the union of their own domains, a set no larger
- * than the variables (a Hall set), with the presence [premises]: per variable, its bound lifted to the nearest
- * value outside the union, and each hole inside its bounds that the union lacks. Holes inside the union, and every
- * variable outside [hall], play no part.
- */
+// Reason that hall is confined to the union of its domains: per variable, its bound lifted to the nearest value
+// outside the union and each hole the union lacks. Holes inside the union and variables outside hall play no part.
 internal fun hallReason(state: PropagationState, hall: IntArray, premises: IntArray): IntArray? {
     val values = LongHashSet()
     for (x in hall) state.intDomains[x].values.forEach { values.add(it) }
@@ -44,7 +40,6 @@ internal fun hallReason(state: PropagationState, hall: IntArray, premises: IntAr
     return if (out.size == 0 && state.currentLevel == 0) null else out.toIntArray()
 }
 
-/** Counts how many present occurrences of [intVar] exist in [vars]. */
 internal inline fun countPresentOccurrences(
     vars: IntArray,
     intVar: Int,

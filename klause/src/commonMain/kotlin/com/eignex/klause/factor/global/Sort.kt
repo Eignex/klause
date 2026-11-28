@@ -23,7 +23,7 @@ class Sort(val xs: IntArray, val ys: IntArray) : Factor {
 
     override fun remap(mapping: VarRemap): Factor = Sort(mapping.ints(xs), mapping.ints(ys))
 
-    /** The input multiset ignores order, so `xs` is sorted in the key; `ys` is positional and kept in order. */
+    // The input multiset ignores order, so `xs` is keyed as a set; `ys` is positional.
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.SORT, ::buildKey)
 
     override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.SORT, mapping, ::buildKey)

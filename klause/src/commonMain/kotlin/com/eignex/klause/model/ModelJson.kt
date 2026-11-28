@@ -22,14 +22,11 @@ import kotlinx.serialization.json.doubleOrNull
  * holding its operands, a named reference is `{"ref": name}` and an integer literal is a bare
  * number. Other formats keep the sealed-class representation.
  *
- * Keys shared with Kumulant follow the portable expression profile, so one key never names
- * two operations: integer division is `truncDiv`/`truncMod`, and `div` stays real division.
- * Encoding writes the profile's two-operand shapes: [IntScale] is `mul` with the coefficient
- * first, and [IntSum], [IntMin], [IntMax], [And] and [Or] over more than two children nest
- * to the left, so `x + 1 + 2` is `{"add": [{"add": [x, 1]}, 2]}`. Decoding merges an `add`,
- * `and` or `or` chain nested in the first operand back into one node, as the DSL operators
- * build them, and reads `mul` with a numeric left operand as [IntScale], so trees built with
- * the DSL operators and receiver helpers round-trip unchanged.
+ * Keys shared with Kumulant follow the portable expression profile: integer division is
+ * `truncDiv`/`truncMod`, and `div` stays real division. Encoding writes two-operand shapes:
+ * [IntScale] is `mul` with the coefficient first, and [IntSum], [IntMin], [IntMax], [And] and [Or]
+ * over more than two children nest to the left. Decoding merges `add`, `and` and `or` chains back
+ * into one node, so trees built with the DSL operators round-trip unchanged.
  */
 object ModelJson {
     /** Every model vocabulary, for composing into another [JsonNodeCatalog]. */

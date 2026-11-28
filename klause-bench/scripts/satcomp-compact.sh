@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Draw the satcomp-compact selection: SAT Competition main-track CNF instances (2022-2024) that Kissat
+# Draw the satcomp-compact selection: SAT Competition main-track CNF instances (2022-2024) the reference entry
 # decided in a minute or two, small enough to keep, at most PER_FAMILY per family, balanced SAT/UNSAT.
-# Prints one TSV row per instance: gbd-hash, family, name, result, kissat-seconds, year, xz-bytes, variables,
+# Prints one TSV row per instance: gbd-hash, family, name, result, reference-seconds, year, xz-bytes, variables,
 # clauses. The rows are what SatCompCompact.instances pins; rerun to redraw the list, then bump the suite version.
 # Needs curl, unzip, sqlite3 and awk. Work files go to $WORK (default: a temporary directory).
 # Usage: satcomp-compact.sh [count]
@@ -31,8 +31,8 @@ unzip -qo sc2022.zip main-seq.csv -d sc2022
 unzip -qo sc2023.zip results_main_detailed.csv -d sc2023
 unzip -qo sc2024.zip detailed_main.csv -d sc2024
 
-# hash, verified result and Biere's Kissat entry's time from one year's main-track table; 10000 marks unsolved.
-times() { # <csv> <year> <kissat column> <result column>
+# hash, verified result and the reference entry's time from one year's main-track table; 10000 marks unsolved.
+times() { # <csv> <year> <solver column> <result column>
     awk -F, -v year="$2" -v solver="$3" -v result="$4" '
         NR == 1 { for (i = 1; i <= NF; i++) { if ($i == solver) k = i; if ($i == result) r = i; if ($i == "hash") h = i }; next }
         ($r == "sat" || $r == "unsat") { printf "%s\t%s\t%s\t%s\n", $h, $r, $k, year }' "$1"

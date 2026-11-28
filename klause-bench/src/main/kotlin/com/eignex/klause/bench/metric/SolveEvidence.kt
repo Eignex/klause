@@ -11,7 +11,7 @@ import java.nio.CharBuffer
 import java.security.MessageDigest
 import java.util.Locale
 
-/** How a record's claims were judged: the solver's own report, unchecked by the bench. */
+// The solver's own report, unchecked by the bench.
 internal const val REPORTED_RESULT_POLICY = "reported-result-v1"
 internal const val MINIZINC_SOLUTION_SEPARATOR = "----------"
 
@@ -148,9 +148,7 @@ internal object SolveEvidence {
         trimmed.isNotEmpty() && !trimmed.startsWith('%') && !trimmed.startsWith("=====")
     }.dropWhile { !ASSIGNMENT.containsMatchIn(it) }
 
-    /** The last complete DZN solution, mapped by [modelOutput] when given, with the `% klause-exact:`,
-     *  `% klause-coordinate:` and `% klause-float-` lines of that solution appended; an exact-coordinate-only
-     *  solution keeps those lines alone. */
+    // Append exact coordinates and complete-assignment comments from the same solution as the mapped DZN.
     private fun miniZincWitness(
         raw: SolverOutput,
         maxChars: Int,
@@ -186,7 +184,6 @@ internal object SolveEvidence {
         }
     }
 
-    /** The last complete XCSP3 `<instantiation>` of the `v ` lines, without their prefix. */
     private fun xcspInstantiation(lines: Sequence<String>, maxChars: Int): String? {
         var candidate: BoundedWitness? = null
         var witness: String? = null

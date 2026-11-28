@@ -14,51 +14,32 @@ import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.system.exitProcess
 
-/**
- * Draw klause-bench's named problem sets from classified problems and the lab's reference results:
- *
- *     klause-bench/scripts/draw-sets.sh <features-dir> <references.csv> <sets-dir> [set,…]
- *
- * `<features-dir>` holds `klause-bench select suite=<s> per-family=1000000 features=true` output, one `<suite>.jsonl`
- * per suite. `<references.csv>` is the lab's reference_rows as `collection,problem,feasible,proven,elapsed_ms`
- * (feasible blank when undecided). Each focused set takes its [SIZES] count of problems of one theme, mixing
- * difficulties by how fast the reference proved them, spread over suites and families; a problem the reference did not
- * prove is left out. A problem goes in the first set that takes it, so `sweep`, which includes them all, holds each
- * once. Naming sets draws only those and leaves the other set files as they are: a new theme joins `sweep` without
- * redrawing the rest. The draws retain the original seeded Mersenne Twister and shuffle.
- */
+// Each focused set takes SIZES problems of one theme, mixing difficulty tiers by how fast the reference proved them
+// and spreading over suites and families; unproved problems are left out. A problem goes in the first set that takes
+// it, so `sweep` holds each once. Naming sets redraws only those, so a new theme joins `sweep` without redrawing the
+// rest.
 internal object MakeSets {
-    /** Focused sets in the order they draw, each the theme it covers. */
+    // Draw order.
     val SETS = listOf(
         "open-int", "linear-real", "nonlinear-real", "mip", "scheduling", "routing", "packing", "globals",
         "sat", "maxsat", "pb",
     )
 
-    /**
-     * Formats a set leaves out: MPS models with continuous columns are covered by `mip`, so `linear-real` is SMT and
-     * MiniZinc, where they would otherwise outnumber the SMT-LIB logics it is for.
-     */
+    // MPS models with continuous columns are covered by `mip`; in `linear-real` they would outnumber the SMT-LIB
+    // logics it is for.
     private val EXCLUDED_FORMATS = mapOf("linear-real" to setOf("MPS"))
 
-    /** Each set's size: CSP/COP and SMT weigh more than MPS, SAT and PB. 275 in all. */
+    // CSP/COP and SMT weigh more than MPS, SAT and PB.
     val SIZES = mapOf(
         "globals" to 30, "scheduling" to 25, "routing" to 20, "packing" to 20, "open-int" to 35,
         "linear-real" to 35, "nonlinear-real" to 25, "mip" to 25, "sat" to 20, "pb" to 20, "maxsat" to 20,
     )
 
-    /**
-     * The most of a set's picks in a tier one suite may take: hakank's many small models would otherwise fill the
-     * MiniZinc share of every set it has a theme in.
-     */
+    // hakank's many small models would otherwise fill the MiniZinc share of every set with their theme.
     private val SUITE_SHARE = mapOf("hakank" to 0.15)
 
-    /** Sets made of others: `linear` is open-domain integers with linear reals as well. */
     private val UNIONS = mapOf("linear" to listOf("open-int", "linear-real"), "sweep" to SETS + "smt-ground-sweep-v1")
 
-    /**
-     * Difficulty tiers by the reference's time to prove. A set takes [EASY_SHARE] easy, [HARD] hard and medium for the
-     * rest: over the 250, about 100 easy, 140 medium and 10 hard.
-     */
     private val TIERS = listOf(Tier("easy", 0, 1_000), Tier("medium", 1_000, 10_000), Tier("hard", 10_000, 60_001))
     private const val EASY_SHARE = 0.4
     private const val HARD = 1
@@ -66,7 +47,6 @@ internal object MakeSets {
 
     private data class Tier(val name: String, val low: Long, val high: Long)
 
-    /** A problem as a set lists it: `<suite>/<problem>`, drawn per family. */
     data class Candidate(val suite: String, val family: String, val problem: String)
 
     fun main(args: List<String>): Int {
@@ -88,7 +68,7 @@ internal object MakeSets {
         only: Set<String>,
         today: LocalDate = LocalDate.now(),
     ) {
-        // Each problem's tier by how fast the reference proved it, over every reference solver.
+        // Fastest proof over every reference solver.
         val fastest = HashMap<Pair<String, String>, Long>()
         for (row in csvRows(referencesCsv.readText())) {
             if (row["proven"] == "1" && row["feasible"] != "") {
@@ -97,7 +77,6 @@ internal object MakeSets {
             }
         }
 
-        // Candidates per (theme, tier).
         val pools = HashMap<Pair<String, String>, MutableList<Candidate>>()
         val features = Files.list(featuresDir).use { list -> list.filter { it.name.endsWith(".jsonl") }.toList() }
             .sortedWith { a, b -> compareCodePoints(a.name, b.name) }
@@ -160,10 +139,7 @@ internal object MakeSets {
     private fun tierOf(elapsedMs: Long): String? =
         TIERS.firstOrNull { elapsedMs >= it.low && elapsedMs < it.high }?.name
 
-    /**
-     * [n] of [candidates], one per (suite, family) per round, suites and families taken in a seeded order, no suite
-     * beyond its [SUITE_SHARE] of [n] (at least one).
-     */
+    // One per (suite, family) per round in a seeded order, no suite beyond its SUITE_SHARE of n (at least one).
     fun spread(candidates: List<Candidate>, n: Int, rng: PythonRandom): List<Candidate> {
         val caps = SUITE_SHARE.mapValues { (_, share) -> maxOf(1, (n * share).toInt()) }
         val taken = HashMap<String, Int>()
@@ -194,7 +170,7 @@ internal object MakeSets {
         return chosen
     }
 
-    /** The rows of [text], a CSV with a header line, as Python's `csv.DictReader` reads them: blank lines skipped. */
+    // Header-keyed rows; blank lines are skipped.
     fun csvRows(text: String): List<Map<String, String>> {
         val records = mutableListOf<List<String>>()
         val fields = mutableListOf<String>()
@@ -257,10 +233,8 @@ internal object MakeSets {
     }
 }
 
-/**
- * Python's `random.Random(seed)` for a non-negative integer seed, as far as [MakeSets] uses it: MT19937 seeded by
- * `init_by_array`, `getrandbits` and `shuffle`, so the sets it draws are the ones Python drew.
- */
+// MT19937 seeded by `init_by_array` with `getrandbits` and `shuffle` semantics matching Python's `random.Random`, so
+// the committed sets stay reproducible.
 internal class PythonRandom(seed: Long) {
     private val mt = IntArray(N)
     private var index = N
@@ -313,7 +287,6 @@ internal class PythonRandom(seed: Long) {
         return y xor (y ushr 18)
     }
 
-    /** `getrandbits(k)` for k up to 32. */
     fun bits(k: Int): Long {
         require(k in 0..32)
         return if (k == 0) 0 else (next().toLong() and 0xffffffffL) ushr (32 - k)
@@ -341,7 +314,7 @@ internal class PythonRandom(seed: Long) {
     }
 }
 
-/** Draw the repository's named sets from classified inputs and exported lab reference results. */
+/** Draws the named problem sets; see `klause-bench/scripts/draw-sets.sh` for usage. */
 fun main(args: Array<String>) {
     exitProcess(MakeSets.main(args.toList()))
 }

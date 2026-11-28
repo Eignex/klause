@@ -125,7 +125,7 @@ private fun mappedRoles(ids: IntArray, count: Int, rename: (Int) -> Int, cancell
     return result.toIntArray()
 }
 
-/** Exact integer reconstruction `(constTerm + Σ coefficients·terms) / divisor` over retained columns. */
+// Exact integer reconstruction `(constTerm + Σ coefficients·terms) / divisor` over retained columns.
 internal class AffineReconstruction(
     val constTerm: Long,
     val terms: IntArray,
@@ -133,11 +133,9 @@ internal class AffineReconstruction(
     val divisor: Long,
 )
 
-/**
- * Integer columns [this] rebuilds by a single affine step that reads only columns it retains, keyed in its
- * source coordinates. Presolve preserves column slots, so the terms are direct target coordinates; a column
- * written by any other step, or rebuilt from a rebuilt column, has no direct reconstruction.
- */
+// Integer columns [this] rebuilds by a single affine step that reads only columns it retains, keyed in its
+// source coordinates. Presolve preserves column slots, so the terms are direct target coordinates; a column
+// written by any other step, or rebuilt from a rebuilt column, has no direct reconstruction.
 internal fun SourceMapping.affineReconstructions(cancellation: ExecutionControl): Map<Int, AffineReconstruction>? {
     val retained = retainedCoordinates(cancellation) ?: return null
     val writes = MutableIntIntMap()
@@ -167,7 +165,7 @@ internal fun SourceMapping.affineReconstructions(cancellation: ExecutionControl)
     return if (cancellation()) null else reconstructions
 }
 
-/** [this] with every reconstructed column that equals one retained column exactly renamed onto it. */
+// [this] with every reconstructed column that equals one retained column exactly renamed onto it.
 internal fun VarRemap.withAliases(reconstructions: Map<Int, AffineReconstruction>): VarRemap {
     val ints = IntArray(intCount) { int(it) }
     for ((variable, reconstruction) in reconstructions) {
@@ -177,12 +175,10 @@ internal fun VarRemap.withAliases(reconstructions: Map<Int, AffineReconstruction
     return VarRemap(IntArray(boolCount) { bool(it) }, ints)
 }
 
-/**
- * The source row with each reconstructed column replaced by its reconstruction, the row scaled by that
- * reconstruction's divisor so every coefficient stays exact. A reconstructed output passes to its
- * reconstruction's single term, the column presolve kept in its place. A row whose output cancels, an
- * output reconstructed from several terms, or an overflowing coefficient declines.
- */
+// The source row with each reconstructed column replaced by its reconstruction, the row scaled by that
+// reconstruction's divisor so every coefficient stays exact. A reconstructed output passes to its
+// reconstruction's single term, the column presolve kept in its place. A row whose output cancels, an
+// output reconstructed from several terms, or an overflowing coefficient declines.
 internal fun DefinitionHint.Linear.reconstructed(
     reconstructions: Map<Int, AffineReconstruction>,
 ): DefinitionHint.Linear? = try {

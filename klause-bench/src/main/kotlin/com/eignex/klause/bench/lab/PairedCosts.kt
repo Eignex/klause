@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
-/** Outcomes and observed costs of retained rows, each case and attempt counted once per scope. */
+// Each case and attempt is counted once per scope.
 internal object PairedCosts {
     fun outcomes(rows: List<AuditedRow>, arm: String): ArmOutcomes {
         val records = rows.filter { it.state in ACCEPTED }

@@ -61,13 +61,11 @@ class Diffn(
         nonStrict,
     )
 
-    /** Position-faithful (rectangle i is fixed by index): keeps the coordinate arrays in order and
-     *  folds in the constant sizes, the var-size split, and the [nonStrict] flag. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.DIFFN, ::buildKey)
 
     override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.DIFFN, mapping, ::buildKey)
 
-    // widths/heights are constant sizes; xs/ys and the optional width/height var arrays are int-var ids.
+    // Position-faithful: rectangle i is identified by index, so every array keeps its order.
     private fun buildKey(sink: KeySink) {
         sink.bool(nonStrict)
         sink.constLongs(widths)
@@ -85,9 +83,8 @@ class Diffn(
     /** Whether the search can resize rectangles (var dimensions present). */
     val varSize: Boolean = widthVars != null || heightVars != null
 
-    // Var id → its rectangle index, or -1 when the id is shared by ≥2 rectangles or absent. The
-    // affected-pair delta only touches the moved rectangle, which is exact iff the moved var maps to exactly
-    // one rectangle; a shared id forces the O(n²) full recount.
+    // -1 when the id is shared by several rectangles: the affected-pair delta is exact only when the moved
+    // var maps to exactly one rectangle, so a shared id forces the full recount.
     private val varToRect: IntIntMap = run {
         val m = MutableIntIntMap(n * 2)
         fun record(v: Int, i: Int) {

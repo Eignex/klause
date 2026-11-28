@@ -13,7 +13,7 @@ class BoolExprTest {
     fun `equal content with distinct coeff arrays should compare equal`() {
         val a = flc(doubleArrayOf(1.0, 2.0), listOf("x", "y"))
         val b = flc(doubleArrayOf(1.0, 2.0), listOf("x", "y"))
-        assertEquals(a, b) // data-class default would be false (DoubleArray identity); custom equals fixes it
+        assertEquals(a, b) // a data-class default would compare the DoubleArrays by identity
         assertEquals(a.hashCode(), b.hashCode())
     }
 

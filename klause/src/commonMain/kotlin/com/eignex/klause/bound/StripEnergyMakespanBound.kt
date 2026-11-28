@@ -21,48 +21,27 @@ import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.subExact
 
 /**
- * Strip-energy floor on a minimized objective variable `o`: the tasks proven to end by `o` need room
- * for their energy before it. Energetic reasoning as in Baptiste, Le Pape and Nuijten,
- * *Constraint-Based Scheduling* (Springer, 2001), https://doi.org/10.1007/978-1-4615-1479-4.
- *
- * A task with start `s` and duration `d` ends by `o` when a chain of hard rows proves `o ≥ s + d`
- * ([MakespanLinks.offsetsTo]: two-variable precedence rows add their constants, max edges add zero).
- * Every such task with demand `r` on a resource of capacity `cap` runs inside `[t1, o)` except the part
- * it can left-shift before `t1`, so for every left edge `t1`
- *
- * ```
- *   cap·o  ≥  cap·t1 + Σ rᵢ·clamp(estᵢ + dᵢ − t1, 0, dᵢ)
- * ```
- *
- * ([energeticRhs] picks the strongest edge), and `o ≥ ⌈rhs / cap⌉` because `o` is integral.
- *
- * A resource is a [Cumulative] through its [SchedulingView] (constant durations, mandatory tasks,
- * minimum demand, declared capacity) or a constant-size [Diffn] projected onto either axis. Every slice
- * across the axis meets pairwise-disjoint rectangles stacked inside the perpendicular extent of the
- * counted rectangles, so that extent is a capacity and each perpendicular size a demand.
- *
- * The floor rests on the live earliest starts and, for a diffn strip, the live perpendicular bounds;
- * [StripEnergyFloor.reason] negates exactly those bound atoms. Starts the model leaves open below, and
- * perpendicular coordinates it leaves open on either side, are skipped: a search-box endpoint states no
- * schedule or packing limit.
+ * Tasks proven to end by the minimized objective `o` ([MakespanLinks.offsetsTo] gives `o ≥ s + d`) need room
+ * for their energy before it (Baptiste, Le Pape and Nuijten, *Constraint-Based Scheduling*, Springer
+ * 2001, https://doi.org/10.1007/978-1-4615-1479-4). For every left edge `t1`,
+ * `cap·o ≥ cap·t1 + Σ rᵢ·clamp(estᵢ + dᵢ − t1, 0, dᵢ)`, and `o ≥ ⌈rhs / cap⌉` since `o` is integral. A resource
+ * is a cumulative, or a constant-size diffn projected onto either axis with its perpendicular extent as
+ * capacity. Starts the model leaves open below, and perpendicular coordinates open on either side, are skipped:
+ * a search-box endpoint states no schedule or packing limit.
  */
 internal class StripEnergyMakespanBound(
     private val problem: Problem,
-    /** The minimized objective variable the floor bounds. */
     val objectiveVar: Int,
     deferred: Boolean = false,
 ) {
 
-    /** One resource's tasks proven to end by [objectiveVar]. */
     private class Strip(
         val starts: IntArray,
         val durations: LongArray,
         val demands: LongArray,
-        /** Declared capacity, or `0` when the capacity is the live extent of [across]. */
+        // `0` when the capacity is the live extent of across.
         val capacity: Long,
-        /** Perpendicular coordinates of a diffn strip; empty for a cumulative. */
         val across: IntArray,
-        /** Perpendicular sizes, aligned with [across]. */
         val acrossSizes: LongArray,
     )
 
@@ -79,11 +58,7 @@ internal class StripEnergyMakespanBound(
 
     val applicable: Boolean get() = strips.isNotEmpty()
 
-    /**
-     * The strongest floor on [objectiveVar] over the strips under [session]'s live bounds, or null
-     * when no strip yields one (or its arithmetic overflows). The floor need not exceed the
-     * objective's current lower bound.
-     */
+    // The floor need not exceed the objective's current lower bound.
     fun floor(session: PropagationSession): StripEnergyFloor? {
         var best: Strip? = null
         var bestValue = Long.MIN_VALUE
@@ -110,7 +85,6 @@ internal class StripEnergyMakespanBound(
         return if (rhs % cap > 0L) rhs / cap + 1L else rhs / cap
     }
 
-    /** `max(acrossᵢ.max + sizeᵢ) − min(acrossᵢ.min)`: the room the strip's rectangles stack within. */
     private fun liveExtent(strip: Strip, session: PropagationSession): Long {
         var hi = Long.MIN_VALUE
         var lo = Long.MAX_VALUE
@@ -123,7 +97,6 @@ internal class StripEnergyMakespanBound(
         return subExact(hi, lo)
     }
 
-    /** Negated `start ≥ est` atoms, plus both perpendicular bounds of a diffn strip. */
     private fun reasonOf(strip: Strip, session: PropagationSession): IntArray {
         val seen = IntHashSet()
         val lits = IntArrayList()
@@ -138,8 +111,6 @@ internal class StripEnergyMakespanBound(
         }
         return lits.toIntArray()
     }
-
-    // Structural strip construction: once, at problem load.
 
     private suspend fun SequenceScope<Unit>.tick() {
         if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
@@ -170,7 +141,6 @@ internal class StripEnergyMakespanBound(
         return out
     }
 
-    /** Whether a task starting at [start] with duration [dur] provably ends by [objectiveVar]. */
     private fun endsByObjective(offsets: MutableIntLongMap, start: Int, dur: Long): Boolean =
         problem.intBounds.hasLower(start) && offsets.getOrDefault(start, Long.MIN_VALUE) >= dur
 
@@ -219,12 +189,8 @@ internal class StripEnergyMakespanBound(
     }
 }
 
-/**
- * A floor [value] on the objective variable and its [reason]: currently-false literals negating the
- * bound atoms it rests on, so `objective ≥ value ∨ reason` holds at every solution. The reason is built
- * on first read from the session's bounds at that time, since building it allocates bound atoms, so a
- * caller reads it before those bounds move.
- */
+// `objective ≥ value ∨ reason` holds at every solution. The reason allocates bound atoms, so it is built on first
+// read from the bounds at that time, and a caller reads it before those bounds move.
 internal class StripEnergyFloor(val value: Long, explain: () -> IntArray) {
     val reason: IntArray by lazy(LazyThreadSafetyMode.NONE, explain)
 }

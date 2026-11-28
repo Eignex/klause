@@ -21,48 +21,28 @@ import com.eignex.util.numbers.mulExact
 import com.eignex.util.numbers.subExact
 import kotlin.math.ceil
 
-/**
- * Subgradient Lagrangian bound for a 0/1 **multi-knapsack** decomposition over a
- * non-assignment exact subproblem. For `minimize Σ cᵢ·xᵢ` over Boolean variables subject to several
- * `PseudoBoolean` capacity rows `Σ aᵢ·xᵢ ≤ Cap`, **one** capacity row is kept as the subproblem and
- * solved **exactly** by 0/1-knapsack dynamic programming, while the remaining `PseudoBoolean` rows are
- * **dualized** with multipliers λ. For any valid-sign λ,
- * `L(λ) = min_x [obj + Σ_r λ_r(a_r·x − b_r)]` over the single kept knapsack is a lower bound on the
- * optimum (every feasible point makes the dualized terms ≤ 0), so maximizing it over λ tightens the
- * bound. The exact knapsack captures integrality the monolithic LP relaxes away, so at good λ the
- * bound can exceed the LP bound — the point of decomposition over plain relaxation.
- *
- * ## Exactness
- * Multipliers are integers `p_r` over a fixed denominator [Q] (`λ_r = p_r / Q`). The adjusted cost of
- * variable `i` is the integer `Wᵢ = Q·cᵢ + Σ_r p_r·a_ri`, so the subproblem (free variables in closed
- * form, kept-knapsack variables by DP) is solved in exact [Long] arithmetic and the bound numerator
- * `subMin − Σ_r p_r·b_r + Q·rest` is exact. The subgradient *step* uses floating math only to pick the
- * next λ; every evaluated `L(λ)` is exact, so the reported bound is always valid. Overflow makes the
- * node's bound unavailable, never wrong.
- */
+// Multi-knapsack Lagrangian bound: the largest clean capacity row is solved exactly by 0/1-knapsack DP and the
+// other pseudo-Boolean rows are dualized. The exact knapsack keeps integrality the LP relaxes away, so the bound
+// can beat the LP. Multipliers are integers over the denominator Q, so every evaluated `L(λ)` is exact Long
+// arithmetic and only the step uses floating point; overflow makes the bound unavailable, never wrong.
 internal class KnapsackLagrangianBound(
     private val problem: Problem,
     private val objective: LinearObjective?,
     deferred: Boolean = false,
 ) : LagrangianDualBound {
-    /** Boolean variable id per local index (the union of the knapsack/link/objective variables). */
     private lateinit var varIds: IntArray
 
-    /** Objective coefficient per local index. */
     private lateinit var cost: LongArray
 
-    /** Kept-knapsack: local item indices, positive weights, and the capacity. */
     private lateinit var kItems: IntArray
     private lateinit var kWeights: LongArray
     private var kCap: Long = 0L
 
-    /** Dualized linking rows (other PseudoBooleans), as `Σ coeff·x_local ⟨sign⟩ rhs` over local indices. */
     private lateinit var rowVars: Array<IntArray>
     private lateinit var rowCoeffs: Array<LongArray>
     private lateinit var rowRhs: LongArray
     private lateinit var rowSign: IntArray // +1: λ≥0 (LE), -1: λ≤0 (GE), 0: free (EQ)
 
-    /** Objective contribution of the integer variables (this bound only reasons over the bools). */
     private lateinit var intCoef: LongArray
     private var objConstant: Long = 0L
 
@@ -80,8 +60,6 @@ internal class KnapsackLagrangianBound(
             if (factor is PseudoBoolean && permitsLongPseudoBoolean(factor.constants)) pbs.add(factor)
             if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
         }
-        // The subproblem knapsack must be a clean capacity row: all positive literals, positive weights,
-        // a DP-bounded capacity. The largest such row is kept; the rest are dualized.
         var chosen: PseudoBoolean? = null
         for (factor in pbs) {
             var clean = factor.op == PbOp.LE && factor.bound >= 0
@@ -107,8 +85,6 @@ internal class KnapsackLagrangianBound(
             objConstant = 0L
             applicable = false
         } else {
-            // Local index space: every bool var that appears in the kept knapsack, a linking row, or the
-            // objective. A variable absent from all three contributes nothing and is left out.
             val index = MutableIntIntMap(problem.numBoolVars)
             yield(Unit)
             val ids = IntArrayList()
@@ -198,10 +174,8 @@ internal class KnapsackLagrangianBound(
         }
     }.iterator()
 
-    /** Number of dualized linking constraints; the multiplier vector has this length. */
     override val multiplierCount: Int get() = rowVars.size
 
-    /** A subproblem evaluation at fixed multipliers: feasibility, scaled cost, and the chosen x. */
     private class Eval(val feasible: Boolean, val num: Long, val x: IntArray)
 
     override fun computeBound(
@@ -226,7 +200,7 @@ internal class KnapsackLagrangianBound(
             val steps = if (incumbent.isFinite()) iterations else 1
             repeat(steps) {
                 val eval = evaluate(pinned, p)
-                if (!eval.feasible) return LagrangianResult(true, 0L, Q, p) // forced items exceed capacity ⇒ infeasible
+                if (!eval.feasible) return LagrangianResult(true, 0L, Q, p)
                 var num = addExact(eval.num, mulExact(Q, rest))
                 for (r in 0 until multiplierCount) num = subExact(num, mulExact(p[r], rowRhs[r]))
                 if (num > bestNum) bestNum = num
@@ -240,7 +214,7 @@ internal class KnapsackLagrangianBound(
         return if (bestNum == Long.MIN_VALUE) null else LagrangianResult(false, bestNum, Q, p)
     }
 
-    /** Adjusted cost `Wᵢ = Q·cᵢ + Σ_r p_r·a_ri` of local variable [i] under multipliers [p]. */
+    // `Wᵢ = Q·cᵢ + Σ_r p_r·a_ri`.
     private fun adjustedCost(i: Int, p: LongArray): Long {
         var w = mulExact(Q, cost[i])
         for (r in 0 until multiplierCount) {
@@ -250,11 +224,6 @@ internal class KnapsackLagrangianBound(
         return w
     }
 
-    /**
-     * Minimize `Σ Wᵢ·xᵢ` over the box (free vars in closed form) and the kept knapsack (exact 0/1 DP),
-     * honouring pins. Free non-knapsack vars take 1 iff `Wᵢ < 0`; the knapsack picks, within remaining
-     * capacity, the negative-`W` items that most reduce the objective.
-     */
     private fun evaluate(pinned: IntArray, p: LongArray): Eval {
         val x = IntArray(varIds.size)
         val w = LongArray(varIds.size) { adjustedCost(it, p) }
@@ -271,7 +240,6 @@ internal class KnapsackLagrangianBound(
 
                 pinned[i] == 0 -> x[i] = 0
 
-                // decided by the DP below
                 inKnap[i] -> Unit
 
                 w[i] < 0L -> {
@@ -280,16 +248,14 @@ internal class KnapsackLagrangianBound(
                 }
             }
         }
-        // Capacity consumed by pinned-true knapsack items.
         for (k in kItems.indices) if (pinned[kItems[k]] == 1) usedCap = addExact(usedCap, kWeights[k])
         if (usedCap > kCap) return Eval(feasible = false, num = 0L, x = x)
-        // Exact 0/1 knapsack over the still-free knapsack items: maximize Σ(−Wᵢ) within (kCap − usedCap).
         val rem = (kCap - usedCap).toInt()
-        val dp = LongArray(rem + 1) // dp[c] = max Σ(−W) achievable with weight ≤ c
-        val take = ArrayList<Pair<Int, Int>>() // (item local idx, weight) for free, beneficial items
+        val dp = LongArray(rem + 1) // dp(c) = max Σ(−W) with weight ≤ c
+        val take = ArrayList<Pair<Int, Int>>()
         for (k in kItems.indices) {
             val i = kItems[k]
-            if (pinned[i] != -1 || w[i] >= 0L) continue // pinned handled; W≥0 never helps a min
+            if (pinned[i] != -1 || w[i] >= 0L) continue
             if (kWeights[k] > rem.toLong()) continue
             take.add(i to kWeights[k].toInt())
         }
@@ -305,7 +271,6 @@ internal class KnapsackLagrangianBound(
                 }
             }
         }
-        // Reconstruct the selection from the best-value capacity and fold it into x / num.
         var c = rem
         var best = 0L
         var bestC = rem
@@ -352,8 +317,6 @@ internal class KnapsackLagrangianBound(
         return coefficient
     }
 
-    /** Objective contribution of the integer variables at their bound-optimal value (the bools are
-     *  handled exactly by the subproblem). Checked arithmetic — called inside the overflow guard. */
     private fun trivialRest(session: PropagationSession): Long {
         var total = objConstant
         for (i in intCoef.indices) {
@@ -375,7 +338,6 @@ internal class KnapsackLagrangianBound(
     }
 }
 
-/** Ceiling of `a / b` for `b > 0`. */
 private fun ceilDiv(a: Long, b: Long): Long {
     val q = a / b
     return if (a % b > 0L) q + 1 else q

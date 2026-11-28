@@ -6,22 +6,15 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.ExecutionControl
 import kotlin.time.Duration
 
-/**
- * The **blocking** interface of a portfolio executor, implemented by [Portfolio] on as many lanes as
- * [PortfolioScenario.cores] gives it. Coroutine-free: `solve` and `minimize` are plain blocking calls.
- */
+/** A blocking portfolio executor, implemented by [Portfolio]. */
 interface PortfolioExecutor : AutoCloseable {
     /** Solve (satisfaction), honouring [cancellation]. */
     fun solve(cancellation: ExecutionControl = ExecutionControl.Never): SolveResult
 
     /**
-     * Branch-and-bound minimisation, honouring [cancellation]. When [onImprovement] is set it fires
-     * once per **strict global improvement**, tagged with the producing worker — the attribution
-     * entry point for anytime telemetry / per-arm credit. The callback is serialised under the
-     * same lock as the install, so the consumer never sees concurrent invocations and receives the improvements
-     * in the order the shared incumbent installed them: the objectives a consumer scores against the one before
-     * them never regress. [AttributedImprovement.elapsed] carries no
-     * such ordering; see it.
+     * Branch-and-bound minimisation, honouring [cancellation]. [onImprovement] fires once per strict global
+     * improvement, tagged with the producing worker. Calls are serialised under the install lock and arrive in
+     * install order, so the objectives never regress; [AttributedImprovement.elapsed] carries no such ordering.
      */
     fun minimize(
         cancellation: ExecutionControl = ExecutionControl.Never,
@@ -29,13 +22,11 @@ interface PortfolioExecutor : AutoCloseable {
     ): MinimizeResult
 }
 
-/** One strict global improvement, tagged with the producing worker's label and the elapsed time
- *  since the minimisation started. Emitted by [PortfolioExecutor.minimize]'s `onImprovement`. */
+/** One strict global improvement reported by [PortfolioExecutor.minimize], tagged with its producing worker. */
 data class AttributedImprovement(
     /** [PortfolioWorker.label] of the worker that produced this incumbent. */
     val workerLabel: String,
-    /** [PortfolioWorker.armId] of the producing worker — its composed-arm identity; replicas of the
-     *  same arm share it, so a credit consumer pools their rewards. */
+    /** [PortfolioWorker.armId] of the producing worker; replicas of the same arm share it. */
     val armId: Int,
     /** Time since the minimisation started, read by the producing worker after its own install rather than
      *  with it. Two publishers racing between their compare-and-set and this read can take their readings

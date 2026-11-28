@@ -23,31 +23,12 @@ import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.random.Random
 
-/**
- * A portfolio arm running hybrid ALNS with CP repair: an outer destroy/repair loop over the
- * incumbent, each freed neighbourhood repaired by a bounded backtrack LCG+LP solve under the pinned
- * complement ([BacktrackRepair]) — full propagation, clause learning, and LP bounding on the fragment,
- * unlike a pure-LS repair. An LS-class engine: it optimises anytime and returns
- * [com.eignex.klause.solver.result.MinimizeResult.BestFound], never claiming completeness, so it fits
- * the local-search track. COP-oriented (it optimises an incumbent); on a CSP the underlying [Alns]
- * degrades to its inner LS via `solve`.
- *
- * [profile] fixes this arm's regime — its destroy-size band and acceptance temperature; a diverse ALNS
- * engine cycles [AlnsProfile.Curated] via [diverse]. The default regime is used for the standalone arm
- * (e.g. the neighbourhood arm of a mixed roster).
- *
- * [nodeBudget] is the solve-spanning node allowance. This arm builds its repair [BacktrackParams] itself
- * rather than drawing a [com.eignex.klause.backtrack.BacktrackRecipe] from the pool, so it has to be
- * handed the allowance explicitly; without it the bootstrap and every repair search nodes that neither
- * count against the cap nor stop at it. The outer destroy/repair loop also charges each iteration's flip
- * allowance as local-search moves, so a run whose repairs never search still stops at the cap.
- *
- * [PortfolioWorker.newResumableSearch] retains CP and LS bootstrap preparation across counted
- * [PortfolioWorker.acceptsInstructionBudget] segments. After the first incumbent it retains the
- * neighborhood, acceptance policy and CP repair session. Each finite segment charges its offered
- * scheduling allowance; [com.eignex.klause.solver.result.AlnsStats] records actual inner work separately.
- * Repairs remain bounded atomic fragment searches.
- */
+// Hybrid ALNS arm: each destroyed neighbourhood is repaired by a bounded backtrack LCG+LP solve under the
+// pinned complement. Anytime only, it never claims completeness; on a CSP Alns degrades to its inner LS.
+//
+// nodeBudget must be passed explicitly because this arm builds its repair BacktrackParams itself; without it
+// the bootstrap and repair searches neither count against the node cap nor stop at it. Each outer iteration
+// also charges its flip allowance as LS moves, so a run whose repairs never search still stops at the cap.
 internal class AlnsWorkerConfig private constructor(
     val profile: AlnsProfile,
     val nodeBudget: NodeBudget?,
@@ -173,11 +154,8 @@ internal class AlnsWorkerConfig private constructor(
         }
     }
 
-    /**
-     * This regime's acceptance-policy factory: strict hill-climbing when the profile disables worsening,
-     * else simulated annealing whose start temperature is scaled to the initial objective — a move
-     * `saInitialWorsening` worse than the first incumbent accepts with ~50% probability, then cools.
-     */
+    // The start temperature makes a move saInitialWorsening worse than the first incumbent accept with ~50%
+    // probability.
     private fun acceptanceFactory(): (Double) -> AcceptanceCriterion = if (profile.saInitialWorsening <= 0.0) {
         { AcceptanceCriterion.Improving }
     } else {
@@ -189,12 +167,9 @@ internal class AlnsWorkerConfig private constructor(
     }
 
     companion object {
-        /** What an ALNS arm needs from a model: an objective to optimise. */
         val NEEDS: Set<ArmNeed> = setOf(ArmNeed.Objective)
 
-        /** [count] diverse ALNS arms cycling the curated regimes ([AlnsProfile.Curated]) — the ALNS analog
-         *  of [LocalSearchWorkerConfig.diverse]. Every slot is a fresh instance even when regimes repeat,
-         *  and every slot spends [nodeBudget]. */
+        // Every slot is a fresh instance even when regimes repeat.
         fun diverse(count: Int, nodeBudget: NodeBudget? = null): List<AlnsWorkerConfig> =
             List(count) { AlnsWorkerConfig(AlnsProfile.Curated[it % AlnsProfile.Curated.size], nodeBudget) }
     }

@@ -22,11 +22,8 @@ import com.eignex.klause.ir.materializeKey
  * (`a ≥ b ≥ c` ⇔ `c ≤ b ≤ a`), so callers post those by reversing [xs]; this factor only ever
  * represents the ascending orientation.
  *
- * Deduction is a Berge-acyclic chain, so the propagator's pairwise bounds sweep already achieves full
- * bounds-consistency — no global algorithm is stronger. Keeping it one factor (rather than
- * decomposing to pairwise [com.eignex.klause.factor.arithmetic.Linear]) buys the local-search
- * invariant, which re-monotonises the whole chain in one cascading step. The exact pairwise rows in
- * [linearRows] are still surfaced to presolve and to the LP relaxation.
+ * The chain is Berge-acyclic, so a pairwise bounds sweep is already bounds-consistent. One factor
+ * keeps the whole chain available to local search; [linearRows] still exposes the pairwise rows.
  */
 class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
 
@@ -34,7 +31,6 @@ class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
         require(xs.size >= 2) { "increasing needs at least two variables" }
     }
 
-    /** Minimum gap between adjacent variables: `1` for strict (`<`), `0` for non-decreasing (`≤`). */
     internal val gap: Int = if (strict) 1 else 0
 
     // The chain propagates prefix minima and suffix maxima, so it reads bounds and never a value set.
@@ -42,7 +38,6 @@ class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
 
     override fun remap(mapping: VarRemap): Factor = Increasing(mapping.ints(xs), strict)
 
-    /** The chain is position-faithful — its order *is* the constraint — so [xs] is keyed positionally. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.INCREASING, ::buildKey)
 
     override fun remapStructuralHash(mapping: VarRemap): Int =

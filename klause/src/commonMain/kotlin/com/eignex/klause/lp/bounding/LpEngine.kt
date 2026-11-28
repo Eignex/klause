@@ -114,11 +114,8 @@ private class RootProgress(
 // Magnitude below which every Long and the cutoff it is compared to are exact doubles.
 private const val EXACT_LONG_DOUBLE = 9_007_199_254_740_992.0
 
-/** The persistent gated-residual float filter: the node-invariant [relaxation], the ONE [simplex]
- *  instance re-solving it with its kept factorization, and the reusable per-row [enforced] buffer
- *  [LpEngine.gatedResidual] refreshes to the live pins each node. [lastEnforced]/[lastFeasible] memo
- *  the previous solved node: the model is a pure function of the enforcement, so an unchanged
- *  fingerprint after a feasible solve (a decision that flips no real atom) needs no solve at all. */
+// One simplex re-solves the node-invariant relaxation with its kept factorization. The model is a pure
+// function of the enforcement, so lastEnforced/lastFeasible memoize the previous feasible verdict.
 internal class GatedResidual(
     val relaxation: LpRelaxation,
     val simplex: PersistentLpSolver,
@@ -152,19 +149,9 @@ internal enum class LpRootQueryPolicy {
     CHECKPOINTED_WORK,
 }
 
-/**
- * Per-node relaxation-bounding runtime for branch-and-bound. Owns the whole LP-relaxation family
- * state — the [CpToLpRelaxation] relaxer, structural cut separators and the harvested global-cut
- * pool, the Lagrangian / knapsack-Lagrangian / energetic / cumulative-flow bounds with their
- * multiplier vectors and check counters, the adaptive effort ladder, the per-depth warm-start basis
- * cache, LP branching hints and the pending LP-learned nogood pool — all derived from [problem],
- * [objective] and [params].
- *
- * [pruneNode] is the per-node cascade (lower bound → scheduling-feasibility bounds → Lagrangian
- * bounds → LP relaxation): it returns true when the node is provably dominated/infeasible, recording
- * [sink] telemetry, nogoods, multiplier updates, warm-start bases and [lastBackjump] along the way.
- * Internal fields are null/empty when their feature flag is off, so the cascade skips those arms.
- */
+// Per-node relaxation-bounding runtime for branch-and-bound: owns the relaxer, cut separators and pool,
+// the combinatorial bounds, the effort ladder, warm-start bases, branching hints and the LP nogood pool.
+// Fields stay null or empty when their feature is off, so the prune cascade skips those arms.
 internal class LpEngine(
     val problem: Problem,
     private val objective: LinearObjective,
@@ -490,7 +477,6 @@ internal class LpEngine(
         check(!closed) { "LP engine is closed" }
     }
 
-    /** Attribute an auxiliary root/presolve simplex invocation to this solve's shared sink. */
     internal fun observeRootSolve(
         solver: LpSolver,
         metrics: com.eignex.klause.lp.engine.LpSolveMetrics = solver.lastMetrics,
@@ -978,9 +964,7 @@ internal class LpEngine(
 
     internal fun <T> observeRootCutBuild(selected: Int, build: () -> T): T = sink.lp.observeCutBuild(selected, build)
 
-    /** The relaxation-bound family resolved from the high-level emphasis ([LpParams.lpConfig])
-     *  against this problem's structure; with no emphasis set, the explicit
-     *  [LpParams.lpPlan] is used verbatim. Callers carry only the intent, never a resolved copy. */
+    // Preparation resolves lpConfig into lpPlan here; callers carry only the intent, never a resolved copy.
     var params: LpParams = params0
         private set
 
@@ -1035,9 +1019,7 @@ internal class LpEngine(
 
     private var elementIndexes: Set<Int>? = null
 
-    /** Construct the relaxer for [plan]'s hull flags, or null when bounding is off. Factored so the
-     *  ineffective-hull probe can build variants with whole families ([plan]) or factor groups
-     *  ([suppressedHullFactors]) turned off. */
+    // The ineffective-hull probe builds variants with whole families or factor groups turned off.
     private fun buildRelaxer(
         plan: LpPlan,
         suppressedHullFactors: Set<Int> = emptySet(),
@@ -1093,12 +1075,10 @@ internal class LpEngine(
         omitBoundRows = sourcePreparation == LpSourcePreparation.ADMITTED,
         onTemplateWork = ::noteNodeOverhead)
 
-    /** The active relaxer. Rebuilt once by [pruneIneffectiveHulls] when a hull is dropped; otherwise the
-     *  [params]-resolved one for the whole search. */
+    // Rebuilt once by pruneIneffectiveHulls when a hull is dropped.
     var lpRelaxer: CpToLpRelaxation? = null
         private set
 
-    // Structure-based cut separators, run against the sparse LP point.
     var lpSeparators: List<CutSeparator> = emptyList()
         private set
 
@@ -1110,18 +1090,11 @@ internal class LpEngine(
         observe = { family, stage, outcome -> sink.lp.cutLifecycle.event(family, stage, outcome) },
     )
 
-    /** The global cuts folded into every node's relaxation — the live contents of [cutPool]. */
     val lpGlobalCuts: List<Cut> get() = cutPool.cuts().filter { it.global }
 
-    /**
-     * Exchange this engine's global cuts with a portfolio peer via [exchange]: import the cuts
-     * other arms published — re-mapped onto this engine's stable column layout — and export this
-     * engine's own. A no-op until a persistent relaxation exists, since cut sharing rides its
-     * fixed column→variable maps; a non-persistent relaxation has no single layout to map through.
-     * Importing only adds globally-valid cuts, so it is sound at any node; the next node folds the
-     * violated subset in via [CutPool.select], so no base invalidation is needed (mirroring
-     * [recordSearchCuts]).
-     */
+    // Cut sharing maps through the persistent relaxation's fixed column layout, so it is a no-op until one
+    // exists. Imported cuts are globally valid and the next node selects the violated subset, so no base
+    // invalidation is needed.
     internal fun exchangeCuts(exchange: CutExchange) {
         val relaxation = persistentRelaxation ?: return
         exchange.exchange(
@@ -1156,14 +1129,10 @@ internal class LpEngine(
     private var cumulativeFlowBound: CumulativeFlowBound? = null
     private var stripEnergyBound: StripEnergyMakespanBound? = null
 
-    /** The strip-energy floor on the minimized single objective variable under [session]'s live bounds, or
-     *  null when the objective is not one minimized variable or no scheduling task provably ends by it. */
     internal fun stripEnergyFloor(session: PropagationSession): StripEnergyFloor? = stripEnergyBound?.floor(session)
 
-    /** The single objective variable's modular residue, when it is defined by a linear equality
-     *  `a·v + Σ cⱼ·xⱼ = b` with `|a| = 1` and `g = gcd(cⱼ) > 1`: then `v ≡ r (mod g)` in every solution
-     *  (`r = (a·b) mod g`), recorded as `(v, g, r)`. An LP lower bound on `v` can be rounded up to the
-     *  next value congruent to `r` — a tighter sound cutoff. `null` when no defining equality gives one. */
+    // `(v, g, r)` when the objective variable is defined by `a·v + Σ cⱼ·xⱼ = b` with `|a| = 1` and
+    // `g = gcd(cⱼ) > 1`, so `v ≡ r (mod g)` in every solution and an LP bound on `v` rounds up to residue `r`.
     internal val objectiveModulus: Triple<Int, Long, Long>? by lazy { computeObjectiveModulus() }
 
     private fun computeObjectiveModulus(): Triple<Int, Long, Long>? {
@@ -1179,7 +1148,7 @@ internal class LpEngine(
             var g = 0L
             for (j in f.vars.indices) if (j != vi) g = gcdOfLong(g, row.coeff(j))
             if (g <= 1L) continue
-            // a·v ≡ b (mod g); a = ±1 ⇒ v ≡ a·b (mod g). Keep the largest modulus (tightest rounding).
+            // a = ±1 ⇒ v ≡ a·b (mod g). Keep the largest modulus (tightest rounding).
             if (best != null && g <= best.second) continue
             val residue = (a * row.bound).mod(g)
             best = Triple(v, g, residue)
@@ -1199,12 +1168,9 @@ internal class LpEngine(
     }
     private var lpCheckCounter = 0
 
-    // Cumulative LP work allowance: the count-based [lpLadder] below needs a warmup window of solves to
-    // demote, so it can never shed an LP whose single solve is enormous and that spends the whole budget
-    // bounding nothing. When the total solve budget is known, root and node LP work together may spend at most
-    // `fraction × budget` worth of work ([lpWorkAllowance]) before optional node LP work stops and the arm
-    // runs as a bare combinatorial search. Each solve is capped at what is left ([nodeWorkBudget]), so one
-    // solve cannot run far past the allowance before the ledger sees it. See [LpEffortGovernor].
+    // The count-based lpLadder needs a warmup window of solves to demote, so it cannot shed an LP whose
+    // single solve spends the whole budget. The cumulative work allowance can; each solve is capped at what
+    // is left of it.
     private val lpEffortGovernor = LpEffortGovernor(
         opsPerNodeCap = params.lpPlan.boundMaxOpsPerNode,
         workAllowance = lpWorkAllowance(params.solveBudgetMillis, params.lpPlan.lpWorkBudgetFraction).let {
@@ -1214,32 +1180,22 @@ internal class LpEngine(
         warmupSolves = LpEffortLadder.DEFAULT_WARMUP,
     )
 
-    // Pivot budget for an LP that is not repaying its cost. See [LpPivotBudget].
     private val lpPivotBudget = LpPivotBudget(
         cap = params.lpPlan.boundMaxPivots,
         warmupSolves = LpEffortLadder.DEFAULT_WARMUP,
     )
 
-    /** Pivots this node's LP may spend, or 0 for the size-derived budget that effectively never binds. */
     internal fun nodePivotBudget(): Int = lpPivotBudget.pivots()
 
-    // Adaptive work budget, keyed on what each solve did rather than on what the search found.
     private val lpWorkBudget = LpWorkBudget(
         minOps = MIN_NODE_WORK_OPS,
         maxOps = MAX_NODE_WORK_OPS,
         initialOps = INITIAL_NODE_WORK_OPS,
     )
 
-    /** Whether the adaptive work budget is running; also gates the degeneracy count it needs. */
+    // Also gates the degeneracy count the adaptive budget needs.
     internal val adaptiveWork: Boolean get() = params.lpPlan.boundAdaptiveWork
 
-    /**
-     * Work this node's LP may spend, or 0 when the adaptive budget is off.
-     *
-     * A demoted LP drops to the floor rather than off. It still bounds, and with a persistent basis its
-     * solves still advance the next one — so there is nothing to gain from silencing it entirely that a
-     * floor does not already get.
-     */
     internal fun retainedRootRemainingWork(): Long {
         var remaining = retainedRootCumulativeWork()
         val offered = nodeWorkAllowance()
@@ -1327,7 +1283,6 @@ internal class LpEngine(
     private var pendingSolveOps = 0L
     private var nodeWorkStoppedAfterProgress = false
 
-    /** Add one solve's work to the current node's total. */
     internal fun noteSolveOps(ops: Long) {
         pendingSolveOps = saturatedAdd(pendingSolveOps, ops)
         chargeWork(ops)
@@ -1344,18 +1299,12 @@ internal class LpEngine(
     private var totalSolveOps = 0L
     private var totalOverheadOps = 0L
 
-    /** Deterministic cumulative LP work, for policies that compare snapshots without mutating it. */
     internal fun totalSolveWork(): Long = totalSolveOps
 
     internal fun pendingNodeSolveWork(): Long = pendingSolveOps
 
-    /**
-     * Charge [ops] of node-LP work the simplex does not meter: building the relaxation, setting a solver up,
-     * certifying exactly, fixing by reduced cost and editing the scoped solver's bounds. It counts toward the
-     * same node and total work as a solve, so the effort governor and anything that slices on [totalSolveWork]
-     * see what an LP node costs. Each site charges its own size, weighted to roughly one simplex work operation
-     * per unit (see [LpNodeOverhead]).
-     */
+    // Node-LP work the simplex does not meter (assembly, solver setup, exact certification, fixing, bound
+    // edits) counts like solve work, so the effort governor sees what an LP node costs.
     internal fun noteNodeOverhead(ops: Long) {
         if (ops <= 0L) return
         totalOverheadOps = saturatedAdd(totalOverheadOps, ops)
@@ -1363,18 +1312,10 @@ internal class LpEngine(
         sink.lp.observeOverhead(ops)
     }
 
-    /**
-     * Whether the LP has spent [budgetOps] of work in total.
-     *
-     * The one-shot root cut harvest is time-boxed by a deadline, which makes how many cuts survive a
-     * function of machine speed — and the cuts a search inherits change the whole search. Bounding it by
-     * work instead makes the harvest a property of the model, so the run that follows is comparable to
-     * itself. The deadline stays as a backstop for cost this meter cannot see.
-     */
+    // Bounds the root harvest by work so the cuts a search inherits do not depend on machine speed.
     internal fun workSpentExceeds(budgetOps: Long, additionalWork: Long = 0L): Boolean =
         budgetOps > 0L && totalSolveOps >= budgetOps - minOf(budgetOps, additionalWork)
 
-    /** Feed one solve's outcome back into the work budget. */
     internal fun observeNodeWork(reachedOptimum: Boolean, degenerateColumns: Int, columns: Int, rows: Int) {
         if (!adaptiveWork) return
         lpWorkBudget.observe(reachedOptimum, degenerateColumns, columns, sizeBudget(columns, rows))
@@ -1412,24 +1353,19 @@ internal class LpEngine(
         }
     }
 
-    /**
-     * The work a solve of this model ought to cost, from its shape alone: roughly one dense pass per
-     * column-derived iteration, with `columns / SIZE_BUDGET_DIVISOR` iterations.
-     */
+    // Expected solve cost from shape alone: one dense pass per iteration, `columns / SIZE_BUDGET_DIVISOR`
+    // iterations.
     private fun sizeBudget(columns: Int, rows: Int): Long {
         if (columns <= 0 || rows <= 0) return MIN_NODE_WORK_OPS
         val perPass = rows.toLong() * columns
         return (perPass / SIZE_BUDGET_DIVISOR * columns).coerceIn(MIN_NODE_WORK_OPS, MAX_NODE_WORK_OPS)
     }
 
-    /** Whether root and node LP work have together spent the work allowance. The one-shot root work stops
-     *  on it, so it competes with the per-node solves for one allowance rather than the looser
-     *  [LpPlan.rootBudgetFraction] cap alone letting it consume the whole slice. */
+    // Root and node work share one allowance, so the root cannot consume the whole slice under the looser
+    // rootBudgetFraction cap.
     internal fun lpWorkAllowanceSpent(additionalWork: Long = 0L): Boolean =
         lpEffortGovernor.allowanceSpent || lpEffortGovernor.remainingWork()?.let { it <= additionalWork } == true
 
-    // Adaptive LP effort ladder: the emphasis sets the ceiling rung (cuts when enabled, else the bare
-    // bound), and a tumbling prune-rate window descends one rung at a time, re-probing upward on backoff.
     private lateinit var lpLadder: LpEffortLadder
     lateinit var lpSeparatorGate: LpSeparatorGate
         private set
@@ -1437,9 +1373,7 @@ internal class LpEngine(
         private set
     private val lpBasisByDepth = ArrayList<Basis?>()
 
-    /** LP-solution record sink for branching hints (set by the search when LP branching is on; null in
-     *  presolve). The engine only records into it; the concrete `LpHints` and its selection reads live in
-     *  the search layer. */
+    // Set by the search when LP branching is on; the engine only records into it.
     var lpHints: LpHintSink? = null
     private var lpBackjump: Learned? = null
 
@@ -1447,8 +1381,8 @@ internal class LpEngine(
     // optimality gap; NaN fixes against the pruning cutoff.
     internal var fixingCutoff = Double.NaN
 
-    // A lower bound on every point of the node the last pruneNode call pruned: positive infinity for a prune that read
-    // no objective bound, and the pruning cutoff where the arm records nothing tighter.
+    // A lower bound on every point of the last pruned node: positive infinity for a prune that read no
+    // objective bound, the pruning cutoff where the arm records nothing tighter.
     internal var lastPruneBound = Double.NaN
         private set
 
@@ -1667,15 +1601,10 @@ internal class LpEngine(
 
     private var leafSolver: LpSolveSession? = null
 
-    // Gated residual float filter (pure-real models): a structurally node-invariant relaxation whose
-    // rows toggle by per-row enforcement alone, plus ONE simplex instance that re-solves it with its
-    // kept LU factorization, so a node costs a few dual pivots instead of a build and factorization.
-    // Exact certificates read the retained source rows and live bounds.
+    // Exact certificates for the gated filter read the retained source rows and live bounds.
     private var gatedResolved = false
     private var gatedFilter: GatedResidual? = null
 
-    /** The gated residual filter with its enforcement refreshed to [session]'s pins, or null when the
-     *  model does not qualify (not pure-real, or no gated rows). */
     @Suppress("TooGenericExceptionCaught") // failed acquisition must restore ownership state for every throwable
     internal fun gatedResidual(session: PropagationSession): GatedResidual? {
         requireOpen()
@@ -1710,20 +1639,12 @@ internal class LpEngine(
         return filter
     }
 
-    /** The asserting LP backjump clause derived during the last [pruneNode], or null. */
     fun lastBackjump(): Learned? = lpBackjump
 
-    /**
-     * Exact residual verdict at a full-assignment leaf, over the relaxation built from the live
-     * [session] — the strict-aware decider with the
-     * rows premise-cited, so an [LpVerdict.INFEASIBLE] leaf also derives a theory lemma over the
-     * activating literals (a Farkas-ray clause when the certificate carries an integer ray, else the
-     * active rows' premises) and stashes it for [lastBackjump], unless [poolRefutation] is false: a caller that
-     * decides the leaf within a tolerance the exact rows do not read keeps no such lemma, except from a refutation that
-     * holds over the sides widened by the context's refutation slack. On [LpVerdict.FEASIBLE] and
-     * [LpVerdict.ATTAINED_OPTIMUM] the returned reals complete the assignment exactly; on
-     * [LpVerdict.TOLERANCE_OPTIMUM] they are the float optimum [toleranceCheck] accepted.
-     */
+    // Exact residual verdict at a full-assignment leaf. An infeasible leaf pools a theory lemma over the
+    // activating literals unless poolRefutation is false, in which case only a refutation that holds within
+    // the refutation slack is pooled. FEASIBLE and ATTAINED_OPTIMUM reals complete the assignment exactly;
+    // TOLERANCE_OPTIMUM reals are the float optimum toleranceCheck accepted.
     fun leafCertify(
         session: PropagationSession,
         toleranceCheck: ((Sample) -> Boolean)? = null,
@@ -1769,9 +1690,7 @@ internal class LpEngine(
                 relaxation.exactLeafResult(certified, problem, objective, leafSample(session, emptyDoubleArray()))
 
             LpVerdict.INFEASIBLE -> {
-                // Pool the theory lemma for restart-time registration: the leaf itself just rejects
-                // (the engine backtracks chronologically), and the next restart makes the lemma a
-                // permanent clause pruning the dead region everywhere.
+                // The leaf only rejects; the next restart registers the pooled lemma as a permanent clause.
                 val clause = if (certified.floatInfeasibility != null) {
                     certified.floatInfeasibility.takeIf { it.isNotEmpty() }
                         ?.let { LpExplanation.infeasibilityClause(relaxation, it, session) }
@@ -1816,8 +1735,7 @@ internal class LpEngine(
         leafSample(session, relaxation.floatReals(float.primal, problem))
     }
 
-    // The leaf's relaxation, or null when cancellation stops its assembly. An engine that runs no node bounding
-    // assembles its layout here, at its first leaf.
+    // An engine that runs no node bounding assembles its layout here, at its first leaf.
     private fun leafRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? = try {
         nodeRelaxation(relaxer, session)
     } catch (_: LpAssemblyCancelled) {
@@ -1830,9 +1748,8 @@ internal class LpEngine(
         reals,
     )
 
-    /** The active rows' premises as one clause — the whole activating-literal set is real-infeasible.
-     *  Weaker than a ray-filtered clause but still a valid theory lemma; null when some non-global row
-     *  has no recorded premise (inexpressible) or nothing is cited. */
+    // Weaker than a ray-filtered clause but still a valid lemma; null when some non-global row has no
+    // recorded premise.
     private fun activePremiseClause(relaxation: LpRelaxation, session: PropagationSession): IntArray? {
         val lits = IntArrayList()
         val seen = IntHashSet()
@@ -1841,12 +1758,6 @@ internal class LpEngine(
         return if (ok && lits.size > 0) lits.toIntArray() else null
     }
 
-    /**
-     * Per-node prune cascade. Returns true when this node is provably dominated by the incumbent
-     * ([effectiveBound]) or infeasible. Arms run in cascade order and stop at the first prune; each
-     * records its own side effects (check counters, [sink] telemetry, [lpNogoods], multipliers,
-     * warm-start bases and [lastBackjump]).
-     */
     fun pruneNode(
         session: PropagationSession,
         effectiveBound: Double,
@@ -1899,7 +1810,6 @@ internal class LpEngine(
         return lower >= cutoff
     }
 
-    /** Discrete objective lower-bound dominance against the incumbent. */
     private inner class LinearBound(override val applicable: Boolean) : RelaxationBound {
 
         override fun prune(
@@ -1919,9 +1829,6 @@ internal class LpEngine(
         }
     }
 
-    /** Scheduling-feasibility prune arm (energetic and cumulative-flow — same prune family): every
-     *  [checkEvery] visits, prune the node when [bound] proves the schedule infeasible, recording the
-     *  explanation as an LP nogood. One class drives both bounds. */
     private inner class SchedulingFeasibilityArm(
         private val bound: SchedulingFeasibilityBound,
         private val checkEvery: Int,
@@ -1943,9 +1850,6 @@ internal class LpEngine(
         }
     }
 
-    /** Lagrangian dual prune arm (structured and knapsack-Lagrangian): reassigns its own persistent
-     *  multiplier vector each call and prunes when the dual bound beats the incumbent. One class
-     *  drives both bounds. */
     private inner class LagrangianArm(private val bound: LagrangianDualBound) : RelaxationBound {
         private var multipliers = LongArray(bound.multiplierCount)
         override val applicable: Boolean get() = true
@@ -1964,9 +1868,6 @@ internal class LpEngine(
         }
     }
 
-    /** LP-relaxation simplex bound with depth/cadence/effort-ladder gating, warm-start basis caching and
-     *  LP-learned backjump/nogood recording. Sets the outer [lpBackjump] when it derives an
-     *  asserting clause. */
     private inner class LpSimplexBound : RelaxationBound {
         override val applicable: Boolean get() = lpRelaxer != null
 
@@ -1989,11 +1890,9 @@ internal class LpEngine(
             ) {
                 return false
             }
-            // The ladder's run rung decides whether during-search cuts separate at this node.
             val cutsAllowed = lpLadder.cutsEnabled
             val depth = session.decisionLevel
-            // Warm-start this node's LP from the parent depth's optimal basis: tightening
-            // a child's bounds keeps that basis dual-feasible, so the re-solve takes a few pivots.
+            // Tightening a child's bounds keeps the parent's optimal basis dual-feasible.
             val warm = if (params.lpPlan.warmStart && depth - 1 in lpBasisByDepth.indices) {
                 lpBasisByDepth[depth - 1]
             } else {
@@ -2013,7 +1912,6 @@ internal class LpEngine(
                 warm = warm,
                 cutsAllowed = cutsAllowed,
             )
-            // What this node's LP cost against the nodes explored; the allowance was charged as it spent.
             lpEffortGovernor.observeSolve(pendingSolveOps, outcome.prune,
                 nodeWorkStoppedAfterProgress && outcome.basis == null)
             pendingSolveOps = 0L
@@ -2039,36 +1937,18 @@ internal class LpEngine(
         }
     }
 
-    // Per-node prune cascade in short-circuit order: cheap lower bound, scheduling feasibility,
-    // Lagrangian bounds, then LP relaxation.
+    // Short-circuit order: cheap lower bound, scheduling feasibility, Lagrangian bounds, LP relaxation.
     private var bounds: List<RelaxationBound> = emptyList()
 
-    /**
-     * Drop each convex hull that adds no strength to the root LP optimum, rebuilding the relaxer once
-     * over the survivors. Per-factor hulls (every factor whose LP projection
-     * emits a [com.eignex.klause.lp.Contribution.HULL] row) are pruned separately, except Element
-     * properties sharing an index, which are removed as a complete group. Each group is kept only
-     * if its removal loosens the optimum. The driver hulls (cumulative time-indexed, diffn, Boolean RLT) are
-     * emitted by the driver, not a factor, so they carry no per-factor tag and are pruned by whole
-     * family. A hull whose removal leaves the optimum unchanged (often because root propagation already
-     * achieves the same bound) is pure per-node build cost and is dropped. This is the per-technique
-     * counterpart of [LpEffortLadder]'s whole-simplex demotion, decided once before the persistent base
-     * is first built.
-     *
-     * Comparison uses the true LP optimum ([rootLpObjective]), not the safe under-estimate, so a hull's
-     * real tightening is visible. Sound: a hull is a sound relaxation whether present or not, and one is
-     * dropped only when the root optimum is identical without it. Costs one extra root solve per hull
-     * candidate, bounded by [cancellation] (the shared root budget). A no-op when bounding is off or no
-     * hull is enabled.
-     */
+    // Drops each hull group whose removal leaves the root LP optimum unchanged, then rebuilds the relaxer
+    // once. Per-factor hulls go by group (Element properties sharing an index together); driver-emitted
+    // hulls carry no factor tag and go by whole family. Comparison uses the true LP optimum, not the safe
+    // under-estimate, so a hull's real tightening is visible. Decided once, before the persistent base.
     fun pruneIneffectiveHulls(cancellation: ExecutionControl) {
         val relaxer = lpRelaxer ?: return
         val full = rootLpObjective(relaxer, cancellation)
         if (full.isNaN()) return
-        // Greedily solve out each tagged hull group; removing a hull can only loosen a
-        // minimisation optimum, so an unchanged optimum (within tol) means it added no root strength. A
-        // NaN probe (the hull is the only structure) keeps it. Candidates are the factors that emitted a
-        // HULL row in the full build.
+        // Removing a hull can only loosen a minimisation optimum; a NaN probe keeps the hull.
         val suppressed = mutableSetOf<Int>()
         val hullIds = try {
             relaxer.build(PropagationSession(problem, cancellation), cancellation = cancellation).hullFactorIds
@@ -2092,10 +1972,9 @@ internal class LpEngine(
             val bound = rootLpObjective(probe, cancellation)
             if (!bound.isNaN() && bound >= full - HULL_PRUNE_TOL) suppressed.addAll(group)
         }
-        // Per-family: the driver-emitted hulls with no per-factor tag.
         var plan = params.lpPlan
         for (disable in HULL_DISABLERS) {
-            val candidate = disable(plan) ?: continue // null when this hull is already off
+            val candidate = disable(plan) ?: continue
             val probe = buildRelaxer(candidate, suppressed) ?: continue
             val bound = rootLpObjective(probe, cancellation)
             if (!bound.isNaN() && bound >= full - HULL_PRUNE_TOL) plan = candidate
@@ -2104,14 +1983,9 @@ internal class LpEngine(
     }
 
     private companion object {
-        /** A root optimum this close to the all-hulls optimum counts as "no strength added". */
         const val HULL_PRUNE_TOL = 1e-6
 
-        /** One disabler per prunable hull that is **not** per-factor (emitted by the driver, not a
-         *  factor projection, so it carries no [com.eignex.klause.lp.Contribution] tag): returns the plan
-         *  with that family off, or null when it is already off. The per-factor convex hulls are pruned
-         *  in factor groups by [pruneIneffectiveHulls]; the base relaxation, objective cone and circuit arcs
-         *  are not hulls and are excluded. */
+        // Driver-emitted hulls only; each returns null when its family is already off.
         val HULL_DISABLERS: List<(LpPlan) -> LpPlan?> = listOf(
             { p -> if (p.cumulativeTimeIndexed) p.copy(cumulativeTimeIndexed = false) else null },
             { p -> if (p.diffn) p.copy(diffn = false) else null },
@@ -2275,41 +2149,33 @@ internal class LpEngine(
     }.iterator()
 }
 
-/** Eta-chain length of the persistent gated-residual simplex before it refactorizes: its pivots
- *  (reconciliation and dual repair after each pin flip) accumulate across nodes, so the chain must span
- *  many node re-solves for the kept factorization to pay; each eta costs one extra sparse pass per
- *  FTRAN/BTRAN, bounding the drift. */
+// Eta-chain length before the gated-residual simplex refactorizes. Its pivots accumulate across nodes, so
+// the chain must span many re-solves for the kept factorization to pay; each eta costs one extra sparse
+// pass per FTRAN/BTRAN.
 private const val GATED_UPDATE_LIMIT = 400
 
-/** Floor on the adaptive node LP work budget ([LpWorkBudget]). A floor rather than an off switch: with a
- *  persistent basis a stopped solve is progress the next node resumes from, and it still bounds. */
+// A floor rather than an off switch: with a persistent basis a stopped solve is progress the next node
+// resumes from, and it still bounds.
 private const val MIN_NODE_WORK_OPS = 10_000L
 
-/** Ceiling on the adaptive node LP work budget — roughly the cost of the most expensive solves measured
- *  on the XCSP3 COP corpus, so a runaway model cannot spend without limit. */
+// Keeps a runaway model from spending without limit.
 private const val MAX_NODE_WORK_OPS = 100_000_000L
 
-/** Where the adaptive budget starts, before any solve has reported. */
 private const val INITIAL_NODE_WORK_OPS = 1_000_000L
 
-/** Divisor on the size-derived work baseline: `columns / 40` iterations. */
 private const val SIZE_BUDGET_DIVISOR = 40L
 
-// LP work (simplex plus the node-LP overhead the engine charges) done in about one millisecond of LP time,
-// calibrated on MIPLIB 2017 models with continuous columns (median 18.7k, spread 6.4k to 72.8k).
+// LP work (simplex plus charged node-LP overhead) done in about one millisecond of LP time.
 private const val LP_WORK_PER_MILLI = 20_000L
 
-/** The LP work allowance for [fraction] of a [budgetMillis] solve, or 0 (none) when either is unknown or off. */
 private fun lpWorkAllowance(budgetMillis: Long?, fraction: Double): Long {
     if (budgetMillis == null || budgetMillis <= 0L || fraction <= 0.0) return 0L
     // Double-to-Long conversion saturates, so a huge budget caps at Long.MAX_VALUE instead of wrapping.
     return (budgetMillis * fraction * LP_WORK_PER_MILLI).toLong().coerceAtLeast(1L)
 }
 
-/**
- * Weights that put the node-LP costs the simplex does not meter on its scale, in work operations per unit of
- * each site's size. Exact certification runs on rationals, which is what its weight reflects.
- */
+// Work operations per unit of size for node-LP costs the simplex does not meter. Exact certification runs on
+// rationals, hence its weight.
 internal object LpNodeOverhead {
     const val BUILD = 4L
     const val SETUP = 2L
@@ -2318,5 +2184,5 @@ internal object LpNodeOverhead {
     const val EDIT = 1L
 }
 
-/** Rows, columns and nonzeros: the size every whole-model pass over [this] is linear in. */
+// Rows, columns and nonzeros: the size every whole-model pass is linear in.
 internal fun LpModel.extent(): Long = n.toLong() + m + (doubleView?.colVal?.size ?: csc.rowIdx.size)

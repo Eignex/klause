@@ -52,9 +52,8 @@ sealed interface TheoryCheck<out A> {
     data class Infeasible(val explanation: SearchExplanation? = null) : TheoryCheck<Nothing>
 
     /**
-     * The fragment remains undecided because of cancellation, limits or an incomplete service, not only
-     * external cancellation. It supplies neither a witness nor a refutation and must not be cached as a
-     * decided answer.
+     * The fragment remains undecided because of cancellation, limits or an incomplete service. It supplies
+     * neither a witness nor a refutation and must not be cached as a decided answer.
      */
     data object Cancelled : TheoryCheck<Nothing>
 }

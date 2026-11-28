@@ -5,35 +5,23 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 
-/**
- * Source-text structural features of an instance — filled by [InstanceClassifier] from the raw source
- * (no klause compile, so a whole-corpus pass stays flat in memory). [structure] is a coarse niche class
- * (`global`, `pseudo-boolean`, `sat`, `linear` or `arithmetic`) that results are sliced by; the counts
- * make it analysable rather than just a label.
- */
+// Read from the raw source without compiling, so a whole-corpus pass stays flat in memory.
 internal data class InstanceFeatures(
     val format: String,
     val structure: String,
     val numGlobal: Int,
     val numLinear: Int,
     val boolHeavy: Boolean,
-    /** The instance's theory/logic where the format names one directly: an SMT-LIB `(set-logic …)`
-     *  (`QF_LIA`, `QF_NRA`, …) or an MPS integrality class (`MIP` has an `INTORG` marker, else `LP`).
-     *  Blank where the format has no such single-axis classification (MiniZinc/XCSP3/OPB/DIMACS use
-     *  [structure] instead). */
+    // An SMT-LIB `(set-logic …)` or the MPS integrality class (`MIP`/`LP`); blank for formats classified by structure.
     val logic: String = "",
-    /** What solving the instance asks of klause, as named in [InstanceClassifier.THEMES]; an instance can
-     *  have several. Named problem sets are drawn per theme. */
+    // Named problem sets are drawn per theme.
     val themes: Set<String> = emptySet(),
 )
 
-/**
- * Classifies an instance from its raw source text — a fast, memory-flat heuristic (regex counts of
- * declarations / constraint keywords), never building the klause `Problem`. Approximate by design: it
- * feeds `select features=true` (and through it klause-lab's set drawing), not the solver.
- */
+// Approximate by design (regex counts, never a klause `Problem`): it feeds `select features=true` and set drawing,
+// not the solver.
 internal object InstanceClassifier {
-    /** MiniZinc/FlatZinc global-constraint stems (either the `.mzn` name or a flattened `_int` form). */
+    // Either the `.mzn` name or a flattened `_int` form.
     private val MZN_GLOBALS = listOf(
         "all_different", "alldifferent", "all_equal", "cumulative", "circuit", "subcircuit", "table",
         "element", "global_cardinality", "count", "among", "nvalue", "inverse", "regular", "bin_packing",
@@ -41,33 +29,22 @@ internal object InstanceClassifier {
         "arg_max", "arg_min", "maximum", "minimum", "network_flow",
     )
 
-    /** XCSP3 global-constraint element names. */
     private val XCSP_GLOBALS = listOf(
         "allDifferent", "allEqual", "cumulative", "circuit", "element", "extension", "count", "nValues",
         "cardinality", "regular", "mdd", "noOverlap", "binPacking", "channel", "ordered", "lex",
         "maximum", "minimum", "knapsack",
     )
 
-    /**
-     * The themes [InstanceFeatures.themes] draws from:
-     * - `open-int`: integer variables without a finite domain (SMT-LIB QF_LIA/QF_IDL/QF_LIRA, MiniZinc `var int`).
-     * - `linear-real`: real-valued variables in linear constraints (SMT-LIB QF_LRA/QF_RDL/QF_LIRA, MPS continuous
-     *   columns, MiniZinc `var float`).
-     * - `nonlinear-real`: real-valued variables under polynomial constraints (SMT-LIB QF_NRA).
-     * - `nonlinear-int`, `arrays`, `bitvectors`, `datatypes`, `free-functions`: declared SMT theories.
-     * - `mip`: an MPS model with integer columns.
-     * - `scheduling`, `routing`, `packing`: a cumulative/disjunctive/no-overlap, circuit, or bin-packing/knapsack/
-     *   diffn global.
-     * - `globals`: any other global constraint.
-     * - `sat`, `maxsat`, `pb`: a CNF, a WCNF, an OPB instance.
-     */
+    // open-int: integer variables without a finite domain. linear-real / nonlinear-real: real variables under linear /
+    // polynomial constraints. mip: MPS with integer columns. scheduling, routing, packing: a matching global; globals:
+    // any other global. nonlinear-int, arrays, bitvectors, datatypes, free-functions: declared SMT theories.
     val THEMES =
         listOf(
             "open-int", "linear-real", "nonlinear-real", "mip", "scheduling", "routing", "packing", "globals", "sat",
             "maxsat", "pb", "nonlinear-int", "arrays", "bitvectors", "datatypes", "free-functions",
         )
 
-    /** The themes a specific global gives; `globals` is for an instance with globals but none of these. */
+    // `globals` is for an instance with globals but none of these.
     private val STRUCTURED = setOf("scheduling", "routing", "packing")
     private val MZN_SCHEDULING = listOf("cumulative", "disjunctive", "unary", "no_overlap")
     private val MZN_ROUTING = listOf("circuit", "subcircuit")
@@ -76,11 +53,9 @@ internal object InstanceClassifier {
     private val XCSP_ROUTING = listOf("circuit")
     private val XCSP_PACKING = listOf("binPacking", "knapsack")
 
-    /** Source-text features for [ref], or null if the source can't be read. */
     fun classify(ref: ProblemRef): InstanceFeatures? =
         runCatching { fromSource(ref.format, CorpusFiles.readText(CorpusFetcher.resolve(ref.source))) }.getOrNull()
 
-    /** The format-specific heuristic over the raw source [text] (the testable core of [classify]). */
     fun fromSource(format: Format, text: String): InstanceFeatures {
         val fmt = format.name.lowercase()
         val features = when (format) {
@@ -146,7 +121,6 @@ internal object InstanceClassifier {
         if ("UF" in theory) add("free-functions")
     }
 
-    /** Whether an MPS model's COLUMNS section names a column outside every `INTORG`…`INTEND` marker pair. */
     private fun hasContinuousColumns(text: String): Boolean {
         var inColumns = false
         var integer = false
@@ -215,18 +189,12 @@ internal object InstanceClassifier {
         return InstanceFeatures(fmt, "sat", 0, clauses, boolHeavy = true)
     }
 
-    /** The declared `(set-logic X)` names the SMT theory directly — the axis the SMT-LIB competition
-     *  itself organizes benchmarks by, so it is reported as [InstanceFeatures.logic] verbatim rather
-     *  than folded into [InstanceFeatures.structure]. */
     private fun smtlib(fmt: String, text: String): InstanceFeatures {
         val logic = Regex("""\(set-logic\s+([A-Za-z0-9_]+)\)""").find(text)?.groupValues?.get(1).orEmpty()
         val asserts = Regex("""\(assert\b""").findAll(text).count()
         return InstanceFeatures(fmt, "arithmetic", 0, asserts, boolHeavy = false, logic = logic)
     }
 
-    /** An `INTORG` marker section means the model has integer columns (a MIP); its absence means every
-     *  column is continuous (an LP). Reported as [InstanceFeatures.logic] since MPS has no other native
-     *  theory/structure axis. */
     private fun mps(fmt: String, text: String): InstanceFeatures {
         val logic = if (Regex("""\bINTORG\b""").containsMatchIn(text)) "MIP" else "LP"
         return InstanceFeatures(fmt, "arithmetic", 0, 0, boolHeavy = false, logic = logic)

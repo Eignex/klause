@@ -9,22 +9,22 @@ import com.eignex.kumulant.stat.summary.WeightedMeanResult
 import com.eignex.util.collections.LongHashSet
 
 /**
- * Core tree-search counters — the CDCL / DFS backbone shared by the complete backends: node and
- * failure counts, restarts, propagations, learned clauses, and the depth distribution. Zero for a
- * pure local-search solve apart from [restarts]. See [SolveStats].
+ * Core tree-search counters shared by the complete backends: node and failure counts, restarts,
+ * propagations, learned clauses, and the depth distribution. Zero for a pure local-search solve apart
+ * from [restarts]. See [SolveStats].
  */
 data class SearchStats(
     /** Decision nodes visited. */
     val nodes: SumResult = ZERO_COUNT,
     /** Failed nodes: propagation conflicts plus bound-pruned subtrees. */
     val fails: SumResult = ZERO_COUNT,
-    /** Restarts performed (shared field — the LS engine folds its own restart count in here). */
+    /** Restarts performed, including local-search restarts. */
     val restarts: SumResult = ZERO_COUNT,
     /** Finite deductions reported by successful search fixpoints, excluding decision and root pins. */
     val propagations: SumResult = ZERO_COUNT,
     /** Clauses learned by conflict analysis. */
     val learnedClauses: SumResult = ZERO_COUNT,
-    /** Literals across [learnedClauses]; their mean size shows whether the explanations behind them are sharp. */
+    /** Literals across [learnedClauses]. */
     val learnedLiterals: SumResult = ZERO_COUNT,
     /** Literal block distance summed across [learnedClauses]. */
     val learnedLbd: SumResult = ZERO_COUNT,
@@ -227,7 +227,6 @@ data class SearchStats(
     )
 }
 
-/** Mutable [SearchStats] accumulator; snapshots into a [SearchStats]. See [SolveStatsSink]. */
 internal class SearchStatsSink {
     var learning: () -> Map<String, Long> = { emptyMap() }
     var valueOrdering: () -> ValueOrderingStats = { ValueOrderingStats() }
@@ -260,24 +259,16 @@ internal class SearchStatsSink {
     val depthMean: MeanStat = MeanStat()
     val rootFixed: MaxStat = MaxStat()
 
-    /**
-     * Nodes visited so far, as a plain counter.
-     *
-     * [nodes] holds the same total but reading it allocates a result, and this is read on the search's
-     * pause check — every node — by a scheduler slicing on node count rather than on a clock.
-     */
+    // Plain counters read on every node's pause check, where reading the stat would allocate.
     var nodeCount: Long = 0L
         private set
 
-    /** [SearchStats.inprocessProbes] as a plain counter, read on the same pause check as [nodeCount]. */
     var inprocessProbes: Long = 0L
         private set
 
-    /** [SearchStats.inprocessVisits] as a plain counter, read on the same pause check as [nodeCount]. */
     var inprocessVisits: Long = 0L
         private set
 
-    /** Call on every visited decision node so [nodes] increments and the depth stats see the observation. */
     fun observeNode(depth: Int) {
         nodeCount++
         nodes.update(1.0)
@@ -288,7 +279,6 @@ internal class SearchStatsSink {
     fun observeRestart() = restarts.update(1.0)
     fun observePropagation(count: Long = 1L) = repeat(count.toInt()) { propagations.update(1.0) }
 
-    /** Count a learned constraint over [literals] with literal block distance [lbd], and whether it was seen before. */
     fun observeLearned(literals: IntArray, lbd: Int) {
         learnedClauses.update(1.0)
         learnedLiterals += literals.size
@@ -300,7 +290,6 @@ internal class SearchStatsSink {
 
     private var glueClauses = 0L
 
-    /** Count an inprocessing slice's [probes] and clause-literal [visits]. */
     fun observeInprocessing(probes: Long, visits: Long) {
         inprocessProbes += probes
         inprocessVisits += visits
@@ -345,7 +334,6 @@ internal class SearchStatsSink {
     )
 }
 
-// The largest literal block distance a learned clause can have and still count as glue.
 internal const val GLUE_LBD = 2
 
 // An order-independent 64-bit fingerprint of a literal set: equal sets always match, and distinct ones collide

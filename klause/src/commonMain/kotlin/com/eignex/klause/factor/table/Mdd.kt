@@ -17,24 +17,14 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 
 /**
- * Layered multi-valued decision diagram acceptance. The diagram has `n+1` state layers
- * (`n = seq.size`); layer `i` has `numStatesPerLayer(i)` states. [transitions] is a flat
- * sequence of `(srcState, value, dstState[, weight])` rows; [layerStarts] indexes into it
- * (layer i spans `layerStarts(i) until layerStarts(i+1)`).
+ * Acceptance by a layered multi-valued decision diagram with `seq.size + 1` state layers. Layer `i` of
+ * [transitions] spans `layerStarts(i) until layerStarts(i+1)`. When [recordStride] is 4, each record carries a
+ * weight and the weights along the accepted path sum to [cost].
  *
- * When [recordStride] is 4, each transition has a 4th field (weight) and [cost] must be
- * provided — the sum of edge weights along the accepted path equals [cost].
- *
- * Propagation (after Cheng and Yap, "An MDD-based generalized arc consistency algorithm for positive
- * and negative table constraints and some global constraints", Constraints 15(2), 2010,
- * https://doi.org/10.1007/s10601-009-9087-y) reads each symbol variable's full domain:
- *  - Forward sweep: state `s` at layer `i` is forward-reachable iff some forward-reachable
- *    state at layer `i-1` has a transition on a symbol in `seq(i-1)`'s domain leading to `s`.
- *  - Backward sweep symmetric from accepting states.
- *  - Prune `seq(i)` values that have no transition between forward∩backward reachable states.
- *  - Fail if no forward-reachable state at layer `n` is accepting.
- *  - For cost variant: tighten [cost] bounds by the min/max weighted path through the
- *    forward-reachable lattice.
+ * Propagation follows Cheng and Yap, "An MDD-based generalized arc consistency algorithm for positive and
+ * negative table constraints and some global constraints", Constraints 15(2), 2010,
+ * https://doi.org/10.1007/s10601-009-9087-y: forward and backward reachability sweeps prune values with no
+ * transition between live states, and the cost variant bounds [cost] by the min/max weighted live path.
  */
 class Mdd(
     /** Sequence variable ids, one per layer. */
@@ -43,8 +33,7 @@ class Mdd(
     val numStatesPerLayer: IntArray,
     /** Prefix-sum index into [transitions] per layer. */
     val layerStarts: IntArray,
-    /** Flat transition records `(src, symbol, dst[, weight])`; stride [recordStride]. The symbol column
-     *  holds domain values (possibly wide); `src`/`dst`/`weight` are small ids read as [Int]. */
+    /** Flat records `(src, symbol, dst[, weight])` of stride [recordStride]; all but the symbol fit [Int]. */
     val transitions: LongArray,
     /** Start state. */
     val initial: Int,
@@ -76,20 +65,14 @@ class Mdd(
         if (cost >= 0) mapping.int(cost) else cost,
     )
 
-    /** Position-faithful (layer i matters): keeps the sequence vars in order and folds in the whole
-     *  diagram — per-layer state counts, layer offsets, the transition records, the initial and
-     *  accepting states, the record stride, and the cost var. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.MDD, structuralKeyWeight, ::buildKey)
 
-    // The key splices the whole diagram, so the arity-derived default would under-size the builder by
-    // orders of magnitude on a large MDD and leave it doubling its way through the payload.
+    // The key splices the whole diagram, so the arity-derived default would badly under-size the builder.
     override val structuralKeyWeight: Int
         get() = seq.size + numStatesPerLayer.size + layerStarts.size + transitions.size + accepting.size
 
     override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.MDD, mapping, ::buildKey)
 
-    // The diagram (states, layer offsets, transition records, accepting set) is constant structure;
-    // seq are the sequence's int-var ids; cost is an int var or a negative sentinel.
     private fun buildKey(sink: KeySink) {
         sink.int(initial)
         sink.int(recordStride)
@@ -101,11 +84,8 @@ class Mdd(
         sink.intVars(seq)
     }
 
-    /** Symbol relabeling: each transition record is `(fromState, symbol, toState[, cost])`, so a
-     *  value permutation maps the symbol field of every record. Sound — the `seq` values are the
-     *  symbols and there is no positional-variable/constant coupling (unlike Element). No bijection
-     *  check is needed: records carry the symbol explicitly, so any map yields a valid diagram and the
-     *  verification's key comparison decides whether the relabeling is actually a symmetry. */
+    // Records carry the symbol explicitly, so any map yields a valid diagram and the verifier's key comparison
+    // decides whether it is a symmetry.
     override fun remapValues(valueMap: (Long) -> Long): Factor {
         val newTransitions = transitions.copyOf()
         var p = 0
@@ -118,15 +98,9 @@ class Mdd(
 
     override val variables: VarList = SpanIntVars(if (cost >= 0) seq + intArrayOf(cost) else seq.copyOf())
 
-    /**
-     * Minimize the diagram under the current domains: drop states not forward-reachable from [initial]
-     * over in-domain symbols, and states not backward-co-reachable to an accepting state; rebuild over
-     * the surviving states with dense per-layer ids. A permanent structural shrink of what the flattened
-     * transition table otherwise carries for the whole solve — the reduction bound/GAC propagation makes
-     * dynamically, baked in once. Solution-set exact under [domains] (presolve only tightens). Capped by
-     * [MINIMIZE_RECORD_CAP] so a giant diagram isn't re-swept every presolve round; an emptied layer is
-     * left to the propagator to report infeasible.
-     */
+    // Drops states that are not both reachable and co-reachable under [domains] and renumbers the survivors
+    // densely, baking in once what propagation would redo for the whole solve. An emptied layer is left to the
+    // propagator to refute.
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod", "ReturnCount")
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
         val records = transitions.size / recordStride
@@ -171,14 +145,14 @@ class Mdd(
         for (l in 0..n) {
             var id = 0
             for (s in 0 until numStatesPerLayer[l]) if (fwd[l][s] && bwd[l][s]) liveId[l][s] = id++
-            if (id == 0) return Unchanged // a layer emptied ⇒ infeasible; the propagator reports it
+            if (id == 0) return Unchanged
             newCounts[l] = id
         }
-        if (newCounts.contentEquals(numStatesPerLayer)) return Unchanged // nothing dead
+        if (newCounts.contentEquals(numStatesPerLayer)) return Unchanged
         val newTransitions = LongArrayList()
         val newStarts = IntArray(n + 1)
         for (i in 0 until n) {
-            newStarts[i] = newTransitions.size // element offset into the flat record array, as [layerStarts]
+            newStarts[i] = newTransitions.size
             val d = domains[seq[i]]
             var p = layerStarts[i]
             val end = layerStarts[i + 1]
@@ -197,7 +171,6 @@ class Mdd(
             }
         }
         newStarts[n] = newTransitions.size
-        // Every surviving final-layer state is accepting (live ⊆ accepting), so this collects them all.
         val newAccepting = IntArrayList()
         for (a in accepting) {
             if (a in 0 until numStatesPerLayer[n] && fwd[n][a] && bwd[n][a]) newAccepting.add(liveId[n][a])
@@ -219,8 +192,7 @@ class Mdd(
     }
 
     private companion object {
-        /** Above this many transition records [structuralReduce] skips minimization, so a giant diagram
-         *  is not re-swept each presolve round (and is likely already minimal from its lowering). */
+        // A giant diagram is not re-swept each presolve round.
         const val MINIMIZE_RECORD_CAP: Int = 100_000
     }
 }

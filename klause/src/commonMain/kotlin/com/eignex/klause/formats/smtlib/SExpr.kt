@@ -22,14 +22,13 @@ sealed interface SExpr {
 /** Streaming parser for S-expressions. Pulls characters from a [CharReader], so the whole script is
  *  never materialized; commands are read one at a time via [readCommandOrNull]. */
 class SExprReader(private val reader: CharReader) {
-    /** Parse a [String] in one shot — the in-memory path for tests and the DSL. */
+    /** Parses an in-memory script. */
     constructor(src: String) : this(CharReader(StringCharSource(src)))
 
     /** Wrap a streamed [source] directly. */
     constructor(source: CharSource) : this(CharReader(source))
 
-    /** The next top-level form, or `null` at end of input (inter-command whitespace skipped). Streaming
-     *  the commands one at a time keeps a large script from ever being held whole. */
+    /** The next top-level form, or `null` at end of input. */
     fun readCommandOrNull(): SExpr? {
         skipWs()
         if (reader.eof()) return null
@@ -42,16 +41,13 @@ class SExprReader(private val reader: CharReader) {
         while (true) out.add(readCommandOrNull() ?: return out)
     }
 
-    // Structural parse failures surface through the catchable FormatException supertype (shared by
-    // every klause front-end), not a raw IllegalArgumentException. Funnelled through one helper so the
-    // sites stay `if (cond) parseError(...)` guards rather than inline `throw` clutter.
+    // Failures surface through the FormatException supertype every front-end shares.
     private fun parseError(msg: String): Nothing = throw UnsupportedSmtException(msg)
 
     private fun readExpr(): SExpr {
         skipWs()
         if (reader.eof()) parseError("unexpected end of input")
-        // A `)` where an expression is expected is unbalanced: [readToken] would return an empty
-        // token without advancing, spinning [readAll] forever, so reject it here.
+        // [readToken] would return an empty token without advancing on `)`, spinning [readAll] forever.
         if (reader.peek() == ')'.code) parseError("unexpected ')'")
         if (reader.peek() != '('.code) return SExpr.Atom(readToken())
         // Iterative nesting via an explicit stack: SMT-LIB formulas nest thousands of lists deep,
@@ -160,8 +156,6 @@ class SExprReader(private val reader: CharReader) {
         }
     }
 
-    // Append the character under the cursor and consume it — the streaming analogue of a
-    // `substring(start, pos)` token capture.
     private fun StringBuilder.appendCurrent() {
         append(reader.peek().toChar())
         reader.advance()

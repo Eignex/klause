@@ -24,13 +24,8 @@ import com.eignex.util.collections.IntIntMap
 import kotlin.math.abs
 import kotlin.math.ceil
 
-/**
- * The [problem] with an objective-bound factor for [objective] appended (the ratchet arm's overlay),
- * paired with the shared [MutableObjectiveBound] the minimize engine tightens at each incumbent; `null`
- * when the objective has no variable terms. The appended factor is LS-only ([NoPropagator]), so the
- * overlay's bake is identical to the base — the extra factor adds one LS invariant and its occurrence
- * entries, nothing more.
- */
+// Null when the objective has no variable terms. The appended factor has no propagator, so the overlay bakes
+// exactly like the base.
 internal fun objectiveBoundOverlay(
     problem: BakedProblem,
     objective: LinearObjective,
@@ -40,47 +35,31 @@ internal fun objectiveBoundOverlay(
     return problem.withAppendedFactor(factor) to bound
 }
 
-/**
- * Shared, mutable upper bound on an objective's weighted sum `Σ w·b + Σ c·i` — the ratchet knob for
- * the objective-as-constraint local-search arm. The [ObjectiveBoundFactor] reads
- * [value]; the minimize engine calls [tightenBelow] each time it reaches a feasible incumbent, so the
- * factor goes violated again and the feasibility fight repairs "beat the incumbent" like any other
- * constraint. [Long.MAX_VALUE] (the initial value) is inactive: the raw sum never exceeds it, so the
- * factor is satisfied until the first incumbent tightens it.
- */
+// The minimize engine tightens this at each incumbent, so the bound factor turns "beat the incumbent" into
+// ordinary repair. Inactive until the first incumbent.
 internal class MutableObjectiveBound(private val objectiveConstant: Long) {
-    /** Upper bound on the raw weighted sum. Inactive at [Long.MAX_VALUE]. */
     var value: Long = Long.MAX_VALUE
         private set
 
-    /** The same bound for a sum kept in floating point — an objective with continuous terms, or one whose
-     *  sum can pass the 64-bit range. Inactive at [Double.POSITIVE_INFINITY]. */
+    // For a sum kept in floating point.
     var realLimit: Double = Double.POSITIVE_INFINITY
         private set
 
-    /** Tighten so the next feasible sum must strictly beat [objectiveValue] (`objective = sum +
-     *  constant`), i.e. `sum ≤ objectiveValue − 1 − constant`, or by a relative margin for a sum kept in
-     *  floating point. */
+    // The next feasible sum must strictly beat [objectiveValue]; a floating-point sum by a relative margin.
     fun tightenBelow(objectiveValue: Double) {
         value = objectiveValue.toLong() - 1 - objectiveConstant
         realLimit = objectiveValue - objectiveConstant - REAL_IMPROVEMENT * maxOf(1.0, abs(objectiveValue))
     }
 
     private companion object {
-        // Relative improvement a floating-point sum must make over the incumbent.
         const val REAL_IMPROVEMENT: Double = 1e-9
     }
 }
 
 /**
- * A local-search-only soft constraint `Σ boolWeights·b + Σ intCoeffs·i ≤ bound` over the objective's
- * decision variables, sharing a [MutableObjectiveBound] that the minimize engine ratchets down at each
- * incumbent. Injected as an extra factor into one arm's `Problem` overlay so
- * `cost == 0` means "hard constraints satisfied AND objective beats the incumbent" — turning objective
- * optimization back into violation repair for the SAT-style feasibility arms (probSAT / WalkSAT).
- *
- * Its propagation projection is [NoPropagator]: the bound is an LS artifact and must never enter CP (the objective
- * is already enforced there through branch-and-bound), so this factor belongs only in an LS overlay.
+ * LS-only soft constraint `Σ boolWeights·b + Σ intCoeffs·i ≤ bound`, so `cost == 0` means the hard constraints
+ * hold and the objective beats the incumbent. Its propagator is [NoPropagator]: branch-and-bound already enforces
+ * the objective in CP.
  */
 internal class ObjectiveBoundFactor(
     private val objectiveBoolVars: IntArray,
@@ -116,8 +95,6 @@ internal class ObjectiveBoundFactor(
     }
 
     companion object {
-        /** The objective-bound factor for [objective] sharing [bound], or `null` when the objective has
-         *  no variable terms (nothing to bound). Keeps only the nonzero-weight/coefficient variables. */
         fun of(objective: LinearObjective, bound: MutableObjectiveBound): ObjectiveBoundFactor? {
             val boolVars = objective.boolWeightValues.indices.filter { objective.boolWeightValues[it] != 0L }
             val intVars = objective.intCoefficientValues.indices.filter { objective.intCoefficientValues[it] != 0L }
@@ -136,12 +113,6 @@ internal class ObjectiveBoundFactor(
     }
 }
 
-/**
- * LS invariant for [ObjectiveBoundFactor]: keeps the running weighted sum in
- * [LocalSearchState.longPayload] and grades violation by how far it exceeds the shared bound. Repair
- * moves push the sum down (toward the bound), so a SAT-style arm repairs the objective slack exactly
- * as it repairs any violated constraint.
- */
 internal class ObjectiveBoundInvariant(
     private val boolVars: IntArray,
     private val boolWeights: LongArray,
@@ -150,8 +121,7 @@ internal class ObjectiveBoundInvariant(
     private val bound: MutableObjectiveBound,
 ) : Invariant {
 
-    // Each objective variable's position, so a move reads its one weight instead of scanning the objective, which
-    // on a MaxSAT model with thousands of soft literals would make every flip cost as much as the objective is long.
+    // Indexed so a move reads one weight instead of scanning an objective that may have thousands of terms.
     private val boolIndex = IntIntMap.build(boolVars, IntArray(boolVars.size) { it }, absent = -1)
     private val intIndex = IntIntMap.build(intVars, IntArray(intVars.size) { it }, absent = -1)
 
@@ -159,8 +129,6 @@ internal class ObjectiveBoundInvariant(
 
     private fun intCoeffOf(intVar: Int): Long = intIndex[intVar].let { if (it < 0) 0L else intCoeffs[it] }
 
-    /** Graded degree of `sum ≤ bound`: `0` when satisfied, else the (soft-capped) overshoot. A
-     *  [Long.MAX_VALUE] bound makes the overshoot non-positive, so the factor is inert. */
     private fun degree(state: LocalSearchState, sum: Long): Int {
         val overshoot = sum - bound.value
         return if (overshoot <= 0L) 0 else compressViolation(overshoot, state.violationSoftCap)
@@ -211,8 +179,6 @@ internal class ObjectiveBoundInvariant(
         return degree(state, newSum) - degree(state, oldSum)
     }
 
-    /** Push the sum toward the bound: drop positive-weight trues (raise negative-weight ones), and
-     *  step each int var in the direction its coefficient says lowers the sum. */
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (state.longPayload[factorId] <= bound.value) return
         for (i in boolVars.indices) {
@@ -230,12 +196,8 @@ internal class ObjectiveBoundInvariant(
     }
 }
 
-/**
- * LS invariant for an [ObjectiveBoundFactor] whose sum a `Long` cannot carry exactly: one with continuous terms, or
- * one whose integer terms can pass the 64-bit range over the search domains. The sum is kept in floating point and
- * compared with [MutableObjectiveBound.realLimit]. The ratchet only steers the search — every incumbent's objective
- * is evaluated from its assignment — so a rounded sum costs steering accuracy, never a wrong objective.
- */
+// For sums a `Long` cannot carry exactly. The ratchet only steers search and every incumbent is evaluated from its
+// assignment, so a rounded sum costs steering accuracy, never a wrong objective.
 internal class FloatObjectiveBoundInvariant(
     private val boolVars: IntArray,
     private val boolWeights: LongArray,
@@ -314,8 +276,7 @@ internal class FloatObjectiveBoundInvariant(
     override fun applyRealSet(state: LocalSearchState, factorId: Int, realVar: Int, oldValue: Double): Int =
         shift(state, factorId, realCoeff(realVar) * (state.assignment.realValue(realVar) - oldValue))
 
-    /** Push the sum toward the bound, as [ObjectiveBoundInvariant] does, with each continuous term moved by the
-     *  whole overshoot. */
+    // Each continuous term moves by the whole overshoot.
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val overshoot = cell(state, factorId)[0] - bound.realLimit
         if (overshoot <= 0.0) return
@@ -340,11 +301,7 @@ internal class FloatObjectiveBoundInvariant(
     }
 }
 
-/**
- * Whether an objective sum over [intVars] can pass the 64-bit range over [domains]: `Σ |coeff|·max(|min|, |max|)`
- * plus the Boolean weights reaches 2^61, estimated in `Double` as [com.eignex.klause.factor.arithmetic.needsExactSum]
- * does for a row.
- */
+// The objective counterpart of needsExactSum.
 internal fun objectiveSumIsWide(
     boolWeights: LongArray,
     intVars: IntArray,

@@ -101,7 +101,6 @@ class LocalSearchModel private constructor(
 // Open sides stand at ±2^62 so a domain's width `max - min` stays inside `Long`.
 private const val OPEN_EDGE: Long = 1L shl 62
 
-/** Column [v]'s declared value set, or its declared range with each open side at [OPEN_EDGE]. */
 private fun Problem.declaredSearchDomain(v: Int): IntDomain {
     intDomainOrNull(v)?.let { return it }
     val bounds = intBounds
@@ -110,7 +109,7 @@ private fun Problem.declaredSearchDomain(v: Int): IntDomain {
     return IntDomain(lo, hi)
 }
 
-/** Window wide [Cumulative] columns only when their selected scorer is the built-in scheduling scorer. */
+// Only the built-in scheduling scorer needs wide Cumulative columns windowed.
 private fun scheduleWindows(problem: BakedProblem, domains: Array<IntDomain>): Array<IntDomain> {
     val selection = problem.factorProjections
     val windowed = problem.factors.indices.filter {
@@ -121,10 +120,6 @@ private fun scheduleWindows(problem: BakedProblem, domains: Array<IntDomain>): A
     return domains.copyOf().also { copy -> for (v in windowed) copy[v] = scheduleWindow(domains[v]) }
 }
 
-/**
- * Fold the bake-time propagation result and [assumptions] into the pins the search sees, or `null` when
- * propagation refutes them.
- */
 private fun BakedProblem.rootPins(assumptions: Assumptions): Assumptions? {
     val root = baked
     if (root is PropagationResult.Unsat) return null

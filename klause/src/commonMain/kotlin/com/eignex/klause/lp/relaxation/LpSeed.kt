@@ -8,14 +8,9 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.CheckedLongOverflowException
 import kotlin.math.roundToLong
 
-/**
- * A starting point for a search over [domains]: the LP relaxation's optimum inside them, integers rounded and kept in
- * their domains, Booleans read at one half. Null when the LP finds no point before [cancellation], or the 64-bit LP
- * cannot state the model over [domains].
- *
- * Only a seed: nothing here claims the point satisfies anything, so it suits a search that verifies whatever it
- * reports. The relaxation is built over [domains] as a box, which is what lets it serve a model with open sides.
- */
+// The LP optimum inside domains, integers rounded into their domains and Booleans read at one half. Only a
+// seed: nothing claims the point satisfies anything, so it suits a search that verifies what it reports.
+// Building over domains as a box is what lets it serve a model with open sides.
 internal fun Problem.lpSeed(domains: Array<IntDomain>, cancellation: ExecutionControl): Sample? {
     // Rows that read a column's declared range, a reified row's big-M among them, need one even on an open column;
     // the box stands in for it, which only bounds where the seed is looked for.
@@ -41,7 +36,6 @@ internal fun Problem.lpSeed(domains: Array<IntDomain>, cancellation: ExecutionCo
     return Sample(bools, ints, relaxation.floatReals(primal, boxed))
 }
 
-/** [RelaxationDomains] over fixed [domains]: every integer column at its box, every Boolean free. */
 private class BoxDomains(private val domains: Array<IntDomain>) : RelaxationDomains {
     override fun intDomain(varId: Int): IntDomain = domains[varId]
     override fun boolValue(varId: Int): Boolean? = null

@@ -5,8 +5,8 @@ import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 
 /**
- * "First-fail": smallest current domain wins. Bools count as size 2 when unpinned. Tied
- * candidates are broken by variable id (bools precede ints). The classic CSP default.
+ * First-fail: smallest current domain wins. Unpinned bools count as size 2. Ties broken by variable id,
+ * bools before ints.
  */
 object SmallestDomain : VariableSelector {
     override fun fresh() = this

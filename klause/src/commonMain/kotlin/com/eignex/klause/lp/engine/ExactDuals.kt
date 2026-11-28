@@ -47,17 +47,15 @@ internal data class ExactDualLimits(
 
 internal enum class ExactDualDecline { SHAPE, NOT_DYADIC, SINGULAR, NONFINITE, STALLED, STEPS, BITS, MEMORY, TIME }
 
-/**
- * Exact duals y* of a basis, y*(i) = [scaled](i) / [denominator] with one shared denominator, verified to satisfy
- * Bᵀy* = c_B exactly. [approximations] are the doubles nearest y* within one ulp, [magnitudes] |y*| rounded up.
- */
+// y*(i) = [scaled](i) / [denominator], verified to satisfy Bᵀy* = c_B exactly. [approximations] are the doubles
+// nearest y* within one ulp, [magnitudes] |y*| rounded up.
 internal class ExactDuals(
     val denominator: BigInt,
     val scaled: Array<BigInt>,
     val approximations: DoubleArray,
     val magnitudes: DoubleArray,
 ) {
-    /** D·d(j) as a numerator over a positive denominator, where d(j) = c(j) − a(j)ᵀy* and D = [denominator]. */
+    // D·d(j) as a numerator over a positive denominator, where d(j) = c(j) − a(j)ᵀy* and D = [denominator].
     fun reducedTimesDenominator(exact: ExactLpModel, j: Int): Pair<BigInt, BigInt> {
         val cost = exact.objective.cost(j).value
         val column = if (j < exact.n) {
@@ -87,17 +85,12 @@ internal class ExactDualsOutcome(
     val denominatorBits: Int,
 )
 
-/**
- * Exact duals of [basis] in [model]'s exact authority, by iterative refinement on one float factorization of B.
- * Each step solves for a correction from the exact residual r = c_B − Bᵀy scaled by a power of two, adds it to y
- * exactly and updates r exactly and incrementally; every basic column and cost must be dyadic, so all of it stays
- * in integers times powers of two. Once y has gained enough bits, continued fractions recover y* with a shared
- * denominator and Bᵀy* = c_B is checked in exact arithmetic. [start] seeds y; steps, bits, metered allocation and
- * time are capped, and a stop through [cancellation] or any cap declines.
- *
- * Refinement and reconstruction follow Gleixner, Steffy and Wolter, "Iterative Refinement for Linear Programming",
- * INFORMS J. Comput., 2016, https://doi.org/10.1287/ijoc.2016.0692.
- */
+// Iterative refinement on one float factorization of B: each step solves for a correction from the exact residual
+// r = c_B − Bᵀy scaled by a power of two and updates y and r exactly. Every basic column and cost must be dyadic, so
+// all values stay integers times powers of two. Continued fractions then recover y* with a shared denominator, and
+// Bᵀy* = c_B is checked exactly. A stop through [cancellation] or any cap declines.
+// Gleixner, Steffy and Wolter, "Iterative Refinement for Linear Programming", INFORMS J. Comput., 2016,
+// https://doi.org/10.1287/ijoc.2016.0692.
 @Suppress("ReturnCount")
 internal fun exactBasisDuals(
     model: LpModel,
@@ -456,7 +449,7 @@ private class Dyadic(val man: BigInt, val exp: Int) {
     }
 }
 
-/** [numerator] / [denominator] for positive integers, rounded up to a double; null past the double range. */
+// Positive integers only; null past the double range.
 internal fun quotientAbove(numerator: BigInt, denominator: BigInt): Double? {
     if (numerator.isZero()) return 0.0
     val shift = numerator.magnitudeBitLength() - denominator.magnitudeBitLength() - QUOTIENT_BITS

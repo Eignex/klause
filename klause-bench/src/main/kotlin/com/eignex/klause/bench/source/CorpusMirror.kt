@@ -34,8 +34,7 @@ internal class CorpusMirror(private val root: URI, private val downloads: Corpus
         }
     }
 
-    /** Publish [collection] as the pack of [id]. True when this call stored it; false when a pack was already
-     *  there, whose bytes may differ from [collection] (a different upstream fetch). */
+    // False when a pack was already there, whose bytes may differ (a different upstream fetch).
     fun publish(id: String, collection: File): Boolean {
         val archive = Files.createTempFile(collection.parentFile.toPath(), ".mirror-", ".tar")
         try {
@@ -46,10 +45,8 @@ internal class CorpusMirror(private val root: URI, private val downloads: Corpus
         }
     }
 
-    /**
-     * The index of [id]'s pack, or null when none is published. It is stored as `<id>.index.tar` (a tar holding one
-     * `index.json`) so it shares the pack key space the signer already grants, and is read without the pack.
-     */
+    // Stored as `<id>.index.tar` (a tar holding one `index.json`) so it shares the pack key space the signer already
+    // grants, and is read without the pack.
     fun index(id: String, scratch: File): CorpusIndex? {
         val archive = Files.createTempFile(scratch.toPath(), ".mirror-index-", ".tar")
         try {
@@ -73,7 +70,7 @@ internal class CorpusMirror(private val root: URI, private val downloads: Corpus
         }
     }
 
-    /** Publish [index], which must describe the pack stored for its collection. */
+    // The index must describe the pack stored for its collection.
     fun publishIndex(index: CorpusIndex, scratch: File): Boolean {
         val archive = Files.createTempFile(scratch.toPath(), ".mirror-index-", ".tar")
         try {
@@ -93,7 +90,6 @@ internal class CorpusMirror(private val root: URI, private val downloads: Corpus
 
     private fun indexId(id: String) = "$id.index"
 
-    /** PUT [archive] as `<name>.tar` unless it already exists; true when this call stored it. */
     private fun upload(name: String, archive: Path): Boolean {
         val digest = MessageDigest.getInstance("SHA-256")
         Files.newInputStream(archive).use { input ->

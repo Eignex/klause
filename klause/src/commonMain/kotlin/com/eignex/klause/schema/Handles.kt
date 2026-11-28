@@ -106,7 +106,6 @@ class FloatExpr internal constructor(internal val terms: Map<FloatHandle, Double
 
     internal fun compareWith(threshold: Double, op: IntCmpOp): BoolExpr {
         if (terms.isEmpty()) return constantBool(evalConstant(op, threshold))
-        // `Σ c_i · h_i + offset  ⟨op⟩  threshold`  →  `Σ c_i · h_i  ⟨op⟩  threshold - offset`.
         val coeffs = DoubleArray(terms.size)
         val names = ArrayList<String>(terms.size)
         for ((i, e) in terms.entries.withIndex()) {
@@ -125,7 +124,7 @@ class FloatExpr internal constructor(internal val terms: Map<FloatHandle, Double
         IntCmpOp.NE -> offset != threshold
     }
 
-    /** `0 = 0` for true and `0 ≠ 0` for false; the compiler's affine pass folds these. */
+    // The compiler's affine pass folds these.
     private fun constantBool(value: Boolean): BoolExpr = if (value) {
         IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(0))
     } else {

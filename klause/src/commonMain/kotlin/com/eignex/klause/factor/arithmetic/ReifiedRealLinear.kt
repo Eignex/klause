@@ -15,21 +15,15 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.materializeKey
 
 /**
- * A reified real linear atom `aux ⟺ (Σ intCoeffs·vars + Σ realCoeffs·realVars ⟨op⟩ bound)` — the
- * real-atom half of boolean structure over linear real arithmetic. [aux] is an ordinary CP Boolean
- * the search branches on. Its finite CP projection is inert; local search uses floating heuristic
- * scores. Exact feasibility checks enforce both directions through the LP/source arithmetic route:
+ * A reified real linear atom `aux ⟺ (Σ intCoeffs·vars + Σ realCoeffs·realVars ⟨op⟩ bound)`. [aux] is an
+ * ordinary search Boolean; the finite CP projection is inert and local search scores the atom heuristically.
  *
- *  - The LP relaxation consults the build's live pin of [aux]: pinned true emits the atom's row, pinned
- *    false emits its exact complement (`¬(a ≤ b) ⟺ a > b`, strictness flipping through the
- *    delta-rational machinery), unpinned emits nothing (a sound weakening — every leaf pins every
- *    Boolean, so leaf feasibility enforces the equivalence and search stays complete).
- *  - Each emitted row carries the activating literal as its validity premise, so an LP infeasibility
- *    certificate that leans on it cites the literal in the learned clause — the Farkas-derived
- *    theory lemma over the real atoms.
+ * The LP relaxation emits the row while [aux] is pinned true, its strict complement while pinned false, and
+ * nothing while unpinned; every leaf pins every Boolean, so leaf feasibility enforces the equivalence. Each
+ * emitted row carries the activating literal, so an infeasibility certificate that uses it cites the literal.
  *
- * [op] is [LinearOp.LE] or [LinearOp.GE]; an equality atom is two of these conjoined by the caller
- * (its complement is a disjunction, which a single row cannot express).
+ * [op] is [LinearOp.LE] or [LinearOp.GE]; an equality atom is two of these conjoined by the caller, since its
+ * complement is a disjunction.
  */
 class ReifiedRealLinear(
     /** The reifying Boolean variable. */

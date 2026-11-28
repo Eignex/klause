@@ -14,7 +14,7 @@ import com.eignex.util.concurrent.Mutex
 internal class ContributionTally(private val lock: Mutex = Mutex(concurrent = false)) {
     private val counts = Array(Contribution.entries.size) { DoubleArray(0) }
 
-    /** Count [amount] of [origin]'s contributions of [kind]; a negative origin names no arm and is ignored. */
+    // A negative origin names no arm and is ignored.
     fun note(kind: Contribution, origin: Int, amount: Double = 1.0) {
         if (origin < 0 || amount <= 0.0 || !amount.isFinite()) return
         lock.withLock {
@@ -25,7 +25,6 @@ internal class ContributionTally(private val lock: Mutex = Mutex(concurrent = fa
         }
     }
 
-    /** Hand every non-zero count to [action] and reset it. */
     fun drain(action: (kind: Contribution, origin: Int, amount: Double) -> Unit) {
         val drained = lock.withLock {
             val copy = counts.map { it.copyOf() }
@@ -39,17 +38,13 @@ internal class ContributionTally(private val lock: Mutex = Mutex(concurrent = fa
     }
 }
 
-/** A kind of shared contribution one arm makes for the others. */
 internal enum class Contribution(val signal: Signal) {
-    /** A learned clause another arm imported. */
     Clause(Signal.ClauseUses),
 
-    /** A global cut another arm imported. */
     Cut(Signal.CutUses),
 
-    /** A root variable bound another arm imported. */
     Bound(Signal.BoundUses),
 
-    /** A raise of the pool's proven objective lower bound, by the amount it rose. */
+    // Counted by the amount the proven objective floor rose.
     Floor(Signal.Floor),
 }

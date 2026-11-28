@@ -2,32 +2,16 @@ package com.eignex.klause.bench.catalog
 
 import com.eignex.klause.ir.Problem
 
-/**
- * Small Kotlin DSL for declaring [Suite]s. Suite-level defaults ([format], [category],
- * [license]) cascade into each `problem(...)`/`vendored(...)`/`inCode(...)` call so common
- * cases stay terse:
- *
- * ```
- * val s = suite("dimacs-core", "Curated small SAT/UNSAT CNF") {
- *     format = Format.DIMACS; license = "SATLIB (public benchmarks)"
- *     vendored("php4", Category.UNSAT, Expected.Unsat)
- *     vendored("random3sat-20-80", Category.SAT, Expected.Sat)
- * }
- * ```
- */
+// Suite-level defaults (format, category, license) cascade into each entry.
 internal class SuiteBuilder(val id: String, val description: String) {
-    /** Default format for entries that don't specify one. */
     var format: Format? = null
 
-    /** Default category for entries that don't specify one. */
     var category: Category = Category.CSP
 
-    /** Default license/provenance string for entries that don't specify one. */
     var license: String = "internal"
 
     private val problems = mutableListOf<ProblemRef>()
 
-    /** Fully-explicit entry. */
     fun problem(
         name: String,
         source: ProblemSource,
@@ -41,10 +25,7 @@ internal class SuiteBuilder(val id: String, val description: String) {
         problems += ProblemRef(name, format, source, category, expected, data, tags, license)
     }
 
-    /**
-     * A file vendored under `klause-bench/smoke-corpus/`. [relPath] defaults to
-     * `<formatDir>/<name>.<ext>` (e.g. DIMACS → `dimacs/<name>.cnf`).
-     */
+    // Under `klause-bench/smoke-corpus/`; relPath defaults to `<formatDir>/<name>.<ext>`.
     fun vendored(
         name: String,
         category: Category = this.category,
@@ -55,7 +36,6 @@ internal class SuiteBuilder(val id: String, val description: String) {
         license: String = this.license,
     ) = problem(name, corpus(relPath), format, category, expected, tags = tags, license = license)
 
-    /** A MiniZinc model + optional `.dzn`, both vendored under `klause-bench/smoke-corpus/`. */
     fun vendoredMzn(
         name: String,
         category: Category = this.category,
@@ -75,7 +55,6 @@ internal class SuiteBuilder(val id: String, val description: String) {
         license = license,
     )
 
-    /** A file tracked elsewhere in the workspace (e.g. `klause-mzn-lib/test-models/`). */
     fun workspace(
         name: String,
         workspaceRelPath: String,
@@ -87,7 +66,6 @@ internal class SuiteBuilder(val id: String, val description: String) {
         license: String = this.license,
     ) = problem(name, ProblemSource.Vendored(workspaceRelPath), format, category, expected, data, tags, license)
 
-    /** A file inside a fetched [ExternalCollection]. */
     fun external(
         name: String,
         collection: ExternalCollection,
@@ -108,8 +86,6 @@ internal class SuiteBuilder(val id: String, val description: String) {
         license = collection.license,
     )
 
-    /** The [index]-th file (sorted by name) with extension [ext] inside a fetched
-     *  [ExternalCollection] — for collections whose member filenames aren't predictable. */
     fun externalIndexed(
         name: String,
         collection: ExternalCollection,
@@ -129,7 +105,6 @@ internal class SuiteBuilder(val id: String, val description: String) {
         license = collection.license,
     )
 
-    /** A programmatic instance built in Kotlin. */
     fun inCode(
         name: String,
         category: Category = this.category,
@@ -145,11 +120,10 @@ internal class SuiteBuilder(val id: String, val description: String) {
     internal fun build(): Suite = Suite(id, description, problems.toList())
 }
 
-/** Build a [Suite] with the DSL. */
 internal fun suite(id: String, description: String, block: SuiteBuilder.() -> Unit): Suite =
     SuiteBuilder(id, description).apply(block).build()
 
-/** Default `klause-bench/smoke-corpus/` sub-directory for a format. */
+/** The `klause-bench/smoke-corpus/` subdirectory for this format. */
 val Format.dir: String
     get() = when (this) {
         Format.DIMACS -> "dimacs"
@@ -163,7 +137,7 @@ val Format.dir: String
         Format.IN_CODE -> error("IN_CODE has no corpus directory")
     }
 
-/** Canonical file extension for a format. */
+/** The canonical file extension of this format. */
 val Format.ext: String
     get() = when (this) {
         Format.DIMACS -> "cnf"

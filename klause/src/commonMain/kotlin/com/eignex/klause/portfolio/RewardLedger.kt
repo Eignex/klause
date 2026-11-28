@@ -6,28 +6,19 @@ import com.eignex.klause.solver.result.PortfolioStats
 import com.eignex.klause.solver.result.SharingStats
 import com.eignex.klause.solver.result.SolveStats
 
-/**
- * Per-arm reward accounts for the sequential portfolio: what each arm earned, settled against what it spent.
- *
- * Credit is posted per [Signal], each in its own unit, at any time and for any arm, including one that is not
- * running; it waits in the arm's account until that arm's next segment settles it. An arm is scored on the rate
- * it earned each signal at, per unit of work, against the rate the rest of the pool earned it at this phase. A
- * rate rather than a total keeps a long segment from scoring higher for being long, and comparing each signal
- * only with itself puts signals in unrelated units on one scale without a hand-set weight between them.
- *
- * The pool's rate counts credit as earned when it is posted, not when it settles: an arm owed credit it has not yet
- * been scheduled to collect still earned it, and leaving it out would score every other arm as the only one earning
- * nothing on that signal, a full reward for half the work.
- *
- * An arm is scored only on the signals it [earns]: a signal its engine cannot produce says nothing about it, and
- * scoring it there would count every arm of the other engine against it. The pool's rate for a signal is likewise
- * taken over the work of the arms that can earn it.
- *
- * Rates pool over the current phase only; [resetPhase] starts a new one.
- */
+// Credit is posted per signal, each in its own unit, at any time and for any arm, including one that is not
+// running; it waits until that arm's next segment settles it. An arm is scored on the rate it earned each signal
+// at, per unit of work, against the rate the rest of the pool earned it at this phase. A rate rather than a total
+// keeps a long segment from scoring higher for being long, and comparing each signal only with itself puts
+// signals in unrelated units on one scale without a hand-set weight.
+//
+// The pool's rate counts credit when it is posted, not when it settles: leaving out credit an arm has not yet
+// collected would score every other arm as the only one earning nothing on that signal.
+//
+// An arm is scored only on the signals it earns: a signal its engine cannot produce says nothing about it. The
+// pool's rate for a signal is likewise taken over the work of the arms that can earn it.
 internal class RewardLedger(
     private val arms: Int,
-    /** Whether an arm can earn a signal at all; every arm earns every signal by default. */
     private val earns: (arm: Int, signal: Signal) -> Boolean = { _, _ -> true },
 ) {
     private val pending = Array(Signal.entries.size) { DoubleArray(arms) }
@@ -36,7 +27,6 @@ internal class RewardLedger(
     private val spentByArm = LongArray(arms)
     private val total = Array(Signal.entries.size) { DoubleArray(arms) }
 
-    /** Post [amount] of [signal] to [arm]'s account. Non-positive and non-finite amounts are ignored. */
     fun credit(arm: Int, signal: Signal, amount: Double) {
         if (amount <= 0.0 || !amount.isFinite()) return
         pending[signal.ordinal][arm] += amount
@@ -45,33 +35,23 @@ internal class RewardLedger(
         total[signal.ordinal][arm] += amount
     }
 
-    /**
-     * Settle [arm]'s account over the [work] its segment spent, returning a reward in `[0, 1]`.
-     *
-     * Each signal the arm [earns] and the pool has earned this phase scores `own / (own + others)` on rates: one
-     * for an arm the only one earning it, a half for one earning it as fast as the rest of the pool does, zero for
-     * one earning nothing. The reward is the mean over those signals.
-     */
+    // Each signal the arm earns and the pool has earned this phase scores `own / (own + others)` on rates; the
+    // reward in `[0, 1]` is the mean over those signals.
     fun settle(arm: Int, work: Long): Double {
         val segmentWork = work.coerceAtLeast(1L)
         spentByArm[arm] += segmentWork
         return score(arm, segmentWork)
     }
 
-    /** Whether [arm] holds credit no settle has paid out yet. */
     fun hasPending(arm: Int): Boolean = pending.any { it[arm] > 0.0 }
 
     fun pendingCreditOf(arm: Int): Map<String, Double> =
         Signal.entries.filter { pending[it.ordinal][arm] > 0.0 }
             .associate { it.name to pending[it.ordinal][arm] }
 
-    /**
-     * Settle the credit [arm] earned while it was not running, scored as if over [overWork] of its own work. No work
-     * is charged: the credit came from other arms using what this one shared.
-     */
+    // No work is charged: the credit came from other arms using what this one shared.
     fun settleIdle(arm: Int, overWork: Long): Double = score(arm, overWork.coerceAtLeast(1L))
 
-    // Clear [arm]'s pending credit and score it over [segmentWork].
     private fun score(arm: Int, segmentWork: Long): Double {
         var share = 0.0
         var signals = 0
@@ -89,11 +69,10 @@ internal class RewardLedger(
         return if (signals == 0) 0.0 else share / signals
     }
 
-    /** Everything credited to [arm] over the whole run, by signal name, leaving out signals it never earned. */
+    // Over the whole run, unaffected by resetPhase.
     fun creditOf(arm: Int): Map<String, Double> =
         Signal.entries.filter { total[it.ordinal][arm] > 0.0 }.associate { it.name to total[it.ordinal][arm] }
 
-    /** Start a new phase: pooled rates and unsettled credit both clear. */
     fun resetPhase() {
         for (row in pending) row.fill(0.0)
         for (row in earnedByArm) row.fill(0.0)
@@ -102,59 +81,43 @@ internal class RewardLedger(
     }
 }
 
-/** One kind of progress an arm is credited for in a [RewardLedger]. */
 internal enum class Signal {
-    /** A first feasible solution, before the run has an incumbent. */
+    // Before the run has an incumbent.
     FirstSolution,
 
-    /** Objective improvement of the shared incumbent. */
     Improvement,
 
-    /** Rise of the pool's proven lower bound on the objective: the dual side of the gap. */
+    // Rise of the pool's proven lower bound on the objective.
     Floor,
 
-    /** Variables a complete search, backtrack or open theory, newly fixed at its root. */
     RootFixings,
 
-    /** Share of the pool's record constraint violation a local-search arm removed. */
+    // Share of the pool's record constraint violation a local-search arm removed.
     Violation,
 
-    /** Short learned clauses a complete search derived: the conflicts that teach it most. */
+    // Short learned clauses: the conflicts that teach a complete search most.
     Glue,
 
-    /** Uses other arms made of this arm's shared clauses. */
+    // Uses other arms made of this arm's shared clauses, cuts and root bounds.
     ClauseUses,
 
-    /** Uses other arms made of this arm's shared cuts. */
     CutUses,
 
-    /** Uses other arms made of this arm's shared root bounds. */
     BoundUses,
 
-    /** A source-authorized terminal accepted by the coordinator. */
+    // A source-authorized terminal accepted by the coordinator.
     ProofClosure,
 }
 
-/** What a counted arm, local search or ALNS, earns: it finds and improves solutions and lowers violation. */
 internal val COUNTED_SIGNALS: Set<Signal> = setOf(Signal.FirstSolution, Signal.Improvement, Signal.Violation)
 
-/**
- * What a complete search, backtrack or open theory, earns on its own: it finds and improves solutions, fixes
- * variables at its root and learns clauses. What it shares earns the rest; see [PortfolioWorker.sharing].
- */
+// What a complete search earns on its own; what it shares earns the rest.
 internal val SEARCH_SIGNALS: Set<Signal> =
     setOf(Signal.FirstSolution, Signal.Improvement, Signal.RootFixings, Signal.Glue)
 
-/**
- * Turns the counters a segment reports into progress credit, the graded signal a search earns before it has
- * anything to show for itself.
- *
- * A complete-search arm is credited for variables newly fixed at its root, the one kind of progress no later search
- * undoes; its count is the most the arm has shown, so a re-seeded handle does not earn the same fixings twice. It
- * is credited too for the short clauses it learns, the conflicts that teach it most, though it has fixed nothing
- * yet. A local-search arm is credited for lowering the pool's record violation, by the share of the record it removed,
- * so getting close to a solution pays and merely matching the best so far does not.
- */
+// Graded credit a search earns before it has a solution to show. Root fixings are the one progress no later search
+// undoes; counting the most the arm has shown keeps a re-seeded handle from earning the same fixings twice. Violation
+// credit is the share of the pool's record removed, so matching the best so far earns nothing.
 internal class ProgressCredit(arms: Int) {
     private val rootFixedSeen = DoubleArray(arms)
     private val glueSeen = DoubleArray(arms)
@@ -164,7 +127,7 @@ internal class ProgressCredit(arms: Int) {
         glueSeen[arm] = 0.0
     }
 
-    /** Credit [arm] in [ledger] for the progress in [stats], cumulative for a resumable handle or one segment's. */
+    // stats are cumulative for a resumable handle, else one segment's.
     fun observe(ledger: RewardLedger, arm: Int, stats: SolveStats) {
         val fixed = stats.search.rootFixed.max
         if (fixed > rootFixedSeen[arm]) {
@@ -187,7 +150,6 @@ internal class ProgressCredit(arms: Int) {
     }
 }
 
-/** What the scheduler did with each arm over a run, reported as [SolveStats.portfolio]. */
 internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
     val progress = PortfolioProgressLog(workers)
     private val segments = LongArray(workers.size)
@@ -203,8 +165,6 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
     private val faults = LongArray(workers.size)
     private val reseeds = LongArray(workers.size)
 
-    /** One segment of [arm]: the [spent] work, the [elapsed] milliseconds, the [reward] it settled for, and whether
-     *  it [failed]. */
     fun record(arm: Int, spent: Long, elapsed: Long, reward: Double, failed: Boolean) {
         segments[arm]++
         work[arm] += spent
@@ -238,13 +198,12 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
         reseeds[arm]++
     }
 
-    /** Count a refuted claim against [arm]. */
+    // A refuted claim.
     fun fault(arm: Int) {
         faults[arm]++
     }
 
-    /** The schedule so far, with each arm's credit read from [ledger]. Replicas of one arm share a
-     *  worker label, so the second and later ones are numbered to keep each arm's report its own. */
+    // Replicas of one arm share a worker label, so the second and later ones are numbered.
     fun stats(ledger: RewardLedger, proofLedger: RewardLedger = ledger): PortfolioStats {
         val seen = HashMap<String, Int>()
         return PortfolioStats(

@@ -33,8 +33,7 @@ import com.eignex.util.hash.splitmix64
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.addExact
 
-/** Marks a bool var id into a range disjoint from int var ids in [RedundantConstraints.shallowKey]'s
- *  variable-set sum, so a bool var and an int var of the same id don't cancel or alias. */
+// Lifts bool var ids into a range disjoint from int var ids so the two cannot alias in a shallow key.
 private const val BOOL_VAR_MARK = 1L shl 40
 
 internal object RedundantConstraints {
@@ -46,15 +45,8 @@ internal object RedundantConstraints {
         if (scan != null && !scan.visit(units)) throw Interrupted()
     }
 
-    /**
-     * Subsumption entry point. Without [incremental] it recomputes from scratch. Given a
-     * [SubsumeIncremental] it maintains the phase-1/2 indices across rounds in [SubsumeIncremental.memo],
-     * reprocessing only the factors added / dropped since the pass last ran, so a fruitless re-run costs
-     * O(delta). Strict-subset analysis retains its own bounded continuation in the same memo.
-     *
-     * [ranges] is how wide each column is to the activity-based phases: a finite projection's folded
-     * domains, or what a source model states (see [removeRedundantSourceConstraints]).
-     */
+    // With [incremental], the phase-1/2 indices persist in [SubsumeIncremental.memo] and only factors added or
+    // dropped since the last run are reprocessed, so a fruitless re-run costs O(delta).
     fun removeRedundantConstraints(
         problem: Problem,
         ranges: ColumnRanges,
@@ -73,15 +65,8 @@ internal object RedundantConstraints {
         return delta
     }
 
-    /**
-     * The part of subsumption that reads declarations and factors alone.
-     *
-     * Phases 1, 2 and 4 compare rows against each other — exact duplicates, same-vector domination, and
-     * knapsacks an at-most-one clique already implies — so each drop is justified by another retained
-     * row rather than by any column's finite extent. Phases 3 and 5 charge a column its whole width, so
-     * they run here over what the source states and decline the individual row or global that mentions a
-     * column with an open side. The model being open somewhere else costs them nothing.
-     */
+    // Phases 1, 2 and 4 justify each drop by another retained row, never by a column's extent. Phases 3 and 5
+    // charge a column its whole width, so here they decline any row or global mentioning an open column side.
     fun removeRedundantSourceConstraints(
         problem: Problem,
         cancellation: ExecutionControl,
@@ -90,8 +75,7 @@ internal object RedundantConstraints {
         problem, ColumnRanges.of(problem.intBounds), cancellation, memo?.subsets,
     ).asSourceDelta()
 
-    // Debug switch: every incremental firing also recomputes the full delta and asserts the two agree, so a
-    // divergence throws on the exact instance/round. Off in production (the full recompute defeats the point).
+    // Debug switch: every incremental firing also recomputes the full delta and asserts the two agree.
     private const val SUBSUME_DIFFERENTIAL_CHECK = false
 
     private fun assertMatchesFull(problem: Problem, ranges: ColumnRanges, delta: PassDelta) {
@@ -102,29 +86,16 @@ internal object RedundantConstraints {
     }
 
     /**
-     * Constraint subsumption / redundant-constraint removal: drop a constraint implied by
-     * another retained one, preserving the feasible set exactly. Phases 1 and 2 run here, the rest in
-     * [finishAfterPhase2]:
+     * Drops constraints implied by another retained one, preserving the feasible set exactly:
+     *  1. Exact duplicates by `Factor.structuralKey`; unkeyed factors are always kept.
+     *  2. Same-vector domination over [Linear] / [PseudoBoolean] inequalities, each `≥` normalized to `≤`
+     *     and GCD-reduced: among rows sharing a reduced coefficient vector the tightest bound implies the
+     *     rest. An `=` drops looser rows but is never dropped here.
+     *  3. Variable-subset / proportional domination ([SubsetDomination]).
+     *  4. Clique-implied knapsacks ([dropCliqueImpliedKnapsacks]).
+     *  5. Vacuous globals ([isVacuousGlobal]).
      *
-     *  1. **Exact duplicates** — any factor whose `Factor.structuralKey` equals an earlier kept one is
-     *     redundant (the keys are collision-free up to variable identity, so an equal key means an
-     *     equal constraint). Unkeyed factors (`null` key) are never matched and always kept.
-     *  2. **Same-vector domination** — over the [Linear] / [PseudoBoolean] inequalities, normalising
-     *     each `≥` to a `≤` (negating coefficients and bound) and GCD-reducing it, constraints sharing
-     *     a reduced coefficient vector are comparable: the tightest (smallest `≤` bound) implies the
-     *     rest, so only it is kept. An `=` over the same vector contributes its bound to *both*
-     *     directions and implies (drops) any looser `≤` / `≥`, but is itself never dropped here.
-     *  3. **Variable-subset / proportional domination** ([SubsetDomination]) — a `≤`-row whose
-     *     support is a strict subset of another's, with coefficients a positive multiple of it on the
-     *     shared variables and a bound that implies the larger row's (after charging the extra terms
-     *     their maximal activity), drops the larger row across *different* supports.
-     *  4. **Clique-implied knapsacks** ([dropCliqueImpliedKnapsacks]).
-     *  5. **Vacuous globals** ([isVacuousGlobal]).
-     *
-     * The GCD reduction in step 2 makes the pass effective standalone — proportional rows match even
-     * when coefficient strengthening hasn't run first. Self-redundant rows
-     * (maximal activity already within the bound) are dropped by the strengthen lift, so this pass is
-     * purely cross-constraint.
+     * Self-redundant rows are left to coefficient strengthening, so this pass is purely cross-constraint.
      */
     private fun computeFull(
         problem: Problem,
@@ -146,10 +117,8 @@ internal object RedundantConstraints {
     private fun survivorsOfPhases1And2(problem: Problem, scan: ScanMeter): List<Factor> {
         if (!scan.check()) throw Interrupted()
         val factors = problem.factors
-        // Phase 1: exact-duplicate removal by structural key, two-tier so the full key (which for a
-        // Table embeds its entire sorted tuple set) is built only when it can matter. A cheap
-        // [shallowKey] buckets the factors; the full `Factor.structuralKey` is computed and compared only
-        // for factors that collide on it (true duplicates always do).
+        // Phase 1 is two-tier: a cheap [shallowKey] buckets the factors, and the full structural key (a
+        // Table's embeds its whole tuple set) is built only on a collision. True duplicates always collide.
         val deduped = ArrayList<Factor>(factors.size)
         val firstByShallow = HashMap<Long, Factor>()
         val keysByShallow = HashMap<Long, HashSet<StructuralKey>>()
@@ -188,8 +157,7 @@ internal object RedundantConstraints {
         }
         for (f in deduped) {
             visit(scan)
-            // Every exact row (integer-linear or Boolean-literal, over any factor) feeds the dominator
-            // buckets through the uniform [offerForms] view; a `≥`/`=` also offers its opposite direction.
+            // An `=` also offers its opposite direction.
             for (n in offerForms(f, scan)) {
                 visit(scan)
                 offer(n.key, n.bound, fromEq = n.fromEq)
@@ -221,8 +189,7 @@ internal object RedundantConstraints {
         return out
     }
 
-    /** Phases 3–5 over the phase-1/2 survivor list [out] (in `Problem.factors` order), recovering the
-     *  dropped input indices. Shared by the from-scratch and the incremental path. */
+    // [out] holds the phase-1/2 survivors in `Problem.factors` order.
     private fun finishAfterPhase2(
         problem: Problem,
         ranges: ColumnRanges,
@@ -237,9 +204,8 @@ internal object RedundantConstraints {
         // a variable contained only in it, which the affine pass then projects out (implied-free).
         val out5 = out4.filterNot { isVacuousGlobal(it, ranges) }
         if (out5.size == factors.size) return PassDelta()
-        // This pass only drops; every survivor in [out5] is identity-equal to an input factor, in input
-        // order, so a two-pointer walk recovers the dropped input indices (correct even with reference
-        // duplicates, which Phase 1 collapses to one survivor).
+        // Survivors are identity-equal to input factors in input order, so a two-pointer walk recovers the
+        // dropped indices.
         val dropped = IntArrayList(factors.size - out5.size)
         var p = 0
         for (i in factors.indices) {
@@ -248,8 +214,7 @@ internal object RedundantConstraints {
         return PassDelta(dropped.toIntArray())
     }
 
-    /** The factors added / dropped since subsume last ran, plus its persistent [memo]. [rebuild] forces a
-     *  full rebuild of the memo from the whole live set (first run, or after a reseed invalidated it). */
+    // [rebuild] forces a full memo rebuild from the whole live set: first run, or after a reseed invalidated it.
     internal class SubsumeIncremental(
         val rebuild: Boolean,
         val liveIds: IntArray,
@@ -260,22 +225,15 @@ internal object RedundantConstraints {
 
     internal class SubsumeFactor(val id: Int, val factor: Factor)
 
-    /**
-     * Persistent phase-1 (exact-duplicate) and phase-2 (same-vector domination) indices, maintained
-     * across subsume firings so a re-run reprocesses only the delta instead of rescanning every factor.
-     * Phase 2 keeps at most one representative `≤`-row per coefficient-vector bucket, so per bucket the
-     * only live drop-candidate is that representative — a re-run reconciles it against the delta in O(1).
-     *
-     * A dropped drop-candidate keeps its bucket offer the round it is dropped (the from-scratch path
-     * offers every deduped row *before* deciding drops), so it is retracted only on the next firing:
-     * other passes' drops arrive via [SubsumeIncremental.droppedIds]; subsume's own drops fall before
-     * the next change-mark and are carried over to the next firing internally.
-     */
+    // Persistent phase-1/2 indices. Phase 2 keeps at most one representative `≤`-row per bucket, so a re-run
+    // reconciles each bucket against the delta in O(1).
+    //
+    // A dropped row keeps its bucket offer the round it is dropped, as the from-scratch path offers every
+    // deduped row before deciding drops, so it is retracted only on the next firing.
     internal class SubsumeMemo : SubsumeState {
         val subsets = SubsetDomination()
 
-        // Long-keyed to avoid boxing the shallow key on every factor: a clause-heavy model registers
-        // hundreds of thousands of factors, and a `HashMap<Long, …>` would box the key on each lookup.
+        // Long-keyed so clause-heavy models don't box the shallow key on every lookup.
         private val shallowSingle = MutableLongObjectMap<SubsumeFactor>()
         private val shallowMulti = MutableLongObjectMap<HashMap<StructuralKey, SubsumeFactor>>()
         private val buckets = HashMap<TermKey, Bucket>()
@@ -284,8 +242,7 @@ internal object RedundantConstraints {
         // Stable occurrence ids keep a duplicate's retraction separate from its retained representative.
         private var pendingSelfDrops = IntArray(0)
 
-        // Set when a rebuild bailed on the presolve deadline, leaving the indices cleared — the next
-        // reconcile must rebuild rather than apply a delta against the empty index.
+        // A rebuild that bailed on the deadline left the indices cleared, so the next reconcile must rebuild.
         private var bailedRebuild = false
 
         private fun clearIndices() {
@@ -295,8 +252,6 @@ internal object RedundantConstraints {
             indexed.clear()
         }
 
-        /** A coefficient-vector bucket: the multiset of `≤` offer bounds (and which are equalities, for
-         *  the equality-dominates rule) and the single surviving representative row, if any. */
         private class Bucket {
             val bounds = MutableLongIntMap()
             val eqBounds = MutableLongIntMap()
@@ -326,17 +281,12 @@ internal object RedundantConstraints {
             }
         }
 
-        /** Reconcile the memo with the current live set and return the phase-1/2 survivor list in
-         *  `Problem.factors` order. On [SubsumeIncremental.rebuild] the memo is rebuilt from scratch;
-         *  otherwise only the delta is applied. */
         fun reconcile(
             problem: Problem,
             inc: SubsumeIncremental,
             cancellation: ExecutionControl = ExecutionControl.Never,
         ): List<Factor> {
             val drops = IntHashSet()
-            // A prior firing that bailed mid-rebuild left the memo cleared, so it must rebuild (not apply a
-            // delta against an empty index).
             if (inc.rebuild || bailedRebuild) {
                 clearIndices()
                 pendingSelfDrops = IntArray(0)
@@ -371,9 +321,7 @@ internal object RedundantConstraints {
             pendingSelfDrops = allDropped
         }
 
-        // Phase 1: register [entry], returning true if it is a fresh survivor and false if it duplicates a
-        // kept factor. Mirrors the from-scratch two-tier dedup — the full structural key is built only on
-        // a shallow-key collision — so the lazy single-survivor slot never computes a key.
+        // Mirrors the from-scratch two-tier dedup, so the lazy single-survivor slot never computes a key.
         private fun registerP1(entry: SubsumeFactor): Boolean {
             val f = entry.factor
             val sk = shallowKey(f)
@@ -471,8 +419,6 @@ internal object RedundantConstraints {
         }
     }
 
-    /** Replay the from-scratch phase-2 offer sequence for [f]: each exact `≤`-row (a `≥` folded to `≤`,
-     *  an `=` contributing both directions). Mirrors the from-scratch [offerForms] loop. */
     private inline fun forEachOffer(f: Factor, action: (key: TermKey, bound: Long, eq: Boolean) -> Unit) {
         for (n in offerForms(f)) {
             action(n.key, n.bound, n.fromEq)
@@ -480,12 +426,8 @@ internal object RedundantConstraints {
         }
     }
 
-    /** Whether [factor] is a global constraint that the current [ranges] make *vacuously* satisfied —
-     *  it can never prune, so dropping it preserves the feasible set exactly. Detects an [AllDifferent]
-     *  whose variables have pairwise-disjoint domains (no two can ever be equal, so distinctness always
-     *  holds — for the plain, opt, and `_except` variants alike, since absence and excepted values only
-     *  relax the constraint). Disjointness is tested on the `[min, max]` intervals
-     *  (a sound sufficient condition; hole-induced disjointness is conservatively not claimed). */
+    // An AllDifferent over pairwise-disjoint `[min, max]` intervals can never prune, for every variant:
+    // absence and excepted values only relax it. Hole-induced disjointness is not claimed.
     private fun isVacuousGlobal(factor: Factor, ranges: ColumnRanges): Boolean {
         if (factor !is AllDifferent || factor.vars.size < 2) return false
         // Disjointness is a claim about where each column can sit, so a column with an open side leaves
@@ -499,24 +441,15 @@ internal object RedundantConstraints {
         return true
     }
 
-    /** Poll the cancellation once per this many factors while rebuilding the subsume memo from scratch. */
     private const val REBUILD_CANCEL_POLL_MASK = 0x3FF
 
     /**
-     * Clique-aware redundancy. An at-most-one (AMO) clique over a set of literals — at most one
-     * is satisfied — caps the contribution of those literals to a `≤` pseudo-Boolean knapsack at the
-     * single largest weight. So if covering a knapsack `Σ wⱼ·lⱼ ≤ b` (positive weights) with the
-     * model's AMO cliques brings its clique-aware maximal activity to `≤ b`, the knapsack holds for
-     * every clique-respecting assignment and is redundant — drop it (the clique factors stay, so
-     * soundness is preserved). The greedy cover yields *some* valid activity upper bound; a looser
-     * cover only misses drops, never makes an unsound one.
+     * Drops a knapsack `Σ wⱼ·lⱼ ≤ b` (positive weights) whose maximal activity, with each at-most-one clique
+     * contributing only its largest weight, is already `≤ b`. A greedy cover gives a valid upper bound; a
+     * looser one only misses drops.
      *
-     * Only [maximalPersistentAmoCliques] (cliques backed by [Cardinality] / [Clause],
-     * never a knapsack) are used: a clique implied by a knapsack holds only while that knapsack stays,
-     * so dropping by it could remove the very constraint it rests on.
-     *
-     * Clique-based coefficient lifting is excluded because naively clamping to the clique-reduced slack
-     * is unsound.
+     * Only [maximalPersistentAmoCliques] (backed by [Cardinality] / [Clause], never a knapsack) are used: a
+     * clique implied by a knapsack could justify dropping the very constraint it rests on.
      */
     private fun dropCliqueImpliedKnapsacks(factors: List<Factor>, cancellation: ExecutionControl): List<Factor> {
         val candidates = ArrayList<Pair<Int, LinearRow>>()
@@ -541,9 +474,6 @@ internal object RedundantConstraints {
         return factors.filterIndexed { i, _ -> i !in dropped }
     }
 
-    /** Whether the AMO [cliques] force `Σ wⱼ·lⱼ ≤ bound` (all weights > 0): greedily cover the
-     *  knapsack literals with cliques (each contributing only its max assigned weight) and compare the
-     *  resulting activity upper bound to the bound. */
     private fun cliqueImpliesKnapsack(knapsack: LinearRow, cliques: List<Set<Int>>): Boolean = try {
         cliqueActivityWithinBound(knapsack, cliques)
     } catch (_: CheckedLongOverflowException) {
@@ -577,25 +507,18 @@ internal object RedundantConstraints {
         return activity <= knapsack.bound
     }
 
-    /** A linear / pseudo-Boolean constraint as a `≤`-normalised bucket contribution: [key] is the
-     *  coefficient vector (a `≥` folds to `≤` by negating), [bound] the `≤` right-hand side. [fromEq]
-     *  marks an equality (it also contributes its [opposite] direction and is never itself dropped).
-     *  `null` for `≠` and non-(Linear/PseudoBoolean) factors, which take no part in domination. */
+    // [fromEq] marks an equality, which also contributes its [opposite] direction and is never dropped.
     private class IneqForm(val key: TermKey, val bound: Long, val fromEq: Boolean, val opposite: IneqForm? = null) {
         fun copyWithOpposite(opp: IneqForm) = IneqForm(key, bound, fromEq, opp)
     }
 
-    /** Every exact [LinearRow] of [f] as `≤`-normalised [IneqForm]s (each `=` row carries its opposite
-     *  direction), for offering into the dominator buckets. Clause-shaped rows are skipped (see [rowForm]). */
     private fun offerForms(f: Factor, scan: ScanMeter? = null): List<IneqForm> =
         f.impliedLinearRows.mapNotNull {
             visit(scan)
             rowForm(it, scan)
         }
 
-    /** The `≤`-normalised [IneqForm] of [f] when it is a single-row inequality (the only shape this pass
-     *  drops as dominated), else `null` — a multi-row factor (cardinality, increasing chain) offers its
-     *  rows but is never itself dropped here. */
+    // A multi-row factor offers its rows but is never itself dropped as dominated.
     private fun dropForm(f: Factor, scan: ScanMeter? = null): IneqForm? =
         if (f.linearForm is LinearForm.Conjunction) {
             f.impliedLinearRows.singleOrNull()?.let { rowForm(it, scan) }
@@ -603,14 +526,8 @@ internal object RedundantConstraints {
             null
         }
 
-    /**
-     * A single exact [LinearRow] as its `≤`-normalised [IneqForm], keyed uniformly over the row's tagged
-     * term refs — integer-variable and Boolean-literal refs occupy disjoint tag ranges, so an integer
-     * and a Boolean constraint never share a bucket with no extra discriminator. A `≥` folds to `≤` by
-     * negating, an `=` carries its opposite direction. `null` for a `≠` row or a pure clause
-     * `Σ literals ≥ 1` — the clause is kept out of the buckets so a clause-heavy SAT model stays a
-     * phase-2 no-op (clause subsumption is BVE's job).
-     */
+    // Pure clauses stay out of the buckets so a clause-heavy model is a phase-2 no-op; clause subsumption
+    // belongs to BVE.
     private fun rowForm(row: LinearRow, scan: ScanMeter?): IneqForm? {
         visit(scan)
         if (row.constants !is IntegerConstants) return null
@@ -648,8 +565,6 @@ internal object RedundantConstraints {
         }
     }
 
-    /** A pure clause `Σ literals ≥ 1` (all-Boolean terms, unit coefficients) — skipped by [rowForm]
-     *  without materialising its terms, so a clause-heavy model pays nothing here. */
     private fun isPureClause(row: LinearRow, scan: ScanMeter?): Boolean {
         if (row.relation != LinearOp.GE || row.bound != 1L) return false
         for (k in 0 until row.size) {
@@ -665,10 +580,8 @@ internal object RedundantConstraints {
             -xs[it]
         }
 
-    /** A `≤`-form `Σ coeffs·refs ≤ bound`, GCD-reduced so proportional rows (`x+y ≤ 2` and `2x+2y ≤ 4`)
-     *  share a bucket even when coefficient strengthening hasn't normalised them
-     *  first. Dividing by the coefficient GCD `g` and flooring the bound is exact: the left side is
-     *  a multiple of `g`, so `Σ c·t ≤ b ⟺ Σ (c/g)·t ≤ ⌊b/g⌋`. */
+    // GCD reduction lets proportional rows share a bucket. Flooring the bound is exact: the left side is a
+    // multiple of `g`, so `Σ c·t ≤ b ⟺ Σ (c/g)·t ≤ ⌊b/g⌋`.
     private fun reducedIneq(
         refs: IntArray,
         coeffs: LongArray,
@@ -688,9 +601,8 @@ internal object RedundantConstraints {
         }
     }
 
-    /** A `≤`-normal-form bucket key: the `(ref, coeff)` pairs sorted by ref. Disjoint integer/Boolean ref
-     *  tags keep the two constraint kinds apart, and a literal's polarity is baked into its ref, so `x`
-     *  and `¬x` never share a term. */
+    // `(ref, coeff)` pairs sorted by ref. Disjoint integer and Boolean ref tags keep the two kinds apart, and
+    // a literal's polarity is part of its ref.
     private data class TermKey(val terms: List<Long>)
 
     private fun refKey(refs: IntArray, coeffs: LongArray, scan: ScanMeter?): TermKey {
@@ -706,13 +618,8 @@ internal object RedundantConstraints {
         return TermKey(terms)
     }
 
-    /** A cheap discriminator for Phase-1 duplicate bucketing: a commutative splitmix sum of the variable
-     *  ids (bool ids marked into a disjoint range) plus the arity-derived `Factor.structuralKeyWeight`,
-     *  never a Table's tuple payload. It is **order-invariant** so
-     *  it is implied by full structural-key equality (a [Linear]'s key compares its terms as a var→coeff
-     *  map, not positionally, so an order-sensitive hash would split genuine duplicates into different
-     *  buckets and miss them). True duplicates therefore always share it; unrelated collisions are
-     *  harmless — they only fall through to the exact full-key comparison. */
+    // Order-invariant so full structural-key equality implies it: a Linear's key compares its terms as a
+    // var→coeff map, not positionally. Collisions only fall through to the full-key comparison.
     private fun shallowKey(f: Factor, scan: ScanMeter? = null): Long {
         var vsum = 0L
         for (v in f.intVars) {

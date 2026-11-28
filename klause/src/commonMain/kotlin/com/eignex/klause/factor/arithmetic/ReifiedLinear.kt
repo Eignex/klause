@@ -28,16 +28,15 @@ import com.eignex.util.numbers.BigInt
 /**
  * `auxBoolVar ↔ (Σ coeff(i)·vars(i) ⟨op⟩ bound)`. Created by the compiler when a
  * multi-variable [com.eignex.klause.model.IntCompare] appears non-top-level so the rest of the
- * Tseitin lowering can treat its truth as a Boolean literal. Payload at `longPayload(factorId)`
- * is the current weighted sum, mirrored from [Linear]. Terms pair [vars] with the coefficients in
- * [constants]; the sum is compared by [op] against that shape's bound.
+ * Tseitin lowering can treat its truth as a Boolean literal. Terms pair [vars] with the coefficients
+ * in [constants]; [op] compares their sum against the bound.
  */
 class ReifiedLinear private constructor(
     override val auxBoolVar: Int,
     terms: CoalescedTerms,
     val op: LinearOp,
     rawBound: Long,
-    // Over-64-bit integer coefficients and bound, carried exactly. Null for the plain integer form.
+    // Over-64-bit integer constants only.
     wideCoeffsIn: Array<BigInt>? = null,
     wideBoundIn: BigInt? = null,
 ) : ReifiedFactor {
@@ -45,9 +44,8 @@ class ReifiedLinear private constructor(
     val vars: IntArray = terms.vars
 
     /**
-     * The row's coefficients and right-hand side, at the width that holds them exactly. A consumer narrows
-     * to [integerConstants] to reason in 64 bits, or reads [IntegralConstants] for exact arbitrary
-     * precision; a reified row keeps its op, so nothing is negated here.
+     * The row's coefficients and right-hand side at the width that holds them exactly. Unlike [Linear], a
+     * reified row keeps its op, so nothing is negated.
      */
     val constants: IntegralConstants = if (wideCoeffsIn != null) {
         WideConstants(WideConsts(wideCoeffsIn), wideBoundIn!!)
@@ -55,7 +53,7 @@ class ReifiedLinear private constructor(
         IntegerConstants(constsOf(terms.coeffs), rawBound)
     }
 
-    /** The row read as plain 64-bit integer arithmetic, or `null` when its constants are wider. */
+    /** The row's 64-bit integer constants, or `null` when they are wider. */
     val integerConstants: IntegerConstants? get() = constants as? IntegerConstants
 
     /** The row's over-64-bit constants, or `null` when it is not one. */
@@ -84,11 +82,7 @@ class ReifiedLinear private constructor(
     )
     override val variables: VarList = MixedVars(boundInts = vars, boolVars = intArrayOf(auxBoolVar))
 
-    /**
-     * `auxBoolVar ↔ (Σ coeffs(i) * vars(i) ⟨op⟩ bound)`. Duplicate variables are coalesced
-     * (their coefficients summed) so the local-search payload stays consistent regardless of
-     * caller.
-     */
+    /** `auxBoolVar ↔ (Σ coeffs(i) * vars(i) ⟨op⟩ bound)`. Duplicate variables are coalesced by summing. */
     constructor(auxBoolVar: Int, coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int) :
         this(auxBoolVar, coalesceLinearTerms(vars, coeffs), op, bound.toLong())
 
@@ -97,8 +91,7 @@ class ReifiedLinear private constructor(
         this(auxBoolVar, coalesceLinearTerms(vars, coeffs), op, bound)
 
     override fun remap(mapping: VarRemap): Factor = when (val c = constants) {
-        // A colouring map can collapse two of the row's vars onto one image, so coalesce their exact
-        // coefficients (summing) to keep one term per variable, which the interval propagator requires.
+        // A colouring map can collapse two vars onto one image, and the propagator needs one term per variable.
         is WideConstants -> {
             val (rv, rc) = coalesceWide(mapping.ints(vars), c.coefficients.toTypedArray())
             ReifiedLinear(mapping.bool(auxBoolVar), rv, rc, op, c.bound)
@@ -118,8 +111,7 @@ class ReifiedLinear private constructor(
         sink.boolVar(auxBoolVar)
         sink.enum(op)
         when (val c = constants) {
-            // A wide row keys on its exact BigIntegers: feed the decimal strings char-by-char with an
-            // out-of-char separator so distinct wide rows never collide.
+            // Decimal digits with an out-of-char separator, so distinct wide rows never collide.
             is WideConstants -> {
                 val digits = c.keyDigits
                 for (code in digits[0]) sink.long(code)
@@ -137,9 +129,7 @@ class ReifiedLinear private constructor(
         }
     }
 
-    // A wide row has no 64-bit payload to read; local search scores it with an exact-sum invariant instead.
-    // The conservative "always violated" / max-residual values cannot let a caller accept an assignment
-    // that breaks it.
+    // A wide row has no 64-bit payload; the conservative answers cannot accept an assignment that breaks it.
     override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean =
         integerConstants?.let { linearHolds(state.longPayload[factorId], op, it.bound) } ?: false
 

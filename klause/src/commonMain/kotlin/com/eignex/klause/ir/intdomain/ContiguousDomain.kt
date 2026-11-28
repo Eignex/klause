@@ -7,7 +7,6 @@ import com.eignex.klause.ir.IntSpan
 import com.eignex.klause.ir.defaultDomainStorageSettings
 import com.eignex.util.collections.storage.PackedBits
 
-/** Contiguous `(min..max)`, no interior holes. */
 internal class ContiguousDomain(
     override val min: Long,
     override val max: Long,

@@ -2,6 +2,7 @@ package com.eignex.klause.factor.global
 
 import com.eignex.klause.config.DEFAULT_DOMAIN_WALK_CAP
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
+import com.eignex.klause.factor.global.internals.GccAssignmentReplay
 import com.eignex.klause.factor.global.internals.GccIncrementalState
 import com.eignex.klause.factor.global.internals.GccPropCache
 import com.eignex.klause.factor.table.internals.allEventWatches
@@ -20,7 +21,6 @@ import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.MutableIntIntMap
 import com.eignex.util.collections.MutableLongIntMap
 
-/** CP propagation logic for `global_cardinality`. */
 internal class GlobalCardinalityPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,
@@ -38,20 +38,16 @@ internal class GlobalCardinalityPropagator(
 
     override val expensiveBake: Boolean get() = true
 
-    // Plain (no-presence) path: subscribe to every int-domain event on the constrained variables and
-    // consume the dirty-variable delta, so a fire re-blocks only the var→cover edges of the variables
-    // that actually changed instead of the O(n·m) full scan. The optional-variable path keeps the
-    // occurrence-list wakeup (its presence bools are not int events).
+    // Without presence literals a fire re-blocks only the var→cover edges of the changed variables. The
+    // optional path keeps occurrence-list wakeup because presence bools are not int events.
     override val initialIntEventWatches: IntArray? =
         if (presents.isEmpty()) allEventWatches(intVars) else null
 
     override val consumesIntEventDelta: Boolean = presents.isEmpty()
 
-    /** var id → its index in [xs], to map the changed-variable delta onto the block scan (plain path). */
     private val xsIndexOf: MutableIntIntMap = MutableIntIntMap(xs.size)
 
-    /** Whether [xs] repeats a variable — then one var id maps to several indices and the delta-driven
-     *  block scan (which keys on a single index) would miss one, so that path scans every variable. */
+    // A repeated var id maps to several indices, which the delta-driven block scan would miss.
     private val xsHasDups: Boolean = run {
         var dup = false
         for (i in xs.indices) {
@@ -72,10 +68,8 @@ internal class GlobalCardinalityPropagator(
             if (lit != Lit.NONE && seen.add(lit)) out.add(lit)
         }
 
-        /** [x] took [value]. */
         fun pinned(x: Int, value: Long) = add(Lit.make(state.atomVarEq(x, value), false))
 
-        /** [value] had left [x]'s domain. */
         fun lacks(x: Int, value: Long) = add(
             if (state.undoLogging) {
                 state.exclusionLiteral(x, value, state.undo.size)
@@ -86,7 +80,7 @@ internal class GlobalCardinalityPropagator(
             },
         )
 
-        /** Every value outside the cover had left [x]'s domain. */
+        // Every value outside the cover had left x's domain.
         fun lacksOthers(x: Int) {
             collectHoleAndBoundAntecedents(state, intArrayOf(x))?.forEach { add(it) }
         }
@@ -120,11 +114,8 @@ internal class GlobalCardinalityPropagator(
         presence()
     }
 
-    /**
-     * No flow reaches from the nodes [reach] marks back to the far side: only an edge leaving one of its variables
-     * could open a path, so the reason is every var→value edge they lack (the values that had left their domains),
-     * with the count bounds the network's capacities read.
-     */
+    // Only an edge leaving a reached variable could reopen a path, so the reason is every var→value edge the
+    // reached variables lack, plus the count bounds the capacities read.
     private fun cutReason(
         state: PropagationState,
         xs: IntArray,
@@ -165,18 +156,11 @@ internal class GlobalCardinalityPropagator(
         return out
     }
 
-    /**
-     * Bring [inc]'s reversible `definite`/`possible` counts up to the current domains. A first fire or a
-     * backtrack that restored (widened) any domain forces a full recount; otherwise only the variables
-     * whose domain shrank since the last fire are patched — each deleted cover value drops `possible`,
-     * and a variable reaching a singleton on a cover value is counted into `definite` exactly once. The
-     * per-var `domRef` is then re-based to the current domains for the next delta.
-     */
+    // A first fire or a widened domain forces a full recount; otherwise only shrunk domains are patched.
     private fun maintainCounts(state: PropagationState, inc: GccIncrementalState) {
         val n = inc.n
-        // A domain larger than the walk cap cannot be walked to detect widening or to count cover
-        // membership. Force a full rebuild (below, counted span-safely per variable) rather than the
-        // incremental delta, whose widen/leave scans enumerate the domain value-by-value.
+        // The incremental delta enumerates domains value by value, so a domain past the walk cap forces
+        // the span-safe full rebuild.
         val anyWide = (0 until n).any { state.intDomains[inc.xs[it]].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null }
         var rebuild = inc.valid.value == 0 || anyWide
         if (!rebuild) {
@@ -210,8 +194,6 @@ internal class GlobalCardinalityPropagator(
                         if (k >= 0) inc.possible[k] = inc.possible[k] + 1
                     }
                 } else {
-                    // Iterate the (small) cover set and test membership — span-independent, and only
-                    // cover values contribute to the counts anyway.
                     for (k in cover.indices) if (cover[k] in d) inc.possible[k] = inc.possible[k] + 1
                 }
                 if (d.min == d.max) {
@@ -248,7 +230,6 @@ internal class GlobalCardinalityPropagator(
             state.refPayload[factorId] = fresh
             fresh
         }
-        // Plain path: the changed-variable delta drives the fast-path skip and the incremental block scan.
         val dirty = if (presents.isEmpty()) state.drainIntEventDirtyVars(factorId) else emptyIntArray()
         if (presents.isEmpty() && intVars.isNotEmpty() && cache.cachedDoms[0] != null && dirty.isEmpty()) {
             return true
@@ -306,10 +287,8 @@ internal class GlobalCardinalityPropagator(
             }
         }
         val cvArr = countVars
-        // Per-cover `definite` (vars pinned to cover[k]) and `possible` (vars whose domain holds it)
-        // counts. On the plain (no-presence) path these are maintained incrementally on the undo trail —
-        // a fire patches only the vars whose domain changed since the last fire; the optional-variable
-        // path recounts fully (maybeXs is only non-empty there).
+        // `definite` counts vars pinned to cover(k), `possible` vars whose domain holds it. Only the
+        // no-presence path maintains them incrementally on the trail.
         val incCounts: GccIncrementalState? = if (presents.isEmpty()) {
             val cur = cache.inc?.takeIf { it.xs.contentEquals(effectiveXs) && it.m == m }
                 ?: GccIncrementalState(state, effectiveXs, m).also { cache.inc = it }
@@ -382,13 +361,11 @@ internal class GlobalCardinalityPropagator(
         val source = 0
         val sink = 1
         // Node ids: variable i is `2 + i`, cover value k is `2 + n + k`.
+        val firstValue = 2 + n
         val flow = cache.flow
-        // The fixed-bound, no-presence path keeps a persistent, reversible network (see [GccPropCache] /
-        // [GccFlowBuilder]): the edge set is built once for the root (widest) domains and the flow lives on
-        // the undo trail, so a fire only blocks the var→cover edges whose value left and — since removing a
-        // flow-FREE edge cannot lower the (already maximum, still feasible) flow — needs no re-solve. A
-        // removed flow-CARRYING edge (a broken assignment) is rerouted in place, or re-solved on the same
-        // structure when no alternate path exists.
+        // The fixed-bound, no-presence path keeps a persistent network built for the root domains, with the
+        // flow on the trail. Removing a flow-free edge keeps the flow maximum; a removed flow-carrying edge is
+        // rerouted in place, or re-solved on the same structure when no alternate path exists.
         val persistentEligible = presents.isEmpty() && countVars == null
         val xToCovEdgeIdx: IntArray
         val xToOtherEdgeIdx: IntArray
@@ -397,30 +374,23 @@ internal class GlobalCardinalityPropagator(
         val superSource: Int
         val superSink: Int
         val requiredSSFlow: Int
-        var needFlowSolve = true // false on the fast reuse path (flow persists, unchanged)
-        // Whether the residual graph changed this fire. A rebuild always changes it; a reuse fire that
-        // blocks no edge and reroutes nothing leaves the flow byte-identical to the previous fire, so its
-        // SCC partition and prune are unchanged — the pass already reached fixpoint and can be skipped.
+        var needFlowSolve = true
+        // A reuse fire that blocks no edge leaves the flow identical to the previous fire, whose SCC prune
+        // already reached fixpoint.
         var residualChanged = true
         if (persistentEligible && cache.structBuilt && flow.frozen && cache.sN == n && cache.sM == m) {
             xToCovEdgeIdx = cache.pXToCov
-            xToOtherEdgeIdx = cache.xToOther(n) // no-other case: all -1
+            xToOtherEdgeIdx = cache.xToOther(n)
             otherNode = -1
             baseNodes = cache.sBaseNodes
             superSource = cache.sSuperSource
             superSink = cache.sSuperSink
             requiredSSFlow = cache.sRequiredSSFlow
-            // Incremental repair: block every newly-absent var→cover edge; a flow-free one just drops out
-            // (the flow stays maximum), a flow-carrying one (a broken assignment) is recovered in place by
-            // rerouting that variable's unit along an alternate path. Only if a reroute has no alternate do
-            // we fall back to a full re-solve.
             var needResolve = false
             var touchedFlow = false
 
-            // Block the newly-absent var→cover edges of the changed variables (`dirty` from the int-event
-            // delta), recovering a broken assignment in place. Only a variable whose domain shrank can have
-            // a newly-absent edge, so scanning just those is complete; a repeated `xs` (one var id → several
-            // indices) can't be keyed by the delta, so that rare case scans every variable.
+            // Only a variable whose domain shrank can have a newly-absent edge, so scanning the dirty
+            // variables is complete.
             fun blockVar(i: Int) {
                 val d = state.intDomains[effectiveXs[i]]
                 for (k in 0 until m) {
@@ -444,8 +414,6 @@ internal class GlobalCardinalityPropagator(
             }
             residualChanged = touchedFlow
             if (needResolve) {
-                // A variable's unit could not be rerouted locally: clear the residual, block every absent
-                // edge, and re-solve from the surviving assignment (replay + max flow) below.
                 flow.resetFlow()
                 for (i in 0 until n) {
                     val d = state.intDomains[effectiveXs[i]]
@@ -455,7 +423,6 @@ internal class GlobalCardinalityPropagator(
                     }
                 }
             } else {
-                // Fully recovered in place: the flow is still maximum and feasible.
                 needFlowSolve = false
             }
         } else {
@@ -464,8 +431,7 @@ internal class GlobalCardinalityPropagator(
                 var any = false
                 for (i in 0 until n) {
                     val d = state.intDomains[effectiveXs[i]]
-                    // A domain larger than the walk cap (far exceeding the finite cover) is over-approximated
-                    // as holding a value outside the cover — sound, and never walked to find out.
+                    // A domain past the walk cap is over-approximated as holding a value outside the cover.
                     val found = if (d.spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null) {
                         true
                     } else {
@@ -483,12 +449,16 @@ internal class GlobalCardinalityPropagator(
             superSource = baseNodes
             superSink = baseNodes + 1
             flow.reset(baseNodes + 2)
+            val replay = if (presents.isEmpty()) {
+                (cache.assignmentReplay ?: GccAssignmentReplay(n, m).also { cache.assignmentReplay = it })
+                    .also { it.reset() }
+            } else {
+                null
+            }
             val excess = cache.excess(baseNodes + 2)
-            // Freeze a persistent structure only on the FIRST build: that fire sees the widest (root)
-            // domains, so its edge set and no-other layout span every later state. `anyOther` is not
-            // monotone (search can prune then a backtrack restore a non-cover value), so persisting on a
-            // later build could omit edges/other-node the restored domain needs. A persistent structure
-            // owns its edge-index map; the pooled buffer is reused per fire otherwise.
+            // Persist only the first build, which sees the root domains and so spans every later state.
+            // `anyOther` is not monotone under backtracking, so a later build could miss edges a restored
+            // domain needs.
             val storePersistent = persistentEligible && !anyOther && !cache.builtOnce
             cache.builtOnce = true
             xToCovEdgeIdx = if (storePersistent) IntArray(n * m) { -1 } else cache.xToCov(n, m)
@@ -509,7 +479,8 @@ internal class GlobalCardinalityPropagator(
                 if (lo[k] > hi[k]) return false
                 excess[2 + n + k] -= lo[k]
                 excess[sink] += lo[k]
-                flow.addEdge(2 + n + k, sink, hi[k] - lo[k])
+                val aboveMinimum = flow.addEdge(firstValue + k, sink, hi[k] - lo[k])
+                replay?.aboveMinimum?.set(k, aboveMinimum)
             }
             if (otherNode != -1) flow.addEdge(otherNode, sink, n)
             excess[sink] -= n
@@ -519,11 +490,16 @@ internal class GlobalCardinalityPropagator(
             for (v in 0 until baseNodes) {
                 when {
                     excess[v] > 0 -> {
-                        flow.addEdge(superSource, v, excess[v])
+                        val supply = flow.addEdge(superSource, v, excess[v])
+                        if (v in 2 until firstValue) replay?.supply?.set(v - 2, supply)
                         req += excess[v]
                     }
 
-                    excess[v] < 0 -> flow.addEdge(v, superSink, -excess[v])
+                    excess[v] < 0 -> {
+                        val drain = flow.addEdge(v, superSink, -excess[v])
+                        if (v == sink) replay?.remainingTotal = drain
+                        if (v in firstValue until firstValue + m) replay?.minimum?.set(v - firstValue, drain)
+                    }
                 }
             }
             requiredSSFlow = req
@@ -539,13 +515,13 @@ internal class GlobalCardinalityPropagator(
             }
         }
         if (needFlowSolve) {
-            if (presents.isEmpty()) {
+            cache.assignmentReplay?.let { replay ->
                 val assign = cache.flowAssign ?: RevIntArray(state, n, -1).also { cache.flowAssign = it }
                 for (i in 0 until n) {
                     val k = assign[i]
-                    if (k in 0 until m && xToCovEdgeIdx[i * m + k] >= 0) {
-                        flow.augmentThroughEdge(superSource, superSink, 2 + i, 2 + n + k)
-                    }
+                    if (k !in 0 until m) continue
+                    val choice = xToCovEdgeIdx[i * m + k]
+                    if (choice >= 0) flow.seedAssignment(replay, i, k, choice)
                 }
             }
             val obtained = flow.maxFlow(superSource, superSink)
@@ -555,7 +531,6 @@ internal class GlobalCardinalityPropagator(
                     cutReason(state, effectiveXs, reach, otherNode, xToOtherEdgeIdx).build()
                 return false
             }
-            // Persist the just-established flow so later fires reuse it without a rebuild or replay.
             if (persistentEligible && cache.structBuilt && !flow.frozen) flow.freeze(state)
             cache.flowAssign?.let { assign ->
                 for (i in 0 until n) {
@@ -572,8 +547,6 @@ internal class GlobalCardinalityPropagator(
             }
         }
         if (!residualChanged) {
-            // Flow byte-identical to the previous fire: the residual SCC and every prune it implies are
-            // unchanged and were already applied, so recomputing them can only reproduce the same fixpoint.
             if (presents.isEmpty()) for (i in intVars.indices) cache.cachedDoms[i] = state.intDomains[intVars[i]]
             return true
         }
@@ -617,8 +590,7 @@ internal class GlobalCardinalityPropagator(
                         }
                     }
                 }
-                // A domain too large to walk is skipped here (sound: it is never a full assignment, and the
-                // same removal runs once it narrows below the cap; every leaf has only singleton domains).
+                // A domain too large to walk is skipped; the removal runs once it narrows below the cap.
             }
         }
         if (presents.isEmpty()) for (i in intVars.indices) cache.cachedDoms[i] = state.intDomains[intVars[i]]

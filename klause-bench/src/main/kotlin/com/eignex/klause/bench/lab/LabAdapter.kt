@@ -219,7 +219,7 @@ internal object KlauseLabSuite : BenchSuite {
             ),
         )
         timings.finish("harnessComparisonProvenanceMs", provenanceStarted)
-        // Child solveRecord only: excludes JVM startup, parent verification and final record encoding/write.
+        // Excludes JVM startup, parent verification and final record encoding and write.
         timings.finish("harnessCaseMs", started)
         val retained = reported.copy(stats = reported.stats + timings.stats())
         val recordPath = context.outputDirectory.resolve("report/${Reports.fileStem(ref.name)}.json")

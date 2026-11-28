@@ -7,9 +7,8 @@ import com.eignex.klause.ir.IntSpan
 import com.eignex.klause.ir.defaultDomainStorageSettings
 import com.eignex.util.collections.storage.PackedBits
 
-/** Bitset over a narrow span: bit `(value - bitsetLo)` is set iff `value` is present. The backing
- *  array keeps its construction-time length; a later bound move clears bits but never reallocates,
- *  so the surplus high words are always zero. */
+// Bit `(value - bitsetLo)` is set iff value is present. The array keeps its construction-time length; bound moves
+// clear bits but never reallocate, so the surplus high words are always zero.
 internal class BitsetDomain(
     override val min: Long,
     override val max: Long,

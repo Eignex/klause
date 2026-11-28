@@ -5,46 +5,38 @@ import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.util.ExecutionControl
 
 /**
- * The LP-bounding runtime's own parameters, independent of the search layer's `BacktrackParams`. Both the
- * backtrack search (per-node bounding) and presolve (the LP harvest) drive [LpEngine], so its inputs are
- * expressed here in the LP layer rather than pulled from the backtrack params object.
+ * Parameters of the LP-bounding runtime, which both backtrack search and presolve drive.
  *
- * [lpConfig], when set, is a high-level emphasis resolved against the problem's structure into a concrete
- * [lpPlan] by [LpAutoConfig.resolve]; with no emphasis the [lpPlan] is used verbatim.
+ * [lpConfig], when set, is resolved against the problem's structure into [lpPlan] by [LpAutoConfig.resolve];
+ * otherwise [lpPlan] is used verbatim.
  */
 class LpParams(
-    /** The per-technique relaxation plan, used verbatim unless [lpConfig] resolves a richer one. */
+    /** The per-technique relaxation plan, used verbatim when [lpConfig] is null. */
     val lpPlan: LpPlan = LpPlan(),
     /** High-level emphasis to resolve into [lpPlan] against the problem structure, or null. */
     val lpConfig: LpConfig? = null,
     /** Deadline token polled by every LP solve / fixpoint. */
     val cancellation: ExecutionControl = ExecutionControl.Never,
-    /** The whole-solve wall budget in milliseconds, which sizes the cumulative LP work allowance; null = uncapped. */
+    /** Whole-solve budget in milliseconds, which sizes the cumulative LP work allowance; null = uncapped. */
     val solveBudgetMillis: Long? = null,
     /** Seed for the feasibility pump and randomized pricing; null means 0. */
     val randomSeed: Long? = null,
     /** Entering-column policy for exactly zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
 ) {
-    /** These params with [lpPlan] replaced (the resolved-plan swap [LpEngine] makes after auto-config). */
+    /** These params with [lpPlan] replaced. */
     fun copy(lpPlan: LpPlan = this.lpPlan): LpParams =
         LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed, zeroObjectivePricing)
 }
 
-/**
- * The LP-solution sink [LpEngine] records each node's fractional primal and reduced costs into. The
- * search-layer branching-hint store (`LpHints`) implements it; presolve passes no sink. Keeping the engine
- * dependent only on this record interface (not on `LpHints`, which reads the backtrack `VarRef` selector
- * type) is what lets the engine live below the search layer.
- */
+// Lets the engine record LP points for branching hints without depending on the search layer's `LpHints`.
 internal interface LpHintSink {
     fun clear()
 
-    /** Advisory floating optimum in minimized working units; supplies no certified bound. */
+    // Advisory floating optimum in minimized working units; supplies no certified bound.
     fun recordObjective(relaxation: LpRelaxation, objective: Double) {}
 
     fun recordInfeasible() {}
 
-    /** Record an LP solution's [primal] and [duals] against [relaxation]'s column→variable map. */
     fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray)
 }

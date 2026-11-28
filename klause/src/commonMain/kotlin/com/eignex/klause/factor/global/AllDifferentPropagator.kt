@@ -14,7 +14,6 @@ import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongHashSet
 
-/** CP propagation logic for `all_different`. */
 internal class AllDifferentPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,
@@ -55,12 +54,8 @@ internal class AllDifferentPropagator(
         return state.boolPinnedAt(v, atTrail) && state.boolValues[v] == Lit.isPositive(presents[i])
     }
 
-    /**
-     * The literals falsified by "every filtered position is present" — one per definitely-present
-     * position. Filtering reasons only over those positions, so every prune and every Hall conflict is
-     * conditional on them; an absent position lifts its column out of the constraint entirely. Positions
-     * that are definitely absent contribute nothing to a distinctness violation and are left out.
-     */
+    // Filtering reasons only over definitely-present positions, so every prune and Hall conflict is
+    // conditional on their presence literals.
     private fun presencePremises(state: PropagationState): IntArray {
         if (presents.isEmpty()) return emptyIntArray()
         val out = IntArrayList()

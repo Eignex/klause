@@ -9,18 +9,9 @@ import com.eignex.klause.propagation.checkFiniteWork
 import com.eignex.klause.propagation.lazyReason
 import com.eignex.util.arrays.binarySearchLong
 
-/*
- * Reversible, delta-driven layered-MDD filtering. Each layer keeps forward reachability from
- * [initial] and backward reachability to accepting states in [RevLongArray]. A symbol at
- * position i survives iff a forward-reachable state transitions on it to a backward-reachable
- * state. Reachability filters full symbol domains, including interior holes. A fire
- * recomputes affected layers; backtracking restores changed words. The cost variant derives
- * cost-variable bounds from the current forward lattice.
- *
- * Transitions are indexed by source ([fwdHead], [fwdPtr]) and destination ([bwdHead], [bwdSrc],
- * [bwdSym]). Sweeps visit outgoing edges of reachable sources or incoming edges of reachable
- * destinations, limiting work to live edges.
- */
+// Reversible, delta-driven layered-MDD filtering. Each layer keeps forward and backward reachability; a symbol at
+// position i survives iff a forward-reachable state transitions on it to a backward-reachable state. A fire
+// recomputes affected layers and backtracking restores changed words. Sweeps visit only edges of reachable states.
 internal class MddIncrementalState(
     state: PropagationState,
     private val seq: IntArray,
@@ -35,12 +26,8 @@ internal class MddIncrementalState(
 ) {
     private val n = seq.size
 
-    // Each layer's reachability bitset is packed to its OWN width (`ceil(numStatesPerLayer / 64)` words)
-    // rather than a uniform `max(numStatesPerLayer)` width. A layered diagram whose middle layers are far
-    // wider than its ends (word MDDs) would otherwise pay the widest layer for every layer — a several-fold
-    // blow-up per factor, decisive when a group holds thousands of factors over one diagram. [layerBase] is the
-    // prefix-sum word offset of each layer into [fwd]/[bwd]; [layerWords] its word count; [w] the widest
-    // layer's word count (scratch size).
+    // Each layer's bitset is packed to its own width: middle layers of word MDDs are far wider than the ends, and
+    // a uniform width would multiply memory per factor. [layerBase] is each layer's word offset into [fwd]/[bwd].
     private val layerWords = IntArray(seq.size + 1) { (numStatesPerLayer[it] + 63) ushr 6 }
     private val layerBase = IntArray(seq.size + 2).also { for (i in 0..seq.size) it[i + 1] = it[i] + layerWords[i] }
     private val totalWords = layerBase[seq.size + 1]
@@ -49,18 +36,13 @@ internal class MddIncrementalState(
     // Held for the deferred [fwd]/[bwd] construction below; every other reversible cell is built here.
     private val owner = state
 
-    // Two `totalWords`-long reversible bitsets per factor — on a wide diagram of millions of states
-    // that is hundreds of KB each, and a `<group>` holds one factor per row over the same diagram. A row
-    // that only ever reuses the shared root snapshot never reads them, so they are built on first real
-    // use rather than at construction. Single-threaded per [PropagationState], hence the unsynchronized
-    // mode. See [snapshotOnly] for what keeps a deferred pair from being read stale.
+    // Built on first real use: a row that only reuses the shared root snapshot never reads them, and they are large
+    // on wide diagrams. Single-threaded per [PropagationState], hence the unsynchronized mode. See [snapshotOnly].
     private val fwdLazy = lazy(LazyThreadSafetyMode.NONE) { RevLongArray(owner, totalWords) }
     private val bwdLazy = lazy(LazyThreadSafetyMode.NONE) { RevLongArray(owner, totalWords) }
     private val fwd: RevLongArray get() = fwdLazy.value
     private val bwd: RevLongArray get() = bwdLazy.value
 
-    /** Whether this factor has had to build its own reachability bitsets — false while it is still
-     *  standing on the group's shared root snapshot. */
     internal val layersBuilt: Boolean get() = fwdLazy.isInitialized()
     private val valid = RevInt(state, 0)
 
@@ -68,14 +50,11 @@ internal class MddIncrementalState(
         valid.set(0)
     }
 
-    /** 1 while this factor's reachability is exactly the shared root snapshot and [fwd]/[bwd] therefore
-     *  hold nothing of its own. Reversible alongside [valid], so a backtrack above the point where the
-     *  layers were filled restores it to 1 and the stale bitsets are re-seeded before any incremental
-     *  step reads them. */
+    // 1 while this factor's reachability is exactly the shared root snapshot and [fwd]/[bwd] hold nothing of its
+    // own. Reversible, so a backtrack past the fill restores 1 and the stale bitsets are re-seeded before use.
     private val snapshotOnly = RevInt(state, 0)
 
-    // Per-layer CSR indices over the transition records (see [MddTransitionIndex]). Shared across the
-    // factors of a `<group>` of identical diagrams when the caller passes one in; otherwise built here.
+    // Shared across factors over one diagram when the caller passes one in.
     private val idx = index ?: MddTransitionIndex.build(transitions, layerStarts, numStatesPerLayer, recordStride)
     private val fwdHead = idx.fwdHead
     private val fwdPtr = idx.fwdPtr
@@ -92,7 +71,6 @@ internal class MddIncrementalState(
     private fun testBit(rev: RevLongArray, layer: Int, s: Int): Boolean =
         (rev[layerBase[layer] + (s ushr 6)] and (1L shl (s and 63))) != 0L
 
-    /** Invoke [action] for each set bit below [cap] in [rev]'s [layer] words (the live states). */
     private inline fun forEachState(rev: RevLongArray, layer: Int, cap: Int, action: (Int) -> Unit) {
         val base = layerBase[layer]
         for (k in 0 until layerWords[layer]) {
@@ -126,7 +104,7 @@ internal class MddIncrementalState(
         return changed
     }
 
-    /** fwd(i+1) = { dst : (src,sym,dst) ∈ layer i, src ∈ fwd(i), sym ∈ domain(seq(i)) }. */
+    // fwd(i+1) = { dst : (src,sym,dst) ∈ layer i, src ∈ fwd(i), sym ∈ domain(seq(i)) }
     private fun recomputeForward(state: PropagationState, i: Int, scratch: LongArray): Boolean {
         scratch.fill(0L)
         val d = state.intDomains[seq[i]]
@@ -150,7 +128,7 @@ internal class MddIncrementalState(
         return writeLayer(fwd, i + 1, scratch)
     }
 
-    /** bwd(i) = { src ∈ fwd(i) : (src,sym,dst) ∈ layer i, dst ∈ bwd(i+1), sym ∈ domain(seq(i)) }. */
+    // bwd(i) = { src ∈ fwd(i) : (src,sym,dst) ∈ layer i, dst ∈ bwd(i+1), sym ∈ domain(seq(i)) }
     private fun recomputeBackward(state: PropagationState, i: Int, scratch: LongArray): Boolean {
         scratch.fill(0L)
         val d = state.intDomains[seq[i]]
@@ -174,14 +152,9 @@ internal class MddIncrementalState(
         return writeLayer(bwd, i, scratch)
     }
 
-    /**
-     * Backward sweep for the full [rebuild] that also records, into [survives], which symbols keep
-     * position `i` alive: a symbol survives iff some incoming edge on it joins a forward-reachable source
-     * to a backward-co-reachable destination — precisely the edges this scan already keeps. The [rebuild]
-     * then excludes the non-survivors from a cheap per-position loop, so the diagram is never scanned a
-     * third time for a separate prune pass. [survives] is indexed by `sym - minSym` (the alphabet offset,
-     * so the same bitset can seed the shared root snapshot) and must be pre-zeroed.
-     */
+    // Also records into [survives] the symbols that keep position `i` alive, which are exactly the edges this scan
+    // keeps, so the diagram needs no third scan for pruning. [survives] is indexed by `sym - minSym`, so it can
+    // seed the shared root snapshot, and must be pre-zeroed.
     private fun recomputeBackwardCollecting(state: PropagationState, i: Int, scratch: LongArray, survives: LongArray) {
         scratch.fill(0L)
         val d = state.intDomains[seq[i]]
@@ -207,8 +180,7 @@ internal class MddIncrementalState(
         writeLayer(bwd, i, scratch)
     }
 
-    /** Whether every position still admits the whole alphabet, so the reachability is purely structural
-     *  and can be shared through the root snapshot. */
+    // Full alphabets make reachability purely structural, so it can be shared through the root snapshot.
     private fun domainsCoverAlphabet(state: PropagationState): Boolean {
         if (symSpan <= 0) return false
         val maxSym = minSym + symSpan - 1
@@ -223,8 +195,6 @@ internal class MddIncrementalState(
         return true
     }
 
-    /** Exclude, at position [i], every live domain value that no surviving edge keeps (its alphabet bit is
-     *  clear, or it lies outside the alphabet entirely). Shared by the compute and snapshot-reuse paths. */
     private fun excludeNonSurvivors(state: PropagationState, i: Int, survives: LongArray, ant: IntArray?): Boolean {
         val d = state.intDomains[seq[i]]
         for (s in d.min..d.max) {
@@ -237,7 +207,7 @@ internal class MddIncrementalState(
         return true
     }
 
-    /** bwd(n) = accepting ∩ fwd(n). */
+    // bwd(n) = accepting ∩ fwd(n)
     private fun recomputeAcceptLayer(scratch: LongArray): Boolean {
         scratch.fill(0L)
         val numN = numStatesPerLayer[n]
@@ -254,8 +224,6 @@ internal class MddIncrementalState(
         return false
     }
 
-    /** Prune every position in `[lo, hi]`: a symbol value survives iff some forward-reachable state
-     *  transitions on it to a backward-co-reachable state. Returns false on a domain wipeout. */
     private fun prune(state: PropagationState, lo: Int, hi: Int, ant: IntArray?): Boolean {
         for (i in lo..hi) {
             owner.checkFiniteWork()
@@ -293,7 +261,7 @@ internal class MddIncrementalState(
         return true
     }
 
-    /** Cost variant: derive `cost` bounds from the min/max weighted path over the forward lattice. */
+    // Cost bounds from the min/max weighted path over the forward lattice.
     private fun tightenCost(state: PropagationState, ant: IntArray?): Boolean {
         val inf = Long.MAX_VALUE / 4
         val minCost = Array(n + 1) { LongArray(numStatesPerLayer[it]) { inf } }
@@ -426,16 +394,14 @@ internal class MddIncrementalState(
             collectHoleAndBoundAntecedents(state, if (cost >= 0) seq + intArrayOf(cost) else seq)
         }
         if (valid.value == 0) return rebuild(state, ant)
-        // Standing on the shared snapshot: take a private copy of it first, since the incremental step
-        // reads and rewrites the bitsets. A vanished snapshot leaves nothing to step from, so recompute.
+        // The incremental step rewrites the bitsets, so a factor on the shared snapshot copies it first.
         if (snapshotOnly.value == 1 && !seedFromSnapshot()) return computeReachability(state, ant, snapshot = false)
         return delta(state, dirty, ant)
     }
 
     private fun rebuild(state: PropagationState, ant: IntArray?): Boolean {
-        // When every position still admits the whole alphabet the reachability is purely structural, so a
-        // `<group>` of identical diagrams computes it once and the rest reuse it — the dominant cost on a
-        // large shared diagram is this per-factor sweep, and at the root every factor would repeat it.
+        // Factors over one diagram compute structural reachability once: otherwise every factor repeats the
+        // dominant sweep at the root.
         if (domainsCoverAlphabet(state)) {
             idx.rootSnapshot?.let { return applyRootSnapshot(state, it, ant) }
             return computeReachability(state, ant, snapshot = true)
@@ -459,17 +425,11 @@ internal class MddIncrementalState(
         }
         if (!anyAcceptingForward()) return false
         recomputeAcceptLayer(scratch)
-        // Fuse the backward reachability sweep with pruning: the surviving symbols per position fall out of
-        // the same accepting-to-root scan, so the diagram needs no separate full prune pass. Survivors are
-        // collected per layer and the (scan-free) exclusions applied afterwards, so every backward pass
-        // still reads the pre-prune domains — identical to a backward-then-prune ordering.
+        // Exclusions are applied after the fused backward sweep, so every backward pass reads the pre-prune domains.
         val survivors = Array(n) { LongArray(symWords.coerceAtLeast(1)) }
         for (i in n - 1 downTo 0) recomputeBackwardCollecting(state, i, scratch, survivors[i])
         valid.set(1)
-        // The bitsets now hold this factor's own reachability, not the shared snapshot's.
         snapshotOnly.set(0)
-        // Under full domains the survivors are structural; publish them (and the reachability) once for the
-        // group's remaining factors to reuse.
         if (snapshot) {
             idx.rootSnapshot = MddRootSnapshot(
                 LongArray(totalWords) { fwd[it] },
@@ -483,10 +443,8 @@ internal class MddIncrementalState(
     }
 
     private fun applyRootSnapshot(state: PropagationState, snap: MddRootSnapshot, ant: IntArray?): Boolean {
-        // The snapshot IS this factor's reachability, so copying it into per-factor bitsets would only
-        // duplicate it. Record that instead and leave [fwd]/[bwd] unbuilt; [seedFromSnapshot] fills them
-        // if and when an incremental step actually needs them. A cost diagram is the exception: its bound
-        // comes from reading the forward lattice below, so it takes its copy now.
+        // The snapshot is this factor's reachability, so [fwd]/[bwd] stay unbuilt until an incremental step needs
+        // them. A cost diagram copies now, since its bound reads the forward lattice.
         if (cost >= 0) seedFrom(snap) else snapshotOnly.set(1)
         valid.set(1)
         for (i in 0 until n) if (!excludeNonSurvivors(state, i, snap.survivors[i], ant)) return false
@@ -494,16 +452,13 @@ internal class MddIncrementalState(
         return true
     }
 
-    /** Fill [fwd]/[bwd] from the shared root snapshot this factor has been standing on, so an incremental
-     *  step can proceed from its own copy. Returns false when the snapshot is gone, leaving the caller to
-     *  recompute from scratch. */
+    // False when the snapshot is gone, leaving the caller to recompute.
     private fun seedFromSnapshot(): Boolean {
         val snap = idx.rootSnapshot ?: return false
         seedFrom(snap)
         return true
     }
 
-    /** Copy [snap] into this factor's own bitsets, leaving it free to diverge. */
     private fun seedFrom(snap: MddRootSnapshot) {
         val f = fwd
         val b = bwd
@@ -561,8 +516,7 @@ internal class MddIncrementalState(
             val hi = minOf(n - 1, maxOf(maxD, lastFwdChanged))
             if (!prune(state, lo, hi, ant)) return false
         }
-        // Cost is one-directional output (path bounds over the forward lattice); recompute whenever
-        // anything changed — cheap relative to the reachability cascade and only for cost MDDs.
+        // Cheap relative to the reachability cascade, so cost bounds are recomputed on every change.
         if (cost >= 0 && !tightenCost(state, ant)) return false
         return true
     }

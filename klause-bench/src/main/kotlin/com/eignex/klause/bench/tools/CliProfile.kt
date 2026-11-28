@@ -7,10 +7,8 @@ import java.io.File
 import java.io.PrintStream
 import java.util.Locale
 
-/**
- * Phase and caller tables for a klause-cli JFR recording. A lab `profileCli` case sets `KLAUSE_LAB_PROFILE_DIR`,
- * and [com.eignex.klause.bench.metric.SolverInvocation] prints these tables for the `cli.jfr` the CLI wrote there.
- */
+// A lab `profileCli` case sets `KLAUSE_LAB_PROFILE_DIR`, and SolverInvocation prints these tables for the `cli.jfr` the
+// CLI wrote there.
 internal object CliProfile {
     private const val CLI_CALLER_DEPTH = 3
     private const val MODEL_CALLER_DEPTH = 4
@@ -292,7 +290,6 @@ internal object CliProfile {
         else -> "backtrack search"
     }
 
-    /** Top Java frame of an event's stack, as `Type.method`, or null when no Java frame. */
     private fun topMethod(e: RecordedEvent): String? {
         val frame = e.stackTrace?.frames?.firstOrNull { it.isJavaFrame } ?: return null
         return "${frame.method.type.name}.${frame.method.name}"

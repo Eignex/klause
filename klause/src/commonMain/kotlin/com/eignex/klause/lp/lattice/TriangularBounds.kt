@@ -10,41 +10,14 @@ import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
 
-/**
- * Per-variable bounds derived from a lower-triangular system by forward substitution.
- *
- * This is what the Hermite transformation is *for*. On a double-bounded system `lo ≤ Hy ≤ hi` whose `H`
- * is lower triangular, row `i`'s pivot column is the last one it mentions, so that row bounds its pivot
- * variable once the earlier ones are bounded. Sweeping rows top to bottom therefore bounds every pivot
- * variable in turn, and a variable bounded this way needs no invented search box — the bound is the
- * model's own.
- *
- * A column that pivots in no row is unconstrained by the triangle and stays open; the caller either drops
- * it (it appears in no row, so it takes any value) or keeps it in the open lane. Returning `null` for such
- * a column is the honest answer, not a failure.
- */
+// `null` where the sweep derives no bound, as for a column that pivots in no row.
 internal class TriangularBounds(
-    /** Lower bound per column, `null` where the sweep derives none. */
     val lo: Array<BigInt?>,
-    /** Upper bound per column, `null` where the sweep derives none. */
     val hi: Array<BigInt?>,
 )
 
-/**
- * Forward-substitute [h] (lower triangular, one [SparseIntRow] per row, over [cols] columns) against row
- * ranges `[rowLo, rowHi]` to bound each column. A `null` row side is an unbounded direction and simply
- * contributes nothing.
- *
- * Row `i` reads `rowLo[i] ≤ Σⱼ h(i, j)·yⱼ ≤ rowHi[i]`. Isolating the pivot column `p` gives
- * `h(i, p)·y_p ∈ [rowLo[i] − maxRest, rowHi[i] − minRest]`, where the rest-interval comes from the
- * already-bounded earlier columns. The division rounds inward — floor on the upper side, ceil on the
- * lower — which is exact over the integers, and the two swap when the pivot coefficient is negative.
- * A rest-term whose own side is unbounded makes that direction unbounded, so the pivot keeps only the
- * side that survives.
- *
- * Only the row's non-zeros feed the rest-interval, so the sweep costs the triangle's own content rather
- * than `rows · cols` — a zero term contributes nothing to either side in any case.
- */
+// In a lower-triangular [h] each row's pivot is its last column, so sweeping top to bottom bounds each pivot from
+// `h(i, p)·y_p ∈ [rowLo(i) − maxRest, rowHi(i) − minRest]` over the already-bounded earlier columns, rounding inward.
 @Suppress("NestedBlockDepth", "CyclomaticComplexMethod")
 internal fun triangularBounds(
     h: List<SparseIntRow>,
@@ -73,7 +46,6 @@ internal fun triangularBounds(
             restHi = if (termHi == null || restHi == null) null else restHi + termHi
         }
 
-        // h(i, pivot)·y ∈ [rowLo − restHi, rowHi − restLo]
         val lowSide = rowLo[i]
         val highSide = rowHi[i]
         val prodLo = if (lowSide == null || restHi == null) null else lowSide - restHi

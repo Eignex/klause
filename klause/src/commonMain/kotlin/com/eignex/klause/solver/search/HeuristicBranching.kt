@@ -9,15 +9,10 @@ fun interface SearchUnassignListener {
 }
 
 /**
- * Boolean branching driven by a substrate-neutral [VariableBranching].
- *
- * The heuristic sees the shared session only through [BranchingState], so the same instance that
- * drives a finite CP traversal drives this one. It also observes the traversal: activity heuristics
- * need conflicts, and the shared analyzer's asserting clause names every variable that participated,
- * which is a better attribution than a substrate reporting only the decision that failed.
- *
- * Polarity is false-before-true, as in [BooleanBranching.SourceOrder] — this changes which variable is
- * split, not which side is tried first.
+ * Boolean branching driven by a substrate-neutral [VariableBranching], seeing the session only through
+ * [BranchingState]. Conflicts are attributed from the asserting clause, which names every participating
+ * variable, rather than only the failed decision. Polarity is false-before-true, as in
+ * [BooleanBranching.SourceOrder].
  */
 class HeuristicBooleanBranching(
     private val heuristic: VariableBranching<BranchingState>,
@@ -67,7 +62,7 @@ class HeuristicBooleanBranching(
         if (heuristic.tracksUnassign) heuristic.onUnassign(VarRef.Bool(variable))
     }
 
-    /** Attribute a conflict that produced no asserting clause to the decision that failed. */
+    // A conflict that produced no asserting clause is attributed to the decision that failed.
     private fun flushPendingConflict() {
         if (!conflictPending) return
         conflictPending = false
@@ -110,12 +105,7 @@ internal class ActivityRestartBooleanBranching(
     }
 }
 
-/**
- * [BranchingState] over a shared session.
- *
- * No integer columns are offered: this seam supplies Boolean alternatives, and an integer split stays
- * with the component that owns the domain it splits.
- */
+// No integer columns are offered: an integer split stays with the component that owns its domain.
 private class SessionBranchingState(override val numBoolVars: Int) : BranchingState {
     var context: SearchContext? = null
 

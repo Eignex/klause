@@ -16,30 +16,21 @@ import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.TerminationReason
 
-/**
- * A parsed instance, lowered to exactly what [SolveCore] needs — mode-neutral. Both the
- * FlatZinc objective-by-name + lsObjective/linear split and XCSP/SMT's single LinearObjective
- * collapse onto this shape.
- */
+// A parsed instance lowered to what the solve driver needs, independent of the mode.
 internal class Solvable(
     private val finite: FiniteSolveShape?,
-    /** Render one solution to the mode's solution text. */
     val render: (Sample) -> String,
-    /** Sign-corrected objective value in source-model units. */
+    // Sign-corrected, in source-model units.
     val objectiveValue: ((Sample) -> Long)?,
-    /** Sign-corrected objective including continuous-column contributions. */
     val continuousObjectiveValue: ((Sample) -> Double)? = null,
     val rendering: SourceRendering = SourceRendering.FiniteCp,
-    /** LP work performed while proving bounds for source routing. */
     val routingLpStats: LpStats = LpStats(),
-    /** Wall time spent proving bounds for rendering selection. */
     val routingElapsedMs: Long = 0L,
-    /** Tolerance semantics for continuous leaves: a check of a source-space sample; `null` keeps exact semantics. */
+    // Checks a source-space sample under tolerance semantics; null keeps exact semantics.
     val toleranceCheck: ((Sample) -> Boolean)? = null,
     val numericalCompletion: Boolean = false,
     val sourceInvocation: PreparedSourceInvocation? = finite?.sourceInvocation,
 ) {
-    /** This instance solved under tolerance semantics with [check]. */
     fun withToleranceCheck(check: (Sample) -> Boolean): Solvable = Solvable(
         finite,
         render,
@@ -59,38 +50,24 @@ internal class Solvable(
     )
 
     constructor(
-        /** Finite CP problem. */
         problem: Problem?,
         optimize: Boolean,
-        /** True when the user goal is maximisation (the objectives below already negate for it). */
+        // The objectives already negate for maximization.
         maximize: Boolean,
-        /** Per-move gradient view of the objective for the LS workers (null for satisfy / when
-         *  none); rides into `LocalSearchParams.lsObjective`. */
         lsObjective: IncrementalObjective?,
-        /** The canonical linear objective every optimising backend minimises (null for satisfy). */
         linearObjective: LinearObjective?,
-        /** Single objective int var id, when the objective is one variable — enables the
-         *  enumerate-over-objective fallback. Null for weighted-sum objectives / satisfy. */
+        // Set when the objective is one variable; enables the enumerate-over-objective fallback.
         objVarId: Int?,
-        /** FlatZinc definitional-sweep DAG; null for XCSP/SMT. */
         definitionalSweep: DefinitionalSweep?,
         render: (Sample) -> String,
-        /** Sign-corrected objective value in original problem units, or null for satisfy. Carries the
-         *  discrete terms only, so a model weighting a continuous column also sets [continuousObjectiveValue]
-         *  — this one stays exact for the integral formats, whose coefficients can outrun a `Double`. */
+        // Discrete terms only, exact for integral formats whose coefficients can outrun a Double.
         objectiveValue: ((Sample) -> Long)?,
-        /** Sign-corrected objective value including the continuous columns' contribution, set only when the
-         *  objective weights one: their values are real, so the total has no exact integral form. Null
-         *  leaves [objectiveValue] the whole objective. */
+        // Set only when the objective weights a continuous column; the total then has no exact integral form.
         continuousObjectiveValue: ((Sample) -> Double)? = null,
-        /** Model-supplied finite search intent. */
         searchHints: SearchHints? = null,
         rendering: SourceRendering = SourceRendering.FiniteCp,
-        /** LP work performed while proving bounds for source routing. */
         routingLpStats: LpStats = LpStats(),
-        /** Wall time spent proving bounds for rendering selection. */
         routingElapsedMs: Long = 0L,
-        /** Existing finite source ownership selected by the frontend. */
         preparedRoute: SourceProblemRoute.Finite? = null,
     ) : this(
         finite = problem?.finiteSolveShape(
@@ -111,7 +88,6 @@ internal class Solvable(
         routingElapsedMs = routingElapsedMs,
     )
 
-    /** Finite CP problem. */
     val problem: Problem? get() = finite?.problem
     val optimize: Boolean get() = finite?.optimize
         ?: (sourceInvocation?.operation == ExecutionOperation.OPTIMIZE)

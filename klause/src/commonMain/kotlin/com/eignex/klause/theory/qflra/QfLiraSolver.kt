@@ -2100,7 +2100,6 @@ private fun LinearRow.activationUnder(bools: IntArray): Boolean? {
     }
 }
 
-/** Outcome of the Double-Bounded Reduction at one Boolean/disjunction leaf. */
 // Source integer values beyond the largest exactly representable double are a useful diagnostic for
 // model conversions that would otherwise silently lose an integer unit.
 private val WIDE_INTEGER_LIMIT = bigIntOf(1L shl 53)

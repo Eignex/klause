@@ -11,11 +11,8 @@ import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 
 /**
- * `regular(seq, Q, S, d, q0, F)` — the sequence `seq` is accepted by the DFA with
- * `Q` states, alphabet size `S`, transition function [transitions] indexed by
- * `(q-1) * S + (s-1)` (row-major, 1-based states and symbols), initial state [q0],
- * and accepting set [accepting]. A transition value of `0` denotes rejection (the
- * "dead state").
+ * [seq] is accepted by the DFA with transition table [transitions], indexed by `(q-1) * S + (s-1)` over 1-based
+ * states and symbols, initial state [q0] and accepting set [accepting]. A transition value of `0` rejects.
  *
  * Propagation is GAC over the layered unrolling of the DFA (Pesant, "A Regular Language Membership
  * Constraint for Finite Sequences of Variables", CP 2004, https://doi.org/10.1007/978-3-540-30201-8_36):
@@ -30,8 +27,7 @@ class Regular(
     val numStates: Int,
     /** Number of input symbols. */
     val alphabetSize: Int,
-    /** `numStates × alphabetSize` row-major transition table; 0 means no transition. Entries are DFA
-     *  state ids (small); the symbol axis is the row-major column index (`1..alphabetSize`). */
+    /** `numStates × alphabetSize` row-major transition table of state ids; 0 means no transition. */
     val transitions: LongArray,
     /** Initial state. */
     val q0: Int,
@@ -52,9 +48,6 @@ class Regular(
     override fun remap(mapping: VarRemap): Factor =
         Regular(mapping.ints(seq), numStates, alphabetSize, transitions, q0, accepting)
 
-    /** Position-faithful (seq position i matters): keeps the sequence vars in order and folds in the
-     *  whole automaton — state/alphabet sizes, the transition table, the initial and accepting
-     *  states. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REGULAR, ::buildKey)
 
     override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.REGULAR, mapping, ::buildKey)
@@ -68,13 +61,10 @@ class Regular(
         sink.intVars(seq)
     }
 
-    /** Symbol-alphabet relabeling: the `seq` values *are* the symbols, so a value permutation
-     *  permutes the transition table's symbol axis — `δ'(q, valueMap(s)) = δ(q, s)`. Sound because
-     *  Regular has no positional-variable/constant coupling (unlike Element): swapping symbol values in
-     *  a sequence and the matching columns preserves acceptance exactly. Returns `null` if [valueMap]
-     *  is not a permutation of `1..alphabetSize` (then it can't relabel this automaton's columns). */
+    // The `seq` values are the symbols, so a value permutation permutes the symbol axis:
+    // `δ'(q, valueMap(s)) = δ(q, s)`. Null unless [valueMap] permutes `1..alphabetSize`.
     override fun remapValues(valueMap: (Long) -> Long): Factor? {
-        val target = IntArray(alphabetSize + 1) // 1-based symbols
+        val target = IntArray(alphabetSize + 1)
         val seen = BooleanArray(alphabetSize + 1)
         for (s in 1..alphabetSize) {
             val t = valueMap(s.toLong())

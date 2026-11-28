@@ -7,25 +7,16 @@ import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
 
-/** One exact row whose activity is bounded on both sides. */
 internal class DoubleBoundedRow(val coefficients: SparseIntRow, val lower: BigInt, val upper: BigInt) {
     init {
         require(lower <= upper) { "double-bounded row has crossed bounds: $lower > $upper" }
     }
 }
 
-/**
- * An exact, lattice-preserving rewrite of a double-bounded integer system.
- *
- * The Double-Bounded Reduction of M. Bromberger, *A Reduction from Unbounded Linear Mixed Arithmetic Problems into
- * Bounded Problems*, IJCAR 2018, https://doi.org/10.1007/978-3-319-94205-6_22, separates an arbitrary system into an
- * unbounded part and a double-bounded part. This type owns the latter's column transformation: the caller retains the
- * row ranges, while `x = V·y` preserves every integer point exactly. It deliberately does not decide which source rows
- * are bounded; that requires the full active mixed-arithmetic system and belongs above this
- * leaf package.
- */
+// The column transformation of the double-bounded part in M. Bromberger, *A Reduction from Unbounded Linear Mixed
+// Arithmetic Problems into Bounded Problems*, IJCAR 2018, https://doi.org/10.1007/978-3-319-94205-6_22. `x = V·y`
+// preserves every integer point. Deciding which rows are bounded needs the whole system and belongs above this leaf.
 internal class DoubleBoundedReduction(val rows: List<DoubleBoundedRow>, val transform: UnimodularTransform) {
-    /** Recover the source integer point `x = V·y`. */
     fun recover(y: Array<BigInt>): Array<BigInt> {
         val x = Array(transform.size) { BIG_ZERO }
         transform.forEachEntry { row, col, value -> x[row] += value * y[col] }
@@ -33,13 +24,8 @@ internal class DoubleBoundedReduction(val rows: List<DoubleBoundedRow>, val tran
     }
 }
 
-/**
- * Apply a unimodular column transformation to a double-bounded system.
- *
- * Each returned row has the same closed activity interval as its input row, because column operations
- * rewrite only the variables. A cancellation returns null instead of a partially transformed system:
- * mixing transformed rows with an incomplete transform would not preserve the integer lattice.
- */
+// Column operations rewrite only the variables, so each row keeps its activity interval. Cancellation returns
+// null, since a partial transform would not preserve the integer lattice.
 internal fun doubleBoundedReduction(
     rows: List<DoubleBoundedRow>,
     cols: Int,

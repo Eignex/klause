@@ -2,11 +2,9 @@ package com.eignex.klause.util
 
 import kotlin.time.ComparableTimeMark
 
-/**
- * A token that fires when [cancelled] does and states [deadlineOf] as its deadline, read each time it is asked so a
- * deadline re-armed later stays current. It carries no work meter. An adapter that wraps a token in a predicate builds
- * it from this rather than a bare lambda, which [ExecutionControl.shorten] would read as having no time limit at all.
- */
+// A token that fires when cancelled does and reads deadlineOf each time, so a re-armed deadline stays current. It
+// carries no work meter. Adapters wrapping a predicate build it from this rather than a bare lambda, which
+// ExecutionControl.shorten would read as having no time limit.
 internal fun cancelledWhen(
     deadlineOf: () -> ComparableTimeMark?,
     workScheduledOf: () -> Boolean = { false },
@@ -16,7 +14,7 @@ internal fun cancelledWhen(
 
 internal fun ExecutionControl.workScheduled(): Boolean = workScheduled
 
-// This control, with every unit it is charged also reported to [record], for a caller that meters its own share.
+// Reports every unit charged to this control to record, for a caller that meters its own share.
 internal fun ExecutionControl.counting(record: (Long) -> Unit): ExecutionControl {
     val containing = this
     return object : ExecutionControl() {

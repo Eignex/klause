@@ -35,7 +35,7 @@ class IndexedPlanningTest {
         }
     }
 
-    /** Fetching this collection fails at once, so a plan that touches its bytes fails the test. */
+    // Fetching this collection fails at once, so a plan that touches its bytes fails the test.
     private val collection = ExternalCollection(
         "indexed-fixture",
         "https://fixture.invalid/indexed",

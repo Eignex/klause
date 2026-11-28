@@ -1,71 +1,36 @@
 package com.eignex.klause.localsearch
 
 /**
- * The local-search contract of a constraint: violation scoring, move delta computation,
- * move application, and move proposal. In the LS literature an *invariant* is a maintained
- * constraint with a graded violation score and an incremental update rule; this interface is
- * the klause realisation of that concept.
- *
- * A [com.eignex.klause.ir.Factor] supplies this role through its local-search projection.
- * The projection describes constraint semantics; mutable payloads belong to [LocalSearchState].
- *
- * Every method defaults to a sound no-op (always-satisfied, zero deltas, naive ±1 repair
- * moves), so a propagation-only factor needs to implement nothing here.
- *
- * See [com.eignex.klause.ir.Factor] for the engine-neutral constraint contract.
+ * The local-search contract of a constraint: graded violation, move deltas, move application and move proposal.
+ * Mutable payloads belong to [LocalSearchState]. Every method defaults to a sound no-op, so a propagation-only
+ * factor implements nothing.
  */
 interface Invariant {
-    /** Build this factor's payload from the current assignment. Called once per restart.
-     *  Default no-op for stateless factors that maintain no payload. */
+    /** Builds this factor's payload from the current assignment; called once per restart. */
     fun initialize(state: LocalSearchState, factorId: Int) {}
 
-    /** True iff this factor is violated under the current state. Default: never violated —
-     *  the correct answer for a propagation-only factor that carries no LS semantics. */
+    /** True iff this factor is violated under the current state. */
     fun isViolated(state: LocalSearchState, factorId: Int): Boolean = false
 
     /**
-     * **Graded violation degree**: `0` when satisfied, a positive magnitude that grows with
-     * "how far" the constraint is from being satisfied. The LS hard cost is
-     * `Σ violationDegree` over all factors — *not* a count of violated factors — so CBLS
-     * sees a descent gradient on tight arithmetic and global constraints (a move that shrinks
-     * an `int_lin_eq` residual from 1000 → 1 scores a real improvement instead of 0).
+     * Graded violation: `0` when satisfied, otherwise a positive magnitude that grows with the distance from
+     * satisfaction, so descent sees a gradient on arithmetic and global constraints. The default is `1` when
+     * [isViolated], which is exact for inherently binary factors.
      *
-     * The default delegates to the binary [isViolated] (degree `1` when violated, else `0`),
-     * which is the *correct* degree for inherently-binary factors — a violated clause, a
-     * single comparator, a table membership all genuinely have degree 1. Gradable factors
-     * (linear, count/cardinality, packing, scheduling, all-different, …) override this with
-     * a real magnitude.
-     *
-     * **Contract (must hold for cost/gradient consistency):** for every move kind,
-     * `deltaIf*` must return exactly `violationDegree(after) - violationDegree(before)`.
-     * Move scoring uses these deltas. After applying a move, the engine reconciles `cost`,
-     * per-factor degrees and violated membership from the exact post-move degree rather than
-     * the returned apply value. Apply methods must leave payloads consistent with the updated
-     * assignment; their return values are implementation-specific and are not scoring deltas.
-     * A candidate delta that disagrees with this method mis-scores candidates.
-     * Degrees should be clamped to a sane range to avoid `Int` overflow in degree arithmetic;
-     * the engine sums them into a `Long` cost.
+     * Every `deltaIf*` must return exactly `violationDegree(after) - violationDegree(before)`, or candidates are
+     * mis-scored. Degrees stay within `Int`; the engine sums them into a `Long` cost.
      */
     fun violationDegree(state: LocalSearchState, factorId: Int): Int = if (isViolated(state, factorId)) 1 else 0
 
-    /**
-     * Δ in this factor's [violationDegree] if the given move were applied, computed without
-     * mutating state. For a binary factor this is `+1` (satisfied → violated), `-1` (the
-     * opposite), or `0`; for a graded factor it is the signed change in magnitude (any
-     * integer). Default returns 0; factors override the methods relevant to the move kinds
-     * they handle.
-     */
+    /** Change in [violationDegree] if [boolVar] were flipped, without mutating state. */
     fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int = 0
 
     /** Δ violation-degree if [intVar] were set to [newValue], without mutating state. */
     fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int = 0
 
     /**
-     * Apply a committed move to this factor's payload. The assignment has already been
-     * updated, so factors compare current values against the saved `oldValue` (for int sets)
-     * or recover the pre-flip value by inversion. Called for committed moves and reversible
-     * score probes. The return value is implementation-specific; read [violationDegree] after
-     * application for the exact degree.
+     * Updates this factor's payload after [boolVar] was flipped in the assignment, for committed moves and
+     * reversible probes. The return value is implementation-specific; read [violationDegree] for the exact degree.
      */
     fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int = 0
 
@@ -78,11 +43,7 @@ interface Invariant {
     /** Update payloads after setting [realVar] from [oldValue]. Return semantics match [applyBoolFlip]. */
     fun applyRealSet(state: LocalSearchState, factorId: Int, realVar: Int, oldValue: Double): Int = 0
 
-    /**
-     * Suggest moves that would (or might) repair this factor when violated. The default lists
-     * a Boolean flip per boolVars member plus a step to each in-domain neighbour per intVars member. Factors
-     * with structural insight (e.g. a comparator can snap to its bound) override this.
-     */
+    /** Suggests moves that may repair this factor; the default flips each Boolean and steps each int to a neighbour. */
     fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         for (b in state.problem.factors[factorId].boolVars) sink.addBoolFlip(b)
         for (i in state.problem.factors[factorId].intVars) {
@@ -94,49 +55,27 @@ interface Invariant {
     }
 
     /**
-     * Suggest moves that the factor *currently* knows would preserve its own satisfaction
-     * (`isViolated → false` after the move). Called by the minimize engine during the
-     * objective-descent phase to collect candidate moves that don't break the constraint
-     * but might improve the LS objective. Pre-condition: `!isViolated(state, factorId)`
-     * — engines only consult this on already-feasible states.
-     *
-     * Default: no proposals. Factors with structural insight (e.g. `Linear EQ`'s "shift
-     * between two summed vars" or `Cardinality.exactlyOne`'s "swap a true literal with a
-     * false one") override to push self-preserving moves. The engine combines proposals
-     * from all factors and scores each against the objective.
+     * Suggests moves that keep this satisfied factor satisfied, for objective descent; the engine scores them
+     * against the objective. Called only when the factor is not violated.
      */
     fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
     }
 
     /**
-     * Opt-in extension of [proposeStructuredMoves]: richer feasibility-preserving moves a factor can
-     * offer but that aren't part of the default neighbourhood — coordinated multi-variable moves
-     * (a circuit 2-opt reversal, an all-different 3-cycle) that broaden reach but cost more to
-     * generate and aren't always net-positive. Drawn only by the opt-in extended-structured source,
-     * so the default arms never pay for them. Default: none.
+     * Costlier feasibility-preserving moves, such as a circuit 2-opt reversal, drawn only by the opt-in
+     * extended-structured source.
      */
     fun proposeExtendedStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
     }
 
-    /**
-     * Opt-in extension of [proposeRepairMoves]: a richer repair a factor can offer (e.g. a Regular
-     * DP-optimal accepting run) that's costlier than the default piecemeal repair and not always
-     * net-positive. Drawn only by the opt-in extended-repair source. Default: none.
-     */
+    /** Costlier repairs, such as a DP-optimal accepting run, drawn only by the opt-in extended-repair source. */
     fun proposeExtendedRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
     }
 
     /**
-     * Append the sibling updates that keep this factor consistent when [intVar] moves from [oldValue]
-     * to [newValue], for value-driven channeling ([LocalSearchState.synthesizeChannelingMove]). The
-     * engine calls this on every factor mentioning [intVar] so each rolls its own indicator flip or
-     * counter-shift into one atomic [Move.Compound] instead of the engine chasing the cascade a move
-     * at a time.
-     *
-     * Contributors must respect [ChannelingSink.isPinned] (never re-shift a claimed var) and
-     * [LocalSearchState.assumptions] (skip frozen vars). Default: no contribution — only factors with
-     * a deterministic "which sibling moves" answer (single-var EQ reified indicators, satisfied
-     * `Linear EQ` sums) override.
+     * Appends the sibling updates that keep this factor consistent when [intVar] moves from [oldValue] to
+     * [newValue], so a value-driven channeling move becomes one atomic [Move.Compound]. Contributors skip vars that
+     * [ChannelingSink.isPinned] reports and vars frozen by [LocalSearchState.assumptions].
      */
     fun contributeChanneling(
         state: LocalSearchState,
@@ -148,74 +87,34 @@ interface Invariant {
     ) {}
 
     /**
-     * True iff this factor's [proposeStructuredMoves] generates a *feasibility-preserving*
-     * neighbourhood for a structural global — moves that keep the constraint satisfied while
-     * relocating values within its scope (e.g. an all-different value swap, a circuit tour
-     * re-link). Such factors are candidates for implicit-solving: the engine seeds them
-     * feasible and draws their structure-preserving moves even during infeasibility so they
-     * can clear violations in *coupled* constraints without ever breaking themselves.
-     *
-     * Default `false`. Factors with arithmetic structured moves that only make sense at
-     * feasibility (e.g. `Linear EQ` pair-shifts, `Cardinality` count-preserving swaps) leave
-     * this `false` — they are objective-descent helpers, not implicit-solving neighbourhoods.
+     * True iff [proposeStructuredMoves] relocates values within the scope while keeping this global satisfied. The
+     * engine then seeds it feasible and draws those moves even while infeasible, so it clears violations in coupled
+     * constraints without breaking itself. Moves that only make sense at feasibility do not qualify.
      */
     val providesImplicitNeighbourhood: Boolean get() = false
 
     /**
-     * Overwrite this factor's variables in [state]'s assignment with a configuration that
-     * satisfies the factor, used by the engine's implicit-solving feasible-init pass on a
-     * scope-disjoint set of elected globals (so seeds never clobber one another). Must leave
-     * variables frozen by [LocalSearchState.assumptions] untouched and may only write the
-     * factor's own intVars / boolVars. Returns true if it produced a fully satisfying
-     * configuration, false if the factor could not be seeded feasibly (over-constrained or
-     * frozen out) — the engine then falls back to the random assignment for those vars.
-     *
-     * Default: no-op returning false. Structural globals that provide an implicit
-     * neighbourhood ([providesImplicitNeighbourhood]) override this so the search can begin
-     * inside their feasible region.
+     * Overwrites this factor's own variables with a satisfying configuration, leaving vars frozen by
+     * [LocalSearchState.assumptions] untouched. False when it cannot seed feasibly; those vars then keep their
+     * random values.
      */
     fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean = false
 
-    /** True iff this factor maintains its contribution to [LocalSearchState.boolBreakCount]
-     *  and [LocalSearchState.boolMakeCount] incrementally via [updateBoolBreakMakeForFlip],
-     *  skipping the engine's brute-force O(arity²) per-flip subtract-add cycle.
-     *
-     *  Factors that override should: (a) set this to true, (b) implement
-     *  [updateBoolBreakMakeForFlip] so the post-flip counts match what brute-force would
-     *  produce, (c) maintain whatever internal state the update needs (e.g. `numTrueLits`
-     *  in [LocalSearchState.intPayload]). Default `false` keeps the brute-force fallback. */
+    /** True iff [updateBoolBreakMakeForFlip] maintains this factor's share of [LocalSearchState.boolBreakCount] and
+     *  [LocalSearchState.boolMakeCount], replacing the engine's O(arity²) recount per flip. */
     val maintainsBreakMakeIncrementally: Boolean get() = false
 
-    /** Adjust [LocalSearchState.boolBreakCount] / [LocalSearchState.boolMakeCount] after
-     *  [flippedVar] has been flipped. Called *after* the assignment is updated and after
-     *  this factor's own [applyBoolFlip] has run, so any internal payload is current.
-     *
-     *  Only invoked when [maintainsBreakMakeIncrementally] is true. Net adjustment must
-     *  equal the brute-force "subtract pre-flip per-var deltas, add post-flip" pattern. */
+    /** Adjusts the break and make counts after [flippedVar] flipped and this factor's [applyBoolFlip] ran. The net
+     *  change must equal the engine's recount. */
     fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {}
 
-    /** Mirror of [maintainsBreakMakeIncrementally] for the int-set path. When `true`, the
-     *  LS engine skips its brute-force boolVars walk after an `intVar` is set and calls
-     *  [updateIntBreakMakeForIntSet] instead. Factors whose [deltaIfBoolFlipped] doesn't
-     *  depend on int values (e.g. pure Boolean constraints with no intVars) get no
-     *  benefit from setting this flag — the engine already short-circuits when intVars
-     *  is empty via [LocalSearchProblem.intOccurrences]. */
+    /** Int-set counterpart of [maintainsBreakMakeIncrementally], using [updateIntBreakMakeForIntSet]. */
     val maintainsIntBreakMakeIncrementallyForIntSet: Boolean get() = false
 
-    /** Adjust [LocalSearchState.boolBreakCount] / [LocalSearchState.boolMakeCount] after
-     *  [intVar] has been set from [oldValue] to its new value (read via
-     *  `state.assignment.intValue(intVar)`). Called *after* the assignment is updated and
-     *  after this factor's own [applyIntSet] has run. Only invoked when
-     *  [maintainsIntBreakMakeIncrementallyForIntSet] is true. Net adjustment must equal
-     *  the brute-force "subtract pre-set per-bool deltas, add post-set" pattern. */
+    /** Adjusts the break and make counts after [intVar] moved from [oldValue] and this factor's [applyIntSet] ran.
+     *  The net change must equal the engine's recount. */
     fun updateIntBreakMakeForIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long) {}
 }
 
-/**
- * The absence of a local-search role. A factor whose local-search projection returns this is
- * **propagator-only**: it participates in CP propagation but contributes nothing to local
- * search. The LS engine skips such factors entirely — they are dropped from the LS occurrence lists
- * ([LocalSearchProblem.boolOccurrences] / [LocalSearchProblem.intOccurrences]) so a move never queries them and they
- * add no violation. All methods keep the no-op [Invariant] defaults (never violated, zero delta).
- */
+/** The absence of a local-search role: the factor only propagates and is dropped from local-search occurrence lists. */
 object NoInvariant : Invariant

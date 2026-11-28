@@ -6,30 +6,23 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 
-/** Exact checks that may decline a float candidate. Engine-local: consumers adapt it into their own
- * statistics rather than making the kernel depend on solver results. */
+// Engine-local: consumers adapt it into their own statistics rather than making the kernel depend on solver results.
 internal enum class LpCertifier { INTEGER, SAFE_OBJECTIVE, EXACT_BASIS, EXACT_FARKAS, EXACT_POINT, RATIONAL }
 
-/** Where one certifier invocation's modeled work is accounted. Each call site states it, so no certifier's work is
- * left out of a ledger that sums both channels. */
+// Each call site states where its work is accounted, so no certifier's work is left out of a ledger summing both.
 internal sealed interface LpCertifierCost {
-    /** Charged through [LpCertificationObserver.observeBasisVerification] or
-     *  [LpCertificationObserver.observeContinuation]. */
+    // Charged through [LpCertificationObserver.observeBasisVerification] or
+    // [LpCertificationObserver.observeContinuation].
     data object Reported : LpCertifierCost
 
-    /** The invocation's own modeled work, charged with this observation. */
     data class Metered(val work: Long) : LpCertifierCost
 }
 
-/**
- * Passes a certifier makes over [model], each visiting every structural entry, column and row once. A pass whose
- * products run [Long.SIZE_BITS] wide costs one unit per entry, and a wider one the square of its word length, as an
- * exact continuation multiplication does, so a wide model or operand is not undercharged.
- */
+// Each pass visits every structural entry, column and row once. A pass with Long-wide products costs one unit per
+// entry and a wider one the square of its word length, so a wide model or operand is not undercharged.
 internal class LpScanCount(private val model: LpModel) {
     private var units = 0L
 
-    /** One pass whose operand values are at most [operandBits] wide. */
     fun scan(operandBits: Int = Long.SIZE_BITS) {
         val words = (maxOf(model.coefficientBits, Long.SIZE_BITS) + operandBits - 1L) / Long.SIZE_BITS
         val square = words * words
@@ -44,12 +37,9 @@ internal class LpScanCount(private val model: LpModel) {
     }
 }
 
-/** Bit length of the widest numerator or denominator in [values], the operand width of a pass over them. */
 internal fun exactBits(values: Iterable<BigFraction>): Int =
     values.fold(1) { widest, value -> maxOf(widest, value.num.magnitudeBitLength(), value.den.magnitudeBitLength()) }
 
-/** Why a simplex solve rebuilt its factors, as emitted by the engine rather than inferred from aggregate
- * counts. */
 internal enum class LpRefactorReason {
     INITIAL,
     WARM_START,
@@ -61,7 +51,7 @@ internal enum class LpRefactorReason {
     PRIMAL,
 }
 
-/** Outcome of one float invocation; candidates still require independent exact certification. */
+// Candidates still require independent exact certification.
 internal enum class LpFloatTermination {
     OPTIMAL_CANDIDATE,
     INFEASIBLE_CANDIDATE,
@@ -73,7 +63,6 @@ internal enum class LpFloatTermination {
     OTHER,
 }
 
-/** Optional, solve-scoped observer for certification and exact-input eligibility. */
 internal interface LpCertificationObserver {
     fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost)
     fun observeExactInput(accepted: Boolean)
@@ -87,8 +76,8 @@ internal interface LpCertificationObserver {
     fun observeContinuationRejection(key: String, count: Long) {}
 }
 
-/** Primitive cost reading from one engine invocation. It can cross the engine boundary without
- * importing model-facing result types, and component engines add it even when a later block fails. */
+// Crosses the engine boundary without model-facing result types; component engines add it even when a later block
+// fails.
 internal data class LpSolveMetrics(
     val pivots: Int = 0,
     val workOps: Long = 0L,
@@ -178,19 +167,11 @@ internal data class LpSolveMetrics(
     )
 }
 
-/**
- * The engine that solves an [LpModel] to a float optimum and the artifacts an exact certifier needs
- * from it. The seam is deliberately engine-agnostic: everything here is producible by any LP method,
- * simplex or not (e.g. a first-order primal–dual method) — the [FloatLpResult] carries the primal
- * point and the dual vector for the safe bound of Neumaier and Shcherbina ("Safe bounds in linear and
- * mixed-integer linear programming", Math. Program. 99, 2004, https://doi.org/10.1007/s10107-003-0433-3),
- * and [infeasibleRay] carries the candidate Farkas ray for exact infeasibility certification. Basis
- * warm-starting and cut generation are simplex-specific and live on [TableauCutSolver], not here, so a
- * basis-free engine implements only this interface.
- *
- * All returned values are double-precision guides; the authoritative bound always comes from exactly
- * certifying the result downstream ([integerCertify] / [integerFarkasRay]), never from these.
- */
+// Engine-agnostic: any LP method can produce the primal and duals for the safe bound of Neumaier and Shcherbina
+// ("Safe bounds in linear and mixed-integer linear programming", Math. Program. 99, 2004,
+// https://doi.org/10.1007/s10107-003-0433-3) and a candidate Farkas ray. Cut generation is simplex-specific and lives
+// on [TableauCutSolver]. Returned values are double-precision guides; authoritative bounds come only from exact
+// certification downstream.
 internal interface LpSolver : AutoCloseable {
     val trialProgress: Map<String, Long> get() = emptyMap()
 
@@ -199,37 +180,29 @@ internal interface LpSolver : AutoCloseable {
     // Certified callers validate source feasibility independently. Scaled arithmetic guards remain required.
     fun deferUnscaledSourceDiagnostics() = Unit
 
-    /** Most recent solve invocation. Null means the engine does not report a reason or has not solved. */
+    // Null when the engine does not report a reason or has not solved.
     val lastTermination: LpFloatTermination? get() = null
 
-    /**
-     * Solve the relaxation, optionally warm-started from a prior optimal [warm] basis of the same model
-     * structure; null on non-convergence / dual-unbounded / singular basis. The warm basis only changes
-     * the pivot path, never the result. Engines may decline the warm basis and cold-start.
-     */
+    // Null on non-convergence, dual unboundedness or a singular basis. [warm] changes only the pivot path, never the
+    // result, and engines may decline it.
     fun solve(warm: Basis? = null): FloatLpResult?
 
-    /** Solve with the primal pass (phase-1 included), used where a feasible point is wanted even when
-     *  the dual pass would not converge; null on failure. */
+    // For a feasible point even when the dual pass would not converge.
     fun solvePrimal(warm: Basis? = null): FloatLpResult?
 
-    /** The float candidate Farkas ray at a dual-unbounded termination, for [integerFarkasRay] to round
-     *  and certify; null unless the last [solve] returned null on infeasibility. */
+    // Null unless the last [solve] returned null on infeasibility.
     val infeasibleRay: DoubleArray?
 
-    /** Optional structural recession candidate in original coordinates. Null means unsupported or
-     * unavailable; unboundedness also requires an independently checked feasible point. */
+    // In original coordinates. Unboundedness also requires an independently checked feasible point.
     val recessionDirection: DoubleArray? get() = null
 
-    /** Scaling eligibility, fallback and source-unit residuals for this numerical owner. */
     val scalingMetrics: LpScalingMetrics get() = LpScalingMetrics(decline = LpScalingDecline.DISABLED)
 
-    /** The dual-unbounded basis behind [infeasibleRay], for the exact ray solve that a model with an
-     *  unbounded column needs. Null on an engine that keeps no basis; certification then falls back to
-     *  rounding [infeasibleRay]. */
+    // For the exact ray solve a model with an unbounded column needs. Null on an engine that keeps no basis;
+    // certification then falls back to rounding [infeasibleRay].
     val infeasibleBasis: Basis? get() = null
 
-    /** The leaving row of [infeasibleBasis]; `-1` when there is none. */
+    // The leaving row of [infeasibleBasis].
     val infeasibleRow: Int get() = -1
 
     val solvedExactState: LpExactState? get() = null
@@ -240,55 +213,24 @@ internal interface LpSolver : AutoCloseable {
 
     fun continuationBasis(model: LpModel): Basis? = null
 
-    /**
-     * Pivots the last solve spent, whether or not it returned a [FloatLpResult].
-     *
-     * A solve that terminates dual-unbounded or non-convergent still spent them, and a caller that
-     * counts the solve has to be able to count its cost — reading the count off the result alone drops
-     * exactly the solves that prune, which are the ones worth costing. 0 on an engine that keeps no
-     * pivot count.
-     */
+    // Also counts solves that returned no [FloatLpResult]: reading it off the result would drop exactly the solves
+    // that prune.
     val lastPivots: Int get() = 0
 
-    /** Basis factorizations the last solve built, on the same terms as [lastPivots]. */
     val lastRefactorizations: Int get() = 0
 
-    /** Whether the last solve started from a prior basis rather than a cold start, on the same terms
-     *  as [lastPivots]. */
     val lastWarmStarted: Boolean get() = false
 
-    /**
-     * Floating-point operations the last solve charged — a deterministic stand-in for its cost, on the
-     * same terms as [lastPivots].
-     *
-     * Pivots alone do not measure a solve: one pivot on a dense basis outweighs many on a sparse one, and
-     * a refactorization outweighs both. A policy that budgets LP effort needs a figure that reflects
-     * that and is reproducible run to run, which wall-clock time is not. See [LpWork]. 0 on an engine
-     * that keeps no count.
-     */
+    // Deterministic cost in [LpWork] operations: pivots alone miss that a dense pivot outweighs many sparse ones.
     val lastWorkOps: Long get() = 0L
 
-    /**
-     * Factorizations the last solve built that came back singular, on the same terms as [lastPivots].
-     *
-     * A singular factorization is not a failure the caller sees: the engine falls back to the slack
-     * cold start and carries on, discarding the warm basis. So this is the only trace that a warm
-     * start was thrown away, and the measurement behind whether the relaxation's columns are badly
-     * enough conditioned to want scaling. 0 on an engine that keeps no factorization.
-     */
+    // The engine falls back to the slack cold start on a singular factorization, so this is the only trace that a
+    // warm start was thrown away.
     val lastSingularRefactorizations: Int get() = 0
 
-    /**
-     * Pivots the last solve abandoned because the pivot element was numerically too small, on the same
-     * terms as [lastPivots].
-     *
-     * The engine gives up on the solve rather than refactorizing and retrying, so each one is a solve
-     * lost outright — and lost without a [FloatLpResult] to record it in. 0 on an engine that does not
-     * pivot.
-     */
+    // Each is a solve lost outright, with no [FloatLpResult] to record it in.
     val lastSmallPivotBails: Int get() = 0
 
-    /** Complete primitive metrics for the most recent invocation. */
     val lastMetrics: LpSolveMetrics get() = LpSolveMetrics(
         pivots = lastPivots,
         workOps = lastWorkOps,
@@ -296,30 +238,19 @@ internal interface LpSolver : AutoCloseable {
         smallPivotBails = lastSmallPivotBails,
     )
 
-    /** Nonbasic columns with zero reduced cost at the last termination — dual degeneracy. 0 on an engine
-     *  that does not measure it. */
+    // Nonbasic columns with zero reduced cost at the last termination.
     val lastDegenerateColumns: Int get() = 0
 
-    /** Columns the last solve ran over, the denominator [lastDegenerateColumns] is judged against. */
     val lastColumns: Int get() = 0
 
-    /**
-     * Release what the engine holds outside the heap.
-     *
-     * A basis factorization can be a native object, and a search builds an engine per node, so the
-     * ones a caller keeps are worth closing rather than leaving to a cleaner. An engine holding
-     * nothing external closes as a no-op, which is the default, and closing twice is harmless.
-     */
+    // Closing twice is harmless.
     override fun close() {}
 }
 
 internal class LpPrimalGuidance(val coordinates: DoubleArray, val known: BooleanArray)
 
-/**
- * An [LpSolver] whose independent component results can be certified without reconstructing one
- * monolithic exact problem. Factories return this capability explicitly so a decorator around a
- * component engine cannot accidentally hide the certification routes from its consumers.
- */
+// Component results certify without one monolithic exact problem. Factories return this capability explicitly so a
+// decorator around a component engine cannot hide the certification routes.
 internal interface ComponentLpSolverCapability : LpSolver {
     fun partialBoundDuals(cancellation: ExecutionControl = ExecutionControl.Never): DoubleArray? = null
 
@@ -346,17 +277,11 @@ internal interface ComponentLpSolverCapability : LpSolver {
     ): ExactLpWitness?
 }
 
-/**
- * An [LpSolver] that also exposes tableau cut generation. Gomory/MIR cuts are read off an optimal
- * simplex basis, so only a basis-carrying (simplex) engine can supply them; the cut-separation loop
- * types against this, while the general solve/certify path types against [LpSolver].
- */
+// Gomory and MIR cuts are read off an optimal simplex basis, so only a basis-carrying engine supplies them.
 internal interface TableauCutSolver : LpSolver {
-    /** Gomory (Chvátal) integrality cuts from the last optimal basis, up to [maxCuts]; empty if the
-     *  last solve was not optimal. */
+    // Empty if the last solve was not optimal.
     fun gomoryCuts(maxCuts: Int): List<Cut>
 
-    /** Gomory mixed-integer (MIR) cuts from the last optimal basis, up to [maxCuts]. */
     fun mirCuts(maxCuts: Int): List<Cut>
 }
 
@@ -386,10 +311,7 @@ internal interface RetainedComponentLpSolverCapability :
     ComponentLpSolverCapability,
     RetainedLpSolver
 
-/**
- * An [LpSolver] retaining its basis and factorization across exact bound and objective adoption.
- * Monolithic ownership is required: a component solve has no single basis to retain.
- */
+// Retains its basis and factors across exact bound and objective adoption, so it must be monolithic.
 internal interface PersistentLpSolver : RetainedLpSolver {
     // Builds an all-logical basis without claiming feasibility; null means unsupported or declined.
     fun prepareLogicals(token: ExecutionControl = ExecutionControl.Never): Basis? = null
@@ -400,30 +322,18 @@ internal interface PersistentLpSolver : RetainedLpSolver {
 
     val basisLifecycleWork: BasisOperationWork? get() = null
 
-    /**
-     * Re-solve with retained factors. Null [allowance] uses construction limits; explicit zero work
-     * is unbounded and zero iterations uses the size-derived limit. Neither zero means exhausted.
-     */
+    // Null [allowance] uses construction limits; zero work is unbounded and zero iterations uses the size-derived
+    // limit. Neither zero means exhausted.
     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult?
 
-    /**
-     * Re-solve with per-row enforcement, continuing from the kept basis and factorization. A row with
-     * `enforced(i) = false` does not constrain — its equation merely defines a free slack. Only sound
-     * for an all-zero objective, under which every basis is dual-feasible.
-     */
+    // An unenforced row only defines a free slack. Sound only for an all-zero objective, under which every basis is
+    // dual-feasible.
     fun resolveGated(enforced: BooleanArray): FloatLpResult?
 }
 
-/**
- * Construct the LP engine for the general solve/certify path — the swap point for an alternative engine
- * (an interior-point method carries no basis, so it implements [LpSolver] without [TableauCutSolver]);
- * callers depend only on [LpSolver].
- *
- * A separable model first decomposes into its column components ([ComponentLpSolver]) — exact, and
- * each block factorizes at a fraction of the monolithic cost; [componentSplit] (default on, the
- * `lp-component-split` knob) opts out. [workLimit] bounds the solve (each component's, when it splits) in
- * [LpWork] operations, 0 leaving it unbounded; a solve it stops yields at most a bound to certify.
- */
+// A separable model first decomposes into its column components ([ComponentLpSolver]) unless [componentSplit] is
+// off. [workLimit] bounds each solve in [LpWork] operations, 0 leaving it unbounded; a stopped solve yields at most
+// a bound to certify.
 internal fun newLpSolver(
     model: LpModel,
     cancellation: ExecutionControl = ExecutionControl.Never,
@@ -448,14 +358,8 @@ internal fun newLpSolver(
     return factory.newGeneralSolver(model, cancellation, workLimit, pricing)
 }
 
-/**
- * Construct a basis-carrying engine, for the callers that read cuts off the optimal tableau or that
- * budget the solve itself — both simplex-specific, so this never decomposes.
- *
- * [iterationLimit] and [workLimit] bound the dual solve, each 0 leaving it to the engine; a truncated
- * dual iterate supplies only a candidate to certify against the true objective. [trackDegeneracy]
- * turns on the dual-degeneracy measurement an adaptive budget reads back.
- */
+// Never decomposes. [iterationLimit] and [workLimit] bound the dual solve, 0 leaving it to the engine; a truncated
+// dual iterate supplies only a candidate to certify.
 internal fun newTableauCutSolver(
     model: LpModel,
     cancellation: ExecutionControl = ExecutionControl.Never,
@@ -502,14 +406,8 @@ internal fun LpPricingOptions.componentShare(columns: Int, totalColumns: Int, ro
     return copy(basisEntryLimit = share)
 }
 
-/**
- * Construct an engine to keep across solves ([PersistentLpSolver]). Monolithic by construction: a
- * decomposed model has no single basis to carry, which is the whole of what such a caller keeps it for.
- *
- * [refactorUpdateLimit] caps the updates folded into the basis before it is rebuilt. A caller whose
- * pivots accumulate across solves raises it, since the default is sized for one solve's chain. The
- * remaining knobs are [newTableauCutSolver]'s.
- */
+// Monolithic: a decomposed model has no single basis to carry. A caller whose pivots accumulate across solves
+// raises [refactorUpdateLimit], since the default is sized for one solve's chain.
 internal fun newPersistentLpSolver(
     model: LpModel,
     cancellation: ExecutionControl = ExecutionControl.Never,

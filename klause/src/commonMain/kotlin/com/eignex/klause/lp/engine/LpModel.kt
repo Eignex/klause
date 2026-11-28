@@ -20,24 +20,16 @@ import com.eignex.util.numbers.subExact
 import kotlin.math.ceil
 import kotlin.math.floor
 
-/** Constraint relation for a row added to the builder, before normalization to `<=` form. */
 internal enum class Relation { LE, GE, EQ }
 
-/**
- * The live variable bounds a non-global row's validity rests on — the premises an LP certificate
- * must cite alongside its column seats when the row carries dual weight (see [LpModel.rowGlobal]).
- * The canonical producer is a live-big-M `ReifiedLinear` row: its relaxed face spans the *live*
- * range of the linear form, so the row holds wherever each variable respects the live bound that
- * entered the M — exactly the `(variable, side, threshold)` triples recorded here. Only bounds
- * tighter than the declared ones are recorded (a declared bound holds everywhere). Parallel
- * arrays: premise `k` is `x_{vars[k]} ≤ thresholds[k]` when `isUpper[k]`, else `≥`.
- */
+// The live bounds a non-global row's validity rests on, which a certificate giving the row dual weight must cite.
+// A live-big-M row holds wherever each variable respects the live bound that entered its M. Only bounds tighter than
+// the declared ones are recorded. Premise k is x(vars(k)) ≤ thresholds(k) when isUpper(k), else ≥.
 internal class LpRowPremises(
     val vars: IntArray,
     val isUpper: BooleanArray,
     val thresholds: LongArray,
-    /** Boolean literals that must hold for the row to be valid (a reified real atom's activation);
-     *  a learned clause leaning on the row cites their negations. */
+    // Literals the row's validity needs; a learned clause leaning on the row cites their negations.
     val boolLits: IntArray = emptyIntArray(),
 ) {
     fun toExact(): ExactLpPremises = ExactLpPremises(
@@ -46,122 +38,60 @@ internal class LpRowPremises(
     )
 }
 
-/** Optimization sense. Branch-and-bound minimizes; [MAXIMIZE] is negated at build time. */
+// [MAXIMIZE] is negated at build time.
 internal enum class Sense { MINIMIZE, MAXIMIZE }
 
-/** The CPU simplex's private, finite stand-in for an unbounded variable bound (`±∞`). Large enough to
- *  behave as infinity for any realistic model, yet small enough (`Long.MAX / 4`) to leave headroom for
- *  the exact `subExact`/`mulExact` shift arithmetic in [LpBuilder.build]. A variable that can only be
- *  optimized *to* this frontier is genuinely unbounded, which [safeVariableBound] reports as null —
- *  callers express real infinity via [LpBuilder.addFreeVar] and never see this magnitude. */
+// Finite stand-in for ±∞, leaving headroom for the exact shift arithmetic in [LpBuilder.build]. A variable optimized
+// only to this frontier is unbounded, which [safeVariableBound] reports as null; callers use [LpBuilder.addFreeVar].
 internal const val LP_UNBOUNDED_PROBE: Long = Long.MAX_VALUE / 4
 
-/**
- * A bounded-variable LP in the normalized form the revised simplex consumes. The [Long] core holds integer
- * coefficients, bounds and right-hand sides: the float [RevisedSimplex] solves it and the integer-multiplier
- * [integerCertify] certifies it. Real data rides in [doubleView], and exact rational data in [exactState].
- *
- * Build instances with [LpBuilder], which performs three normalizations so the engine sees a
- * uniform shape:
- *
- *  1. **Lower bounds shifted to zero.** Each structural variable `x_j` with domain
- *     `[lo_j, hi_j]` becomes `x'_j = x_j - lo_j` with domain `[0, hi_j - lo_j]`. A nonbasic
- *     variable at its lower bound then contributes nothing to the basic values, which keeps
- *     the inner loops simple. The shift folds into the right-hand sides and an objective
- *     constant ([objConstant]); [loShift] records it so solutions map back.
- *  2. **`>=` rows negated to `<=`.** Multiplying a `>=` row by `-1` yields a `<=` row, so
- *     every inequality slack has lower bound `0` and only the (possibly infinite) upper bound
- *     varies. Equality rows keep a slack fixed at `[0, 0]`.
- *  3. **Slack columns appended.** Row `i` becomes `Σ a_ij x'_j + s_i = b_i`. With the
- *     all-slack basis the constraint matrix is `[A | I]`, an exact identity in the slack
- *     columns, so the initial determinant is `1` and no factorization is needed to start.
- *
- * Variables are indexed `0 until n` for structural columns and `n until n + m` for the slack
- * of row `i = column - n`. Lower bound is `0` for every variable; the upper bound is finite
- * for structural variables and equality slacks, and `+∞` for inequality slacks (see
- * [hasUpper]).
- */
+// The Long core holds integer data; real data rides in [doubleView] and exact rational data in [exactState].
+// [LpBuilder] normalizes: lower bounds shift to zero (folded into [rhs] and [objConstant], recorded in [loShift]),
+// >= rows negate to <=, and row i gains slack column n + i, so the all-slack basis is the identity. Every lower bound
+// is 0; equality slacks are fixed at [0, 0] and inequality slacks have no upper bound.
 internal class LpModel(
-    /** Number of structural (original) variables. */
     override val n: Int,
-    /** Number of constraint rows, equivalently the number of slack variables. */
     override val m: Int,
-    /** Sparse CSC of the structural columns, read column-wise through [forEachInColumn]; slack columns
-     *  are the implicit unit vectors and are never stored. */
+    // Slack columns are implicit unit vectors and never stored.
     val csc: Csc,
-    /** Right-hand side per row, after the lower-bound shift. */
     override val rhs: LongArray,
-    /** Objective coefficient per variable (length `n + m`); minimization sense, slacks are `0`. */
+    // Minimization sense, length n + m.
     val cost: LongArray,
-    /** Upper bound per variable (length `n + m`); meaningful only where [hasUpper] is true. */
+    // Meaningful only where [hasUpper] is true.
     override val upper: LongArray,
-    /** Whether the variable has a finite upper bound; `false` means `+∞` (inequality slacks). */
     override val hasUpper: BooleanArray,
-    /** Lower bound that was shifted out of each structural variable (length `n`). */
     val loShift: LongArray,
-    /** Constant folded into the objective by the shift; the true objective is `c·x' + objConstant`. */
+    // The true objective is c·x' + objConstant.
     val objConstant: Long,
-    /** Original optimization sense; the stored [cost] is always minimization. */
     val sense: Sense,
-    /** Caller tag per structural column, for mapping LP columns back to `(varId, value)`. */
     val tag: IntArray,
-    /**
-     * Per-row global validity: `true` when row `i` holds at **every integer solution of the
-     * problem** — not merely inside the current search node's box. Rows built from live
-     * (branch-tightened) information — a `ReifiedLinear` big-M row
-     * whose M came from tightened domains, a locally separated cut, a Gomory/MIR tableau cut — are
-     * marked `false`. Learned artifacts (Farkas nogoods, objective-bound and reduced-cost reasons)
-     * cite only variable-bound atoms and keep the rows implicit, so they are only valid when every
-     * row their dual certificate leans on is globally valid; this array is what they check.
-     */
+    // True when row i holds at every integer solution of the problem, not only inside the current node's box.
+    // Learned artifacts cite only bound atoms and keep rows implicit, so they are valid only when every row their dual
+    // certificate leans on is global.
     val rowGlobal: BooleanArray = BooleanArray(m) { true },
-    /** Per row, whether the inequality is strict over the reals (`<` rather than `≤`). The float
-     *  simplex ignores it (a sound relaxation); the exact deciders enforce it. */
+    // Strict over the reals. The float simplex ignores it, a sound relaxation; the exact deciders enforce it.
     override val rowStrict: BooleanArray = BooleanArray(m),
-    /**
-     * Per-row citation fallback for non-global rows: the live bounds whose atoms make row `i`
-     * valid ([LpRowPremises]), or null when the row's validity is not expressible as bound atoms
-     * (locally separated and Gomory/MIR cuts) — a certificate leaning on such a row is withheld.
-     * Always null where [rowGlobal] is true.
-     */
+    // Citation fallback for non-global rows; null when validity is not expressible as bound atoms, and a certificate
+    // leaning on such a row is withheld. Always null where [rowGlobal] is true.
     val rowPremises: Array<LpRowPremises?> = arrayOfNulls(m),
-    /**
-     * Right-hand side per row after the `>=`-to-`<=` flip but **before** the lower-bound shift — i.e.
-     * `rhs[i] = flippedRhs[i] − Σ_j csc(i,j)·loShift[j]`. Retained so [rebind] can copy column bounds
-     * over the fixed [csc] for capture replay without re-running [LpBuilder]: the structure
-     * (matrix, costs, tags, row relations) stays fixed while the bound-derived vectors change.
-     * Defaults to the post-shift [rhs] for models that never rebind.
-     */
+    // Right-hand sides before the lower-bound shift, so [rebind] can recompute [rhs] over the fixed [csc].
     val flippedRhs: LongArray = rhs,
-    /** Structural columns whose lower bound is the [LP_UNBOUNDED_PROBE] stand-in for `−∞` rather than a
-     *  real bound (length `n`, all false for ordinary [LpBuilder.addVar] columns). The reject-at-cap
-     *  logic in [safeVariableBound] consults this so an optimum riding to the probe frontier is reported
-     *  unbounded rather than as a spurious finite bound. */
+    // Columns whose bound is the [LP_UNBOUNDED_PROBE] stand-in, so [safeVariableBound] can report an optimum riding
+    // the probe frontier as unbounded.
     override val probeClampedLo: BooleanArray = BooleanArray(n),
-    /** Counterpart to [probeClampedLo] for the upper bound (`+∞` stand-in). */
     override val probeClampedHi: BooleanArray = BooleanArray(n),
-    /** Per structural column, true when it is an LP-only continuous (real) column rather than an
-     *  integer/bool one (length `n`, all false for the pure-integer core). A continuous column is present
-     *  in this relaxation but absent from CP search. Informational; the exact-certification decline keys
-     *  off [hasContinuous]. */
+    // LP-only real columns, absent from CP search.
     val colContinuous: BooleanArray = BooleanArray(n),
-    /**
-     * The double-precision form the LP engine solves when real coefficients are present, else null (the
-     * pure-integer core, where the engine reads the [Long] fields directly). The integer/real split matters
-     * only to certification, which declines while it is present. The CSC mirrors [csc] (structural columns
-     * only, slacks implicit).
-     */
+    // Present when real data is; the engine then solves it instead of the Long fields.
     override val doubleView: LpDoubleView? = null,
     val exactState: LpExactState? = null,
 ) : ExactSimplexModel {
-    /** Total variable count: structural plus slack. */
     override val numVars: Int get() = n + m
 
-    /** Whether the model carries real or exact rational data ([doubleView] or [exactState]), so the 128-bit
-     *  integer certification declines. */
+    // The 128-bit integer certification declines on such a model.
     val hasContinuous: Boolean get() = exactState != null || doubleView != null
 
-    /** Bit length of the widest exact structural coefficient: what one exact pass over the matrix multiplies by. */
+    // What one exact pass over the matrix multiplies by.
     val coefficientBits: Int by lazy {
         var widest = 1
         for (j in 0 until n) {
@@ -172,16 +102,13 @@ internal class LpModel(
         widest
     }
 
-    /** Objective coefficient of variable [j] as a double (from [doubleView] when present). */
     fun costD(j: Int): Double = doubleView?.cost?.get(j) ?: cost[j].toDouble()
 
-    /** Right-hand side of row [i] as a double. */
     fun rhsD(i: Int): Double = doubleView?.rhs?.get(i) ?: rhs[i].toDouble()
 
-    /** Upper bound of variable [j] as a double (meaningful only where [hasFiniteUpper] is true). */
+    // Meaningful only where [hasFiniteUpper] is true.
     fun upperD(j: Int): Double = doubleView?.upper?.get(j) ?: upper[j].toDouble()
 
-    /** Whether variable [j] has a finite upper bound. */
     fun hasFiniteUpper(j: Int): Boolean = exactState?.let { it.model.column(j).bounds.upper != null }
         ?: (doubleView?.hasUpper?.get(j) ?: hasUpper[j])
 
@@ -198,14 +125,11 @@ internal class LpModel(
         value / scale + constant
     } ?: value
 
-    /** Lower-bound shift of structural column [j] as a double. */
     override fun loShiftD(j: Int): Double = doubleView?.loShift?.get(j) ?: loShift[j].toDouble()
 
-    /** Objective constant as a double. */
     val objConstantD: Double get() = doubleView?.objConstant ?: objConstant.toDouble()
 
-    /** Iterate column [j]'s nonzero structural entries as `(row, value)` in double precision — the
-     *  uniform view the LP engine reads, from [doubleView] when present, else the [Long] CSC widened. */
+    // From [doubleView] when present, else the Long CSC widened.
     inline fun forEachInColumnD(j: Int, action: (row: Int, value: Double) -> Unit) {
         val dv = doubleView
         if (dv != null) {
@@ -215,13 +139,8 @@ internal class LpModel(
         }
     }
 
-    /**
-     * A model identical in structure ([csc], [cost], [tag], [rowGlobal], [rowPremises], slack
-     * relations) but with fresh structural-column bounds `[lo[j], hi[j]]`. Recomputes only the
-     * bound-derived vectors — [rhs] (via the lower-bound shift over the fixed matrix), [upper],
-     * [loShift] and [objConstant] — in `O(nnz)`. Capture replay uses this copy to import
-     * updated source authority; it does not mutate a persistent solver.
-     */
+    // Same structure with fresh structural bounds; recomputes only the bound-derived vectors, in O(nnz). Capture
+    // replay uses this copy to import source authority; it does not mutate a persistent solver.
     fun rebind(lo: LongArray, hi: LongArray): LpModel {
         require(exactState == null) { "exact state bounds require the bound trail" }
         require(lo.size == n && hi.size == n) { "rebind expects $n bounds, got ${lo.size}/${hi.size}" }
@@ -263,14 +182,8 @@ internal class LpModel(
         )
     }
 
-    /**
-     * A model identical in structure and bounds but whose objective is a single unit cost [unitCost] on
-     * structural column [col] and zero elsewhere — the per-variable objective optimization-based bound
-     * tightening (`tightenOpenIntBounds`) swaps in for each open side. When the
-     * variable is represented split (`x = x⁺ − x⁻`), [negCol] names the negative part and takes
-     * `−unitCost`, so the objective is still exactly `unitCost·x`. Objective arrays are copied so
-     * retained models and their proof snapshots keep the objective they were built with.
-     */
+    // For a split variable x = x⁺ − x⁻, [negCol] names the negative part and takes −unitCost. Objective arrays are
+    // copied so retained models and their proof snapshots keep the objective they were built with.
     fun withSingleColumnObjective(col: Int, unitCost: Long, negCol: Int = -1): LpModel {
         require(exactState == null) { "exact state objectives require the bound trail" }
         val cost = LongArray(numVars)
@@ -297,14 +210,8 @@ internal class LpModel(
         )
     }
 
-    /**
-     * A model identical in structure and bounds whose objective is `Σ coeffs[k]·x_cols[k]`, the
-     * multi-column counterpart of [withSingleColumnObjective]. The boundedness test of a whole
-     * *direction* — is `aᵢᵀx` bounded in this system — needs a row's coefficients as the objective, not
-     * a unit cost on one column.
-     *
-     * Replaces every structural and logical cost without modifying retained models.
-     */
+    // Tests whether a direction aᵢᵀx is bounded. Replaces every structural and logical cost without modifying
+    // retained models.
     fun withRowObjective(cols: IntArray, coeffs: LongArray): LpModel {
         require(exactState == null) { "exact state objectives require the bound trail" }
         require(cols.size == coeffs.size && cols.all { it in 0 until n })
@@ -335,15 +242,9 @@ internal class LpModel(
         )
     }
 
-    /** Column index of row `i`'s slack variable. */
     fun slackCol(i: Int): Int = n + i
 
-    /**
-     * Iterate the nonzero structural entries of column [j] as `(row, value)`, rows ascending, over the
-     * CSC core — the column-oriented readers ([RevisedSimplex], [safeObjectiveLowerBound],
-     * [integerCertify]) consume this. [j] must be a structural column (`< n`); slack columns are
-     * the implicit unit vectors the callers handle separately.
-     */
+    // Rows ascending; [j] must be structural, since slack columns are implicit.
     inline fun forEachInColumn(j: Int, action: (row: Int, value: Long) -> Unit) {
         for (k in csc.colPtr[j] until csc.colPtr[j + 1]) action(csc.rowIdx[k], csc.colVal[k])
     }
@@ -353,20 +254,10 @@ internal class LpModel(
     }
 }
 
-/**
- * Compressed-sparse-column store of an [LpModel]'s structural columns: column `j` occupies
- * `rowIdx[colPtr[j] until colPtr[j + 1]]` with the parallel values in [colVal], row indices ascending.
- * Slack columns are the implicit unit vectors and are never stored. Built by [LpBuilder.build].
- */
+// Row indices ascend within a column; slack columns are implicit.
 internal class Csc(val colPtr: IntArray, val rowIdx: IntArray, val colVal: LongArray)
 
-/**
- * The double-precision form of an [LpModel] with real coefficients, built by [LpBuilder.build] when any
- * continuous column or real-coefficient row is present. The CSC ([colPtr]/[rowIdx]/[colVal]) mirrors
- * [Csc] over the `n` structural columns (slacks are the implicit unit columns); [cost]/[upper]/[hasUpper]
- * are length `n + m` and [loShift] length `n`, all in double precision after the same lower-shift /
- * `>=`-to-`<=` normalizations the [Long] core applies.
- */
+// Built when any real column or row is present, after the same normalizations as the Long core.
 internal class LpDoubleView(
     override val colPtr: IntArray,
     override val rowIdx: IntArray,
@@ -375,32 +266,23 @@ internal class LpDoubleView(
     val cost: DoubleArray,
     override val upper: DoubleArray,
     override val hasUpper: BooleanArray,
-    /** `Σ cost·loShift` folded out by the lower-bound shift; mutable because
-     *  [LpModel.withSingleColumnObjective] copies [cost] and replaces this constant with the new objective. */
+    // Mutable because [LpModel.withSingleColumnObjective] replaces it along with a copied [cost].
     var objConstant: Double,
     val loShift: DoubleArray,
-    /**
-     * Whether [colVal], [cost] or [loShift] is not the source's: an integer coefficient, cost or lower bound past
-     * binary64's integer range rounded on conversion, or summing repeated entries of one column in a row rounded.
-     * The engines and the exact readers share these arrays, so no exact certificate may be taken over such a view.
-     */
+    // [colVal], [cost] or [loShift] rounded on conversion or when summing repeated entries. The engines and exact
+    // readers share these arrays, so no exact certificate may be taken over such a view.
     val inexactCoefficients: Boolean = false,
-    /**
-     * The exact values of the shifted [rhs] and [upper] entries that rounded in binary64, computed on first use.
-     * The float engines solve the rounded arrays; every exact reader goes through [exactRhs] and [exactUpper].
-     */
+    // The float engines solve the rounded arrays; every exact reader goes through [exactRhs] and [exactUpper].
     val shifts: Lazy<LpExactShifts> = lazyOf(LpExactShifts.NONE),
 ) : ExactSimplexDoubleView {
-    /** The exact shifted right-hand side of row [i]. */
     fun exactRhs(i: Int): BigFraction = shifts.value.rhs(i) ?: exactDouble(rhs[i])
 
-    /** The exact shifted upper bound of variable [j]. */
     fun exactUpper(j: Int): BigFraction = shifts.value.upper(j) ?: exactDouble(upper[j])
 
-    /** Whether the exact shifted upper bound of variable [j] is zero, building no fraction for a nonzero one. */
+    // Builds no fraction for a nonzero bound.
     fun upperIsZero(j: Int): Boolean = upper[j] == 0.0 && (j >= loShift.size || (shifts.value.upper(j)?.isZero ?: true))
 
-    /** The exact shifted upper bound of variable [j] rounded up when [outward], else down; null past [Long]. */
+    // Rounded up when [outward], else down; null past Long.
     fun integerUpper(j: Int, outward: Boolean): Long? {
         shifts.value.upper(j)?.let { exact ->
             return if (outward) exact.ceilLong() else exact.negated().ceilLong()?.let { -it }
@@ -410,7 +292,7 @@ internal class LpDoubleView(
         return if (inLong) rounded.toLong() else null
     }
 
-    /** The exact objective constant `Σ cost_j·loShift_j`, of which [objConstant] is the binary64 rounding. */
+    // [objConstant] is its binary64 rounding.
     fun exactObjConstant(): BigFraction {
         val arithmetic = ExactDoubleArithmetic()
         var sum = 0.0
@@ -424,12 +306,8 @@ internal class LpDoubleView(
     }
 }
 
-/**
- * The exact values of an [LpDoubleView]'s shifted right-hand sides ([rows]/[rhs]) and structural upper bounds
- * ([columns]/[upper]) wherever binary64 rounded them, each list ascending by index. Every entry not listed is
- * exact as the view stores it. Shifting by a lower bound far from the data, the [LP_UNBOUNDED_PROBE] stand-in
- * of an open side included, rounds; the exact value keeps the model the certificates reason about the source's.
- */
+// Exact values wherever binary64 rounded a shifted right-hand side or upper bound; unlisted entries are exact as
+// stored. Shifting by a distant lower bound, the [LP_UNBOUNDED_PROBE] stand-in included, rounds.
 internal class LpExactShifts(
     val rows: IntArray,
     val rhs: List<BigFraction>,
@@ -442,13 +320,12 @@ internal class LpExactShifts(
         require((1 until columns.size).all { columns[it - 1] < columns[it] }) { "exact shift columns must ascend" }
     }
 
-    /** The exact right-hand side of row [i], or null when the stored one is exact. */
+    // Null when the stored value is exact.
     fun rhs(i: Int): BigFraction? = rows.binarySearchInt(i).let { if (it >= 0) rhs[it] else null }
 
-    /** The exact upper bound of column [j], or null when the stored one is exact. */
     fun upper(j: Int): BigFraction? = columns.binarySearchInt(j).let { if (it >= 0) upper[it] else null }
 
-    /** These shifts over the sub-model of [takenRows] and [takenColumns], renumbered by position. */
+    // Renumbered by position.
     fun restrict(takenRows: IntArray, takenColumns: IntArray): LpExactShifts {
         if (this === NONE) return NONE
         val subRows = IntArrayList()
@@ -470,48 +347,37 @@ internal class LpExactShifts(
         return LpExactShifts(subRows.toIntArray(), subRhs, subColumns.toIntArray(), subUpper)
     }
 
-    /** These shifts after every structural upper bound was replaced by an exactly stored one. */
     fun withExactUppers(): LpExactShifts =
         if (columns.isEmpty()) this else LpExactShifts(rows, rhs, emptyIntArray(), emptyList())
 
     companion object {
-        /** No rounded entry. */
         val NONE: LpExactShifts = LpExactShifts(emptyIntArray(), emptyList(), emptyIntArray(), emptyList())
     }
 }
 
-/**
- * Builds an [LpModel] from structural variables and constraint rows. Coefficients are accumulated
- * sparsely during construction and emitted as the CSC core at [build]. The builder owns the
- * normalizations documented on [LpModel]; callers add variables and rows in natural `<=`/`>=`/`=`
- * form. The lower-shift normalization needs a finite lower bound, so an open side is realized by the
- * [LP_UNBOUNDED_PROBE] stand-in ([addFreeVar], [addRealVar]).
- */
+// Owns the normalizations described on [LpModel]. The lower shift needs a finite lower bound, so an open side is
+// realized by the [LP_UNBOUNDED_PROBE] stand-in ([addFreeVar], [addRealVar]).
 internal class LpBuilder {
     private val lo = LongArrayList()
     private val hi = LongArrayList()
     private val cost = LongArrayList()
     private val tags = IntArrayList()
 
-    // Structural columns whose lower/upper bound is the finite [LP_UNBOUNDED_PROBE] stand-in for ±∞
-    // ([addFreeVar]); surfaced on the built model as probeClampedLo/Hi. Empty in the common case.
+    // Columns whose bound is the [LP_UNBOUNDED_PROBE] stand-in; surfaced as probeClampedLo/Hi.
     private val clampedLoCols = IntHashSet()
     private val clampedHiCols = IntHashSet()
 
-    /** Structural columns added by [addOpenAboveVar]: genuinely `[lo, +∞)`, so they carry no upper. */
+    // Genuinely [lo, +∞), so they carry no upper.
     private val openAboveCols = IntHashSet()
 
-    // LP-only continuous columns and their real bounds/cost — the double data the [LpDoubleView] is built
-    // from. Empty for the pure-integer core, which never materializes a double view.
+    // Empty for the pure-integer core, which never materializes a double view.
     private val continuousCols = IntHashSet()
     private val contLo = MutableIntDoubleMap()
     private val contHi = MutableIntDoubleMap()
     private val contCost = MutableIntDoubleMap()
     private var anyRealRow = false
 
-    // A row's coefficients as parallel primitive arrays (column index, value); no boxed map. A real-
-    // coefficient row carries its doubles in [valsD]/[rhsD] and leaves [vals]/[rhs] as unused zeros (the
-    // integer core drops it; the double view is authoritative).
+    // A real-coefficient row carries its doubles in [valsD]/[rhsD] and leaves [vals]/[rhs] as unused zeros.
     private class RawRow(
         val cols: IntArray,
         val vals: LongArray,
@@ -529,11 +395,8 @@ internal class LpBuilder {
 
     val constructionSize: Long get() = varCount.toLong() + rowCount + rowEntries
 
-    /** Number of structural variables added so far; valid column indices are `0 until varCount`. */
     val varCount: Int get() = lo.size
 
-    /** Number of rows added so far; valid row indices are `0 until rowCount`. Lets a caller record
-     *  which rows a given producer emitted (the relaxation cache). */
     val rowCount: Int get() = rows.size
 
     fun sourceBounds(column: Int): ExactLpBounds {
@@ -549,11 +412,7 @@ internal class LpBuilder {
         )
     }
 
-    /**
-     * Add a structural variable with domain `[lower, upper]` and objective coefficient [cost].
-     * [tag] is an opaque caller identifier (e.g. an encoded `(varId, value)`) carried through to
-     * [LpModel.tag] for reduced-cost fixing. Returns the variable's column index.
-     */
+    // [tag] is an opaque caller identifier carried through to [LpModel.tag].
     fun addVar(lower: Long, upper: Long, cost: Long = 0L, tag: Int = -1): Int {
         require(lower <= upper) { "empty domain [$lower, $upper]" }
         lo.add(lower)
@@ -563,14 +422,8 @@ internal class LpBuilder {
         return lo.size - 1
     }
 
-    /**
-     * Add a structural variable that may be unbounded on either side: a null [lower]/[upper] means `−∞`
-     * / `+∞`. The engine realizes each open side with the finite [LP_UNBOUNDED_PROBE] stand-in (so the
-     * lower-shift normalization and the bounded-variable simplex are unchanged — a single ordinary
-     * column, no free-variable ray) and flags it, so [safeVariableBound] can reject an optimum that only
-     * reaches the probe frontier as truly unbounded. Callers thus express genuine `±∞`; the magnitude
-     * stays private to this package.
-     */
+    // A null side is open, realized by the flagged [LP_UNBOUNDED_PROBE] stand-in so [safeVariableBound] can reject an
+    // optimum that only reaches the probe frontier.
     fun addFreeVar(lower: Long?, upper: Long?, cost: Long = 0L, tag: Int = -1): Int {
         // A declared bound past the probe magnitude would make the stand-in box empty and reject a model
         // the caller never over-constrained; the open side widens to clear the declared one instead. The
@@ -583,18 +436,10 @@ internal class LpBuilder {
         return j
     }
 
-    /**
-     * Add a structural column over `[lower, +∞)` that carries **no** upper bound at all, rather than the
-     * [LP_UNBOUNDED_PROBE] stand-in [addFreeVar] uses. The simplex already runs unbounded-above columns —
-     * every inequality slack is one — and the difference matters for certification: a refutation that
-     * never reads an upper bound refutes the open model, whereas one resting on the probe only rules out
-     * points inside a box the model never had.
-     *
-     * The cost is that bound extraction cannot see an optimum "ride to the frontier", which is how
-     * [safeVariableBound] recognises an unbounded direction; a caller wanting a bound from such a column
-     * must handle a genuinely unbounded optimum instead. Use [addFreeVar] unless refutation strength over
-     * the open model is the point.
-     */
+    // No upper bound at all, unlike [addFreeVar]'s stand-in: a refutation that never reads an upper bound refutes the
+    // open model, while one resting on the probe only rules out points inside a box the model never had. Bound
+    // extraction then cannot see an optimum ride to the frontier, so prefer [addFreeVar] unless refutation over the
+    // open model is the point.
     fun addOpenAboveVar(lower: Long, cost: Long = 0L, tag: Int = -1): Int {
         // The stand-in only has to keep the box non-empty for the float ride — the column is open above,
         // so nothing downstream reads this upper (certification declines on `hasUpper = false`). A model
@@ -604,13 +449,8 @@ internal class LpBuilder {
         return j
     }
 
-    /**
-     * Add an LP-only **continuous** (real) column with domain `[lower, upper]` (a null side is `±∞`,
-     * realized by the [LP_UNBOUNDED_PROBE] stand-in like [addFreeVar]) and real objective coefficient
-     * [cost]. The column is present in the LP but absent from CP search; because it carries real data the
-     * model is solved through the double view and the exact integer certification declines. Returns the
-     * column index. The [Long] slot stays a placeholder zero — the double view is authoritative.
-     */
+    // Absent from CP search; a null side is open, like [addFreeVar]. The Long slot stays a placeholder zero and the
+    // model is solved through the double view.
     fun addRealVar(lower: Double?, upper: Double?, cost: Double = 0.0, tag: Int = -1): Int {
         val j = lo.size
         lo.add(0L)
@@ -626,8 +466,7 @@ internal class LpBuilder {
         return j
     }
 
-    /** Add a real-coefficient constraint `Σ vals(k)·x_{cols(k)} rel rhs`; like [addRow] but with double
-     *  data. Forces the model onto the double view (and declines integer certification). */
+    // Forces the model onto the double view.
     fun addRealRow(
         cols: IntArray,
         vals: DoubleArray,
@@ -661,14 +500,8 @@ internal class LpBuilder {
         rowEntries += cols.size
     }
 
-    /**
-     * Add a constraint `Σ vals[k]·x_{cols[k]}  rel  rhs`. [cols] are structural column indices as
-     * returned by [addVar]; absent columns are zero, repeated columns are summed. The arrays are
-     * copied, so the caller may reuse its buffers. [global] records whether the row holds at every
-     * integer solution of the original problem (see [LpModel.rowGlobal]); pass `false` for rows
-     * built from live, branch-tightened information — with [premises] naming the live bounds that
-     * justify the row when they are expressible (see [LpRowPremises]).
-     */
+    // Repeated columns are summed; the arrays are copied. Pass [global] false for rows built from branch-tightened
+    // information, with [premises] naming the live bounds that justify them when expressible.
     fun addRow(
         cols: IntArray,
         vals: LongArray,
@@ -682,7 +515,6 @@ internal class LpBuilder {
         rowEntries += cols.size
     }
 
-    /** Convenience overload for sparse maps (test call sites); unpacks into parallel arrays. */
     fun addRow(coeffs: Map<Int, Long>, rel: Relation, rhs: Long) {
         val cols = IntArray(coeffs.size)
         val vals = LongArray(coeffs.size)
@@ -696,17 +528,12 @@ internal class LpBuilder {
         rowEntries += cols.size
     }
 
-    /**
-     * Materialize the normalized [LpModel] for the given [sense]. Only the sparse CSC core of the structural
-     * columns is built; the dense `m × n` matrix is never allocated. Maximization is converted to minimization
-     * by negating the objective; the reported objective re-applies the sign.
-     */
+    // Maximization negates the objective; the reported objective re-applies the sign.
     fun build(sense: Sense): LpModel {
         val n = lo.size
         val m = rows.size
         val rhs = LongArray(m)
-        // Base rhs after the >=-to-<= flip but before the lower-bound shift; retained on the model so a
-        // model copy can re-derive `rhs` for replay bounds (see LpModel.rebind / flippedRhs).
+        // Retained so [LpModel.rebind] can re-derive rhs.
         val flippedRhs = LongArray(m)
         val loShift = LongArray(n) { lo[it] }
 
@@ -765,9 +592,7 @@ internal class LpBuilder {
         )
     }
 
-    /** Build the double-precision [LpDoubleView] mirroring the [Long] normalizations (lower-shift,
-     *  `>=`-to-`<=`) in double, from the real column data ([contLo]/[contHi]/[contCost]) and any real
-     *  rows. Integer columns and rows contribute their exact [Long] values widened to double. */
+    // Integer columns and rows contribute their Long values widened to double.
     private fun buildDoubleView(n: Int, m: Int, signedSense: Long): LpDoubleView {
         val loD = DoubleArray(n) { contLo.getOrDefault(it, lo[it].toDouble()) }
         // The open-side stand-in rounds too, but it is no source bound: the view shifts by its rounding throughout.
@@ -857,9 +682,8 @@ internal class LpBuilder {
         )
     }
 
-    /** The exact values of the [roundedRows]' shifted right-hand sides and the [roundedColumns]' shifted uppers,
-     *  recomputed from the unshifted source inputs, integer ones read as [Long], when an exact reader first asks.
-     *  Every shift is by the view's own [loD], which is the source's lower bound wherever the view certifies. */
+    // Recomputed from the unshifted inputs when an exact reader first asks. Every shift is by the view's own [loD],
+    // which is the source's lower bound wherever the view certifies.
     private fun exactShifts(roundedRows: IntArray, roundedColumns: IntArray, loD: DoubleArray): Lazy<LpExactShifts> {
         if (roundedRows.isEmpty() && roundedColumns.isEmpty()) return lazyOf(LpExactShifts.NONE)
         // The unsummed entries keep a row exact even where summing its repeated columns would round.
@@ -892,9 +716,7 @@ internal class LpBuilder {
         }
     }
 
-    /** Build the CSC core over the `n` structural columns from the accumulated [rows]: `>=` rows are
-     *  negated to `<=` (the row normalization), repeated columns within a row are summed,
-     *  and entries land column-major with ascending row indices (rows walked in order). */
+    // >= rows negate to <= and repeated columns within a row are summed.
     private fun buildCsc(n: Int): Csc {
         val colRowBuckets = Array(n) { IntArrayList() }
         val colValBuckets = Array(n) { LongArrayList() }
@@ -943,7 +765,7 @@ private fun LpDoubleView.copyObjective(roundedCost: Boolean): LpDoubleView = LpD
 
 private const val TWO_POW_63: Double = 9.223372036854775808E18
 
-/** Whether this value has no binary64 equal; the saturating [Double.toLong] would hide 2^63 − 1 rounding up. */
+// The saturating Double.toLong would hide 2^63 − 1 rounding up.
 private fun Long.roundsInBinary64(): Boolean {
     val d = toDouble()
     return d >= TWO_POW_63 || d.toLong() != this

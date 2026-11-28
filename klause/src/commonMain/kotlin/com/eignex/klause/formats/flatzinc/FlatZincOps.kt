@@ -1,9 +1,9 @@
 package com.eignex.klause.formats.flatzinc
 
-/** Reified bool comparison used by `bool_{eq,le,lt}_reif`. */
+// bool_{eq,le,lt}_reif.
 internal enum class BoolCmpOp { EQ, LE, LT }
 
-/** `(strictly_)(in|de)creasing_{int,bool}` variants. */
+// (strictly_)(in|de)creasing_{int,bool}.
 internal enum class MonotoneOp(val ascending: Boolean, val strict: Boolean) {
     INCREASING(ascending = true, strict = false),
     DECREASING(ascending = false, strict = false),
@@ -11,7 +11,7 @@ internal enum class MonotoneOp(val ascending: Boolean, val strict: Boolean) {
     STRICTLY_DECREASING(ascending = false, strict = true),
 }
 
-/** `global_cardinality*` variants. */
+// global_cardinality*.
 internal enum class GccVariant(val lowUp: Boolean, val closed: Boolean) {
     STANDARD(lowUp = false, closed = false),
     CLOSED(lowUp = false, closed = true),

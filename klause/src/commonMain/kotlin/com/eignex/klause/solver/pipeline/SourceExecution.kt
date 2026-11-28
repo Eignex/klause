@@ -314,7 +314,6 @@ sealed class SourceExecutionResult protected constructor(
     /** Original-unit point acceptance and claim qualification, absent for another source representation. */
     val linearSource: LinearSourceOutcome?,
 ) : SourceSemanticsOwner {
-    /** Bind an invocation without an additional original-unit linear qualification. */
     protected constructor(invocation: PreparedSourceInvocation) : this(invocation, null)
     override val semantics: EffectiveSourceSemantics = invocation.source.semantics
 

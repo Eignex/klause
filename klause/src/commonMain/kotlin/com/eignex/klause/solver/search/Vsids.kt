@@ -12,15 +12,7 @@ import kotlin.random.Random
  * increment is mutated. Rescales when `increment` passes `rescaleThreshold`.
  *
  * Picks the unpinned variable with the highest activity. Ties follow the heap order. Activities persist
- * across [onRestart], so learning carries over.
- *
- * Written against [BranchingState], so the same activities drive a finite CP traversal and a theory
- * traversal. A shared Boolean analyzer names the variables of its asserting clause. Native CP analysis
- * names the variables visited in its implication graph; conflicts without a learned consequence use
- * the decision variables at their conflicting levels.
- *
- * Default `decay = 0.95`. Lower decay (e.g., 0.8) makes the heuristic more
- * aggressive about following recent conflicts; higher (e.g., 0.99) is more conservative.
+ * across [onRestart]. Lower [decay] follows recent conflicts more aggressively.
  */
 class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Double = 1e100) :
     VariableBranching<BranchingState> {
@@ -33,17 +25,13 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
 
     private var increment: Double = 1.0
 
-    // Combined index space: 0..numBool-1 are bool ids; numBool..numBool+numInt-1 are int ids
-    // offset by numBool. One indexed max-heap over both gives O(log n) bumps and amortised
-    // O((1 + pinned-skip) · log n) picks instead of an O(numBool + numInt) linear scan.
+    // Bool ids first, then int ids offset by numBool, in one indexed max-heap.
     private var heap: IndexedMaxHeap? = null
     private var numBoolCached: Int = 0
     private var numIntCached: Int = 0
 
-    // Identity of the state pick() last ran against. pick() removes assigned vars from the
-    // heap and relies on onUnassign to re-insert them, so a solve that ends on a leaf or timeout
-    // leaves the heap partial. A fresh search on the same instance re-offers every removed var on
-    // its first pick, keeping their stored activities warm.
+    // A solve that ends on a leaf or timeout leaves the heap partial, so a pick against a new state
+    // re-offers every removed var with its stored activity.
     private var lastState: BranchingState? = null
 
     private fun ensureSized(numBool: Int, numInt: Int) {
@@ -65,15 +53,9 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
             val total = numBoolCached + numIntCached
             for (id in 0 until total) if (!h.contains(id)) h.restore(id)
         }
-        // Extract the max-activity id and keep it out of the heap. Already-pinned ids surfacing here
-        // are dropped, not restored — [onUnassign] re-inserts every variable a backtrack frees, so
-        // the heap holds roughly only unassigned variables and pick stays O(log n) regardless of
-        // trail depth.
-        //
-        // The bool branch fully assigns the picked var (true/false), so it can stay removed. An
-        // int branch may only *narrow* the domain (still size > 1 after), so the picked int var
-        // is restored — onUnassign fires on widening, not narrowing, and would otherwise never
-        // re-offer a still-free int var, making pick return null with variables undetermined.
+        // Pinned ids are dropped, not restored: onUnassign re-inserts every variable a backtrack frees.
+        // A picked int var is restored because its branch may only narrow the domain, and onUnassign
+        // would never re-offer it.
         while (true) {
             while (h.size > 0) {
                 val id = h.extractMax()
@@ -87,10 +69,8 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
                     }
                 }
             }
-            // Pop-on-pick can strand an open variable out of the heap if a re-add is missed across a
-            // restart or backtrack, and returning `null` then would commit an incomplete assignment
-            // as a solution. Rescan and re-offer every still-open variable before giving up; this runs
-            // only when the heap empties, so `null` provably means no variable still needs a decision.
+            // A missed re-add would strand an open variable, and returning null would commit an
+            // incomplete assignment. Rescan before giving up so null means nothing needs a decision.
             var refilled = false
             for (v in 0 until numBoolCached) {
                 if (state.needsBoolDecision(v) && !h.contains(v)) {
@@ -143,8 +123,7 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
         h.updateKey(id, h.keyOf(id) + increment)
     }
 
-    /** Scale every activity and `increment` by `1/rescaleThreshold`, preserving their order while staying
-     *  clear of `Double.MAX_VALUE`; a uniform factor needs no resifting. */
+    // A uniform factor preserves heap order, so no resifting is needed.
     private fun rescaleAll(h: IndexedMaxHeap) {
         val k = 1.0 / rescaleThreshold
         h.scaleKeys(k)

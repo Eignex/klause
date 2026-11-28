@@ -7,7 +7,7 @@ import com.eignex.klause.propagation.RevLongArray
 import com.eignex.klause.propagation.RevRef
 import com.eignex.klause.propagation.checkFiniteWork
 
-/** STR2 sparse-set propagation state for the Table constraint. */
+// STR2 sparse-set propagation state.
 internal class TableStr2State(
     val validTuples: IntArray,
     numValidInit: Int,

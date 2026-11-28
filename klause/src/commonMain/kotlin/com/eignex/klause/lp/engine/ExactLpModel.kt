@@ -265,12 +265,8 @@ internal class ExactLpModel private constructor(
         ).also { it.storageCache = if (rows === this.rows) layoutStorage else layoutStorage.withRows(rows) }
     }
 
-    /**
-     * This model with [columns] in place of its own, for a caller that changed only bounds and integrality, so
-     * every origin, and with it every invariant [copy] rechecks, is the one this model already holds. The bound
-     * trail derives a state per search push from its predecessor this way; [copy]'s checks are linear in the
-     * columns, with exact arithmetic, and would cost every push that much.
-     */
+    // For a caller that changed only bounds and integrality, so every invariant [copy] rechecks already holds. The
+    // bound trail derives a state per search push this way; [copy]'s exact linear-time checks would cost every push.
     fun withBoundColumns(columns: List<ExactLpColumn>): ExactLpModel {
         require(columns.size == numVars)
         return ExactLpModel(matrix, rightHandSide, columns, rows, objective, false, reconstructionMatrix).also {

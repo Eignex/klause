@@ -7,9 +7,6 @@ import com.eignex.util.collections.DynamicBits
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
-/** Boolean vars for factor [fid]: base factors read from `problem.factors`; tail factors
- *  (fid ≥ baseFactorCount) from `midlife.factors` in incremental mode, else from the
- *  [LearnedPropagator] in [LearnedClauseDb.store]. */
 private fun PropagationState.factorBoolVars(fid: Int): IntArray = when {
     fid < baseFactorCount -> problem.factors[fid].boolVars
     incremental -> midlife.factors[fid - baseFactorCount].boolVars
@@ -17,7 +14,6 @@ private fun PropagationState.factorBoolVars(fid: Int): IntArray = when {
     else -> learned.store[fid - baseFactorCount].boolVars
 }
 
-/** Integer vars for factor [fid]: same routing as [factorBoolVars]. */
 internal fun PropagationState.factorIntVars(fid: Int): IntArray = when {
     fid < baseFactorCount -> problem.factors[fid].intVars
     incremental -> midlife.factors[fid - baseFactorCount].intVars
@@ -25,17 +21,9 @@ internal fun PropagationState.factorIntVars(fid: Int): IntArray = when {
     else -> learned.store[fid - baseFactorCount].intVars
 }
 
-/** Fallback conflict-levels collection for a failing propagator, routed through [factorBoolVars]/[factorIntVars]. */
 internal fun PropagationState.factorVarsConflictLevels(fid: Int): IntArray =
     collectLevelsForVars(factorBoolVars(fid), factorIntVars(fid))
 
-/** Max decision level of any variable in `boolVars` / `intVars`. Used by the driver to
- *  set `currentLevel` before each factor invocation.
- *
- *  No variable's level can exceed the number of decisions pushed so far (`cap`); once
- *  the running max reaches that ceiling, the remaining vars can't raise it, so we stop
- *  early. This is an exact short-circuit (same result, fewer reads) — it mainly trims
- *  the scan for large-arity global constraints that fire often during search. */
 internal fun PropagationState.maxLevelForVars(boolVars: IntArray, intVars: IntArray): Int {
     // No live level can exceed the number of decisions pushed so far; a stored level
     // above that is a stale advisory left by a pop and must be clamped, or it poisons
@@ -68,9 +56,6 @@ internal fun PropagationState.maxLevelForVars(boolVars: IntArray, intVars: IntAr
     return max
 }
 
-/** Variant that also folds in atom-lit levels for a Clause's literals — used for
- *  learned clauses that reference atom-vars, where the relevant decision level isn't
- *  captured by `boolVars` / `intVars` alone. */
 internal fun PropagationState.maxLevelForClause(literals: IntArray): Int {
     // Clamped to the live decision count for the same reason as [maxLevelForVars].
     val cap = levelToDecisionVar.size
@@ -88,14 +73,7 @@ internal fun PropagationState.maxLevelForClause(literals: IntArray): Int {
     return max
 }
 
-/** Collect every decision level touched by `boolVars` / `intVars` — the factor's view of
- *  who's responsible. Used when a factor returns `false` without explicitly setting
- *  [PropagationState.conflictLevels].
- *
- *  Atom-lit dispatch: `boolVars` may legitimately contain virtual atom-var ids when the
- *  failing factor is a learned Clause whose literals reference atom-lits (encoded as
- *  `Lit.make(v, ...)` with `v >= problem.numBoolVars`). Those resolve via [atomLevelForConflict],
- *  not [PropagationState.boolLevel]. */
+// Used when a factor fails without setting conflictLevels. A learned clause's boolVars can hold atom-var ids.
 internal fun PropagationState.collectLevelsForVars(boolVars: IntArray, intVars: IntArray): IntArray {
     levelScratch.clear()
     val numBool = problem.numBoolVars
@@ -112,8 +90,6 @@ internal fun PropagationState.collectLevelsForVars(boolVars: IntArray, intVars: 
     return levelScratch.toIntArray()
 }
 
-/** Decode [levels] (a subset of pushed decision levels) into the bool decision vars at
- *  those levels. */
 internal fun PropagationState.extractConflictBools(levels: IntArray): IntArray {
     if (levels.isEmpty()) return emptyIntArray()
     val out = IntHashSet(levels.size)
@@ -125,7 +101,6 @@ internal fun PropagationState.extractConflictBools(levels: IntArray): IntArray {
     return out.toIntArray()
 }
 
-/** Decode [levels] into the int decision vars at those levels. */
 internal fun PropagationState.extractConflictInts(levels: IntArray): IntArray {
     if (levels.isEmpty()) return emptyIntArray()
     val out = IntHashSet(levels.size)
@@ -137,19 +112,8 @@ internal fun PropagationState.extractConflictInts(levels: IntArray): IntArray {
     return out.toIntArray()
 }
 
-/**
- * BFS the propagation graph backwards from [PropagationState.conflictSeedFactors] (factors directly
- * implicated in a contradiction) through the per-var reason arrays, collecting every
- * factor whose firing transitively contributed. Each visited factor F is expanded by
- * walking its `boolVars` / `intVars`: for each variable, the factor (if any) that
- * forced the current value / domain bound is added to the frontier. Returns the full
- * factor-level core, or the empty set when no seed was recorded (e.g. seed-assumption
- * contradictions that never reached a factor).
- *
- * Two-sided narrowing is handled because [PropagationState.intMinReason] and
- * [PropagationState.intMaxReason] are tracked separately and both endpoints are walked for every
- * int var.
- */
+// Every factor whose firing transitively contributed, walking both int endpoint reasons. Empty when no seed was
+// recorded, such as a seed-assumption contradiction that never reached a factor.
 internal fun PropagationState.extractConflictFactors(): IntArray {
     if (conflictSeedFactors.isEmpty()) return emptyIntArray()
     val scratch = conflictFactorScratch

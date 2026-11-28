@@ -14,24 +14,15 @@ import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.util.ExecutionControl
 
 /**
- * Per-call params for the local-search [LocalSearchSolver]. Engine setup
- * ([LocalSearchSolver.strategy], [LocalSearchSolver.restartPolicy]) lives on the
- * constructor; this data class carries the knobs that vary per `sample` / `enumerate` /
- * `solve` call.
+ * Per-call params for [LocalSearchSolver]; strategy and restart policy live on the solver.
  *
- *  - [maxFlips] — deterministic local-search work allowance. Every accepted move and restart
- *    transition consumes one unit. Sampling resets the allowance after yielding a fresh sample;
- *    minimisation spends it across the entire call. Leave at [Long.MAX_VALUE] to never give up;
- *    lower it to make `enumerate` short-circuit when the engine has effectively exhausted the
- *    local solution space.
+ *  - [maxFlips]: deterministic work allowance; every accepted move and restart consumes one unit. Sampling resets
+ *    it after each fresh sample, minimization spends it across the call.
  */
 data class LocalSearchParams(
     val maxFlips: Long = Long.MAX_VALUE,
-    /**
-     * Wall-clock-independent operation budget across all backends. For [LocalSearchSolver] one
-     * instruction = one local-search work step (move or restart); when both are set, the smaller wins.
-     * `null` = no cap. Exists so callers can use one budget name across the backends' param objects.
-     */
+    /** Operation budget shared by name across backends: one unit per move or restart; the smaller of this and
+     *  [maxFlips] wins. */
     val maxInstructions: Long? = null,
     /**
      * The solve-wide node allowance this run also spends, at [com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK]
@@ -40,73 +31,41 @@ data class LocalSearchParams(
     val nodeBudget: NodeBudget? = null,
     /** Seed for the search RNG; null picks a nondeterministic seed. */
     val randomSeed: Long? = null,
-    /** Variables to pin for the duration of this call. The solver initialises them to
-     *  the requested values on every restart and ignores any move that would change
-     *  them. Defaults to none. */
+    /** Variables pinned for this call: set on every restart and never changed by a move. */
     override val assumptions: Assumptions = Assumptions.None,
     /** Cooperative cancellation predicate; see [ExecutionControl]. */
     val cancellation: ExecutionControl = ExecutionControl.Never,
-    /**
-     * Optional live-event listener; see [SearchEvent]. Called inline on the search thread at
-     * coarse points only, such as new incumbents. `null` disables observation.
-     */
+    /** Live-event listener, called inline on the search thread at coarse points such as new incumbents. */
     val onEvent: ((SearchEvent) -> Unit)? = null,
-    /** How [LocalSearchSolver.minimize] combines constraint violations with the objective
-     *  for greedy descent. Defaults to two-phase feasibility-first behaviour; switch to
-     *  [CostShaping.linear] or [CostShaping.saturating] on tight problems where the
-     *  feasible region is narrow. Ignored by `solve` / `samples` / `enumerate`. */
+    /** How minimization combines violations with the objective for greedy descent. */
     val costShaping: CostShaping = CostShaping.FeasibilityFirst,
     /**
-     * Optional per-move *gradient view* of the objective for [LocalSearchSolver.minimize] /
-     * `improvements`: when non-null, the descent scores moves against this [IncrementalObjective]
-     * instead of the [LinearObjective] passed to `minimize`; every incumbent is still valued by the
-     * linear objective. The canonical use is a functionally-defined objective whose linear form
-     * has zero gradient on decision moves; this view recomputes the defined var from the leaves. It
-     * agrees with the linear objective only where the defined variables sit on their definitions, so it
-     * is used only by a solver whose per-move invariants keep them there; any other descends the linear
-     * objective. Ignored by `solve` / `samples` / `enumerate`.
+     * Per-move view of the objective that minimization scores moves against, such as a functionally defined
+     * objective whose linear form has no gradient on decision moves. Incumbents are still valued by the
+     * [LinearObjective]; only a solver whose per-move invariants hold defined variables in place uses it.
      */
     val lsObjective: IncrementalObjective? = null,
-    /**
-     * Optional warm-start *assignment*: when non-null, the search begins from this assignment instead
-     * of its first random restart; later restarts follow the restart policy. Intended for a hybrid
-     * pipeline handing a CP/backtrack-found feasible point to LS. Size-mismatched samples are ignored.
-     */
+    /** Starting assignment in place of the first random restart; a size-mismatched sample is ignored. */
     val initialAssignment: Sample? = null,
     /**
-     * The verified-incumbent exchange this run takes part in, both ways. Each feasible assignment that
-     * improves on this run's own best is offered to it, and only a candidate the exchange verifies *and*
-     * finds strictly better than the standing incumbent is installed — the engine proposes, the exchange
-     * decides. On each restart the search adopts a not-yet-seen installed incumbent that beats its own as
-     * the restart anchor, letting a peer arm's better assignment pull this walk toward it. Purely
-     * heuristic in that direction: LS re-derives cost and feasibility from the assignment, so a peer's
-     * solution can never make a result unsound. Importing is skipped when this run carries assumption pins
-     * (a foreign assignment may violate them); publishing is not (zero violation means every factor holds,
-     * pinned or not). A portfolio hands every arm one exchange so incumbents circulate across engines.
-     * `null` (default) leaves the run private. Ignored by `solve` / `samples` / `enumerate`.
+     * Verified-incumbent exchange shared with peer arms during minimization. Improvements are offered to it, and
+     * each restart may anchor on a better installed incumbent; a peer assignment only seeds descent, so it cannot
+     * make a result unsound. Importing is skipped under assumption pins a foreign assignment may violate.
      */
     val pooledIncumbents: IncumbentExchange<Sample, Double>? = null,
     /**
-     * Soft cap for the graded violation cost (see
-     * `compressViolation`). Per-factor residuals at or below this
-     * contribute their exact magnitude; above it they grow only logarithmically, so a handful of
-     * large-magnitude constraints (a wide `int_lin_eq`, a deep cumulative overload) can't dominate
-     * the cost sum and starve the many small violations feasibility needs. Lower it toward `0` for
-     * a near-pure "count of violations" cost; raise it for raw-magnitude descent. Defaults to
-     * [com.eignex.klause.factor.DEFAULT_VIOLATION_SOFT_CAP]; shared by every factor in the solve.
+     * Per-factor residuals above this grow only logarithmically, so a few large violations cannot starve the many
+     * small ones feasibility needs. Lower values approach a violation count.
      */
     val violationSoftCap: Int = DEFAULT_VIOLATION_SOFT_CAP,
     /**
-     * Seed the weighted-violation strategies' initial [FactorWeightBook.factorWeights] so no single
-     * constraint *kind* dominates the landscape by population. When set, an over-represented factor
-     * class (count above the mean class size) is damped so its aggregate initial weight is capped at
-     * that mean — purely monotone (it only lowers weights). Weight-blind strategies (WalkSat /
-     * ProbSat / SA) never read the weights, so this is a no-op for them.
+     * Damps each over-represented factor class's initial [FactorWeightBook.factorWeights] so its aggregate weight is
+     * capped at the mean class size; weight-blind strategies ignore it.
      */
     val normalizeWeightsByClass: Boolean = false,
-    /** Collect graded violations by factor kind at strict committed-cost improvements. Disabled by default. */
+    /** Collect graded violations by factor kind at strict committed-cost improvements. */
     val reportResiduals: Boolean = false,
-    /** Record active preparation, seeding, selection and application time. Disabled by default. */
+    /** Record active preparation, seeding, selection and application time. */
     val reportPhaseTimes: Boolean = false,
     /** Objective guidance; unsupported geometric cones retain canonical scoring and proposals. */
     val objectiveGuidance: ObjectiveGuidance = ObjectiveGuidance.Functional,

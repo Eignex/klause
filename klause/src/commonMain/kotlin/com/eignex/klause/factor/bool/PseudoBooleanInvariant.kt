@@ -23,7 +23,6 @@ internal class PseudoBooleanInvariant(
     private val bound: Long,
 ) : Invariant {
 
-    /** Signed contribution of each variable to the weighted sum. */
     private val signedByVar: IntLongMap = buildSignedWeightByVar(weights, literals, exclude = -1)
 
     private fun signedForVar(v: Int): Long = signedByVar[v]

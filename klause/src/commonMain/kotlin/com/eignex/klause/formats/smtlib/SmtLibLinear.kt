@@ -17,28 +17,24 @@ import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.lowering.wideConstHolds
 import com.eignex.util.numbers.addExact
 
-/** Whether a relation node is arithmetic rather than boolean, decided by its first operand's sort via the
- *  scope- and `ite`-aware [isBoolExpr]: head-op matching alone misjudges an int-sorted `ite`/`let` operand. */
+// Head-op matching alone misjudges an int-sorted `ite`/`let` operand, hence the scope-aware [isBoolExpr].
 internal fun Compiler.Builder.isArithmeticRelation(t: SExpr.SList): Boolean {
     val arg = t.items.getOrNull(1) ?: return false
     return !isBoolExpr(arg)
 }
 
-/** Assert a linear relation. An n-ary chain `(op a1 … an)` is the conjunction of its n−1 consecutive
- *  relations, per the SMT-LIB chainable semantics, with no direct relation between non-adjacent operands. */
 internal fun Compiler.Builder.assertLinear(t: SExpr.SList) {
     val op = t.atomAt(0, "relation operator")
     requireChainableRelation(t, op)
-    // Fold each operand once: a term with a side-effecting subterm (`ite`, `div`, …) allocates fresh
-    // variables and clauses per fold, and an interior operand takes part in two consecutive relations.
+    // Fold each operand once: a side-effecting subterm allocates per fold, and an interior operand takes
+    // part in two relations.
     val terms = (1 until t.items.size).map { linearTerm(t.items[it]) }
     if (postOrderChain(op, terms)) return
     for (i in 0 until terms.size - 1) assertRelation(op, terms[i], terms[i + 1])
 }
 
-/** Post an order chain over three or more bare integer variables as one [Increasing], returning whether
- *  it applied. A two-operand relation is already a single exact row, and a repeated variable would make
- *  the chain propagate one unit per wake, so both decline to the pairwise [Linear] rows. */
+// A two-operand relation is already one exact row, and a repeated variable would make the chain propagate
+// one unit per wake, so both fall back to pairwise rows.
 private fun Compiler.Builder.postOrderChain(op: String, terms: List<IntComb>): Boolean {
     if (terms.size < 3) return false
     val descending = when (op) {
@@ -51,14 +47,11 @@ private fun Compiler.Builder.postOrderChain(op: String, terms: List<IntComb>): B
         narrow.lin.asSimpleVar() ?: return false
     }
     if (vars.toHashSet().size != vars.size) return false
-    // `a ≥ b ≥ c` is the ascending chain over the reversed sequence; [Increasing] only represents ascending.
     factors.add(Increasing(if (descending) vars.reversedArray() else vars, strict = strictDelta(op) != 0))
     return true
 }
 
-/** Post a linear row, or resolve a variable-free relation to trivially-true (post nothing) or
- *  false (post the false literal ⇒ unsat) — never an empty [Linear]. Shared by the assert and the
- *  reified-relation paths. */
+/** A variable-free relation resolves to nothing or to the false literal, never an empty [Linear]. */
 internal fun Compiler.Builder.assertLinearRow(coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long) {
     if (vars.isEmpty()) {
         if (!constRelationHolds(op, bound)) forceTrue(Lit.negate(trueLit()))
@@ -67,8 +60,6 @@ internal fun Compiler.Builder.assertLinearRow(coeffs: LongArray, vars: IntArray,
     }
 }
 
-/** Assert `a ⟨op⟩ b` (an SMT relation operator) as a hard linear row, lowering to a wide [Linear]
- *  when a coefficient or the bound exceeds the 64-bit range. */
 internal fun Compiler.Builder.assertRelation(op: String, a: IntComb, b: IntComb) {
     if (op == "=") conditionalEquality(a, b)?.let {
         forceTrue(it)
@@ -86,8 +77,6 @@ internal fun Compiler.Builder.assertRelation(op: String, a: IntComb, b: IntComb)
     }
 }
 
-/** Reify `a ⟨op⟩ b` onto a fresh literal, using a wide [com.eignex.klause.factor.arithmetic.ReifiedLinear]
- *  when a coefficient or the bound exceeds the 64-bit range. */
 internal fun Compiler.Builder.reifyRelation(op: String, a: IntComb, b: IntComb): Int {
     if (op == "=") conditionalEquality(a, b)?.let { return it }
     val linOp = relLinearOp(op)
@@ -130,9 +119,7 @@ private fun Compiler.Builder.conditionalEquality(a: IntComb, b: IntComb): Int? {
     }
 }
 
-/** Record `lit ⇔ variable = value` when the reified row is exactly that, so an `ite` chain can read its
- *  condition back off the literal. Only a finite-domain variable is recorded: a chain selector needs a
- *  known index range, and an open one could never index an array. */
+// Lets an `ite` chain read its condition back off the literal. An open selector could never index an array.
 private fun Compiler.Builder.noteEqAtom(lit: Int, op: LinearOp, coeffs: LongArray, vars: IntArray, bound: Long) {
     if (op != LinearOp.EQ || vars.size != 1) return
     val c = coeffs[0]
@@ -143,15 +130,13 @@ private fun Compiler.Builder.noteEqAtom(lit: Int, op: LinearOp, coeffs: LongArra
     iteChains.noteAtom(lit, vars[0], bound * c)
 }
 
-/** Require a chainable relation node to have at least two operands (`(op a b …)`), else reject. */
 internal fun requireChainableRelation(node: SExpr.SList, op: String) {
     if (node.items.size < 3) {
         throw UnsupportedSmtException("$op with ${node.items.size - 1} operands is not a relation")
     }
 }
 
-/** Collect the 64-bit linear relations of `(op a1 … an)` — one per consecutive pair — for source bound
- *  inference, skipping a pair with a wide operand (a wide relation is enforced by its factor). */
+// Skips a pair with a wide operand, which its factor enforces.
 internal fun Compiler.Builder.relationToLinear(t: SExpr.SList, out: MutableList<Rel>) {
     val op = t.atomAt(0, "relation operator")
     requireChainableRelation(t, op)
@@ -163,7 +148,6 @@ internal fun Compiler.Builder.relationToLinear(t: SExpr.SList, out: MutableList<
     }
 }
 
-/** Build a linear relation `a op b` (as `Σ coeffs·vars ⟨op⟩ bound`) from two folded operands. */
 internal fun Compiler.Builder.relFromOperands(op: String, a: LinComb, b: LinComb): Rel {
     val (vars, coeffs, baseBound) = diff(a, b)
     val (linOp, delta) = when (op) {
@@ -178,20 +162,15 @@ internal fun Compiler.Builder.relFromOperands(op: String, a: LinComb, b: LinComb
     return Rel(vars, coeffs, linOp, foldChecked { addExact(baseBound, delta.toLong()) })
 }
 
-/** Run [block], surfacing a folded-term 64-bit overflow as a clean [UnsupportedSmtException].
- *  SMT integers are unbounded, so an overflow means the term exceeds what the solver represents. */
 internal inline fun <T> foldChecked(block: () -> T): T = try {
     block()
 } catch (_: ArithmeticException) {
     throw UnsupportedSmtException("integer overflow while folding a linear term")
 }
 
-/** Fold [t] to an integer linear combination (iteratively, via [evalTerm]); [IntComb.Wide] when a value
- *  exceeds the 64-bit range. */
 internal fun Compiler.Builder.linearTerm(t: SExpr): IntComb = (evalTerm(t, Sort.INT) as Res.I).term
 
-/** Fold [t] to a 64-bit integer combination, rejecting a wide value — for the narrow-only consumers
- *  (the objective and `distinct`/`AllDifferent`) that have no arbitrary-precision path. */
+// For consumers with no arbitrary-precision path.
 internal fun Compiler.Builder.linearTermNarrow(t: SExpr): LinComb = when (val ic = linearTerm(t)) {
     is IntComb.Narrow -> ic.lin
     is IntComb.Wide -> throw UnsupportedSmtException("integer beyond the 64-bit range in this context")
@@ -202,10 +181,7 @@ internal fun Compiler.Builder.intBinding(name: String, b: Compiler.Builder.Bindi
     return b.lin ?: throw UnsupportedSmtException("'$name' has no compiled Int value")
 }
 
-/** An integer literal — an optionally-signed non-empty run of ASCII digits, of any magnitude (SMT
- *  integers are arbitrary precision, so this includes values beyond `Int`/`Long`). Scanned explicitly
- *  rather than via a `\d` regex, whose Unicode-digit semantics are not guaranteed identical across KMP
- *  targets. */
+// Scanned explicitly: a `\d` regex's Unicode-digit semantics differ across KMP targets.
 internal fun Compiler.Builder.isIntegerLiteral(s: String): Boolean {
     val start = if (s.startsWith('-')) 1 else 0
     if (start >= s.length) return false
@@ -213,10 +189,8 @@ internal fun Compiler.Builder.isIntegerLiteral(s: String): Boolean {
     return true
 }
 
-/** A real literal — a decimal with a fractional point (e.g. `2.6`), which QF_LIA does not permit. */
 internal fun Compiler.Builder.isRealLiteral(s: String): Boolean = '.' in s && s.toDoubleOrNull() != null
 
-/** Build linear coefficients for `a - b op 0`. */
 internal fun Compiler.Builder.diff(a: LinComb, b: LinComb): Triple<IntArray, LongArray, Long> =
     foldChecked { linCombDiff(a, b) }
 

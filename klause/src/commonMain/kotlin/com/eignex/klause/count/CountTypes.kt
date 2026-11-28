@@ -5,15 +5,11 @@ import com.eignex.klause.ir.EffectiveSourceSemantics
 /**
  * Configuration for approximate model counting ([com.eignex.klause.solver.Solver.approximateCount]).
  *
- * Native counting path: XOR hashes are propagated jointly by Gauss-Jordan elimination (see
- * [com.eignex.klause.factor.bool.GaussianXor]) on the backtrack solver, which keeps hashed-cell
- * enumeration tractable. The result is correct within a multiplicative `(1 ± epsilon)` factor with
- * probability at least `1 - delta`.
+ * XOR hashes are propagated jointly by Gauss-Jordan elimination (see [com.eignex.klause.factor.bool.GaussianXor]).
+ * The result is correct within a multiplicative `(1 ± epsilon)` factor with probability at least `1 - delta`.
  *
- * The projection can include integer variables ([intSamplingSet]): those are channelled to Boolean
- * bits (see [IntBitChannel]) and the hashes range over their bits, so counting is over distinct
- * integer *values* (× the Boolean projection). Real columns constrain feasibility but are not
- * counted; every real declaration is retained in the hashed cells.
+ * Integer projection variables ([intSamplingSet]) are channelled to Boolean bits (see [IntBitChannel]), so counting
+ * is over distinct integer values. Real columns constrain feasibility but are not counted.
  */
 data class ApproxCountConfig(
     /** Multiplicative tolerance `ε`. Smaller ε → tighter bound → more enumeration work. */
@@ -124,7 +120,7 @@ data class CountConfig(
         intSamplingSet = intSamplingSet,
         maxChecks = exactBudget,
         maxDecisionsPerCheck = maxDecisionsPerCheck,
-        reportEvery = exactBudget, // hybrid only needs the final interval — report once at the end
+        reportEvery = exactBudget, // the hybrid only needs the final interval
     )
 
     internal fun toApproxConfig() = ApproxCountConfig(
@@ -138,10 +134,7 @@ data class CountConfig(
 
 /** Quality tier for [com.eignex.klause.solver.Solver.samples]. */
 enum class SampleQuality {
-    /**
-     * The production path: fast, biased draws from the backend's own [com.eignex.klause.solver.Solver.samples]
-     * (search-order / locally-reachable). No uniformity guarantee.
-     */
+    /** Fast, biased draws from the backend's own [com.eignex.klause.solver.Solver.samples]; no uniformity guarantee. */
     CHEAP,
 
     /**

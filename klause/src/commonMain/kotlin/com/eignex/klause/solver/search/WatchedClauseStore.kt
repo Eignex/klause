@@ -9,38 +9,23 @@ import com.eignex.util.collections.storage.primitiveCapacityBytes
 import com.eignex.util.collections.storage.referenceCapacity
 import com.eignex.util.collections.storage.valueStorageIdentity
 
-/**
- * Assignment view and consequence sink for a clause store.
- *
- * The store owns the watch invariant; the host owns what an implication or a conflict means. That
- * split lets source and shared learned stores use the same assignment and consequence boundary.
- */
+// The store owns the watch invariant; the host owns what an implication or a conflict means.
 internal interface ClauseWatchHost {
-    /** Truth of [literal] under the current assignment, or null when its variable is unassigned. */
     fun truth(literal: Int): Boolean?
 
-    /** Decision level that assigned [literal]'s variable, or 0 when it is unassigned. */
+    // 0 when the literal's variable is unassigned.
     fun levelOf(literal: Int): Int
 
-    /** Record that clause [clause] implies [literal], which no other literal of it can now satisfy. */
     fun implied(clause: Int, literal: Int): ComponentResult
 
-    /** Record that every literal of clause [clause] is falsified. */
     fun conflicted(clause: Int): ComponentResult
 }
 
-/**
- * Watch-indexed clause database.
- *
- * Each retained clause keeps its watched literals at positions zero and one, so an assignment wakes
- * only the clauses watching the literal it falsified. A clause is immutable as a set of literals while
- * its literal *order* is owned by the watch machinery, which is why callers read literals through
- * [literalsAt] and never retain the array. The two-watched-literal scheme follows Moskewicz, Madigan,
- * Zhao, Zhang and Malik, "Chaff: Engineering an Efficient SAT Solver", DAC 2001,
- * https://doi.org/10.1145/378239.379017.
- */
+// Watched literals sit at positions zero and one. The watch machinery owns each clause's literal order,
+// so callers never retain the array. Two-watched-literal scheme of Moskewicz, Madigan, Zhao, Zhang and
+// Malik, "Chaff: Engineering an Efficient SAT Solver", DAC 2001, https://doi.org/10.1145/378239.379017.
 internal class WatchedClauseStore {
-    /** Watch entries and retracted-implication literals inspected by propagation. */
+    // Watch entries and retracted-implication literals inspected by propagation.
     var watchVisits: Long = 0
         private set
     internal var ownershipRevision: Long = 0L
@@ -143,41 +128,30 @@ internal class WatchedClauseStore {
         return protected
     }
 
-    /** Number of retained clauses. */
     val size: Int get() = clauses.size
 
-    /** Indices of the retained clauses that hold a single literal. */
     val units: IntArrayList get() = unitClauses
 
-    /** Literals of clause [index], watched literals first. */
     fun literalsAt(index: Int): IntArray = clauses[index]
 
-    /** Literal block distance recorded for clause [index] when it was learned. */
     fun lbdAt(index: Int): Int = lbds[index]
 
-    /** Whether clause [index] has implied or conflicted since the last reduction. */
+    // Whether the clause has implied or conflicted since the last reduction.
     fun usedAt(index: Int): Boolean = used[index] != 0
 
-    /** Record that clause [index] implied a literal or derived a conflict. */
     fun markUsed(index: Int) {
         used[index] = 1
     }
 
-    /** Clauses watching [literal], or null when no clause does. */
     fun watchersOf(literal: Int): IntArrayList? = watchers[literal]
 
-    /** Start watching [literal] in clause [index]. */
     fun addWatcher(literal: Int, index: Int) {
         watchers.getOrPut(literal) { IntArrayList() }.add(index)
         ownershipRevision++
     }
 
-    /**
-     * Retain [literals] unwatched, or return -1 when an equivalent clause is already stored.
-     *
-     * Watching is a separate step because the two literals a clause must watch depend on the
-     * assignment as it stands when the clause is first examined, not when it was learned.
-     */
+    // Retains the clause unwatched, or returns -1 when an equivalent clause is already stored. Watches
+    // depend on the assignment when the clause is first examined, so attaching is a separate step.
     fun add(literals: IntArray, lbd: Int): Int {
         if (literals.isEmpty()) return -1
         val bucket = signatures.getOrPut(signatureOf(literals)) { IntArrayList(1) }
@@ -194,7 +168,6 @@ internal class WatchedClauseStore {
         return index
     }
 
-    /** Watch clause [index] on the literals currently held at its first two positions. */
     fun watch(index: Int) {
         attached[index] = 1
         val literals = clauses[index]
@@ -202,16 +175,12 @@ internal class WatchedClauseStore {
         if (literals.size == 1) unitClauses.add(index) else addWatcher(literals[1], index)
     }
 
-    /** Clear every use flag after a reduction has selected its survivors. */
     fun clearUsed() {
         for (index in 0 until used.size) used[index] = 0
     }
 
-    /**
-     * Order-insensitive fingerprint of [literals], so a permutation of a stored clause lands in the
-     * same bucket. Literals are avalanched before being summed, which keeps sets that share a sum of
-     * raw values apart.
-     */
+    // Order-insensitive, so a permutation of a stored clause lands in the same bucket. Avalanching
+    // before summing keeps sets with equal raw sums apart.
     private fun signatureOf(literals: IntArray): Int {
         var accumulated = 0
         for (literal in literals) accumulated += avalanche(literal)
@@ -233,12 +202,6 @@ internal class WatchedClauseStore {
         return left.contentEquals(right)
     }
 
-    /**
-     * Choose watches for clause [index] against the current assignment and evaluate it once.
-     *
-     * Watching is deferred to this point because the two literals a clause must watch depend on the
-     * assignment as it stands when the clause is first examined, not when it was stored.
-     */
     fun attach(index: Int, host: ClauseWatchHost): ComponentResult {
         val literals = clauses[index]
         orderWatches(literals, host)
@@ -264,13 +227,8 @@ internal class WatchedClauseStore {
         return if (unit < 0) conflictOn(index, host) else implyFrom(index, unit, host)
     }
 
-    /**
-     * Re-examine every single-literal clause.
-     *
-     * A unit clause is woken by no assignment, so a caller must run this whenever a retraction may
-     * have unassigned one of their literals. Stops at and returns the first result that is not
-     * [ComponentResult.Consistent], so the caller can keep the units pending.
-     */
+    // A unit clause is woken by no assignment, so callers run this whenever a retraction may have
+    // unassigned a unit literal. Returns the first non-consistent result so the caller can stay pending.
     fun propagateUnits(host: ClauseWatchHost): ComponentResult {
         unitClauses.forEach { index ->
             val literal = clauses[index][0]
@@ -288,12 +246,6 @@ internal class WatchedClauseStore {
         return ComponentResult.Consistent
     }
 
-    /**
-     * Visit every clause watching [falsified], restoring the two-watch invariant.
-     *
-     * A clause that finds a non-falsified replacement literal moves its watch and leaves this list; a
-     * clause with no replacement either implies its remaining watch or is in conflict.
-     */
     fun propagate(falsified: Int, host: ClauseWatchHost): ComponentResult {
         val watching = watchers[falsified] ?: return ComponentResult.Consistent
         var source = 0
@@ -332,16 +284,11 @@ internal class WatchedClauseStore {
         return outcome
     }
 
-    /** The clause-form explanation of clause [index], safe for the caller to retain. */
+    // Copied because the watch machinery reorders the stored array.
     fun explanationOf(index: Int): SearchExplanation = SearchExplanation(clauses[index].copyOf())
 
-    /**
-     * Move the two literals that must be watched to the front of [literals].
-     *
-     * An unassigned or satisfied literal is always preferable, and among falsified literals the one
-     * assigned deepest is preferable: it is the first to be unassigned, which is what keeps a watch
-     * from going stale after a backjump.
-     */
+    // Among falsified literals the deepest is preferred: it is unassigned first, so the watch stays
+    // valid after a backjump.
     private fun orderWatches(literals: IntArray, host: ClauseWatchHost) {
         for (slot in 0 until minOf(2, literals.size)) {
             var best = slot
@@ -378,10 +325,8 @@ internal class WatchedClauseStore {
     }
 
     private companion object {
-        /** Watch preference for an unassigned literal; below a satisfied one, above any level. */
         const val UNASSIGNED_WATCH_RANK = Int.MAX_VALUE - 1
 
-        /** Watch preference for a satisfied literal, which never needs replacing. */
         const val SATISFIED_WATCH_RANK = Int.MAX_VALUE
         const val SIGNATURE_SIZE_FACTOR = 31
         const val SHIFT_HIGH = 16

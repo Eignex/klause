@@ -37,7 +37,6 @@ internal fun FlatZincCompiler.emitAllDisjoint(c: FznConstraint) {
     }
 }
 
-/** Emit `set_partition_into(arr, U)`. */
 internal fun FlatZincCompiler.emitSetPartitionInto(c: FznConstraint) {
     expectArity(c, 2)
     val sets = resolveSetVarArray(c.args[0])
@@ -85,7 +84,7 @@ internal fun FlatZincCompiler.emitSetPartitionInto(c: FznConstraint) {
     }
 }
 
-/** Shared `eqLit ↔ (S = T)` channel used by set equality/inequality emitters. */
+// r ↔ (S = T).
 internal fun FlatZincCompiler.emitSetEqChannel(s: SetVarLayout, t: SetVarLayout, r: Int) {
     val auxes = IntArrayList()
     val emitEqAux: (Int, Int, Int) -> Unit = { sBit, tBit, aux ->

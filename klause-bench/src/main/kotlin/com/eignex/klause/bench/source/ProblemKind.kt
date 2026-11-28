@@ -3,13 +3,9 @@ package com.eignex.klause.bench.source
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 
-/**
- * Classifies CSP/COP from the format or source objective directive before sampling, without compilation.
- * This keeps capped kind selections full. Formats and in-code builders without objectives
- * are CSP; each format uses the same directive as its runner.
- */
+// Classifies before sampling and without compilation, which keeps capped kind selections full. Each format uses the
+// same objective directive as its runner.
 internal object ProblemKind {
-    /** True iff [ref] is a constraint *optimization* problem (carries an objective). */
     fun isCop(ref: ProblemRef): Boolean = when (ref.format) {
         Format.DIMACS, Format.JSON_SCHEMA, Format.IN_CODE -> false
         Format.WCNF -> true

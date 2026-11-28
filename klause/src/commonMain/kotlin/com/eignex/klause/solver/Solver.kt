@@ -25,14 +25,11 @@ import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.util.ExecutionControl
 
 /**
- * Marker for backend-specific solver params. Each solver backend ships its own data class
- * implementing this; the [Solver] / [Optimizer] interfaces are generic over the params type
- * so the type system enforces the right params reach the right backend.
+ * Backend-specific solver params; [Solver] and [Optimizer] are generic over the params type so each
+ * backend receives its own.
  *
- * [withAssumptions] is used by the [Session] abstraction to inject a stacked set of
- * pinned variables into a per-call params object without each backend needing to know
- * about Session. Parameters that support scopes expose [assumptions] and override
- * [withAssumptions] to merge pins with later values winning. The default rejects non-empty scopes.
+ * [Session] injects its assumption stack through [withAssumptions]. Parameters that support scopes
+ * expose [assumptions] and override [withAssumptions]; the default rejects non-empty scopes.
  */
 interface SolverParams {
     /** The per-call pins and deductions; empty for parameters without assumption support. */
@@ -91,14 +88,8 @@ sealed interface SolveResult {
         val core: UnsatCore? = null,
         override val stats: SolveStats = SolveStats.EMPTY,
         /**
-         * When the engine was driven with `params.assumptions` non-empty and proved
-         * UNSAT, a jointly refuted subset of those assumptions. Seed conflicts retain their
-         * complete applied prefix; tree exhaustion can retain the full input. The subset
-         * is not guaranteed minimal — populated by
-         * [com.eignex.klause.backtrack.BacktrackSolver]; other backends leave
-         * this `null`. Used by [com.eignex.klause.solver.result.satisfyUnderAssumptions] to surface a tight
-         * [com.eignex.klause.solver.result.SatisfyResult.UnsatUnderAssumptions.core] without the
-         * `minimizeCore = true` deletion-MUS fallback.
+         * A jointly refuted, not necessarily minimal, subset of `params.assumptions`, or `null` when the
+         * backend computes none.
          */
         val assumptionCore: Assumptions? = null,
         override val evidence: SourceResultEvidence? = null,
@@ -137,16 +128,11 @@ interface Solver<P : SolverParams> {
     /** Solve the problem once and return a [SolveResult]. */
     fun solve(params: P): SolveResult
 
-    /** A one-line, human-readable description of this solver's resolved configuration under [params] —
-     *  what the CLI `dry-run-solver` mode prints instead of solving. The default names the solver
-     *  class; concrete backends override to surface their key knobs (selectors, restart, LP, strategy). */
+    /** A one-line description of this solver's resolved configuration under [params]. */
     fun describe(params: P): String = this::class.simpleName ?: "solver"
 
     /**
-     * Default implementation drains [samples] for one yield. Wraps it in
-     * [SampleResult.Found] when the sequence yields, [SampleResult.Unknown] when it
-     * doesn't. Backends with a cheaper one-shot path that can also distinguish
-     * Infeasible (proven) from Unknown (budget) should override.
+     * Draw one sample: [SampleResult.Found] when [samples] yields, otherwise [SampleResult.Unknown].
      */
     fun sample(params: P): SampleResult {
         val s = openSamples(params).use { it.firstOrNull() }
@@ -190,27 +176,21 @@ interface Solver<P : SolverParams> {
     fun approximateCount(config: ApproxCountConfig = ApproxCountConfig()): Count = ApproxMC.run(problem, config)
 
     /**
-     * Anytime *exact* (projected) model counting: a lazy stream of deterministic [Count]s whose
-     * interval tightens (`lower` ↑, `upper` ↓) until [Count.exact]. Iterate as far as you want;
-     * each step resumes the feasibility search. Cheap when the count is small (it converges fast),
-     * expensive when large — pair it with [approximateCount] via [count] for graceful degradation.
+     * Anytime exact (projected) model counting: a lazy stream of [Count]s whose interval tightens until
+     * [Count.exact]. Each step resumes the feasibility search; [count] falls back to [approximateCount].
      */
     fun exactCount(config: ExactCountConfig = ExactCountConfig()): Sequence<Count> = AnytimeCounter.run(problem, config)
 
     /**
-     * Best-effort count: run the exact counter up to [CountConfig.exactBudget] feasibility checks;
-     * if it proves the count exactly, return that, otherwise fall back to [approximateCount] with
-     * the estimate clamped into the exact phase's proven `[lower, upper]` (the hard bounds can only
-     * sharpen the probabilistic answer). Exact when cheap, approximate when not.
+     * Best-effort count: the exact counter for up to [CountConfig.exactBudget] feasibility checks, otherwise
+     * [approximateCount] clamped into the exact phase's proven `[lower, upper]`.
      */
     fun count(config: CountConfig = CountConfig()): Count =
         combineCounts(exactCount(config.toExactConfig()).last()) { approximateCount(config.toApproxConfig()) }
 
     /**
-     * Quality-tiered sampling. [SampleQuality.CHEAP] (the default and the production path)
-     * delegates to this backend's [samples]; [SampleQuality.ACCURATE] runs near-uniform UniGen2
-     * XOR-hashing over the projection's bits (an accuracy-validation tool). Returns a lazy,
-     * unbounded sequence — use `.take(n)`.
+     * Quality-tiered sampling. [SampleQuality.CHEAP] delegates to [samples]; [SampleQuality.ACCURATE] runs
+     * near-uniform UniGen2 XOR-hashing over the projection's bits. The sequence is lazy and unbounded.
      */
     fun samples(config: SamplingConfig, params: P): Sequence<Sample> = when (config.quality) {
         SampleQuality.CHEAP -> samples(params)
@@ -218,10 +198,8 @@ interface Solver<P : SolverParams> {
     }
 
     /**
-     * Open a stateful [Session] against this solver. The default returns a
-     * [StatelessSession] that manages an assumption stack but holds no other state;
-     * backends can override to inject cross-call state (warm-start, learned clauses,
-     * kumulant heuristic posteriors).
+     * Open a stateful [Session] against this solver. The default [StatelessSession] holds only an
+     * assumption stack; backends override to retain cross-call state.
      */
     fun session(): Session<P> = StatelessSession(this)
 }
@@ -229,15 +207,7 @@ interface Solver<P : SolverParams> {
 /**
  * A [Solver] that also returns a feasible assignment minimising a [LinearObjective].
  *
- * Calls carry the objective per-invocation so the same backend can be reused across
- * differently-weighted optimisation queries (e.g. Thompson-sampled weight vectors).
- *
- * The objective is **statically** the native integer-linear form — the one every front-end
- * produces — so backends enable their objective machinery (LP relaxation bounding, branch-and-bound
- * bounds) from params alone, with no runtime objective-type
- * dispatch. The local-search engines additionally accept a per-move gradient view of the same
- * objective via `LocalSearchParams.lsObjective` (see
- * [com.eignex.klause.solver.objective.IncrementalObjective]).
+ * The objective is passed per call, so one backend serves differently weighted queries.
  */
 interface Optimizer<P : SolverParams> : Solver<P> {
     /**
@@ -257,25 +227,9 @@ interface Optimizer<P : SolverParams> : Solver<P> {
     fun minimize(objective: LinearObjective, params: P): MinimizeResult
 
     /**
-     * Streaming variant of [minimize]: yields one [MinimizeResult] per *new incumbent*
-     * discovered during the search, followed by a single terminal result describing how
-     * the search ended.
-     *
-     *  - Each non-terminal yield is a [MinimizeResult.BestFound] carrying the new best
-     *    sample and objective seen so far.
-     *  - The terminal yield is one of: [MinimizeResult.Optimal] (search proved
-     *    optimality), [MinimizeResult.Unbounded] (no optimum exists),
-     *    [MinimizeResult.Infeasible] (no feasible exists),
-     *    [MinimizeResult.BestFound] with the final reason (budget / timeout /
-     *    cancellation hit while holding a feasible), or [MinimizeResult.Unknown]
-     *    (search ended without proving anything, no feasible found).
-     *
-     * Lets long-running optimizations report progress without callbacks or polling.
-     * `solver.minimize(obj, p)` is equivalent to `solver.improvements(obj, p).last()`.
-     *
-     * Default implementation: a single-element sequence wrapping [minimize]. Backends
-     * with an inner anytime loop ([BacktrackSolver], `LocalSearchSolver`) override to
-     * yield each improvement as it lands.
+     * Streaming variant of [minimize]: one [MinimizeResult.BestFound] per new incumbent, then one terminal
+     * result as [minimize] would return it, so `minimize(obj, p)` equals `improvements(obj, p).last()`.
+     * The default yields only [minimize]'s result.
      */
     fun improvements(objective: LinearObjective, params: P): Sequence<MinimizeResult> =
         sequenceOf(minimize(objective, params))

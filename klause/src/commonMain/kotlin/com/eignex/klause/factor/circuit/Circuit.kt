@@ -21,13 +21,8 @@ import com.eignex.klause.ir.materializeKey
  *    nodes (those with `succ(i) ≠ i`) must form a single closed cycle. All-excluded is the valid empty
  *    subcircuit; pointing to an excluded node, or a sub-cycle among included nodes, is a violation.
  *
- * `succ(i) = j` reads "node `j` is the successor of node `i`"; each `succ(i)` must hold a value in
- * `[0, n)` (out-of-range counts as a violation). LS cost is graded ("how far off single-cycle") so
- * strategies see a gradient rather than a broken/satisfied bit.
- *
- * Propagation and the LP relaxation are mode-specific and dispatched by [subcircuit]: the propagator is
- * a [CircuitPropagator] (Hamiltonian bounds / pigeonhole / sub-cycle prevention) or a
- * [SubcircuitPropagator] (self-loop-aware reachability); the invariant likewise.
+ * Each `succ(i)` must hold a value in `[0, n)`. Local-search cost is graded by distance from a single
+ * cycle. Propagation dispatches on [subcircuit] to [CircuitPropagator] or [SubcircuitPropagator].
  */
 class Circuit(
     /** Successor variable id per node; the assignment must form one (sub)circuit over `succ`. */
@@ -47,9 +42,7 @@ class Circuit(
 
     override fun remap(mapping: VarRemap): Factor = Circuit(mapping.ints(succ), subcircuit)
 
-    /** Position-faithful: `succ(i)` is node i's successor, so the key keeps the variables in order
-     *  rather than sorting them. The [subcircuit] mode is a key field, so a circuit and a subcircuit over
-     *  the same successors never share a bucket. */
+    /** Position-faithful over `succ`, and keyed by [subcircuit]. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.CIRCUIT, ::buildKey)
 
     override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.CIRCUIT, mapping, ::buildKey)

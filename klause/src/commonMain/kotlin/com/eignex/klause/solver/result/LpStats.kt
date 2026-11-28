@@ -226,8 +226,7 @@ data class LpStats(
     val rootPivots: SumResult = ZERO_COUNT,
     /** Deterministic work spent by root or presolve LP invocations. */
     val rootWorkOps: SumResult = ZERO_COUNT,
-    /** Node LP-bounding passes that built and solved a relaxation — the denominator for the prune /
-     *  fix / pivot rates. [pruned] alone is meaningless without knowing how many solves it took. */
+    /** Node LP-bounding passes that built and solved a relaxation; the denominator for prune, fix and pivot rates. */
     val solves: SumResult = ZERO_COUNT,
     /** Nodes pruned by the LP-relaxation bound: infeasible relaxation or bound ≥ incumbent.
      *  Split into [infeasible] (relaxation infeasible) and the remainder (bound dominated). */
@@ -238,7 +237,7 @@ data class LpStats(
     /** Root-node LP relaxation objective (the live dual bound at decision level 0), or NaN when the
      *  LP never solved at the root. Against the final objective this is the integrality gap. */
     val rootBound: Double = Double.NaN,
-    /** Wall time (ms) spent inside LP bounding — the cost side of the LP ROI (benefit = prunes/fixes). */
+    /** Wall time (ms) spent inside LP bounding. */
     val ms: Long = 0L,
     /** Domain reductions applied by LP reduced-cost fixing. */
     val fixed: SumResult = ZERO_COUNT,
@@ -303,26 +302,19 @@ data class LpStats(
     /** Whether root and node LP work spent the LP work allowance (`LpPlan.lpWorkBudgetFraction`),
      *  after which optional node LP work stops. */
     val workAllowanceSpent: Boolean = false,
-    /** Whether the node LP was ever demoted to its floor budget, by either rule.
-     *
-     *  Distinct from [workAllowanceSpent], which says only that the cumulative allowance rather than the
-     *  per-node ratio decided.
-     *  Without this a demotion by the deterministic rule leaves no trace at all, so a run that spent its
-     *  budget on a throttled relaxation reads the same as one that never throttled. */
+    /** Whether the node LP was ever demoted to its floor budget, by the cumulative allowance or the
+     *  per-node ratio; [workAllowanceSpent] records only the former. */
     val demoted: Boolean = false,
-    /** Certified LP solves whose model decomposed into column components (`lp-component-split`); the
-     *  denominator for judging the split is [solves] on the paths that carry a sink. */
+    /** Certified LP solves whose model decomposed into column components. */
     val componentSplits: SumResult = ZERO_COUNT,
     /** Largest component count any one decomposed solve produced; 0 when none decomposed. */
     val componentBlocks: MaxResult = NO_MAX,
     /** Certified solves whose exact integer certificate was produced. */
     val certified: SumResult = ZERO_COUNT,
-    /** Declines because the model carries a real coefficient, which the integer certifier refuses by
-     *  design. Expected, and not a shortfall in the exact layer's reach. */
+    /** Declines because the model carries a real coefficient, which the integer certifier refuses by design. */
     val certifyDeclinedContinuous: SumResult = ZERO_COUNT,
-    /** Declines for an arithmetic reason on an integer model — overflow, an out-of-range multiplier, a
-     *  negative reduced cost on an unbounded column. Each is a certificate the exact layer could in
-     *  principle have had, so this is the number that sizes its reach. */
+    /** Declines for an arithmetic reason on an integer model: overflow, an out-of-range multiplier, or a
+     *  negative reduced cost on an unbounded column. */
     val certifyDeclinedNumeric: SumResult = ZERO_COUNT,
     /** Solves that reached the rational decider — the slow lane every decline falls into. */
     val rationalFallbacks: SumResult = ZERO_COUNT,
@@ -357,11 +349,9 @@ data class LpStats(
     /** Exact-input rationalizations rejected before certification. */
     val exactInputRejections: SumResult = ZERO_COUNT,
     /**
-     * Basis factorizations across all node LP solves that came back singular.
-     *
-     * Each one goes to basis repair, and a warm basis that stays singular falls back to the slack start, so
-     * the [seeded] hit rate above overstates how many solves actually kept their warm basis. Against
-     * [refactorizations] this is the rate at which the relaxation's columns defeat the factorization.
+     * Basis factorizations across all node LP solves that came back singular. Each goes to basis repair,
+     * and a warm basis that stays singular falls back to the slack start, so [seeded] overcounts retained
+     * warm bases.
      */
     val singularRefactorizations: SumResult = ZERO_COUNT,
     /** Node LP pivots abandoned because the pivot element was numerically too small. A scaled solve
@@ -386,8 +376,8 @@ data class LpStats(
     /** Peak sparse-trial admission estimates and decline indicators across workers. */
     val sparseTrial: Map<String, Long> = emptyMap(),
 ) {
-    /** Combine two workers' LP stats: counts add, LU maxes take the larger, wall time sums, and the
-     *  root bound (same root across workers) keeps the tightest finite reading (NaN defers). */
+    /** Combine two workers' LP stats: counts and wall time add, maxima take the larger, and the root bound
+     *  keeps the larger finite reading. */
     fun mergedWith(o: LpStats): LpStats = LpStats(
         phases = mergePhaseStats(phases, o.phases),
         sparseTrial = (sparseTrial.keys + o.sparseTrial.keys).associateWith {

@@ -9,7 +9,7 @@ import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
 
-/** Syntax parser for OPB/WBO. It only validates and represents the input; [OpbDecoder] lowers it. */
+// Only validates and represents the input; OpbDecoder lowers it.
 internal object OpbSyntax {
 
     fun parse(source: CharSource): OpbDocument {

@@ -17,15 +17,12 @@ import com.eignex.klause.util.followStopControl
 import com.eignex.klause.util.workScheduled
 import com.eignex.util.numbers.saturatedAdd
 
-/**
- * The satisfaction driver for a single-threaded portfolio: one [CpSatisfactionTraversal] advanced a slice at a
- * time. A slice that ends pauses at decision or LP iteration granularity and keeps every learned clause, the trail
- * and the heuristics, so the arm resumes where it stopped instead of re-deriving them.
- *
- * Two tokens stop it, as in [ResumableMinimize]. The run's own token, handed to each [runSlice], ends the search;
- * root preparation polls that token. Shared decision assertions also poll the slice allowance; an
- * interrupted assertion retracts to its completed parent and retries the same alternative on resumption.
- */
+// Satisfaction driver for a single-threaded portfolio: one CpSatisfactionTraversal advanced a slice at a time.
+// A slice pauses at decision or LP iteration granularity and keeps learned clauses, trail and heuristics.
+//
+// Two tokens stop it, as in ResumableMinimize. The run's own token, handed to each runSlice, ends the search;
+// root preparation polls that token. Shared decision assertions also poll the slice allowance; an interrupted
+// assertion retracts to its completed parent and retries the same alternative on resumption.
 @Suppress("TooGenericExceptionCaught") // ownership boundaries preserve arbitrary primary and cleanup failures
 internal class ResumableSatisfaction(
     private val solver: BacktrackSolver,
@@ -44,7 +41,7 @@ internal class ResumableSatisfaction(
     private var globalToken: ExecutionControl = params0.cancellation
     private val sink = SolveStatsSink(backend = "backtrack").also { it.start() }
 
-    // Its LP reading waits for the traversal below; nothing arms the slice before the first [runSlice].
+    // Its LP reading waits for the traversal below; nothing arms the slice before the first runSlice.
     private val slice: SliceBudget = SliceBudget(
         { sink.search.searchWork },
         { traversal.lpWork() },

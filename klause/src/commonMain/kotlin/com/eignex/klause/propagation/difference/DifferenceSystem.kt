@@ -10,23 +10,12 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 
-/**
- * A *system* of difference constraints `x − y ≤ c` propagated jointly as a weighted digraph.
- *
- * A single reified difference row can only act once its own variables are nearly fixed. The system
- * reasons over all of them at once: the asserted rows are unsatisfiable exactly when the graph they form
- * holds a negative cycle, which is a structural test over the whole of ℤ — no finite search box, and no
- * dependence on any variable being bounded. That is what makes the difference fragment decidable, and it
- * is the deduction a row-at-a-time propagator cannot reach.
- *
- * A cycle is explained by the guards of the edges on it, so the learned clause names exactly the reified
- * rows whose conjunction is contradictory.
- *
- * This factor is **propagation-only**: its local-search projection is deliberately inert. The system is
- * redundant with the [com.eignex.klause.factor.arithmetic.Linear] and
- * [com.eignex.klause.factor.arithmetic.ReifiedLinear] rows posted alongside it, which carry the same
- * semantics *with* real LS support, so those siblings stay and enforce each row for local search.
- */
+// A system of difference constraints `x − y ≤ c` propagated jointly as a weighted digraph. The asserted
+// rows are unsatisfiable exactly when the graph holds a negative cycle, a test over all of ℤ that needs no
+// variable bounds. A cycle is explained by the guards of its edges.
+//
+// Propagation-only: it is redundant with the Linear and ReifiedLinear rows posted alongside it, which
+// enforce each row for local search.
 internal class DifferenceSystem(
     // Endpoints are integer columns or private graph vertices; DifferenceFragment.ZERO is the constant.
     val edges: List<DifferenceEdge>,
@@ -79,11 +68,7 @@ internal class DifferenceSystem(
         },
     )
 
-    /**
-     * The system is an order-insensitive set of edges, each keyed by its endpoints, bound, and guard.
-     * [DifferenceEdge.domainBound] is part of the key because the propagator treats such an edge
-     * differently, so two systems that differ only there are not interchangeable.
-     */
+    // Order-insensitive over edges. domainBound is keyed because the propagator treats such edges differently.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.DIFFERENCE_SYSTEM) {
         bool(privateVertices)
         int(edges.size)

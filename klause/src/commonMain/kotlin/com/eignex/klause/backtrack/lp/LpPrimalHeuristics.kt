@@ -310,14 +310,8 @@ internal fun LpEngine.lpRoundingProbe(
     }
 }
 
-/**
- * Pin every variable toward the value [targetOf] gives its LP column — the LP point for the rounding
- * probe, the rounded target for the feasibility pump — most-confident first and with the two-sided
- * fallback of [pinIntTowardLp]. Every variable ends pinned to a single value, so a non-null result is a
- * search leaf of the discrete assignment ([pinnedLeaf]); null when a variable conflicts both ways or a
- * leaf check refuses it.
- * Continuous feasibility remains the caller's completion duty.
- */
+// Pins most-confident variables first, each with pinIntTowardLp's two-sided fallback, so a non-null result is
+// a discrete search leaf. Continuous feasibility remains the caller's completion duty.
 internal fun LpEngine.pinToward(
     session: PropagationSession,
     relaxation: LpRelaxation,
@@ -353,13 +347,11 @@ internal fun LpEngine.pinToward(
     return pinnedLeaf(session)
 }
 
-/** The pinned assignment when the session's leaf checks accept it, as they would a leaf the search reached. */
 internal fun pinnedLeaf(session: PropagationSession): Sample? =
     if (session.checkSelectedProjection() == ComponentCheck.Feasible) snapshotAssignment(session) else null
 
-/** Pin [v] to the rounded LP value (or [lo] when it has no LP column), falling back to the other side
- *  of the LP value on a conflict. A conflicting pin reverts to its pre-pin state for the fallback;
- *  interruption restores the last complete fixpoint and withholds the proposal. */
+// A conflicting pin reverts before trying the other side of the LP value; interruption restores the last
+// complete fixpoint and withholds the proposal.
 internal fun pinIntTowardLp(
     session: PropagationSession,
     v: Int,
@@ -392,20 +384,14 @@ internal fun pinIntTowardLp(
 }
 
 /**
- * Feasibility pump (Fischetti, Glover and Lodi, "The feasibility pump", Math. Program. 104, 2005,
- * https://doi.org/10.1007/s10107-004-0570-3) on the primal pass: when root rounding ([lpRoundingProbe]) fails to
- * land a feasible point, alternate between an LP solution and its integer rounding, each round
- * re-solving the relaxation under an L1-distance objective that pulls the LP toward the current
- * rounding, then retrying the rounding. The distance objective is exact (linear) over variables whose
- * rounded target sits at a declared bound — every Boolean and any integer rounded to its bound — and
- * omits interior integer targets, whose `|x − t|` is not linear; this only steers the search, never
- * affects soundness (a returned [Sample] is a [pinnedLeaf]). Stops at the first rounding admitted by
- * [accept] or the round cap. A repeated rounding
- * (cycle) triggers a perturbation ([perturbRounding]) — flip the most-fractional
- * coordinates and keep pumping — up to [PUMP_MAX_RESTARTS] times before giving up. Re-solves prefer the
- * primal pass ([LpSolver.solvePrimal], phase-1 included) and fall back to the dual
- * [LpSolver.solve]. [initial] supplies only the first discrete target; its real coordinates and
- * claimed objective supply no admission authority.
+ * Feasibility pump for when root rounding fails: alternate between an LP solution and its rounding,
+ * re-solving under an L1-distance objective toward the rounding. The distance is linear only for targets at
+ * a declared bound, so interior integer targets are omitted; this only steers, since a returned sample is a
+ * pinned leaf. A repeated rounding triggers a perturbation. Re-solves prefer [LpSolver.solvePrimal] and fall
+ * back to [LpSolver.solve]. [initial] supplies only the first discrete target, never admission authority.
+ *
+ * Fischetti, Glover and Lodi, "The feasibility pump", Math. Program. 104, 2005,
+ * https://doi.org/10.1007/s10107-004-0570-3
  */
 internal fun LpEngine.lpFeasibilityPump(
     objective: LinearObjective,
@@ -460,24 +446,18 @@ internal fun LpEngine.lpFeasibilityPump(
             if (session.fixpointCancelled || session.probeCancelled) outcome = "CANCELLED"
             sink.lp.observePrimalPhase("PRIMAL_PUMP_ROUND", outcome, started.elapsedNow().inWholeNanoseconds)
         }
-        val distance = distanceObjective(relaxation, intTarget, boolTarget) ?: return null // nothing to pump
+        val distance = distanceObjective(relaxation, intTarget, boolTarget) ?: return null
         solved = solveRelaxation(distance, cancellation, preparedRoot) ?: return null
         if (preparedRoot?.valid == false) preparedRoot = null
     }
     return null
 }
 
-/** The dedup key of a feasibility-pump rounding (its full integer + Boolean target tuple). */
 private fun pumpKey(intTarget: LongArray, boolTarget: BooleanArray): String =
     intTarget.joinToString(",") + "|" + boolTarget.joinToString(",")
 
-/**
- * Feasibility-pump cycle perturbation: flip the [count] most-fractional structural coordinates of a
- * pump rounding **in place** — a Boolean flips its bit, an integer rounds the other way (toward the LP
- * value, clamped to its domain) — so a cycled pump escapes to a fresh rounding. When no coordinate is
- * fractional, a random sample of live coordinates flips instead. Pure steering: the pump
- * only proposes roundings that [pinToward] re-realizes as leaves, so this never affects soundness.
- */
+// Flips the most-fractional coordinates in place (a Boolean its bit, an integer the other rounding, clamped)
+// so a cycled pump escapes; with none fractional, random live coordinates flip. Pure steering.
 private fun LpEngine.perturbRounding(
     relaxation: LpRelaxation,
     primal: DoubleArray,
@@ -524,8 +504,6 @@ private fun LpEngine.perturbRounding(
     }
 }
 
-/** Build [obj]'s relaxation at the root and solve it, preferring the primal pass (phase-1 included) and
- *  falling back to the dual solve; null on a trivial/overflowing/failed relaxation. */
 private fun LpEngine.solveRelaxation(
     obj: LinearObjective,
     cancellation: ExecutionControl,
@@ -825,7 +803,6 @@ private fun LpEngine.solveRetainedPrimalRelaxation(
     }
 }
 
-/** The rounded target of structural column [col] as a double, or null when it backs no live variable. */
 private fun LpEngine.targetOfCol(
     relaxation: LpRelaxation,
     intTarget: LongArray,
@@ -841,9 +818,8 @@ private fun LpEngine.targetOfCol(
     }
 }
 
-/** L1-distance objective pulling the LP toward the rounding: `+1·x` for a target at the lower bound
- *  (minimize the gap above it), `−1·x` for one at the upper bound, and 0 for an interior integer target
- *  (whose `|x − t|` is not linear). Null when no coordinate contributes — nothing left to pump. */
+// +1·x for a target at the lower bound, −1·x at the upper bound, 0 for an interior integer target whose
+// |x − t| is not linear. Null when no coordinate contributes.
 private fun LpEngine.distanceObjective(
     relaxation: LpRelaxation,
     intTarget: LongArray,
@@ -878,14 +854,11 @@ private fun LpEngine.distanceObjective(
     return if (any) LinearObjective(boolWeights = boolCoef, intCoefficients = intCoef) else null
 }
 
-/** Round cap for the feasibility pump before it gives up to search. */
 private const val PUMP_ROUNDS = 20
 
-/** Max pump cycles to escape by perturbation before giving up. */
 private const val PUMP_MAX_RESTARTS = 8
 
-/** Base count of most-fractional coordinates flipped per perturbation (actual = base + rand[0, base]). */
+// Flips per perturbation are this plus a random amount up to it.
 private const val PUMP_MIN_FLIP = 3
 
-/** Below this `|primal − target|` a coordinate is effectively integral — not worth flipping. */
 private const val PUMP_FRAC_TOL = 1e-6

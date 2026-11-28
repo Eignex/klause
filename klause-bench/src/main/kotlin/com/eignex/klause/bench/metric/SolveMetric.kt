@@ -25,7 +25,7 @@ import java.io.File
 import java.io.IOException
 import java.time.Instant
 
-/** One problem's result for one settings+budget — the durable per-problem record the lab reads. */
+// The durable per-problem record the lab reads.
 @Serializable
 internal data class SolveRecord(
     val problem: String,
@@ -35,22 +35,17 @@ internal data class SolveRecord(
     val seed: Long,
     val budgetMs: Long,
     val kind: String, // "optimize" | "satisfy"
-    /** True when the objective is maximized (higher is better) — for direction-aware comparison. */
     val maximize: Boolean,
-    /** true = feasible, false = infeasible (proved), null = unknown within budget. */
+    // false = proved infeasible, null = unknown within budget.
     val feasible: Boolean?,
     val objective: Double?,
-    /** ms to the best incumbent (optimize) or to the first solution (satisfy); null when none. */
+    // To the best incumbent when optimizing, to the first solution when satisfying.
     val timeToBestMs: Long?,
-    /** ms to the first feasible solution; null when never feasible. */
     val timeToFirstFeasibleMs: Long? = null,
-    /** optimum proved (optimize) or search closed UNSAT/exhausted. */
+    // Optimum proved, or search closed infeasible or exhausted.
     val proven: Boolean,
     val stats: Map<String, String> = emptyMap(),
-    /**
-     * Per-arm portfolio improvement records in arrival order; empty for single-engine solves.
-     * Exact objectives are integer or rational text, with a legacy continuous objective when needed.
-     */
+    // Arrival order; empty for single-engine solves.
     val attribution: List<Attribution> = emptyList(),
     val gitSha: String?,
     val timestamp: String,
@@ -58,47 +53,39 @@ internal data class SolveRecord(
     val buildProvenance: BuildProvenance? = null,
     val buildFingerprint: String? = null,
     val validationPolicy: String = REPORTED_RESULT_POLICY,
-    /** Subprocess duration, separate from incumbent timings; null when unavailable. */
     val elapsedMs: Long? = null,
-    /** Plain source bytes, independent of cache compression; null when unavailable. */
+    // Hashes of the plain source bytes, independent of cache compression.
     val sourceHashes: Map<String, String> = emptyMap(),
-    /** Final rendered candidate, retained for independent checks when the raw stream is not transferred. */
+    // Retained for independent checks when the raw stream is not transferred.
     val finalWitness: String? = null,
     val processTimeToFirstFeasibleMs: Long? = null,
     val processTimeToBestMs: Long? = null,
     val exactObjective: String? = null,
     val compilerIdentity: MiniZincCompilerIdentity? = null,
-    /** Failed compiler discovery evidence; never an accepted compiler identity. */
+    // Failed discovery evidence; never an accepted compiler identity.
     val compilerDiscovery: MiniZincIdentityEvidence? = null,
-    /** Normalized subprocess stderr, limited to 16 Ki characters; null when unavailable. */
+    // Normalized, limited to 16 Ki characters.
     val stderr: String? = null,
-    /** Whether [stderr] contains the whole normalized stream rather than a bounded prefix. */
     val stderrComplete: Boolean = false,
-    /** Stream completion and artifact integrity, independent of the retained prefix. */
     val stderrCapture: StderrCaptureStatus? = null,
-    /** Bytes supplied to the CLI and output renderer; absent for historical or uncompiled inputs. */
+    // Bytes supplied to the CLI and output renderer; empty for uncompiled inputs.
     val compiledInputHashes: Map<String, String> = emptyMap(),
     val comparisonControls: Map<String, String> = emptyMap(),
-    /** Actual declared and effective MPS policy emitted by the installed CLI; absent on historical records. */
+    // Declared and effective MPS policy as emitted by the installed CLI.
     val numericalSemantics: JsonObject? = null,
-    /** Declared and effective MPS optimality gap emitted by the installed CLI; absent on historical records. */
+    // Declared and effective MPS optimality gap as emitted by the installed CLI.
     val optimalityTolerance: JsonObject? = null,
-    /**
-     * Proved original-unit objective bound of a [proven] optimum that holds only within the effective
-     * [optimalityTolerance] of [exactObjective]: a lower bound when minimizing, an upper bound when maximizing.
-     * Null for an exact optimum or no optimum.
-     */
+    // Proved original-unit bound of an optimum that holds only within optimalityTolerance of exactObjective: lower
+    // when minimizing, upper when maximizing. Null for an exact optimum or no optimum.
     val optimalityBound: String? = null,
 )
 
 internal object SolveMetric {
-    /** Characters of a load failure's message kept in its record. */
     private const val REASON_CAP = 400
     private const val MAX_LOAD_CAUSE_DEPTH = 64
 
-    /** Solve the one problem [ref] with klause-cli, writing its [SolveRecord] to `<outDir>/<problem>.json` and the
-     *  raw solver output beside it, and return the record. A problem that fails to load gets a record too, its reason
-     *  under `stats.unsupported` when klause declines the model and under `stats.loadError` otherwise. */
+    // A problem that fails to load gets a record too: `stats.unsupported` when klause declines the model, else
+    // `stats.loadError`.
     fun solveOne(
         ref: ProblemRef,
         budget: Budget,
@@ -164,7 +151,6 @@ internal object SolveMetric {
         return retained
     }
 
-    /** The record of a problem that never reached the solver: undecided, with why under `stats`. */
     internal fun loadFailureRecord(
         ref: ProblemRef,
         s: SolverInvocation.Settings,
@@ -207,14 +193,13 @@ internal object SolveMetric {
         )
     }
 
-    /** Whether klause declined a model it read, rather than the model failing to compile or parse. */
+    // Declined a model it read, as opposed to failing to compile or parse it.
     private fun declined(failure: Throwable): Boolean = generateSequence(failure) { it.cause }
         .take(MAX_LOAD_CAUSE_DEPTH).any {
             it is UnsupportedFlatZincException || it is UnsupportedXcsp3Exception || it is UnsupportedSmtException
         }
 
-    /** One problem's record from a subprocess solve, with the raw solver output when the
-     *  solve ran; a solve that throws becomes an error record. */
+    // A solve that throws becomes an error record.
     internal fun solve(
         entry: ResolvedProblem,
         settings: SolverInvocation.Settings,
@@ -300,10 +285,9 @@ internal object SolveMetric {
         return result.first.copy(stats = result.first.stats + timings.stats()) to result.second
     }
 
-    /** [raw]'s final witness, with how it was mapped. Klause solves a MiniZinc model's compiled FlatZinc, so its
-     *  solution names FlatZinc variables and gives enums as integers; it goes through the model's output mapping
-     *  to the model's own output variables (`stats.finalWitnessLevel=model`). One that cannot be mapped keeps its
-     *  FlatZinc-level text (`flatzinc`), with why under `stats.finalWitnessMappingError`. */
+    // Klause solves the compiled FlatZinc, so its witness names FlatZinc variables and gives enums as integers; the
+    // output mapping turns it into the model's output (`finalWitnessLevel=model`). An unmappable witness keeps its
+    // FlatZinc text, with why under `stats.finalWitnessMappingError`.
     private fun witness(
         ref: ProblemRef,
         raw: SolverOutput,
@@ -375,12 +359,7 @@ internal object SolveMetric {
         )
     }
 
-    /**
-     * Recovers first-feasible and best timings from portfolio attribution. MiniZinc solution
-     * separators may be buffered until termination. Attribution is in arrival order: bound
-     * publication and emission use separate critical sections, so every entry is compared
-     * by value. Single-engine solves use streamed separator timings.
-     */
+    // MiniZinc solution separators may be buffered until termination, so portfolio timings come from attribution.
     internal fun timings(r: SolverInvocation.Result, maximize: Boolean): Pair<Long?, Long?> {
         if (r.attribution.isEmpty()) return r.timeToFirstFeasibleMs to r.timeToBestMs
         val firstFeasibleMs = r.attribution.first().elapsedMs
@@ -394,11 +373,8 @@ internal object SolveMetric {
             best(r.attribution, maximize).processElapsedMs
     }
 
-    /** The best-valued entry in [attribution], direction-aware: arrival order is not improvement order.
-     *  Every entry in one run shares the same objective channel ([Attribution.continuousObjective] is a
-     *  property of the whole model, not the arm), so once any entry carries one, every entry does —
-     *  compare on it (the whole model-oriented value). Otherwise compare on [Attribution.exactObjective]
-     *  as an exact rational, including original source units and values beyond [Long]. */
+    // Arrival order is not improvement order. continuousObjective is a property of the whole model, so once any
+    // entry carries one every entry does; otherwise compare exact rationals, including values beyond Long.
     internal fun best(attribution: List<Attribution>, maximize: Boolean): Attribution {
         val comparator = if (attribution.any { it.continuousObjective != null }) {
             compareBy<Attribution> { it.continuousObjective ?: 0.0 }

@@ -46,7 +46,6 @@ fun main(args: Array<String>) {
 internal object FixedWorkSatSuite : BenchSuite {
     override fun describe() = BenchDescriptor("fixed-work-sat", "Fixed-work native SAT trajectory measurements")
 
-    /** One declared corpus source. */
     internal data class Source(val path: String, val sha256: String) {
         init {
             require(sha256.matches(Regex("[0-9a-f]{64}"))) { "sha256 must be 64 lowercase hex digits" }
@@ -54,7 +53,7 @@ internal object FixedWorkSatSuite : BenchSuite {
         }
     }
 
-    /** Validated request parameters: `sources` and `seeds` when [planned] is false, one of each in a case. */
+    // `sources` and `seeds` when unplanned, one of each in a case.
     internal data class Options(
         val sources: List<Source>,
         val seeds: List<Long>,
@@ -164,7 +163,6 @@ internal object FixedWorkSatSuite : BenchSuite {
         }
     }
 
-    /** The case result for the child's [records], process [exit] code and emergency [killed] flag. */
     internal fun outcome(
         caseId: String,
         options: Options,
@@ -252,7 +250,6 @@ internal object FixedWorkSatSuite : BenchSuite {
         add(out.toString())
     }
 
-    /** Run the child until it exits or reaches [ceilingSeconds]; returns its exit code and whether it was killed. */
     private fun launch(argv: List<String>, context: BenchContext, ceilingSeconds: Long): Pair<Int?, Boolean> {
         val process = ProcessBuilder(argv).directory(context.outputDirectory.toFile()).redirectErrorStream(true)
             .redirectOutput(context.outputDirectory.resolve(LOG).toFile()).apply {

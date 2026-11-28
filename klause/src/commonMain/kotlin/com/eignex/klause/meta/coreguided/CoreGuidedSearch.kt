@@ -53,18 +53,13 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
-/**
- * Resumable core-guided minimization of a Boolean objective by OLL soft cardinality constraints
- * (A. Morgado, C. Dodaro and J. Marques-Silva, "Core-Guided MaxSAT with Soft Cardinality Constraints",
- * CP 2014, https://doi.org/10.1007/978-3-319-10428-7_41): each core raises the lower bound by its minimum
- * weight and adds a reified `≥ 2` threshold over its literals as a new soft, whose successor threshold
- * enters once it is spent.
- *
- * A finite integer cost `c·x` is the sum of the gaps between consecutive root values that `x` crosses away
- * from its cheapest end, so each gap is a soft threshold literal `[x ≥ v]` (or `[x ≤ v]` when `c < 0`)
- * weighted by `|c|` times the gap. Only the first unspent threshold of each column is materialized; a
- * latent successor implies its frontier.
- */
+// OLL soft cardinality constraints (A. Morgado, C. Dodaro and J. Marques-Silva, "Core-Guided MaxSAT with Soft
+// Cardinality Constraints", CP 2014, https://doi.org/10.1007/978-3-319-10428-7_41): each core raises the lower bound
+// by its minimum weight and adds a reified `≥ 2` threshold over its literals as a new soft, whose successor enters
+// once it is spent.
+//
+// An integer cost `c·x` is a sum of soft threshold literals `[x ≥ v]` (`[x ≤ v]` when `c < 0`), one per gap between
+// consecutive root values, weighted by `|c|` times the gap. Only the first unspent threshold per column exists.
 internal class CoreGuidedSearch(
     private val base: BakedProblem,
     private val objective: LinearObjective,
@@ -668,14 +663,10 @@ internal class CoreGuidedSearch(
             return magnitude <= bigIntOf(9_007_199_254_740_992L)
         }
 
-        /** Boolean objectives, which curated pools admit. */
         fun eligible(problem: BakedProblem, objective: LinearObjective): Boolean =
             admits(problem, objective) && objective.intCoefficientValues.all { it == 0L }
 
-        /**
-         * Boolean objectives and exact integer costs over columns whose source bounds are closed on both
-         * sides, so no frontier starts from or walks toward an endpoint the finite projection invented.
-         */
+        // Integer costs need closed source bounds, so no frontier walks toward an invented endpoint.
         fun admits(problem: BakedProblem, objective: LinearObjective): Boolean =
             problem.numRealVars == 0 && objective.boolWeightValues.size <= problem.numBoolVars &&
                 objective.realCoefficientValues.all { it == 0.0 } &&

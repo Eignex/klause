@@ -31,17 +31,12 @@ import com.eignex.klause.model.SetRef
 import com.eignex.klause.model.SetSubsetOf
 import com.eignex.klause.model.SetUnion
 
-/**
- * Materialise [SetExpr] as a [SetLayout]: named sets reuse their layout; literals and compound
- * expressions allocate indicators tied by clauses. Binary operations use the union universe,
- * except difference, which uses the left operand universe.
- */
+// Binary operations use the union universe, except difference, which uses the left operand universe.
 internal fun Lowering.materializeSet(expr: SetExpr): SetLayout = when (expr) {
     is SetRef -> setLayouts[expr.name]
         ?: error("Unknown set variable '${expr.name}'")
 
     is SetLiteral -> {
-        // Constant set: an ordinary layout whose indicators are pinned true by unit clauses.
         val sorted = expr.elements.distinct().sorted()
         require(sorted.isNotEmpty()) { "set literal must be non-empty" }
         val ids = IntArray(sorted.size) { newBoolVar() }
@@ -50,12 +45,11 @@ internal fun Lowering.materializeSet(expr: SetExpr): SetLayout = when (expr) {
     }
 
     is SetNominalLiteral -> {
-        // Labels map to indices only through a specific nominal-set var's label order, which a
-        // standalone literal lacks, so it is rejected rather than given a fabricated layout.
+        // Labels map to indices only through a nominal-set var's label order, which a standalone literal lacks.
         error("nominal set literal cannot be materialised without a nominal-set var operand on the other side")
     }
 
-    // out ↔ (left(v) ∨ right(v)); result universe is both operands'.
+    // out ↔ (left(v) ∨ right(v)).
     is SetUnion -> materializeSetBinary(expr.left, expr.right, fullUnion = true) { outLit, ll, rl ->
         when {
             ll != null && rl != null -> {
@@ -89,7 +83,7 @@ internal fun Lowering.materializeSet(expr: SetExpr): SetLayout = when (expr) {
         }
     }
 
-    // S \ T: out ↔ (left(v) ∧ ¬right(v)); result universe is S's, so `ll` is always present.
+    // out ↔ (left(v) ∧ ¬right(v)); the result universe is the left one, so `ll` is always present.
     is SetDiff -> materializeSetBinary(expr.left, expr.right, fullUnion = false) { outLit, ll, rl ->
         requireNotNull(ll) { "set diff: left indicator missing for a result-universe element" }
         if (rl != null) {
@@ -97,18 +91,13 @@ internal fun Lowering.materializeSet(expr: SetExpr): SetLayout = when (expr) {
             factors += Clause(intArrayOf(Lit.negate(outLit), Lit.negate(rl)))
             factors += Clause(intArrayOf(outLit, Lit.negate(ll), rl))
         } else {
-            // Nothing to subtract for this element → out ↔ ll.
             factors += Clause(intArrayOf(Lit.negate(outLit), ll))
             factors += Clause(intArrayOf(outLit, Lit.negate(ll)))
         }
     }
 }
 
-/**
- * Materialise both operands and allocate result indicators. [emit] receives each result literal
- * and operand indicators (`null` for elements outside an operand universe). [fullUnion] selects
- * the union universe for ∪ and ∩, or the left universe for difference.
- */
+// emit receives `null` operand indicators for elements outside that operand's universe.
 private fun Lowering.materializeSetBinary(
     left: SetExpr,
     right: SetExpr,
@@ -138,9 +127,6 @@ private fun unionUniverse(a: IntArray, b: IntArray): IntArray {
     out.sort()
     return out
 }
-
-// `assertExpr` calls the assert* forms for top-level set constraints; `lowerToLit` calls the
-// reify* forms in sub-expression positions.
 
 internal fun Lowering.assertSetIn(expr: SetIn) {
     val set = materializeSet(expr.set)
@@ -315,20 +301,17 @@ internal fun Lowering.reifySetEq(expr: SetEq): Int {
     return lowerToLit(andOf(pieces))
 }
 
-/** Lift `card(S)` to a fresh int var whose value equals `Σ indicator_i`. */
 internal fun Lowering.liftSetCard(expr: SetCard): IntRef {
     val layout = materializeSet(expr.set)
     val n = layout.size
     val aux = newAuxIntVar(IntDomain(0, n.toLong()))
     val auxId = intVarOf(aux)
-    // Channel each indicator bool to a 0/1 int (a PB factor cannot equate to an int var),
-    // then assert Σ ints − count = 0.
+    // A PB factor cannot equate to an int var, so each indicator is channeled to a 0/1 int first.
     val indicatorIntVars = IntArray(n) { i ->
         val intName = newAuxIntVar(IntDomain(0, 1))
         val id = intVarOf(intName)
         val boolId = layout.indicatorBoolIds[i]
         val auxBool = newBoolVar()
-        // auxBool ↔ (id = 1)
         factors += ReifiedLinear(
             auxBool,
             intArrayOf(1),
@@ -336,7 +319,6 @@ internal fun Lowering.liftSetCard(expr: SetCard): IntRef {
             LinearOp.EQ,
             1,
         )
-        // auxBool ↔ indicator(i)
         val auxLit = Lit.make(auxBool, positive = true)
         val indLit = Lit.make(boolId, positive = true)
         factors += Clause(intArrayOf(Lit.negate(auxLit), indLit))
@@ -349,8 +331,7 @@ internal fun Lowering.liftSetCard(expr: SetCard): IntRef {
     return IntRef(aux)
 }
 
-/** Wrap a set-indicator bool var id as a [BoolExpr] for the AST-level Tseitin pipeline. [BoolRef]
- *  resolves by name, so an unnamed indicator gets a synthetic name registered on demand. */
+// BoolRef resolves by name, so an unnamed indicator gets a synthetic name registered on demand.
 private fun Lowering.indicatorBoolExpr(boolId: Int): BoolExpr {
     val name = idToBoolName[boolId]
         ?: run {

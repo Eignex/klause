@@ -5,12 +5,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 
-/**
- * Harvest a literal-indexed implication graph with bounded propagation probes.
- *
- * Pinning literal `p` and observing a forced literal `q` proves `p -> q`. The graph is read-only
- * engine information: presolve may use it for rewrites, while local search and LP use it as a hint.
- */
+// Pinning `p` and observing a forced `q` proves `p -> q`. Presolve may rewrite with the graph; local search and
+// LP use it only as a hint.
 internal fun Problem.propagatedImplicationGraph(
     maxCandidates: Int,
     cancellation: ExecutionControl = ExecutionControl.Never,

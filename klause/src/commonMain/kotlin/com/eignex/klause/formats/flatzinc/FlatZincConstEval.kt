@@ -84,14 +84,12 @@ internal fun FlatZincCompiler.evalIntConst(e: FznExpr): Long = when (e) {
     else -> failHere("expected int constant, got ${e::class.simpleName}")
 }
 
-/** Validate a 1-based FlatZinc array [index] against [size] and return the 0-based offset, failing
- *  with a source-located diagnostic rather than an [IndexOutOfBoundsException] on a bad index. */
+// 1-based index to 0-based offset, with a located diagnostic rather than an index crash.
 internal fun FlatZincCompiler.arrayOffset(size: Int, index: Int, name: String): Int {
     if (index < 1 || index > size) failHere("array `$name` index $index out of bounds (1..$size)")
     return index - 1
 }
 
-/** Nullable variant of [evalIntConst]. */
 internal fun FlatZincCompiler.evalIntConstOrNull(e: FznExpr): Long? = when (e) {
     is FznExpr.IntLit -> e.value
 
@@ -149,8 +147,7 @@ internal fun FlatZincCompiler.evalIntConstArray(e: FznExpr): IntArray = when (e)
     else -> failHere("expected int array, got ${e::class.simpleName}")
 }
 
-/** [evalIntConstArray] without narrowing to `Int` — the linear-constraint coefficient path, where a
- *  coefficient may legitimately exceed 32-bit range (mirrors [evalIntConst] returning `Long`). */
+// Linear coefficients may exceed 32-bit range.
 internal fun FlatZincCompiler.evalIntConstArrayLong(e: FznExpr): LongArray = when (e) {
     is FznExpr.ArrayLit -> LongArray(e.elements.size) { evalIntConst(e.elements[it]) }
 
@@ -162,7 +159,6 @@ internal fun FlatZincCompiler.evalIntConstArrayLong(e: FznExpr): LongArray = whe
     else -> failHere("expected int array, got ${e::class.simpleName}")
 }
 
-/** Nullable variant of [evalIntConstArray]. */
 internal fun FlatZincCompiler.tryEvalIntConstArray(e: FznExpr): IntArray? = when (e) {
     is FznExpr.ArrayLit -> {
         val out = IntArray(e.elements.size)
@@ -184,9 +180,8 @@ internal fun FlatZincCompiler.tryEvalIntConstArray(e: FznExpr): IntArray? = when
     else -> null
 }
 
-/** Nullable variant of [evalIntConstArrayLong] — used where the values may exceed 32-bit range
- *  (scheduling durations / rectangle sizes) but the caller must still distinguish a constant array
- *  from a variable one. */
+// For durations and rectangle sizes past 32-bit range, where the caller must tell a constant array from a
+// variable one.
 internal fun FlatZincCompiler.tryEvalIntConstArrayLong(e: FznExpr): LongArray? = when (e) {
     is FznExpr.ArrayLit -> {
         val out = LongArray(e.elements.size)
@@ -264,8 +259,7 @@ internal fun FlatZincCompiler.evalIntVarArray(e: FznExpr): IntArray = when (e) {
             arr.varIds.copyOf()
         }
 
-        // A par int array handed to a var-array position (e.g. `count` over a constant array):
-        // materialize each constant as a fixed singleton var so the global sees uniform var ids.
+        // A par array in a var-array position becomes fixed singleton vars so the global sees uniform ids.
         is FlatZincArray.IntParam -> IntArray(arr.values.size) {
             val v = arr.values[it]
             allocInt("__const_int_${v}_${intVars.size}", v, v)
@@ -277,7 +271,6 @@ internal fun FlatZincCompiler.evalIntVarArray(e: FznExpr): IntArray = when (e) {
     else -> failHere("expected int var array, got ${e::class.simpleName}")
 }
 
-/** Resolve a bool reference to a solver literal. */
 internal fun FlatZincCompiler.resolveBoolLit(e: FznExpr): Int = when (e) {
     is FznExpr.Ident -> {
         val id = boolVars[e.name] ?: failHere("undefined bool var `${e.name}`")
@@ -303,7 +296,6 @@ internal fun FlatZincCompiler.resolveBoolLit(e: FznExpr): Int = when (e) {
     else -> failHere("expected bool var or literal, got ${e::class.simpleName}")
 }
 
-/** Resolve an int reference into a solver int var id. */
 internal fun FlatZincCompiler.resolveIntVar(e: FznExpr): Int = when (e) {
     is FznExpr.Ident -> intVars[e.name] ?: failHere("undefined int var `${e.name}`")
 
@@ -321,7 +313,6 @@ internal fun FlatZincCompiler.resolveIntVar(e: FznExpr): Int = when (e) {
     else -> failHere("expected int var, got ${e::class.simpleName}")
 }
 
-/** Resolve an array-initializer reference to a var id. */
 internal fun FlatZincCompiler.resolveVarRef(e: FznExpr, declaredElement: FznType): Int = when (declaredElement) {
     FznType.Bool -> {
         val lit = resolveBoolLit(e)

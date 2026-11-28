@@ -1,10 +1,6 @@
 package com.eignex.klause.formats
 
-/**
- * Split [this] into whitespace-separated non-empty tokens with a single character scan, shared by the
- * line-oriented format readers (DIMACS / MPS). Scanning by [Char.isWhitespace] rather than a `\s` regex
- * is deterministic across the Kotlin targets and needs no compiled pattern per line.
- */
+// A character scan rather than a `\s` regex is deterministic across Kotlin targets and compiles no pattern.
 internal fun String.splitWhitespace(): List<String> {
     val out = ArrayList<String>()
     val n = length

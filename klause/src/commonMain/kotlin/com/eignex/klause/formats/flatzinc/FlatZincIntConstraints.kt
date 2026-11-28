@@ -32,8 +32,7 @@ internal fun FlatZincCompiler.emitIntCmp(c: FznConstraint) {
     factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b), op, strictAdjust))
 }
 
-/** Post a linear relation as a hard [Linear], or a [ReifiedLinear] onto [reifyLit] when non-null
- *  ([reifyLit] is a bool literal; its variable channels the relation's truth). */
+// A non-null reifyLit's variable channels the relation's truth.
 internal fun FlatZincCompiler.postLinear(coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long, reifyLit: Int?) {
     factors.add(
         if (reifyLit != null) {
@@ -214,7 +213,7 @@ internal fun FlatZincCompiler.emitIntMaxMin(c: FznConstraint, max: Boolean) {
     factors.add(ArrayMinMax(r, intArrayOf(a, b), max))
 }
 
-/** FlatZinc `int_div` uses truncated-toward-zero semantics. */
+// FlatZinc int_div truncates toward zero.
 internal fun FlatZincCompiler.emitIntDiv(c: FznConstraint) {
     expectArity(c, 3)
     val a = resolveIntVar(c.args[0])
@@ -223,7 +222,6 @@ internal fun FlatZincCompiler.emitIntDiv(c: FznConstraint) {
     emitTruncDivMod(a, b, qVar = q, remVar = null)
 }
 
-/** `int_mod` shares truncated div/mod lowering with [emitIntDiv]. */
 internal fun FlatZincCompiler.emitIntMod(c: FznConstraint) {
     expectArity(c, 3)
     val a = resolveIntVar(c.args[0])
@@ -279,9 +277,7 @@ internal fun FlatZincCompiler.emitIntCmpReif(c: FznConstraint) {
     factors.add(ReifiedLinear(r, coeffs, vars, op, bound))
 }
 
-/** Post a half-reified relation `guard -> C`. [ReifiedLinear] is biconditional-only, so a fresh
- *  bool `cond` mirrors `C` (`cond <-> C`) and a clause `(!guard | cond)` forces `guard -> cond -> C`.
- *  When `guard` is false, `cond` floats freely and leaves `C` unconstrained. */
+// guard → C: ReifiedLinear is biconditional only, so a fresh cond ↔ C plus the clause ¬guard ∨ cond.
 private fun FlatZincCompiler.postHalfReified(
     coeffs: IntArray,
     vars: IntArray,

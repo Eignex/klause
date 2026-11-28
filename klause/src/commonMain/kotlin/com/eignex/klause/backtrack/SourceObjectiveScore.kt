@@ -82,16 +82,9 @@ internal fun exactSourceObjective(
     return exact
 }
 
-/**
- * What every producer's proposal must satisfy before it can stand as a minimisation incumbent,
- * whatever engine built it.
- *
- * A non-finite score carries no information and `NaN` compares false against every bound, so an
- * unguarded incumbent would take one and never let it go. And on a problem with LP-only continuous
- * columns the incumbent must carry the continuous values a leaf's residual LP validated and attached:
- * a proposal without them came from a producer that neither solved nor certified the reals, so it is
- * neither complete nor sound to surface however good its integer part looks.
- */
+// Admission for any producer's minimization incumbent. A NaN score compares false against every bound, so an
+// unguarded incumbent would never be replaced. With LP-only continuous columns, a proposal must carry certified
+// reals (or pass the tolerance check); its integer part alone is neither complete nor sound.
 internal fun sampleAdmission(
     problem: Problem,
     toleranceCheck: ((Sample) -> Boolean)? = null,
@@ -111,8 +104,7 @@ internal fun sampleAdmission(
     }
 }
 
-/** The versioned incumbent a minimisation run publishes through: [sampleAdmission] decides what may
- *  stand, and only a strict decrease installs. */
+// Only a strict decrease installs.
 internal fun minimizingSampleExchange(
     problem: Problem,
     toleranceCheck: ((Sample) -> Boolean)? = null,

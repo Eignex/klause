@@ -12,17 +12,11 @@ import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongHashSet
 import com.eignex.util.collections.MutableLongIntMap
 
-/**
- * Bounds-consistency filtering for `all_different ::bounds`: two O(n log n) sweeps over the variable
- * bounds (the second on the negated bounds) that raise lower bounds and lower upper bounds to the edges
- * of Hall intervals, using union-find chains over the sorted endpoints.
- *
- * López-Ortiz, Quimper, Tromp, van Beek, "A fast and simple algorithm for bounds consistency of the
- * alldifferent constraint", IJCAI 2003, https://mlanthology.org/ijcai/2003/lopezortiz2003ijcai-fast
- *
- * Returns the involved variables as a conflict reason when a Hall interval is over-full, or `null`
- * when filtering succeeds.
- */
+// Two O(n log n) sweeps (the second over negated bounds) push bounds to Hall interval edges with
+// union-find chains over the sorted endpoints. Returns a conflict reason when a Hall interval is over-full.
+//
+// López-Ortiz, Quimper, Tromp, van Beek, "A fast and simple algorithm for bounds consistency of the
+// alldifferent constraint", IJCAI 2003, https://mlanthology.org/ijcai/2003/lopezortiz2003ijcai-fast
 internal fun boundsAllDifferentFilter(
     state: PropagationState,
     vars: IntArray,
@@ -91,8 +85,8 @@ private fun boundsRangeFits(lo: LongArray, hi: LongArray): Boolean {
     return upper - lower <= Long.MAX_VALUE - 6
 }
 
-// The reason for [x]'s new bound, recorded for [explainBoundsHall] (via the filtering factor's explain) to build
-// from the Hall interval it crossed; without the undo log nothing reads reasons and the presence premises stand in.
+// A lazy reason explainBoundsHall later builds from the crossed Hall interval; without the undo log nothing
+// reads reasons and the presence premises stand in.
 private fun boundsReason(
     state: PropagationState,
     tag: Int,
@@ -110,14 +104,11 @@ private fun boundsReason(
     else -> premises
 }
 
-/** Marks a lazy reason [boundsAllDifferentFilter] recorded; its second entry tags the variable array it filtered. */
+// Marks a lazy bounds-Hall reason; its second entry tags the filtered variable array.
 internal const val BOUNDS_HALL = -10
 
-/**
- * The reason for a bound [boundsAllDifferentFilter] moved, from its lazy [payload] over the variables [vars] (those
- * present at [atTrail], per [present]): a Hall interval the bound crossed, as it stood then. Every other variable
- * confined to the interval fills it, so the moved variable, which started inside it, lies past it.
- */
+// A Hall interval the bound crossed, as it stood at atTrail: the other variables confined to it fill it, so
+// the moved variable, which started inside, lies past it.
 internal fun explainBoundsHall(
     state: PropagationState,
     vars: IntArray,

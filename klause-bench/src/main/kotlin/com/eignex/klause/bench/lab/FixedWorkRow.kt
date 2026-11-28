@@ -21,7 +21,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 
-/** The validity and trajectory classification of one fixed-work row: every retained case of a key and repeat. */
 internal class FixedWorkRow(
     private val key: String?,
     private val repeat: String?,
@@ -34,7 +33,6 @@ internal class FixedWorkRow(
     private val unverifiable = mutableListOf<String>()
     private val absent = mutableListOf<String>()
 
-    /** How the two arms' measurements relate, with the ratios a valid row of this kind reports. */
     private data class Trajectory(
         val type: String,
         val elapsedRatio: Double? = null,
@@ -98,7 +96,6 @@ internal class FixedWorkRow(
         return if (comparable) trajectory(control, candidate) else null
     }
 
-    /** Whether [case] completed comparable fixed work, from the case, record, process and measured states. */
     private fun measurement(case: JsonObject, role: String): Boolean {
         val details = element(case, "record", "details")
         val measured = element(details, "measured")
@@ -132,7 +129,7 @@ internal class FixedWorkRow(
         return reasons.isEmpty()
     }
 
-    /** One accepted worker attempt and execution frame; the host alone does not establish it. */
+    // The host alone does not establish one accepted worker attempt.
     private fun attempt(control: JsonObject, candidate: JsonObject) {
         val arms = listOf(CONTROL to control, CANDIDATE to candidate)
         val hosts = arms.map { (role, case) ->
@@ -161,10 +158,8 @@ internal class FixedWorkRow(
             ?.takeIf { text(execution, "policy") == RECEIPT_POLICY && it.matches(SHA256) }
     }
 
-    /**
-     * Rows that reached the limit match on their limit-point digests and compare limit-point times; rows that both
-     * completed with a verdict before it match on full digests and compare the measured interval.
-     */
+    // Rows that reached the limit match on limit-point digests and compare limit-point times; rows that both completed
+    // with a verdict before it match on full digests and compare the measured interval.
     private fun trajectory(control: JsonObject, candidate: JsonObject): Trajectory? {
         val reached = listOf(reached(control), reached(candidate))
         val verdicts = listOf(control, candidate).all { text(measured(it), "stop") == VERDICT }
@@ -190,7 +185,6 @@ internal class FixedWorkRow(
         }
     }
 
-    /** Whether both arms' [read] digests are present and equal; null, with a reason, when either is absent. */
     private fun same(
         control: JsonObject,
         candidate: JsonObject,
@@ -203,7 +197,6 @@ internal class FixedWorkRow(
         return if (null in digests) null else digests[0] == digests[1]
     }
 
-    /** Candidate/control wall and thread CPU ratios over the interval at [field]; null when a time is absent. */
     private fun times(
         control: JsonObject,
         candidate: JsonObject,
@@ -223,7 +216,6 @@ internal class FixedWorkRow(
     private fun ratio(control: Double?, candidate: Double?): Double? =
         if (control != null && candidate != null && control > 0) candidate / control else null
 
-    /** Events at the first checkpoint whose digests differ, and at the last one before it both arms share. */
     private fun divergence(control: JsonObject, candidate: JsonObject): Pair<String?, String?> {
         val (left, right) = listOf(control, candidate).map {
             (element(measured(it), "trajectory", "checkpoints") as? JsonArray).orEmpty()

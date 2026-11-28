@@ -25,16 +25,10 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 /**
- * Lossless JSON interchange of [Problem] models, including models built directly through the IR.
- *
- * A document states the Boolean count, every integer column's range (open sides, declared value sets and
- * fallback boxes), real bounds, the factors in order, implied-factor flags, symmetry declaration, resource
- * settings and source semantics. Each factor is one `{key: payload}` node written by the [FactorCodec]
- * registered for its exact class, so native factor kinds and payloads survive unchanged, including
- * arbitrary-width integer and exact rational constants. A factor or key without a codec fails with
- * [MissingFactorCodecException] instead of being dropped or decomposed.
- *
- * Decoding is strict and reports malformed input as a [JsonFormatException] naming its document path.
+ * Lossless JSON interchange of [Problem] models. Each factor is one `{key: payload}` node written by the
+ * [FactorCodec] registered for its exact class; a factor or key without a codec fails with
+ * [MissingFactorCodecException] instead of being dropped or decomposed. Decoding is strict and reports
+ * malformed input as a [JsonFormatException] naming its document path.
  */
 class ProblemJson(
     /** Codecs this instance reads and writes factors with. */

@@ -22,11 +22,7 @@ import com.eignex.util.collections.IntIntMap
 import com.eignex.util.collections.LongHashSet
 import com.eignex.util.collections.MutableIntIntMap
 
-/**
- * Builds the local-search-engine view of immutable factor data. [domains], when given, are the domains the search
- * moves over: a linear row whose running sum can leave the 64-bit range over them takes the exact
- * [ExactLinearInvariant].
- */
+// A linear row whose running sum can leave the 64-bit range over the searched domains takes the exact invariant.
 internal fun Factor.invariantProjection(
     domains: Array<IntDomain>? = null,
     provider: ScoringProjectionProvider = BuiltInScoringProjectionProvider,

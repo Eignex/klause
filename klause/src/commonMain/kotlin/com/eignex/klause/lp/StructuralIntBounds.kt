@@ -14,22 +14,10 @@ import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.toLong
 
-/**
- * Bounds a model's own equality structure implies, for the sides a relaxation leaves open.
- *
- * The equality rows drive a unimodular change of variables `x = V·y` ([mixedEchelonHermite]) whose
- * equality block comes out lower triangular. A triangular block bounds its pivot variables by forward
- * substitution ([triangularBounds]), and `V` being unimodular makes the correspondence exact over the
- * integer lattice, so those ranges push back onto the original columns ([originalBounds]).
- *
- * The distinction that makes this worth running: a bound derived this way is the **model's**, not a box
- * chosen for it. Closing a side with it leaves the model equisatisfiable, so a later `unsat` over the
- * closed model refutes the original — where a side closed by an invented box only ever supports
- * `unknown`.
- *
- * Only unconditional integer equalities participate. Null where the structure implies nothing: no
- * equalities, a reduction [cancellation] cut short, or a row outside the exact-integer fragment.
- */
+// The equality rows drive a unimodular change of variables `x = V·y` whose equality block is lower
+// triangular; forward substitution bounds the pivots, and unimodularity maps those ranges exactly back onto
+// the original columns. A bound derived this way is the model's own, so closing a side with it keeps the
+// model equisatisfiable and a later `unsat` refutes the original.
 internal fun structuralIntBounds(
     numVars: Int,
     constraints: List<Linear>,
@@ -38,8 +26,7 @@ internal fun structuralIntBounds(
     if (numVars == 0) return null
     val eqRows = constraints.filter { it.op == LinearOp.EQ && it.integralConstants != null }
     if (eqRows.isEmpty()) return null
-    // Built sparse: a real model's equality block carries a handful of terms per row against tens of
-    // thousands of columns, and the dense form of it does not fit in memory at all.
+    // Built sparse: the dense equality block of a large model does not fit in memory.
     val eq = eqRows.map { f ->
         val constants = f.integralConstants ?: return null
         val entries = HashMap<Int, BigInt>(f.vars.size)
@@ -59,6 +46,4 @@ internal fun structuralIntBounds(
     return mixed.originalBounds(y.lo, y.hi)
 }
 
-/** [this] as a `Long`, or null where it does not fit — the column then stays open rather than taking a
- *  wrapped bound. */
 internal fun BigInt.longOrNull(): Long? = if (fitsLong()) toLong() else null

@@ -7,114 +7,62 @@ import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
 import kotlin.time.TimeSource
 
-/**
- * First-UIP (Unique Implication Point) conflict analyzer — the classical CDCL clause-learning
- * routine (J. P. Marques-Silva, K. A. Sakallah, "GRASP: A Search Algorithm for Propositional
- * Satisfiability", IEEE Trans. Computers 48(5), 1999, https://doi.org/10.1109/12.769433). Walks the
- * implication graph backwards from a conflict, resolving each step against the antecedent
- * literals of the resolved variable, until exactly one variable at the current decision level
- * remains — the UIP. The conjunction of negated literals on the learned clause is forbidden by
- * the original problem, so adding it prunes any future search path that would re-derive the
- * same conflict.
- *
- * This class is the graph-walking driver: it implements [ReasonGraph] (the frozen implication
- * graph — variable universe, decision levels, antecedents), seeds the analysis from a conflict
- * reason, and selects the pivot to resolve at each step in reverse-assignment order along the
- * pin trail. The "reason → resolvent" step — folding an antecedent into the accumulating nogood,
- * detecting the UIP, and materialising the result — is delegated to a [ConflictResolvent]
- * ([ClauseResolvent] by default), so the same driver serves any learned-constraint algebra.
- *
- * The implication graph spans **bool vars and int order literals** uniformly: bool antecedents
- * come from [PropagationState.boolAntecedents], order-literal antecedents from each atom's
- * trail-resident reason ([AtomStore.ant], with the [atomAntecedentsDerived] fallback
- * for atoms materialised mid-analysis). Factors emit per-factor [Propagator.conflictReason]s
- * and record antecedents on every force, so the analyzer resolves
- * over the full reason graph rather than treating non-clause forces as leaves. A variable with
- * `null` antecedents is a genuine leaf (decision / assumption / root fact).
- *
- * The output is an [AnalysisResult]: either a [AnalysisResult.Learned] carrying the
- * learned-clause literals and the backjump level (= second-highest decision level among
- * the literals; the level the engine should non-chronologically jump to), or
- * [AnalysisResult.NotApplicable] when the analyzer can't produce a usable nogood (the
- * conflict sits at the root).
- */
+// First-UIP conflict analysis (J. P. Marques-Silva, K. A. Sakallah, "GRASP: A Search Algorithm for Propositional
+// Satisfiability", IEEE Trans. Computers 48(5), 1999, https://doi.org/10.1109/12.769433). This driver owns the
+// implication-graph walk and pivot selection along the pin trail; a [ConflictResolvent] owns folding reasons
+// into the nogood. The graph spans Boolean variables and order literals uniformly, so non-clause forces are
+// resolved through rather than treated as leaves; a variable with null antecedents is a decision, assumption
+// or root fact.
 internal class ConflictAnalyzer internal constructor(private val state: PropagationState) : ReasonGraph {
 
-    /** The clause resolvent — the default, and the sound fallback when PB resolution can't proceed. */
+    // The sound fallback when PB resolution cannot proceed.
     private val clauseResolvent: ConflictResolvent = ClauseResolvent(state, this)
 
-    /** The pseudo-Boolean resolvent admits only Boolean premises in each analyzed conflict. */
     private val pbResolvent: PbConflictResolvent? =
         if (state.pbLearning && state.problem.numBoolVars > 0) PbConflictResolvent(state, this) else null
 
-    /** The resolvent that produced the most recent result — its bump sets feed VSIDS. */
+    // Its bump sets feed VSIDS.
     private var lastResolvent: ConflictResolvent = clauseResolvent
 
-    // Reusable per-analysis scratch — [universe] is the live var space (bool vars + atoms) for the
-    // current analysis, exposed to the minimizer and resolvent through [universeSize].
     private var universe = 0
 
-    // Per-analysis memo of atomLevelForConflict. Within one analysis the search path is
-    // frozen — domains are never mutated, only the implication graph is walked — so an atom's
-    // level is invariant. A determined atom on the current path reads it straight off its trail
-    // slot (O(1)); the memo covers the remaining reconstruct/hole-record path for atoms not
-    // carrying a stored level, which the same atom can hit repeatedly across reasons. Caching by
-    // atom id with an epoch stamp keeps those repeats O(1); atomLevelEpoch is bumped per analysis
-    // to invalidate.
+    // Memo of atomLevelForConflict for atoms without a stored level, which recur across reasons. The path is
+    // frozen during an analysis; the epoch invalidates the memo per analysis.
     private var atomLevelMemo = emptyIntArray()
     private var atomLevelStamp = emptyIntArray()
     private var atomLevelEpoch = 0
 
-    /** Bool vars seen during the last analysis (the VSIDS bump set). Valid only when the
-     *  last call returned [AnalysisResult.Learned]; cleared at the start of each analysis. */
+    // Valid only after a Learned result.
     fun lastBumpBoolVars(): IntArrayList = lastResolvent.bumpBoolVars
 
-    /** Underlying int vars seen during the last analysis (via touched atom-lits). */
     fun lastBumpIntVars(): IntArrayList = lastResolvent.bumpIntVars
 
     override fun universeSize(): Int = universe
 
     sealed interface AnalysisResult {
-        /** A learned constraint (clause or pseudo-Boolean) the engine can backjump on and store.
-         *  Shared shape so the driver, the backjump handler, and the learned database treat clause and
-         *  PB nogoods uniformly. */
         sealed interface LearnedConstraint : AnalysisResult {
-            /** Level to pop the trail back to so the constraint becomes asserting. */
             val backjumpLevel: Int
 
-            /** Literal Block Distance (distinct decision levels; lower ⇒ kept longer). */
             val lbd: Int
 
-            /** Distinct decision levels touched, sorted ascending (assumption-core projection). */
             val decisionLevels: IntArray
 
-            /** True iff popping to [backjumpLevel] makes the constraint unit-propagate its asserting literal. */
             val asserting: Boolean
 
-            /** Literal metadata for clauses and PB constraints; integer rows expose no endpoint disjunction. */
+            // Integer rows expose no endpoint disjunction.
             val guardLiterals: IntArray
 
             val isContradiction: Boolean get() = this is Learned && literals.isEmpty()
         }
 
-        /** A learned conflict clause with its backjump target and glue metric. */
         data class Learned(
-            /** The learned clause (disjunction of literals); at least one must hold beyond the conflict point. */
             val literals: IntArray,
-            /** Level to pop the trail back to; the clause is unit there, forcing the asserting literal. */
             override val backjumpLevel: Int,
-            /** Literal Block Distance: distinct decision levels in [literals] (lower ⇒ glue-like, kept longer). */
             override val lbd: Int,
-            /** Distinct decision levels appearing in [literals]. Sorted ascending. Used
-             *  by the engine to project a conflict back to the subset of assumption-
-             *  level pins (decision levels 1..|seed|) that participated — feeds the
-             *  assumption-core extraction path in [com.eignex.klause.solver.result.satisfyUnderAssumptions]. */
+            // Projects a conflict onto the participating assumption levels for core extraction.
             override val decisionLevels: IntArray,
-            /** True iff the clause is a proper 1UIP clause — exactly one literal at the
-             *  conflict level — so that after popping to [backjumpLevel] it becomes unit
-             *  and forces its asserting literal. When false (a conflict that genuinely rests on
-             *  more than one literal at the conflict level), the engine must fall back to chronological backtracking
-             *  instead of trying to assert a non-unit clause. */
+            // False when the conflict rests on several literals at the conflict level; the engine then
+            // backtracks chronologically instead of asserting a non-unit clause.
             override val asserting: Boolean = true,
         ) : LearnedConstraint {
             override val guardLiterals: IntArray get() = literals
@@ -130,12 +78,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                     "levels=${decisionLevels.toList()})"
         }
 
-        /**
-         * A learned pseudo-Boolean constraint `Σ weightsᵢ·literalsᵢ ≥ degree` (all weights > 0) derived by
-         * cutting-planes conflict analysis. Stronger than any single clause the same
-         * conflict could yield; materialized into the learned database as a [com.eignex.klause.factor.bool
-         * .PseudoBooleanPropagator].
-         */
+        // Cutting-planes result, stronger than any single clause the same conflict could yield.
         data class LearnedPb(
             val weights: Array<com.eignex.util.numbers.BigInt>,
             val literals: IntArray,
@@ -171,22 +114,12 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             override val guardLiterals: IntArray = emptyIntArray()
         }
 
-        /** Analysis couldn't produce a usable nogood (no conflict reason, or a conflict at the root). */
         data object NotApplicable : AnalysisResult
     }
 
-    /**
-     * Run analysis from a conflict triggered by factor [conflictFactorId]. The conflict
-     * level is the deepest decision level among the seed reason's own literals, read through
-     * the bound-history-accurate [levelOf] — not `state.currentLevel`, which
-     * runToFixpoint sets from `maxLevelForVars` over *all* of the failing factor's variables
-     * (a superset of the reason). That attribution can name a level no reason literal actually sits at,
-     * which makes the 1UIP loop find no pivot at the conflict level and degenerate into a non-asserting clause
-     * (lost learning) or mis-target backjumpLevelOf. Taking the max over the reason's own
-     * literals pins the conflict level exactly at its deepest literal. (The engine's levelling
-     * is max-antecedent based, so no reason literal — nor any antecedent resolved in below —
-     * sits above this, keeping the asserting/backjump computation sound.)
-     */
+    // The conflict level is the deepest level among the seed reason's literals, not `state.currentLevel`: that is
+    // set over all of the failing factor's variables and can name a level no reason literal sits at, leaving 1UIP
+    // without a pivot. Levelling is max-antecedent based, so nothing resolved in sits above it.
     fun analyze(conflictFactorId: Int): AnalysisResult = boundedAnalysis {
         beginAnalysis()
         val factor = state.factorAt(conflictFactorId)
@@ -216,15 +149,8 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         return@boundedAnalysis analyzeFromSeed(seedReason, conflictLevelOf(seedReason), seedFactorId = conflictFactorId)
     }
 
-    /**
-     * Run 1UIP from an externally supplied conflict clause whose literals are all currently false —
-     * e.g. an LP infeasibility (Farkas) certificate over absolute bound atoms. The clause
-     * is a valid seed reason: its disjunction is violated under the current assignment, exactly the
-     * contract [analyze] feeds the 1UIP loop. The conflict level is the deepest accurate decision
-     * level among its literals, as in [analyze], so the learned clause asserts at the right level and
-     * backjumps non-chronologically. Returns [AnalysisResult.NotApplicable] when the conflict sits at
-     * the root (nothing to learn) or 1UIP cannot collapse it to an asserting clause.
-     */
+    // Seeds from an external clause whose literals are all false, such as an LP Farkas certificate over bound
+    // atoms.
     fun analyzeConflictClause(conflictClause: IntArray): AnalysisResult = boundedAnalysis {
         beginAnalysis()
         return@boundedAnalysis analyzeFromSeed(conflictClause, conflictLevelOf(conflictClause))
@@ -246,11 +172,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         AnalysisResult.NotApplicable
     }
 
-    /**
-     * Start a fresh analysis with a new epoch for the atom-level memo. It runs before anything reads a level, the
-     * conflict level included, since a level memoised by the previous conflict belongs to another path and can
-     * sit below the literal's level on this one.
-     */
+    // Runs before anything reads a level: a level memoized by the previous conflict belongs to another path.
     private fun beginAnalysis() {
         state.arithmeticLearningTrace?.beginConflict(state.currentFactor, state.currentLevel, state.undo.size)
         state.factorAttribution?.beginAnalysis()
@@ -266,8 +188,6 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         atomLevelEpoch++
     }
 
-    /** Deepest accurate decision level among [reason]'s literals — the conflict level for a
-     *  factor-seeded analysis (see [analyze]). */
     private fun conflictLevelOf(reason: IntArray): Int {
         var max = 0
         for (lit in reason) {
@@ -278,26 +198,15 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         return max
     }
 
-    /**
-     * Decision-vs-prior-pin conflict path: when [PropagationState.pinBoolAsDecision]
-     * fails because the var was already pinned to the opposite value, no factor's
-     * `propagate` fired and `currentFactor` is `-1`. The implicit violated clause is:
-     *   `(prior pin's antecedents) ∨ Lit.make(v, !prior_value)`
-     * — every literal currently false in the state, exactly matching the analyzer's
-     * "seed reason" contract. Falls through to the same 1UIP loop as [analyze].
-     *
-     * The conflict level here is `state.currentLevel` — the just-attempted decision level —
-     * not the seed's literal max: the conflicted var's own [PropagationState.boolLevel] is the
-     * *prior* (shallower) pin, so the seed cannot reveal the decision depth that is genuinely
-     * the conflict level. Holding the conflict level above the seed literals also lets the
-     * minimiser resolve the decision lit away into the stronger underlying nogood.
-     */
+    // A decision contradicting a prior pin: no factor fired, and the violated clause is
+    // `(prior pin's antecedents) ∨ ¬decision`. The conflict level is the attempted decision level rather than the
+    // seed's maximum, which is the prior pin's level; holding it above the seed also lets the minimizer resolve
+    // the decision literal away.
     fun analyzeDecisionConflict(conflictedVar: Int): AnalysisResult = boundedAnalysis {
         beginAnalysis()
         val priorValue = state.boolValues[conflictedVar] ?: return@boundedAnalysis AnalysisResult.NotApplicable
         val priorAnt = state.reasonOf(state.boolAntecedents[conflictedVar])
-        // The just-attempted decision lit (currently false in state because the prior
-        // pin still holds and pinBoolImpl rejected the new value).
+        // False because the prior pin still holds.
         val decisionLit = Lit.make(conflictedVar, !priorValue)
         val seed = if (priorAnt == null) {
             intArrayOf(decisionLit)
@@ -310,13 +219,8 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         return@boundedAnalysis analyzeFromSeed(seed, state.currentLevel)
     }
 
-    /**
-     * Drive 1UIP from [seedReason]. When pseudo-Boolean learning is on, run the cutting-planes resolvent
-     * first; if it reports [PbConflictResolvent.failed] (a reason it can't handle, or arithmetic
-     * overflow) re-run the same conflict through the always-sound clause resolvent. [seedFactorId] is the
-     * failing factor's id (so the PB resolvent can load its coefficient-carrying constraint), or -1 for an
-     * externally-supplied clause seed.
-     */
+    // A failed PB resolution (unsupported reason or overflow) re-runs the conflict through the always-sound
+    // clause resolvent. [seedFactorId] is -1 for an external clause seed.
     private fun analyzeFromSeed(seedReason: IntArray, currentLevel: Int, seedFactorId: Int = -1): AnalysisResult {
         state.arithmeticLearningTrace?.record("analysis.seed", seedFactorId.toLong(), currentLevel.toLong())
         state.arithmeticLearningTrace?.clause("analysis.seed-clause", seedReason, state)
@@ -445,13 +349,6 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         }
     }
 
-    /**
-     * The 1UIP loop over one [resolvent]. The frontier (owned by [resolvent]) spans
-     * [0, numBoolVars + atomCount): low indices are bool vars, high indices are virtual atom-vars. Both
-     * share the unified pin trail [PropagationState.boolPinOrder] for reverse-order pivot selection; an
-     * atom materialised mid-analysis has no pin position and is swept from the
-     * [ConflictResolvent.offTrailFrontier] fallback after the trail is exhausted at currentLevel.
-     */
     private fun runResolution(resolvent: ConflictResolvent, seedReason: IntArray, currentLevel: Int): AnalysisResult {
         val numBoolVars = state.problem.numBoolVars
         resolvent.reset(universe)
@@ -460,22 +357,12 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         state.factorAttribution?.let { it.participate(it.reasonFamily(seedReason), seedReason.size) }
         resolvent.resolve(seedReason, currentLevel)
 
-        // Pin-trail cursor for the 1UIP pivot scan. The pivot is always the most-recent still-seen
-        // current-level literal (reverse-assignment order); under single establishment a
-        // reason cites only earlier-established (lower-position) literals, so resolving the pivot at
-        // position `p` marks new frontier literals strictly below `p` and the next pivot is at or
-        // below `p`. The cursor therefore descends monotonically across the analysis (O(trail) total)
-        // instead of re-scanning the whole trail every iteration (O(trail) per resolution). The only
-        // literal that can become seen *above* the cursor is one cited by a mid-analysis-materialised
-        // atom (the off-trail fallback below): it has no pin position, so its derived antecedents may
-        // touch the trail anywhere. After any fallback pivot we re-arm a single full rescan so that
-        // "becomes-seen-behind" case is caught exactly; a purely monotonic cursor would miss it and
-        // emit a non-asserting clause. The rescan cost is confined to the (rare) off-trail case.
+        // Under single establishment a reason cites only lower-position literals, so the pivot cursor descends
+        // monotonically, O(trail) per analysis. An off-trail pivot's derived antecedents may touch the trail
+        // anywhere, so one full rescan follows it; a purely monotonic cursor would emit a non-asserting clause.
         var pinCursor = state.boolPinOrder.size - 1
         var rescanFromTop = true
         while (true) {
-            // Resolved / lower-level literals (no longer frontier) are skipped. `scanFrom` is the
-            // trail top on a re-armed rescan, else the descending cursor.
             val scanFrom = if (rescanFromTop) state.boolPinOrder.size - 1 else pinCursor
             val pivotPos = trailPivotPosition(resolvent, scanFrom, currentLevel, numBoolVars)
             var pivot = if (pivotPos >= 0) state.boolPinOrder[pivotPos] else -1
@@ -488,15 +375,12 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 pivot = offTrailFirst
                 rescanFromTop = true
             } else if (pivot >= 0) {
-                // Trail pivot: its antecedents land strictly below `pivotPos`, so the next pivot is
-                // at or below it — descend the cursor and keep scanning from there.
+                // Its antecedents land strictly below `pivotPos`.
                 pinCursor = pivotPos - 1
                 rescanFromTop = false
             } else {
-                // Fallback for an atom materialised mid-analysis — cited by a derived reason, never
-                // woken, hence absent from the pin trail. Scan the seen-atom frontier by its
-                // [atomLevelForConflict]-derived level. Stale / duplicate entries are skipped by the
-                // [ConflictResolvent.isFrontier] recheck.
+                // An atom materialized mid-analysis is cited by a derived reason but never woken, so it is
+                // absent from the pin trail.
                 pivot = offTrailPivot(resolvent, currentLevel, numBoolVars)
                 if (pivot < 0) break
                 // Off-trail pivot: its derived antecedents may cite trail literals above the cursor,
@@ -570,11 +454,8 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         return -1
     }
 
-    /** Antecedents of `v`, or null when `v` is a decision/leaf — or when `v` falls outside
-     *  the current antecedent universe. Out-of-range atom ids can be reached only through the
-     *  recursive antecedent walk in the [ClauseMinimizer] redundancy DFS (the 1UIP loop stays within `seen`/`resolved`
-     *  bounds); treating them as antecedent-less leaves keeps the literal, which is always sound
-     *  for minimization, rather than indexing past the atom table. */
+    // Out-of-range atom ids are reachable only through the minimizer's redundancy DFS; treating them as leaves
+    // keeps the literal, which is sound, rather than indexing past the atom table.
     override fun antecedentsOf(v: Int): IntArray? {
         val numBoolVars = state.problem.numBoolVars
         return if (v < numBoolVars) {
@@ -606,13 +487,6 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         return !state.lazyReasonMemo.containsKey(requireNotNull(reason))
     }
 
-    /**
-     * Unified level lookup that handles both bool vars (via [PropagationState.boolLevel])
-     * and atom vars. Atom levels come from [PropagationState.atomLevelForConflict] — the
-     * trail-resident establishment level on the current path, which is consistent for the
-     * whole analysis (the path is frozen) and so yields a sound backjump level / LBD / asserting
-     * flag.
-     */
     override fun levelOf(v: Int): Int {
         val numBoolVars = state.problem.numBoolVars
         return if (v < numBoolVars) {
@@ -622,11 +496,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         }
     }
 
-    /** [PropagationState.atomLevelForConflict] with a per-analysis memo: the level is
-     *  invariant during one analysis (the path is frozen), so repeat queries — common, since the
-     *  same atom recurs across reasons — return the cached value instead of re-running the
-     *  reconstruct/hole-record derivation. Atoms materialised mid-analysis (id past the memo arrays)
-     *  fall through to the direct call. */
+    // Atoms materialized mid-analysis lie past the memo arrays and fall through to the direct call.
     private fun cachedAtomLevel(id: Int): Int {
         if (id >= atomLevelStamp.size) return state.atomLevelForConflict(id)
         if (atomLevelStamp[id] == atomLevelEpoch) return atomLevelMemo[id]

@@ -27,20 +27,9 @@ import com.eignex.util.numbers.subExact
 
 internal object CoefficientStrengthening {
 
-    /**
-     * GCD coefficient strengthening for exact integer and Boolean row declarations. If the
-     * coefficients of an integer linear (or pseudo-Boolean) constraint share a common divisor
-     * `g > 1`, dividing through by `g` shrinks the coefficients and, because the left-hand side
-     * is then a multiple of `g`, lets the bound be tightened by flooring/ceiling:
-     *  - `Σ aⱼxⱼ ≤ b`  ⟺  `Σ (aⱼ/g)xⱼ ≤ ⌊b/g⌋`
-     *  - `Σ aⱼxⱼ ≥ b`  ⟺  `Σ (aⱼ/g)xⱼ ≥ ⌈b/g⌉`
-     *  - `Σ aⱼxⱼ = b`: divisible ⟹ `Σ (aⱼ/g)xⱼ = b/g`; otherwise the left-hand side is always a
-     *    multiple of `g` while `b` is not, so the equality is **infeasible**.
-     *  - `Σ aⱼxⱼ ≠ b`: divisible ⟹ divide; otherwise the constraint is always true and is dropped.
-     *
-     * Exact (feasible-set-preserving) and it tightens the LP relaxation the bound participates in.
-     * Replacing a factor requires an equivalent single-row declaration.
-     */
+    // Divides an integer or pseudo-Boolean row by its coefficient GCD `g > 1`, flooring `≤` and ceiling `≥` bounds.
+    // An equality whose bound `g` does not divide is infeasible; such a `≠` is always true and dropped.
+    // Feasible-set-preserving, and tightens the LP relaxation.
     fun strengthenCoefficients(
         problem: Problem,
         cancellation: ExecutionControl = ExecutionControl.Never,
@@ -51,9 +40,7 @@ internal object CoefficientStrengthening {
         var infeasible = false
         val factors = problem.factors
         for (i in factors.indices) {
-            // Poll the presolve deadline: on a multi-million-row model the per-factor strengthen
-            // is O(factors) and must be interruptible. Bailing returns the strengthenings made so far — a
-            // partial pass is sound (each rewrite is feasible-set-preserving; the rest stay unstrengthened).
+            // A partial pass is sound: each rewrite preserves the feasible set.
             if ((i and STRENGTHEN_CANCEL_POLL_MASK) == 0 && cancellation()) break
             val factor = factors[i]
             cancellation.charge(STRENGTHEN_WORK_WEIGHT * (1L + factor.structuralKeyWeight))
@@ -71,8 +58,7 @@ internal object CoefficientStrengthening {
                 pb != null -> strengthenPb(pb)
                 else -> input
             }
-            // A rewrite replaces the input factor; a `null` drops it (always satisfied); an unchanged
-            // factor contributes nothing to the delta.
+            // `null` means always satisfied.
             if (rewritten !== input) {
                 dropped.add(i)
                 if (rewritten != null) added.add(rewritten)
@@ -101,33 +87,26 @@ internal object CoefficientStrengthening {
     // Work units per factor and term strengthened, relative to one simplex operation.
     private const val STRENGTHEN_WORK_WEIGHT = 15L
 
-    /** Poll the cancellation once per this many strengthened factors (power-of-two mask for a cheap test). */
     private const val STRENGTHEN_CANCEL_POLL_MASK = 0x3FF
 
-    /** Whether [factor] has an integer equality its coefficient GCD refutes without finite domains. */
     private fun indivisibleEquality(factor: Factor): Boolean = factor.impliedLinearRows.any { row ->
         row.relation == LinearOp.EQ && row.isLongUnconditional &&
             indivisible((row.constants as IntegerConstants).coeffs, row.bound)
     }
 
-    /** Whether `gcd(|coeffs|) > 1` fails to divide [bound] — the modular obstruction that makes an
-     *  equality `Σ coeffs·x = bound` unsatisfiable over the integers. */
     private fun indivisible(coeffs: LongArray, bound: Long): Boolean {
         val g = PresolveShared.gcdOf(coeffs)
         return g > 1L && bound.mod(g) != 0L
     }
 
-    /** Relation common to [LinearOp] and [PbOp] so the bound rewrite is written once. */
+    // Shared by [LinearOp] and [PbOp] so the bound rewrite is written once.
     private enum class Rel { LE, GE, EQ, NE }
 
     private sealed interface Reduced {
-        /** Divide through; the rewritten bound. */
         data class Bound(val bound: Long) : Reduced
 
-        /** Constraint is always satisfied — drop it. */
         object Drop : Reduced
 
-        /** Leave the constraint as-is. */
         object Unchanged : Reduced
     }
 
@@ -163,44 +142,28 @@ internal object CoefficientStrengthening {
         return liftLinear(gcdReduced, ranges)
     }
 
-    /**
-     * Coefficient lifting for an inequality [Linear] over bounded-integer variables
-     * `xⱼ ∈ [lⱼ, uⱼ]` — MIP coefficient tightening (M. W. P. Savelsbergh, "Preprocessing and Probing
-     * Techniques for Mixed Integer Programming Problems", ORSA J. Computing 1994,
-     * https://doi.org/10.1287/ijoc.6.4.445; T. Achterberg et al., "Presolve Reductions in Mixed Integer
-     * Programming", INFORMS J. Computing 2020, https://doi.org/10.1287/ijoc.2018.0857), which
-     * generalises the 0/1 cover-dual clamp of [liftKnapsack] to `uⱼ > 1`.
-     *
-     * Reduce to a positive-coefficient bounded knapsack `Σ a̅ⱼ zⱼ ≤ B`, `zⱼ ∈ [0, cⱼ]` with
-     * `cⱼ = uⱼ − lⱼ`: shift `zⱼ = xⱼ − lⱼ` when `aⱼ > 0`, complement `zⱼ = uⱼ − xⱼ` (so `a̅ⱼ = −aⱼ`)
-     * when `aⱼ < 0`, folding the constants into `B`. Its complement `Σ a̅ⱼ(cⱼ − zⱼ) ≤ B` is the
-     * cover `Σ a̅ⱼ z̄ⱼ ≥ d` with `d = Amax − B`, `Amax = Σ a̅ⱼcⱼ` the maximal activity. The clamp
-     * `a̅ⱼ → min(a̅ⱼ, d)` is exact on this cover for *bounded* `z̄ⱼ ∈ [0, cⱼ]`, not just binary: the
-     * equivalence `Σ a̅ⱼz̄ⱼ ≥ d ⟺ Σ min(a̅ⱼ,d)z̄ⱼ ≥ d` holds pointwise at every nonnegative-integer
-     * assignment — whenever some `z̄ⱼ ≥ 1` has `a̅ⱼ > d` the clamped term alone already reaches `d`,
-     * and otherwise every active term has `a̅ⱼ ≤ d` so the two sides are identical. Mapping the
-     * clamped cover back to `≤` gives the bound `Σ min(a̅ⱼ,d)cⱼ − d` (de-shifted per variable).
-     *
-     * `d ≤ 0` ⟹ the constraint is always satisfied (dropped). `≥` is complemented to `≤` first;
-     * `=` can't be lifted by clamping (it ties both directions) and `≠` isn't a knapsack — both pass
-     * through, as does a row whose lift arithmetic leaves `Long`. Fixed variables (`cⱼ = 0`) are folded
-     * into the bound and never clamped (their coefficient is immaterial to the feasible set).
-     *
-     * Every step runs in checked arithmetic. On a column carrying the unbounded-search clamp a capacity
-     * `uⱼ − lⱼ` already reaches `2^62`, and the maximal activity `Σ a̅ⱼcⱼ` over a handful of such columns
-     * leaves `Long` — wrapped, it yields either a dropped row (`d ≤ 0` read as always-satisfied) or a
-     * lifted row whose bound has no relation to the original. Both change the feasible set, so an
-     * overflow anywhere returns the row untouched.
-     */
+    // MIP coefficient tightening over bounded integers `xⱼ ∈ [lⱼ, uⱼ]` (M. W. P. Savelsbergh, "Preprocessing and
+    // Probing Techniques for Mixed Integer Programming Problems", ORSA J. Computing 1994,
+    // https://doi.org/10.1287/ijoc.6.4.445; T. Achterberg et al., "Presolve Reductions in Mixed Integer
+    // Programming", INFORMS J. Computing 2020, https://doi.org/10.1287/ijoc.2018.0857), generalising the 0/1
+    // clamp of [liftKnapsack] to `uⱼ > 1`.
+    //
+    // Shift or complement each column to a positive knapsack `Σ a̅ⱼ zⱼ ≤ B`, `zⱼ ∈ [0, cⱼ]`, `cⱼ = uⱼ − lⱼ`, whose
+    // complement is the cover `Σ a̅ⱼ z̄ⱼ ≥ d` with `d = Σ a̅ⱼcⱼ − B`. The clamp `a̅ⱼ → min(a̅ⱼ, d)` is exact for
+    // bounded `z̄ⱼ`, not just binary: a term with `z̄ⱼ ≥ 1` and `a̅ⱼ > d` already reaches `d` alone. Mapping back
+    // gives the bound `Σ min(a̅ⱼ,d)cⱼ − d`. Fixed columns are never clamped.
+    //
+    // An unbounded-search column already has capacity `2^62`, and a wrapped activity would drop the row or lift it
+    // to an unrelated bound, so any overflow keeps the row untouched.
     private fun liftLinear(l: Linear, ranges: ColumnRanges): Factor? = try {
         liftLinearExact(l, ranges)
     } catch (_: CheckedLongOverflowException) {
-        l // the row is not liftable within Long; keep it exactly as it stands
+        l
     }
 
     private fun liftLinearExact(l: Linear, ranges: ColumnRanges): Factor? {
         val row = l.integerConstants ?: return l
-        // Only ≤ / ≥ lift by clamping; complement ≥ to ≤ by negating coeffs and bound.
+        // `=` ties both directions and `≠` is not a knapsack, so only `≤` and `≥` lift.
         val negate = when (l.op) {
             LinearOp.LE -> false
             LinearOp.GE -> true
@@ -208,7 +171,6 @@ internal object CoefficientStrengthening {
         }
         val bound = if (negate) subExact(0L, row.bound) else row.bound
         val n = l.vars.size
-        // Normalise to a positive-coefficient bounded knapsack Σ a̅ⱼzⱼ ≤ B, zⱼ ∈ [0, cⱼ].
         var b = bound
         var amax = 0L
         var maxUnfixedMagnitude = 0L
@@ -217,17 +179,14 @@ internal object CoefficientStrengthening {
             val v = l.vars[i]
             val cap = subExact(ranges.max(v), ranges.min(v))
             val magnitude = if (a < 0) subExact(0L, a) else a
-            // Fold the variable's contribution at its zero-of-zⱼ end into the bound:
-            // aⱼ>0 shifts by aⱼ·lⱼ, aⱼ<0 (complemented) shifts by aⱼ·uⱼ.
             val zeroEnd = if (a >= 0) ranges.min(v) else ranges.max(v)
             b = subExact(b, mulExact(a, zeroEnd))
             amax = addExact(amax, mulExact(magnitude, cap))
             if (cap > 0L) maxUnfixedMagnitude = maxOf(maxUnfixedMagnitude, magnitude)
         }
         val d = subExact(amax, b)
-        if (d <= 0L) return null // maximal activity within bound ⇒ always satisfied
+        if (d <= 0L) return null
         if (maxUnfixedMagnitude <= d) return l
-        // New bound in z-space: Σ a̅'ⱼcⱼ − d, then de-shift each variable back to xⱼ.
         val newCoeffs = LongArray(n)
         var newBound = -d
         for (i in 0 until n) {
@@ -272,19 +231,10 @@ internal object CoefficientStrengthening {
         return liftKnapsack(gcdReduced)
     }
 
-    /**
-     * Knapsack coefficient lifting for a `≤` pseudo-Boolean `Σ wⱼ lⱼ ≤ b`. After normalising
-     * to positive weights (a negative `wⱼ` becomes `|wⱼ|·¬lⱼ` with the bound raised by `|wⱼ|`), the
-     * dual `Σ wⱼ(1−lⱼ) ≥ d` with `d = Σwⱼ − b` is a cover: any weight exceeding `d` contributes no
-     * more than `d` to covering it, so each `wⱼ` clamps to `min(wⱼ, d)` and the bound becomes
-     * `Σ min(wⱼ,d) − d`. Exact (feasible-set-preserving), and it both shrinks coefficients and
-     * tightens the relaxation beyond what GCD reduction reaches. `d ≤ 0` ⟹ the constraint is always
-     * satisfied (dropped). A `≥` constraint is first complemented to `≤`; an `=` constraint
-     * can't be lifted by clamping (it ties both directions) and is left untouched.
-     */
+    // With positive weights, the dual `Σ wⱼ(1−lⱼ) ≥ d`, `d = Σwⱼ − b`, is a cover: a weight above `d` covers no
+    // more than `d`, so each `wⱼ` clamps to `min(wⱼ, d)` and the bound becomes `Σ min(wⱼ,d) − d`.
     private fun liftKnapsack(input: PseudoBoolean): Factor? {
-        // GE → ≤ by complementing literals: Σwⱼlⱼ ≥ b ⟺ Σwⱼ¬lⱼ ≤ Σwⱼ − b. EQ can't be lifted by
-        // clamping (it ties both directions), so it passes through.
+        // `Σwⱼlⱼ ≥ b ⟺ Σwⱼ¬lⱼ ≤ Σwⱼ − b`; EQ ties both directions, so it cannot be lifted.
         val pb: PseudoBoolean = when (input.op) {
             PbOp.LE -> input
 
@@ -320,8 +270,8 @@ internal object CoefficientStrengthening {
         var sum = 0L
         for (w in weights) sum += w
         val d = sum - bound
-        if (d <= 0L) return null // always satisfied
-        if (d >= sum) return input // no weight exceeds d — leave original
+        if (d <= 0L) return null
+        if (d >= sum) return input
         var changed = false
         var newSum = 0L
         val lifted = LongArray(n) { i ->

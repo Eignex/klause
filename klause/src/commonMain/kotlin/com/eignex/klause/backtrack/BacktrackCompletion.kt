@@ -86,19 +86,9 @@ internal sealed interface BacktrackCompletion {
     }
 }
 
-/**
- * The LP relaxation as a satisfaction-path participant: refute a node whose relaxation is infeasible.
- *
- * The optimize path reaches the relaxation through [ResumableMinimize], which owns an [LpEngine] to bound
- * against an incumbent. A satisfaction search has no incumbent and no objective to bound, but that is not
- * the only thing a relaxation decides — an infeasible one refutes its node whatever the objective is, and
- * on real models that is where most of the pruning comes from. Without this component the relaxation is
- * unreachable on a model with no objective, however the arm is configured.
- *
- * The engine is handed a zero objective, so the bound arms it also carries can never prune: the
- * lower bound of a zero objective is zero and the bound to beat is infinite. Root cut harvesting,
- * hull pruning and variable shaving are objective-independent; node pruning uses infeasibility.
- */
+// The LP relaxation on the satisfaction path: an infeasible relaxation refutes its node whatever the objective.
+// The engine gets a zero objective, so its bound arms never prune; root cut harvesting, hull pruning and
+// variable shaving are objective-independent.
 internal class LpFeasibilityComponent(
     problem: Problem,
     private val cp: CpSearchComponent,

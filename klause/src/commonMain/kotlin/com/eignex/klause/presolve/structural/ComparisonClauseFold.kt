@@ -27,30 +27,20 @@ import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.mulExact
 import com.eignex.util.numbers.subExact
 
-/**
- * Folds the reified encoding of an intension comparison disjunction into one [ComparisonClause]. A
- * `Clause` over indicator literals, where each indicator is the sole-use aux of a single-variable
- * reified comparison (`b ⇔ (c·x ⟨op⟩ k)`, `|c| = 1`, `b` used only by that reified factor and
- * this clause), is exactly the disjunction of those comparisons — so it becomes one factor and the
- * indicator definitions drop out. Reconstruction restores each indicator from its defining comparison,
- * independently of the polarity used in the clause. Front-ends that build the disjunction directly
- * (XCSP3 intension) already emit [ComparisonClause]; this pass catches the reified form (FlatZinc, SMT-LIB)
- * produces after Tseitin lowering.
- *
- * With `keepBinary`, a clause is left alone when one of its comparisons reads a `{0, 1}` column that
- * [BinaryColumnSubstitution] would turn into a literal. That comparison is a Boolean literal of its column:
- * kept reified, substitution makes it that literal and the clause stays a Boolean clause, which finite search
- * branches on and conflict analysis learns from. Folded, the [ComparisonClause] reads the column value-wise
- * and holds it, and every row it shares, in the integer lane. A column substitution leaves in that lane
- * anyway gains nothing from the indicator, so comparisons over it still fold.
- *
- * Not solution-set preserving: the dropped indicators are left unconstrained (like affine elimination /
- * duplicate-column merging), so a complete enumerator would over-count — hence gated off under `-a` /
- * `-n N>1`. Model-variable solutions are unchanged (the comparison disjunction over the same variables).
- */
+// Folds the reified encoding of a comparison disjunction into one [ComparisonClause]. A clause whose
+// indicators are each the sole-use aux of a single-variable reified comparison (`b ⇔ (c·x ⟨op⟩ k)`,
+// `|c| = 1`) is exactly the disjunction of those comparisons, so the indicator definitions drop out.
+// Reconstruction restores each indicator from its defining comparison.
+//
+// With `keepBinary`, a clause stays when a comparison reads a `{0, 1}` column [BinaryColumnSubstitution]
+// would turn into a literal: kept reified, it stays a Boolean clause that search branches on and conflict
+// analysis learns from, instead of holding the column in the integer lane.
+//
+// Not solution-set preserving: dropped indicators are left unconstrained, so a complete enumerator would
+// over-count.
 internal object ComparisonClauseFold {
 
-    /** The fold over root-propagated domains, which pin more columns than the declarations do. */
+    // Root-propagated domains pin more columns than the declarations do.
     fun fold(
         problem: BakedProblem,
         objectiveBoolVars: Set<Int> = emptySet(),
@@ -66,11 +56,8 @@ internal object ComparisonClauseFold {
             .asPassDelta(problem.rootIntDomainsInPlace)
     }
 
-    /**
-     * The fold over the ranges the source model declares. A comparison's other terms move to the bound only
-     * when the declaration fixes them; an open column is never fixed, so its term stays and the row declines
-     * as a multi-variable comparison rather than being read at an invented endpoint.
-     */
+    // Only declaration-fixed terms move to the bound; an open column keeps its term, so the row declines
+    // rather than being read at an invented endpoint.
     fun foldSource(
         problem: Problem,
         objectiveBoolVars: Set<Int> = emptySet(),
@@ -85,7 +72,6 @@ internal object ComparisonClauseFold {
         return foldAll(problem.factors, ranges, uses, objectiveBoolVars, cancellation, substitutable)
     }
 
-    /** Substitution's eligibility over [ranges], analysed only once a binary comparison asks for it. */
     private fun Problem.substitutableColumns(ranges: ColumnRanges, objectiveIntVars: Set<Int>): Lazy<BooleanArray?> =
         lazy(LazyThreadSafetyMode.NONE) {
             BinaryColumnSubstitution.substitutableColumns(factors, numIntVars, ranges, objectiveIntVars)
@@ -125,9 +111,6 @@ internal object ComparisonClauseFold {
         return SourceDelta(dropped.toIntArray(), added, rebuild = SourceRebuilds(rebuilds))
     }
 
-    /** The [ComparisonClause] equivalent of [clause] and the reified-factor indices it consumes, or
-     *  `null` when any literal is not a sole-use single-variable reified comparison, or compares a
-     *  `{0, 1}` column marked [substitutable]. */
     private fun foldClause(
         clause: Clause,
         defByAux: MutableIntObjectMap<Pair<Int, LinearRow>>,
@@ -166,13 +149,8 @@ internal object ComparisonClauseFold {
         )
     }
 
-    /**
-     * A reified row body reduced to `(var, op, const)` — one free variable with unit coefficient
-     * against a constant. Fixed variables (a single-value range, e.g. a FlatZinc constant lifted to a
-     * `{c}` var) are substituted into the bound, so `b ⇔ (x − k ≤ 0)` with `k` fixed at 1 becomes
-     * `x ≤ 1`. A `-1` coefficient on the free variable flips the operator and negates the bound. `null`
-     * when more than one variable stays free, the free coefficient is not `±1`, or the bound overflows.
-     */
+    // Reduces a reified row to `(var, op, const)`, substituting fixed variables into the bound. Null unless
+    // exactly one variable stays free with coefficient ±1 and the bound fits in Long.
     private fun singleVarComparison(r: LinearRow, ranges: ColumnRanges): Triple<Int, LinearOp, Long>? {
         val row = r.constants as? IntegerConstants ?: return null
         if (r.strict || !r.isIntegerOnly) return null
@@ -210,8 +188,6 @@ internal object ComparisonClauseFold {
         LinearOp.NE -> LinearOp.NE
     }
 
-    /** The complement of a single-variable comparison: `¬(x ≤ c) = x ≥ c+1`, `¬(x ≥ c) = x ≤ c−1`,
-     *  `¬(x = c) = x ≠ c`, `¬(x ≠ c) = x = c`; `null` when the shifted bound leaves `Long`. */
     private fun negate(lit: Triple<Int, LinearOp, Long>): Triple<Int, LinearOp, Long>? {
         val (v, op, c) = lit
         return when (op) {

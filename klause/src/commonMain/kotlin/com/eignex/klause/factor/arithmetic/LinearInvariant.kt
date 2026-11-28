@@ -43,8 +43,6 @@ internal class LinearInvariant(
         val old = state.assignment.intValue(intVar)
         val sum = state.longPayload[factorId]
         val newSum = sum + coeff * (newValue - old)
-        // The pre-move degree `degree(sum)` is the factor's current violation degree, already
-        // maintained in factorDegree — reuse it instead of re-running the residual/compression.
         return linearDegree(newSum, op, bound, state.violationSoftCap) - state.factorDegree[factorId]
     }
 
@@ -62,8 +60,7 @@ internal class LinearInvariant(
         val sum = state.longPayload[factorId]
         if (linearHolds(sum, op, bound)) return
         if (op == LinearOp.NE) {
-            // sum == bound; step any non-zero-coeff variable to an in-domain neighbour. Each
-            // single shift changes sum by a non-zero multiple of c_i → breaks the equality.
+            // sum == bound, so any single shift of a nonzero-coefficient term breaks the equality.
             forEachRepairTerm(state) { i ->
                 val v = vars[i]
                 val c = coeffs[i]
@@ -103,10 +100,8 @@ internal class LinearInvariant(
         for (target in sideTargets.orEmpty()) sink.addChannelingIntSet(state, target.varId, target.newValue)
     }
 
-    /** Visit every term index on a narrow row, or a fresh [REPAIR_SAMPLE_CAP]-sized random sample on a
-     *  wide one: a full wide-row enumeration floods one pick with tens of thousands of
-     *  candidates whose scoring outlives the deadline, while a per-pick sample keeps the repair
-     *  pressure and lets successive picks cover different slices of the row. */
+    // A wide row is sampled afresh each pick: enumerating it floods one pick with more candidates than the
+    // deadline can score, while successive samples still cover different slices of the row.
     private inline fun forEachRepairTerm(state: LocalSearchState, action: (Int) -> Unit) {
         val n = vars.size
         if (n <= REPAIR_SAMPLE_CAP) {
@@ -117,10 +112,8 @@ internal class LinearInvariant(
         }
     }
 
-    /** Sum channeling for a currently-satisfied EQ: when [intVar] drifts by `c·Δ`, shift the
-     *  lowest-|coeff| other participant by the inverse so `Σ c·x = bound` stays balanced, preferring a
-     *  coefficient that divides the drift evenly so the target lands on an integer. A violated EQ is
-     *  the constraint the caller is repairing via the int set, so a counter-shift would undo it. */
+    // Keeps a satisfied EQ balanced by counter-shifting one partner. A violated EQ is what the move is
+    // repairing, so a counter-shift would undo it.
     override fun contributeChanneling(
         state: LocalSearchState,
         factorId: Int,
@@ -133,13 +126,12 @@ internal class LinearInvariant(
         val coeffV = coeffIndex.coeffOf(intVar)
         if (coeffV == 0L) return
         val drift = coeffV * (newValue - oldValue)
-        // Ascending-|coeff| order prefers the lowest-|coeff| admissible partner.
         for (i in byAbsCoeff) {
             val u = vars[i]
             if (u == intVar || sink.isPinned(u) || !state.moveSink.allowsInt(u)) continue
             val cu = coeffs[i]
             if (drift % cu != 0L) continue
-            val uShift = -drift / cu // (uShift * cu) cancels the drift
+            val uShift = -drift / cu
             val curU = state.assignment.intValue(u)
             val newU = curU + uShift
             if (newU == curU || newU !in state.rootDomains[u]) continue
@@ -149,18 +141,9 @@ internal class LinearInvariant(
         }
     }
 
-    /** Self-preserving move suggestions during objective descent. For [LinearOp.EQ] the
-     *  natural structured move is a pair-shift `(IntSet(a, va+Δa), IntSet(b, vb+Δb))` chosen
-     *  so `coeffs(a)·Δa + coeffs(b)·Δb = 0` — the equality stays satisfied while the
-     *  individual var values change. This is the heart of "swap one item between bins"
-     *  for exactly-one decompositions and the analogous "shift Δ between two summed
-     *  vars" for weighted equalities. For LE/GE we propose unilateral shifts within the
-     *  slack; the engine scores each by objective delta and applies the best
-     *  feasibility-preserving one.
-     *
-     *  Bounded: we sample up to [PAIR_SAMPLE_CAP] random pairs (or all of them when the
-     *  factor's arity is small) rather than enumerate Θ(n²) which would dominate the
-     *  inner loop on large decomposed instances. */
+    // Feasibility-preserving moves for objective descent: an EQ shifts value between two terms with
+    // `coeffs(a)·Δa + coeffs(b)·Δb = 0`, LE/GE shift single terms within the slack. Pairs are sampled
+    // because Θ(n²) enumeration would dominate the descent step on wide rows.
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (vars.size < 2) return
         when (op) {
@@ -170,10 +153,6 @@ internal class LinearInvariant(
         }
     }
 
-    /** EQ pair-shift: for each sampled pair (a, b) with non-zero coefficients and each
-     *  `Δa ∈ {-1, +1}`, propose the compound move when `Δb = -coeffs(a)·Δa / coeffs(b)` is an
-     *  integer and both new values lie in their domains. Equal-coefficient case (e.g.
-     *  exactly-one decomp with all c=1) collapses to a 0/1 value swap. */
     private fun proposeEqPairShifts(state: LocalSearchState, sink: MoveSink) {
         val n = vars.size
         val tryPair = { a: Int, b: Int ->
@@ -216,10 +195,6 @@ internal class LinearInvariant(
         }
     }
 
-    /** LE/GE slack-aware shifts: when slack > 0, move each var by `floor(slack / |c|)` in the
-     *  direction that grows the slack (for LE `sum ≤ bound`, decrease a positive-coefficient
-     *  var or increase a negative one; GE mirrored), clamped to its domain. The move keeps the
-     *  row satisfied, so single-var moves suffice and the engine scores them by objective delta. */
     private fun proposeBoundedSlackShifts(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val curSum = state.longPayload[factorId]
         val slack = when (op) {
@@ -249,16 +224,9 @@ internal class LinearInvariant(
     }
 
     private companion object {
-        /** Cap on randomly-sampled (a, b) pairs in [proposeEqPairShifts]. Total proposals
-         *  bound matters for engine throughput — each scored move costs a state.apply +
-         *  revert. 32 is enough to land useful candidates on the dominant decomposed-CP
-         *  shape (sum-of-bools = constant) without dominating descent step cost. */
+        // Each scored move costs an apply and a revert; 32 pairs suffice for sum-of-bools equalities.
         const val PAIR_SAMPLE_CAP: Int = 32
 
-        /** Per-pick cap on repair proposals from one wide row: past this arity the terms are
-         *  sampled fresh each pick instead of enumerated, so a violated tens-of-thousands-wide row
-         *  can't flood a single pick with more candidates than the deadline can score, while
-         *  successive picks still cover different slices of the row. */
         const val REPAIR_SAMPLE_CAP: Int = 256
     }
 }

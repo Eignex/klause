@@ -69,7 +69,7 @@ internal fun reconstructRational(
     return null
 }
 
-/** `a·b + c` in 128 bits, or null when it does not land back in a `Long`. */
+// Null when a·b + c leaves Long.
 private fun mulAdd(a: Long, b: Long, c: Long): Long? {
     val acc = Int128()
     acc.addProduct(a, b)
@@ -77,14 +77,9 @@ private fun mulAdd(a: Long, b: Long, c: Long): Long? {
     return if (acc.fitsLong()) acc.toLong() else null
 }
 
-/**
- * [values] recovered as one integer vector: each entry reconstructed as a rational, then all scaled by
- * the least common denominator so the result is exactly `L · values` for a positive integer `L`.
- *
- * A ray is only defined up to a positive scale, so clearing the denominators loses nothing — and it is
- * what lets the certificate be checked in integer arithmetic. Null when any entry is not a small
- * rational, or when the common denominator or a scaled entry escapes a `Long`.
- */
+// The result is exactly L·values for a positive integer L, the least common denominator. A ray is defined only up
+// to positive scale, so clearing denominators loses nothing and lets the certificate be checked in integers. Null
+// when an entry is not a small rational or the denominator or a scaled entry escapes Long.
 @Suppress("ReturnCount")
 internal fun reconstructIntegerVector(
     values: DoubleArray,
@@ -110,7 +105,7 @@ internal fun reconstructIntegerVector(
     return out
 }
 
-/** Least common multiple, or null on overflow. Both arguments are positive. */
+// Both arguments positive; null on overflow.
 private fun lcm(a: Long, b: Long): Long? {
     val g = gcd(a, b)
     val acc = Int128()
@@ -129,18 +124,14 @@ private fun gcd(a: Long, b: Long): Long {
     return if (x < 0L) -x else x
 }
 
-/**
- * Denominators above this are not plausibly the value a float was rounded from, and the scaled
- * numerators stop fitting a `Long` soon after. Well above the small determinants a sparse simplex
- * basis produces, and far below where the common denominator would overflow.
- */
+// Denominators above this are not plausibly what a float was rounded from: well above the small determinants of a
+// sparse simplex basis, far below where the common denominator would overflow.
 private const val DEFAULT_MAX_DENOMINATOR = 1L shl 40
 
-/** A float carries about sixteen digits; this leaves margin for the arithmetic that produced it. */
+// A float carries about sixteen digits; this leaves margin for the arithmetic that produced it.
 private const val DEFAULT_TOLERANCE = 1e-9
 
-/** Enough terms for any denominator under the bound: the convergents grow at least as fast as the
- *  Fibonacci numbers, which pass 2⁴⁰ by the sixtieth. */
+// Convergent denominators grow at least as fast as the Fibonacci numbers, which pass 2⁴⁰ by the sixtieth.
 private const val MAX_TERMS = 64
 
 // Denominator bound for rational reconstruction of a refined iterate, following Gleixner, Steffy and Wolter,

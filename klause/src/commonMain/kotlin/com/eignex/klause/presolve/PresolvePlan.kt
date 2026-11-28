@@ -134,14 +134,9 @@ class PresolveConfig(
     fun resolved(pass: PresolvePass, context: PresolveContext): Boolean =
         (!context.solutionSetSensitive || pass.guarantees.bijection) && (overrides[pass] ?: auto(pass, context))
 
-    /**
-     * Whether comparison-clause folding leaves a clause reified when binary-column substitution would turn one
-     * of its comparisons into a literal, on a [finiteLane] preparation. Such a comparison is a Boolean literal
-     * of its `{0, 1}` column: left reified, substitution carries it into the Boolean lane, where search
-     * branches on it and conflict analysis learns from it, while a folded clause holds the column in the
-     * integer lane. Explicitly enabling the pass folds them as well; the open lane substitutes no columns, so
-     * it always folds them.
-     */
+    // A comparison over a `{0, 1}` column left reified is carried into the Boolean lane by binary-column
+    // substitution, where search branches on it and conflict analysis learns from it; folding it would hold
+    // the column in the integer lane. The open lane substitutes no columns, so it always folds.
     internal fun keepsBinaryComparisons(finiteLane: Boolean): Boolean =
         finiteLane && overrides[PresolvePass.FOLD_COMPARISON_CLAUSES] != true
 
@@ -156,7 +151,6 @@ class PresolveConfig(
     fun problemPasses(context: PresolveContext): List<PresolvePass> =
         problemPasses(context, PresolvePass.Capability.FINITE)
 
-    /** Problem-transform passes enabled for [context] and available [capability], in priority order. */
     internal fun problemPasses(context: PresolveContext, capability: PresolvePass.Capability): List<PresolvePass> {
         val passes = PresolvePass.entries.filter {
             it.stage == PresolvePass.Stage.PROBLEM &&

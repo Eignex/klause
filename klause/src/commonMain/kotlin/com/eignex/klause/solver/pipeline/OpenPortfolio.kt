@@ -56,18 +56,14 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Decides or optimizes an open model on the shared [Portfolio] harness: the complete theory route as one arm,
- * local-search arms over the model's source columns as the rest.
+ * The complete theory route runs as one arm on the shared [Portfolio] harness, local-search arms over the source
+ * columns as the rest. The theory arm pauses at branches and resumes by `openWork` slice, keeping its search
+ * across segments; optimizing, it is the descent, each round refuting the better of its own incumbent and the
+ * pool's.
  *
- * The theory arm pauses at branches and resumes by slice, counted in `openWork`, so it keeps its search across the
- * segments it is scheduled. Optimizing, it is the theory's descent, each round refuting the better of its own
- * incumbent and the pool's.
- *
- * Local search proposes witnesses only, never refuting an open model or proving a bound, and every witness it
- * proposes is checked against the source model before it counts. A model no theory decides ([request] null) runs
- * local search alone, so it can be shown satisfiable and never shown unsatisfiable or optimal.
- *
- * The arms run on up to [lanes] threads, each arm on at most one at a time.
+ * Local search proposes witnesses only, each checked against the source model before it counts. A model no
+ * theory decides ([request] null) runs local search alone, so it can be shown satisfiable but never
+ * unsatisfiable or optimal. Each arm runs on at most one of the [lanes] threads at a time.
  */
 internal class OpenPortfolio(
     private val model: Problem,
@@ -107,7 +103,6 @@ internal class OpenPortfolio(
         nodeBudget = slot.nodeBudget,
     )
 
-    /** Run the portfolio until an arm settles the model or [cancellation] fires. */
     fun solve(cancellation: ExecutionControl): OpenTheoryResult {
         val stop = lifetime.includingStop( cancellation)
         if (stop() || preparedPlan.decline == PreparedPlanDecline.RESOURCE) {
@@ -170,11 +165,8 @@ internal class OpenPortfolio(
         }
     }
 
-    /**
-     * Minimize [objective], the model's objective in minimized form, until an arm proves the optimum or
-     * [cancellation] fires. [minimizer] is the theory's descent over it, or null when no theory decides the model and
-     * local search runs alone.
-     */
+    // [objective] is the model's objective in minimized form; [minimizer] is the theory's descent over it, or null
+    // when no theory decides the model and local search runs alone.
     fun minimize(
         objective: LinearObjective,
         minimizer: OpenTheoryMinimizer?,

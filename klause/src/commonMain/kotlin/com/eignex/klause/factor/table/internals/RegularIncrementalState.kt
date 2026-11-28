@@ -9,18 +9,12 @@ import com.eignex.klause.propagation.excludeIntValues
 import com.eignex.klause.propagation.lazyReason
 import com.eignex.util.collections.LongArrayList
 
-/*
- * Reversible, delta-driven GAC for [Regular]. Each layer keeps DFA states forward-reachable
- * from q0 and backward-reachable to accepting states. A symbol at position i survives iff a
- * forward-reachable state at i transitions on it to a backward-reachable state at i+1.
- *
- * Pesant, "A Regular Language Membership Constraint for Finite Sequences of Variables", CP 2004,
- * https://doi.org/10.1007/978-3-540-30201-8_36.
- *
- * Layer bitsets live on the undo trail ([RevLongArray]), so backtracking restores changed words.
- * The forward sweep starts at the lowest dirty position and stops at an unchanged layer;
- * the backward sweep descends from the deepest affected layer with the same stopping rule.
- */
+// Reversible, delta-driven GAC for Regular. A symbol at position i survives iff a forward-reachable state at i
+// transitions on it to a backward-reachable state at i+1. Layer bitsets are trailed, and each sweep stops at the
+// first unchanged layer past the dirty range.
+//
+// Pesant, "A Regular Language Membership Constraint for Finite Sequences of Variables", CP 2004,
+// https://doi.org/10.1007/978-3-540-30201-8_36.
 internal class RegularIncrementalState(
     state: PropagationState,
     private val seq: IntArray,
@@ -33,14 +27,12 @@ internal class RegularIncrementalState(
     private val n = seq.size
     private val w = (numStates + 63) ushr 6
 
-    // Forward-reachable / backward-co-reachable state bitmasks per layer (n+1 layers of w words),
-    // trailed so a backtrack restores them word-by-word.
+    // n+1 layers of w words each.
     private val fwd = RevLongArray(state, (n + 1) * w)
     private val bwd = RevLongArray(state, (n + 1) * w)
     private val valid = RevInt(state, 0)
 
-    /** Responsible `seq` prefix when a forward layer collapsed — advisory, read by conflictReason
-     *  immediately before the engine backtracks, so it need not be reversible. */
+    // Read by conflictReason just before the engine backtracks, so it need not be reversible.
     var conflictPrefix: IntArray? = null
         private set
 
@@ -71,7 +63,6 @@ internal class RegularIncrementalState(
         return true
     }
 
-    /** Write [tmp] into [rev]'s [layer] words (reversibly); return whether any word changed. */
     private fun writeLayer(rev: RevLongArray, layer: Int, tmp: LongArray): Boolean {
         val base = layer * w
         var changed = false
@@ -84,7 +75,7 @@ internal class RegularIncrementalState(
         return changed
     }
 
-    /** fwd(i+1) = { δ(q,s) : q ∈ fwd(i), s ∈ dom(seq(i)) }. Returns whether fwd(i+1) changed. */
+    // fwd(i+1) = { δ(q,s) : q ∈ fwd(i), s ∈ dom(seq(i)) }
     private fun recomputeForward(state: PropagationState, i: Int, scratch: LongArray): Boolean {
         scratch.fill(0L)
         val d = state.intDomains[seq[i]]
@@ -97,7 +88,7 @@ internal class RegularIncrementalState(
         return writeLayer(fwd, i + 1, scratch)
     }
 
-    /** bwd(i) = { q ∈ fwd(i) : ∃ s ∈ dom(seq(i)), δ(q,s) ∈ bwd(i+1) }. Returns whether bwd(i) changed. */
+    // bwd(i) = { q ∈ fwd(i) : ∃ s ∈ dom(seq(i)), δ(q,s) ∈ bwd(i+1) }
     private fun recomputeBackward(state: PropagationState, i: Int, scratch: LongArray): Boolean {
         scratch.fill(0L)
         val d = state.intDomains[seq[i]]
@@ -112,7 +103,7 @@ internal class RegularIncrementalState(
         return writeLayer(bwd, i, scratch)
     }
 
-    /** bwd(n) = accepting ∩ fwd(n). Returns whether it changed. */
+    // bwd(n) = accepting ∩ fwd(n)
     private fun recomputeAcceptLayer(scratch: LongArray): Boolean {
         scratch.fill(0L)
         for (q in accepting) {
@@ -123,8 +114,6 @@ internal class RegularIncrementalState(
         return writeLayer(bwd, n, scratch)
     }
 
-    /** Prune every position in `[lo, hi]`: a symbol survives iff some forward-reachable state at i
-     *  transitions on it into a backward-co-reachable state at i+1. Returns false on a wipeout. */
     private fun prune(state: PropagationState, lo: Int, hi: Int): Boolean {
         // Reachability reads every symbol each position still holds. With the undo log a position's reason is
         // the graph cut [RegularExplainer] builds if analysis reads it; without one nothing reads reasons.
@@ -161,7 +150,6 @@ internal class RegularIncrementalState(
         return if (valid.value == 0) rebuild(state) else delta(state, dirty)
     }
 
-    /** Full forward+backward build, then prune all positions. */
     private fun rebuild(state: PropagationState): Boolean {
         val scratch = LongArray(w)
         for (k in 0 until (n + 1) * w) {
@@ -190,9 +178,8 @@ internal class RegularIncrementalState(
         return prune(state, 0, n - 1)
     }
 
-    /** Delta fire: recompute only the layers reachable from the changed positions. */
     private fun delta(state: PropagationState, dirty: IntArray): Boolean {
-        // Map dirty var ids to seq positions (a var may occupy several positions).
+        // A var may occupy several positions.
         var minD = n
         var maxD = -1
         for (i in seq.indices) {
@@ -205,10 +192,9 @@ internal class RegularIncrementalState(
                 }
             }
         }
-        if (maxD < 0) return true // delta touched no seq var
+        if (maxD < 0) return true
 
         val scratch = LongArray(w)
-        // Forward sweep up from the lowest dirty position; stop once past the dirty range with no change.
         var lastFwdChanged = minD
         var i = minD
         while (i < n) {
@@ -226,7 +212,7 @@ internal class RegularIncrementalState(
             return false
         }
 
-        // Backward sweep down from the deepest changed layer (forward changes shrink co-reachability).
+        // Forward changes shrink co-reachability, so the backward sweep starts at the deepest changed layer.
         var bwdStart = maxOf(maxD, lastFwdChanged)
         var firstBwdChanged = bwdStart
         if (bwdStart == n) {
@@ -242,8 +228,7 @@ internal class RegularIncrementalState(
         }
         if (!testBit(bwd, 0, q0 - 1)) return false
 
-        // Re-prune the affected position window (fwd(i) or bwd(i+1) may have moved). A superset is
-        // sound — an unchanged position simply finds nothing to remove.
+        // A superset window is sound: an unchanged position finds nothing to remove.
         val lo = maxOf(0, minOf(minD, firstBwdChanged - 1))
         val hi = minOf(n - 1, maxOf(maxD, lastFwdChanged))
         return prune(state, lo, hi)

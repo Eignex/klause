@@ -31,16 +31,10 @@ import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 
-/**
- * Whether [point] and [direction] prove [objective] unbounded below over this problem.
- *
- * [direction] moves only the continuous variables, indexed by real variable id, so every discrete value of
- * [point] stays fixed and integrality is kept along the whole ray. The check reads the factors themselves,
- * not an LP built from them: each real bound and each factor over a moved real must hold exactly at [point]
- * and keep holding along `point + t·direction` for every `t ≥ 0`, and [objective] must strictly decrease
- * along it. A factor over a moved real that this check cannot read declines the proof. Discrete-only factors
- * are not re-checked: [point] is a leaf assignment the search already found consistent.
- */
+// direction moves only reals, so integrality holds along the ray. Reads the factors, not an LP built from
+// them: every real bound and factor over a moved real must hold exactly at point and along point + t·direction
+// for all t ≥ 0, and the objective must strictly decrease. An unreadable factor over a moved real declines.
+// Discrete-only factors are not re-checked: point is a leaf assignment the search found consistent.
 internal fun Problem.provesUnbounded(objective: LinearObjective, point: Sample, direction: List<BigFraction>): Boolean {
     val reals = point.exactReals ?: return false
     if (reals.size != numRealVars || direction.size != numRealVars) return false
@@ -52,11 +46,9 @@ internal fun Problem.provesUnbounded(objective: LinearObjective, point: Sample, 
     }
 }
 
-// Whether [point] and [direction] prove [objective] unbounded below over this problem under the tolerance reading of
-// [policy]. [point] must hold every relation within the absolute slack alone, and moving along [direction] must never
-// grow a relation's residual: a row's activity moves only toward its bound side, an absolute value keeps the sign its
-// operand has along the whole ray, a finite membership does not move. Every point of the ray then holds within the
-// slack, whose absolute part does not shrink. A relation this check cannot read is read exactly.
+// point must hold every relation within the absolute slack alone, and moving along direction must never grow a
+// residual: a row's activity moves only toward its bound side, an absolute value keeps its operand's sign along
+// the ray, a finite membership does not move. A relation this check cannot read is read exactly.
 internal fun Problem.provesUnboundedWithinTolerance(
     objective: LinearObjective,
     point: Sample,
@@ -76,7 +68,7 @@ internal fun Problem.provesUnboundedWithinTolerance(
     }
 }
 
-// Whether [direction] is nonzero, moves no real toward a declared bound and lowers [objective].
+// Also requires the direction to move no real toward a declared bound.
 private fun Problem.descends(objective: LinearObjective, direction: List<BigFraction>): Boolean {
     if (direction.all { it.isZero }) return false
     for (r in 0 until numRealVars) {

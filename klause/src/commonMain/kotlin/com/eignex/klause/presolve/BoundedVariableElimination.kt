@@ -6,26 +6,16 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
-/**
- * Bounded variable elimination (BVE) over the pure-SAT part of the model. A Boolean
- * variable `v` is eliminated by resolving every clause containing `v` against every clause containing
- * `¬v` and replacing all of them with the (non-tautological) resolvents — the projection of `v` out of
- * the clause set — but only when neither clause count nor distinct literal volume increases. A
- * monotone `v` (appearing in only one polarity) is a degenerate case: its clauses are satisfiable by the
- * pure value and simply drop, adding no resolvents.
- *
- * Operates on the shared [SatClauseDb], so a variable is eliminable only when [SatClauseDb.eligible] —
- * objective-free and appearing solely in clean all-Boolean clauses. The eliminated `v` is left
- * unconstrained in the reduced problem, so this is **not** solution-set preserving (a complete
- * enumerator over-counts); its value is recovered from the removed clauses by [asRebuilds].
- *
- * N. Eén, A. Biere, "Effective preprocessing in SAT through variable and clause elimination", SAT 2005,
- * https://doi.org/10.1007/11499107_5.
- */
+// Bounded variable elimination over the pure-SAT part of the model. A Boolean `v` is eliminated by
+// replacing every clause on `v` with the non-tautological resolvents of its two polarities, only when
+// neither the clause count nor the literal volume grows; a monotone `v`'s clauses simply drop. Only
+// [SatClauseDb.eligible] variables qualify. The eliminated `v` is left unconstrained, so this is not
+// solution-set preserving; [asRebuilds] recovers its value.
+// N. Eén, A. Biere, "Effective preprocessing in SAT through variable and clause elimination", SAT 2005,
+// https://doi.org/10.1007/11499107_5.
 internal object BoundedVariableElimination {
 
-    /** Skip a variable whose `|pos| · |neg|` resolvent product exceeds this — a per-variable work bound
-     *  so a high-degree variable cannot make the pairwise resolution quadratic-blow-up. */
+    // Per-variable bound so a high-degree variable cannot blow up pairwise resolution.
     private const val RESOLVENT_PRODUCT_CAP = 4_096
 
     private const val RESOLVENT_WIDTH_CAP = 64
@@ -40,14 +30,7 @@ internal object BoundedVariableElimination {
         if (infeasible) PassDelta(infeasible = true) else db.toDelta(rebuild)
     } ?: PassDelta()
 
-    /**
-     * [eliminate] over a canonical source model.
-     *
-     * Resolution reads the clause database and nothing else — no domain, no propagation — so the whole
-     * argument holds before a finite projection exists. `SatClauseDb.build` marks a Boolean ineligible
-     * when any factor that is not a clean clause touches it, scanning every factor directly, so a
-     * Boolean an integer row reads is never resolved away and the open columns beside it are untouched.
-     */
+    // Resolution reads only the clause database, so it holds before a finite projection exists.
     fun eliminateSource(
         problem: Problem,
         objectiveBoolVars: Set<Int> = emptySet(),
@@ -151,7 +134,7 @@ internal object BoundedVariableElimination {
             val removedVolume = clauses.sumOf { it.size.toLong() }
             var addedVolume = 0L
             val out = ArrayList<IntArray>()
-            val seen = HashSet<List<Int>>() // exact literal-set identity — a lossy hash could drop a needed resolvent
+            val seen = HashSet<List<Int>>() // exact identity: a lossy hash could drop a needed resolvent
             for (a in posLits.indices) {
                 for (b in negLits.indices) {
                     if (!work.visit()) return false
@@ -181,7 +164,6 @@ internal object BoundedVariableElimination {
         return false
     }
 
-    /** Collect the live slots (and their literals) that contain [lit] into the parallel lists. */
     private fun gather(
         db: SatClauseDb,
         lit: Int,
@@ -200,9 +182,7 @@ internal object BoundedVariableElimination {
         return true
     }
 
-    /** Resolve [c1] (contains `+v`) and [c2] (contains `¬v`) on [v]: their literals minus the `v`
-     *  literals, deduplicated; `null` when the result is a tautology (contains a literal and its
-     *  negation). */
+    // Null for a tautology.
     private fun resolve(c1: IntArray, c2: IntArray, v: Int, work: PivotWork): IntArray? {
         val lits = IntHashSet()
         for (l in c1) {
@@ -235,17 +215,11 @@ internal object BoundedVariableElimination {
         }
     }
 
-    /** One eliminated variable and the clauses that mentioned it, for solution reconstruction. */
     private class VarElim(val v: Int, val clauses: List<IntArray>)
 
-    /**
-     * The eliminations as the steps that recover them, latest first.
-     *
-     * Each variable is set to satisfy the clauses it appeared in: a clause not satisfied by its other
-     * (already-recovered) literals forces `v` to the polarity of its `v` literal, and bounded resolution
-     * guarantees the two polarities are never forced at once. Reversed, so a variable whose clauses
-     * reference a later-eliminated variable reads that variable's recovered value.
-     */
+    // Latest first, so a variable whose clauses mention a later-eliminated one reads its recovered value.
+    // Each recovered variable satisfies its clauses; resolution guarantees no two clauses force opposite
+    // polarities.
     private fun List<VarElim>.asRebuilds(): SourceRebuilds =
         SourceRebuilds(asReversed().map { RebuildStep.SatisfyClauses(it.v, it.clauses) })
 }

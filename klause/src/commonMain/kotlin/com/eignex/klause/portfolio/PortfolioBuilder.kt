@@ -28,25 +28,16 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.util.concurrent.Mutex
 
 /**
- * Supplies finite recipes and shared immutable preparation to source portfolio construction.
- * [PortfolioComposition] selects arms; each [WorkerConfig.materialize] creates its private engine state.
- * [build] and [buildExplicit] retain the low-level worker-list API for caller-controlled execution.
- * Those entry points bind one finite source invocation and each worker's actual execution assumptions.
+ * Builds portfolio worker lists for caller-controlled execution. Each worker is bound to one finite source
+ * invocation and its own execution assumptions.
  */
 object PortfolioBuilder {
     /**
-     * Compose [scenario] and materialise its arms over [problem].
+     * Composes [scenario] and materialises its arms over [problem], classified as [profile].
      *
-     * [objective] is the canonical [LinearObjective] every optimising worker minimises (null for a
-     * satisfaction-only portfolio). [lsObjective] is the optional per-move gradient view of the
-     * same objective for the local-search workers (see `LocalSearchParams.lsObjective`); backtrack
-     * workers ignore it.
-     *
-     * [definitionalSweep] is threaded into every LS worker (per-move invariants). [onEvent]
-     * threads the [SearchEvent] seam through to every worker tagged with its label; workers run
-     * concurrently under a parallel `Portfolio`, so the listener must be thread-safe and cheap.
-     *
-     * [profile] classifies [problem]; the arms each family gets are the ones its class calls for.
+     * [objective] is what every optimising worker minimises, null for satisfaction; [lsObjective] is an
+     * optional per-move gradient view of it for local-search workers. Workers call [onEvent] concurrently,
+     * so it must be thread-safe and cheap.
      */
     fun build(
         problem: BakedProblem,
@@ -272,9 +263,7 @@ object PortfolioBuilder {
         ),
     )
 
-    /** Materialise each arm of [buildExplicit] via its own [WorkerConfig.materialize]. The arm index offsets
-     *  the seed; [armIds] carries each lane's arm identity purely as attribution metadata; [pools], when
-     *  non-null, is shared by every arm. */
+    // armIds are attribution metadata only; the arm index offsets the seed.
     private fun materialize(
         problem: BakedProblem,
         arms: List<WorkerConfig>,
@@ -320,14 +309,7 @@ object PortfolioBuilder {
         }
     }
 
-    /**
-     * The shared pools for [scenario], or null when sharing doesn't apply (an LS-only portfolio
-     * ignores both). Created once per build and handed to every arm. The lock follows the core
-     * count: a no-op on one lane (zero overhead; the clause pool is just cross-segment memory
-     * there) and a platform mutex for several lanes' concurrent writers. The clause
-     * pool is present when multiple backtrack workers can exchange clauses; the cut pool only when
-     * [PortfolioScenario.shareCuts] opts in.
-     */
+    // The lock is a no-op on one lane, where the clause pool is only cross-segment memory.
     private fun poolsFor(
         scenario: PortfolioScenario,
         problem: BakedProblem,
@@ -340,8 +322,7 @@ object PortfolioBuilder {
         val identity = ModelIdentity.of(problem, objective)
         val concurrent = scenario.cores != 1
         val cuts = if (scenario.shareCuts) SharedCutPool(Mutex(concurrent)) else null
-        // The bound managers are the dual of the shared incumbent: harmless for a CSP pool (no arm
-        // publishes), so they are always present and only an optimising arm feeds them.
+        // The bound managers are always present; on a CSP no arm publishes to them.
         return SharedPools(
             if (clausePeers) {
                 SharedClausePool(

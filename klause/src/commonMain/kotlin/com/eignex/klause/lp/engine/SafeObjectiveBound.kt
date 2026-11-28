@@ -5,13 +5,10 @@ import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.nextDown
 
-/**
- * An exact Lagrangian bound from candidate duals, projected downward to a finite Double. Every input
- * coefficient, bound and objective constant is read from the authoritative Long or binary view;
- * Long models use bounded integer multipliers; Double models use binary duals in the rational reader.
- * Reconstruction and floating summation cannot authorize this bound. Negative reduced costs require
- * an actual finite upper side, and a missing lower side requires a nonpositive reduced cost.
- */
+// Exact Lagrangian bound from candidate duals, projected down to a finite Double. Inputs are read from the
+// authoritative Long or binary view: Long models use bounded integer multipliers, Double models binary duals in the
+// rational reader. Reconstruction and floating summation cannot authorize it. A negative reduced cost needs a finite
+// upper side, and a missing lower side needs a nonpositive reduced cost.
 internal fun safeObjectiveLowerBound(
     model: LpModel,
     y: DoubleArray,
@@ -60,18 +57,11 @@ internal fun BigFraction.lowerBoundDouble(): Double? {
     return null
 }
 
-/**
- * A sound finite bound on structural column [objectiveCol]'s optimum — its **max** when [maximize],
- * else its **min** — from an already-solved primal [result], or null when the variable is genuinely
- * unbounded in that direction. The model's objective must be that single column with cost `±1` and no
- * constant (max is set up as minimizing `−x`). Rigorous under float error via [safeObjectiveLowerBound],
- * then floored (max) / ceiled (min) to an integer. Retained models read live endpoints in their exact
- * source coordinates. **Reject-at-cap:** an optimum that only rode the column to its
- * [LP_UNBOUNDED_PROBE] frontier — the private stand-in for `±∞` on a [LpBuilder.addFreeVar] side — is
- * reported unbounded (null), never as a spurious bound at the probe magnitude. [clamped]
- * overrides which probe flag guards that rejection — a variable represented split (`x = x⁺ − x⁻`)
- * descends by `x⁻` riding *its* upper probe, which [objectiveCol]'s own flags cannot see.
- */
+// Integer bound on [objectiveCol]'s max (when [maximize]) or min from a solved [result]; null when unbounded in that
+// direction. The objective must be that single column with cost ±1 and no constant. An optimum that only rode to
+// the [LP_UNBOUNDED_PROBE] frontier, the stand-in for ±∞ on a [LpBuilder.addFreeVar] side, is reported unbounded,
+// never as a bound at the probe magnitude. [clamped] overrides which probe flag guards that rejection: a split
+// variable x = x⁺ − x⁻ descends by x⁻ riding its own upper probe, which [objectiveCol]'s flags cannot see.
 internal fun LpModel.safeVariableBound(
     result: FloatLpResult,
     objectiveCol: Int,
@@ -88,11 +78,8 @@ internal fun LpModel.safeVariableBound(
     return orientedVariableBound(ceilMin.toLong(), objectiveCol, maximize, clamped)
 }
 
-/**
- * An integer variable bound from the bounded integer-multiplier certificate. The source objective
- * must have an integer lattice. Null on unsupported scaling, overflow or missing finite support.
- * Shares the probe-frontier rejection of [safeVariableBound].
- */
+// The source objective must have an integer lattice. Null on unsupported scaling, overflow or missing finite
+// support. Shares the probe-frontier rejection of [safeVariableBound].
 internal fun LpModel.exactVariableBound(
     result: FloatLpResult,
     objectiveCol: Int,
@@ -104,9 +91,8 @@ internal fun LpModel.exactVariableBound(
     return orientedVariableBound(ceilMin, objectiveCol, maximize, clamped)
 }
 
-/** The shared tail of [safeVariableBound] and [exactVariableBound]: orient `⌈L⌉` on the minimized
- *  objective ([ceilMin]) to the requested sense, then reject a bound that only rode the probe frontier.
- *  The bound source is the only thing the two entry points differ in. */
+// Orients ⌈L⌉ on the minimized objective ([ceilMin]) to the requested sense, then rejects a bound that only rode the
+// probe frontier.
 private fun LpModel.orientedVariableBound(
     ceilMin: Long,
     objectiveCol: Int,
@@ -129,14 +115,8 @@ private fun LpModel.orientedVariableBound(
     return bound
 }
 
-/**
- * The tightest sound bound on [objectiveCol] from an already-solved [result]: the tighter of the exact
- * [exactVariableBound] and the float [safeVariableBound]. Both are valid, so the tighter always wins —
- * the smaller upper bound when [maximize], the larger lower bound otherwise — which never regresses below
- * the float bound yet captures the exact bound's sharpness on free columns. Null only when neither is
- * available (both unbounded / overflow). [clamped] is the split-representation probe override of
- * [safeVariableBound].
- */
+// Both sides are valid, so the tighter wins; the exact side is sharper on free columns. Null only when neither is
+// available. [clamped] is the split-representation probe override of [safeVariableBound].
 internal fun LpModel.tightVariableBound(
     result: FloatLpResult,
     objectiveCol: Int,
@@ -154,15 +134,9 @@ internal fun LpModel.tightVariableBound(
     }
 }
 
-/**
- * `⌈L⌉` on the minimized objective from the *approximate* duals [y], evaluated exactly: the
- * integer-multiplier [integerDualLowerBoundCeil], or — on a model with continuous columns — the same
- * bound over its scaled-integer rationalization ([rationalizedDualLowerBoundCeil]), so mixed real models
- * retain supported scaling. The ceiling requires a verified integer source objective lattice;
- * otherwise this helper declines, since a ceiling may exceed a continuous objective's optimum. Null on a
- * 128-bit certification overflow or a model that does not rationalize. Retained models evaluate their
- * exact authority directly, including objective scaling and external constants.
- */
+// ⌈L⌉ from approximate duals [y], evaluated exactly by [integerDualLowerBoundCeil], or with continuous columns by
+// [rationalizedDualLowerBoundCeil]. Declines without a verified integer source objective lattice, since a ceiling
+// may exceed a continuous optimum. Null on 128-bit overflow or a model that does not rationalize.
 internal fun LpModel.exactObjectiveLowerBoundCeil(y: DoubleArray, observer: LpCertificationObserver? = null): Long? =
     if (!hasIntegralObjective()) {
         null
@@ -175,13 +149,8 @@ internal fun LpModel.exactObjectiveLowerBoundCeil(y: DoubleArray, observer: LpCe
         integerDualLowerBoundCeil(this, y, observer = observer)
     }
 
-/**
- * The tightest sound lower bound on [model]'s minimized objective from the approximate duals [y]: the
- * larger of the projected [safeObjectiveLowerBound] and the exact [exactObjectiveLowerBoundCeil] — the
- * objective-level twin of [tightVariableBound]. The projection and integer ceiling may lose different
- * information. The ceiling is used only for a verified integer source objective. Null only when neither
- * side is available.
- */
+// The larger of [safeObjectiveLowerBound] and [exactObjectiveLowerBoundCeil], which may lose different information.
+// Null only when neither side is available.
 internal fun tightObjectiveLowerBound(
     model: LpModel,
     y: DoubleArray,
@@ -191,11 +160,8 @@ internal fun tightObjectiveLowerBound(
     model.exactObjectiveLowerBoundCeil(y, observer),
 )
 
-/**
- * [tightObjectiveLowerBound] with the exact side taken from [certificate] — the certificate the caller
- * already computed over the same [model] and [y], or null when that certification declined. The
- * supplied certificate may contribute an integer ceiling only when the source objective has that lattice.
- */
+// [certificate] was computed over the same [model] and [y], or is null when it declined. It contributes a ceiling
+// only when the source objective has an integer lattice.
 internal fun tightObjectiveLowerBound(
     model: LpModel,
     y: DoubleArray,
@@ -206,7 +172,6 @@ internal fun tightObjectiveLowerBound(
     certificate?.takeIf { it.belongsTo(model, observer) && model.hasIntegralObjective() }?.objectiveBoundCeil(0L),
 )
 
-/** The larger of two sound lower bounds on the same objective, either of which may be unavailable. */
 private fun tighterLowerBound(safe: Double?, exactCeil: Long?): Double? {
     val exact = exactCeil?.let(::lowerBoundAsDouble)
     return when {
@@ -216,8 +181,7 @@ private fun tighterLowerBound(safe: Double?, exactCeil: Long?): Double? {
     }
 }
 
-/** [v] widened to `Double` without ever rounding **up**: past 2⁵³ the widening rounds to nearest, and a
- *  lower bound that grew in the conversion would no longer be sound. */
+// Past 2⁵³ widening rounds to nearest; a lower bound that grew in the conversion would be unsound.
 private fun lowerBoundAsDouble(v: Long): Double {
     val d = v.toDouble()
     return if (d == Long.MAX_VALUE.toDouble() || d.toLong() > v) d.nextDown() else d

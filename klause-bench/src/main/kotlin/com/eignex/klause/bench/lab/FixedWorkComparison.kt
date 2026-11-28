@@ -14,10 +14,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlin.system.exitProcess
 
-/**
- * Pairs fixed-work SAT rows from `lab cases --json` on stdin; see `klause-bench/scripts/compare-fixed-work.sh`.
- * Prints one JSON line per row, then a summary line.
- */
+/** Pairs fixed-work SAT rows from `lab cases --json` on stdin; see `klause-bench/scripts/compare-fixed-work.sh`. */
 @OptIn(ExperimentalSerializationApi::class)
 fun main(args: Array<String>) {
     val declaration = runCatching { FixedWorkComparison.Declaration.parse(args.toList()) }.getOrElse { failure ->
@@ -29,16 +26,11 @@ fun main(args: Array<String>) {
     FixedWorkComparison.compare(cases, declaration).forEach { println(it) }
 }
 
-/**
- * Classifies each fixed-work row by validity first and trajectory second. A row is valid only when each arm has
- * exactly one retained, completed and comparable measurement, both arms carry the same accepted worker receipt and
- * execution frame, and source, seed, work, measurement and runtime identities agree except where [Declaration.allowed]
- * permits a difference. Contradicting evidence makes a row `invalid`, an arm that did not complete comparable work
- * makes it `incomparable`, and absent evidence makes it `unverifiable`; such rows keep their trajectory diagnostics
- * but never contribute a ratio.
- */
+// A row is valid only when each arm has exactly one retained, completed and comparable measurement, both arms carry
+// the same accepted worker receipt and execution frame, and every identity agrees except where allowed. Contradicting
+// evidence makes a row `invalid`, incomparable work `incomparable`, and absent evidence `unverifiable`; such rows keep
+// their trajectory diagnostics but never contribute a ratio.
 internal object FixedWorkComparison {
-    /** The two compared arms and the identity facets allowed to differ between them. */
     internal data class Declaration(val control: String, val candidate: String, val allowed: Set<String> = emptySet()) {
         init {
             require(control != candidate) { "control and candidate must be different arms" }
@@ -88,7 +80,7 @@ internal object FixedWorkComparison {
         }
     }
 
-    /** Drops warmup records, metrics, artifacts and output; keeps the warmup count the identity check reads. */
+    // Keeps the warmup count the identity check reads.
     private fun retain(line: JsonObject): RetainedCase {
         val record = line["record"] as? JsonObject
         val details = record?.get("details") as? JsonObject
@@ -116,7 +108,6 @@ internal object FixedWorkComparison {
         }
     }
 
-    /** The primitive at [path] as text, or null when any step is absent or JSON null. */
     fun text(value: JsonElement?, vararg path: String): String? =
         (element(value, *path) as? JsonPrimitive)?.takeUnless { it is JsonNull }?.content
 
@@ -133,11 +124,9 @@ internal object FixedWorkComparison {
     const val UNVERIFIABLE = "unverifiable"
     const val INCOMPLETE = "incomplete"
 
-    /** Facets a declaration may allow to differ: the build identity and the treatment parameters. */
     val ALLOWABLE = setOf("revision", "harness", "library", "recipe", "deadline-seconds", "trace-rows", "heap-mib")
 }
 
-/** One retained case, keyed by its lab case index, arm, comparison key and repeat. */
 internal data class RetainedCase(
     val index: Int?,
     val arm: String?,

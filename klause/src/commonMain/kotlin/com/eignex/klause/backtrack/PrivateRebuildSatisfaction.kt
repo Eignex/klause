@@ -375,7 +375,7 @@ internal class PrivateRebuildSatisfaction(
             note("OpeningStopped")
             return
         }
-        // The new model identity owns all imports and propagation indexes. A canonical exchange
+        // The private model identity owns all imports and propagation indexes. A canonical exchange
         // cannot attach to it without a supported translation, so its cursor stays with canonical.
         val privateParams = sharedParams.copy(
             privateRebuildWork = 0L, clauseExchange = null, cutExchange = null, pooledIncumbents = null,

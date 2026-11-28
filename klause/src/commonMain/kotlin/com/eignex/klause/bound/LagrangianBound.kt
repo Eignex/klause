@@ -23,46 +23,20 @@ import com.eignex.util.numbers.mulExact
 import com.eignex.util.numbers.subExact
 import kotlin.math.ceil
 
-/**
- * Subgradient Lagrangian bound for a constraint-coupling decomposition over one or more
- * AllDifferent globals. For
- * `minimize Σ cᵢ·xᵢ s.t. AllDifferent(V₁) ∧ … ∧ AllDifferent(V_k) ∧ (linear linking constraints)`,
- * dualize the linking constraints with multipliers λ and keep the AllDifferents as **independent
- * subproblems** — each an exact min-cost assignment ([MinCostAssignment]). For any valid-sign λ,
- * `L(λ) = min_x [obj + Σ_r λ_r(a_r·x − b_r)]` over the decoupled `AllDifferent(V_j)` is a lower bound
- * on the optimum (every original-feasible point makes the dualized terms ≤ 0), so maximizing it over
- * λ tightens the bound. The decomposition is what makes this stronger than the monolithic LP: each
- * block is solved as an exact combinatorial assignment, capturing the all-different structure the LP
- * relaxes loosely, while a linking constraint that *couples* two blocks is priced into both blocks'
- * costs through λ rather than dropped. Constraints not over the chosen blocks, and all other factors,
- * are dropped — a relaxation only loosens the bound, never makes it unsound.
- *
- * ## Blocks
- * The chosen blocks are pairwise variable-disjoint AllDifferents (each of size `2..`[MAX_VARS], up to
- * [MAX_TOTAL_VARS] variables total), so the residual problem after dualizing the linking constraints
- * separates exactly into one assignment per block. The single-block case is just `k = 1`.
- *
- * ## Exactness
- * Multipliers are kept as integers `p_r` over a fixed denominator [Q] (`λ_r = p_r / Q`). The adjusted
- * objective coefficient of variable `i` is then the integer `Wᵢ = Q·cᵢ + Σ_r p_r·a_ri`, so each block
- * is solved in exact [Long] arithmetic and `L(λ) = (Σ_blocks M_block − Σ_r p_r·b_r + Q·rest) / Q` is an
- * exact rational. The subgradient *step* uses floating math to pick the next λ, but that only chooses
- * which λ to try — every evaluated `L(λ)` is exact, so the reported bound is always valid. Overflow
- * (large coefficients) makes the node's bound unavailable, never wrong.
- */
+// Dualizes the linear rows linking pairwise variable-disjoint all-different blocks and solves each block as an
+// exact min-cost assignment, capturing the all-different structure the LP relaxes loosely. Other factors are
+// dropped, which only loosens the bound. Multipliers are integers over the denominator Q, so every evaluated
+// `L(λ)` is exact Long arithmetic and only the step uses floating point; overflow makes the bound unavailable.
 internal class LagrangianBound(
     private val problem: Problem,
     private val objective: LinearObjective?,
     deferred: Boolean = false,
 ) : LagrangianDualBound {
-    /** Variables of all chosen AllDifferent blocks, concatenated; empty when none is eligible. */
     private lateinit var vars: IntArray
     private lateinit var inV: BooleanArray
 
-    /** Block boundaries: block `j` spans `vars[blockStart[j] until blockStart[j + 1]]`. */
     private lateinit var blockStart: IntArray
 
-    /** Linking constraints (Linear factors entirely over [vars]); dualized with one multiplier each. */
     private lateinit var linkVars: Array<IntArray>
     private lateinit var linkCoeffs: Array<LongArray>
     private lateinit var linkRhs: LongArray
@@ -124,7 +98,7 @@ internal class LagrangianBound(
                     LinearOp.LE -> 1
                     LinearOp.GE -> -1
                     LinearOp.EQ -> 0
-                    LinearOp.NE -> continue // not a linear relaxation
+                    LinearOp.NE -> continue
                 }
                 var contained = true
                 for (v in f.vars) {
@@ -152,7 +126,6 @@ internal class LagrangianBound(
         }
     }.iterator()
 
-    /** Greedily pick pairwise variable-disjoint eligible AllDifferents under the total-variable cap. */
     private fun chooseBlocks(problem: Problem): Sequence<List<IntArray>?> = sequence {
         var visits = 0
         val chosen = ArrayList<IntArray>()
@@ -161,13 +134,10 @@ internal class LagrangianBound(
         for (f in problem.factors) {
             if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(null)
             if (f !is AllDifferent || f.vars.size !in 2..MAX_VARS) continue
-            // Only a *true* all-distinct admits the weighted-assignment bound: the excepted values of an
-            // `alldifferent_except` may repeat (so "fewer distinct values than variables" is not
-            // infeasible, and the assignment lower bound over-counts), and a conditional/optional
-            // AllDifferent (`presents`) need not hold at all. Treating either as hard is unsound.
+            // Excepted values may repeat and optional positions need not hold, so treating either as hard is unsound.
             if (f.exceptSet.isNotEmpty() || f.presents.isNotEmpty()) continue
             if (total + f.vars.size > MAX_TOTAL_VARS) continue
-            if (f.vars.any { it in used }) continue // keep blocks disjoint so the subproblems decouple
+            if (f.vars.any { it in used }) continue
             chosen.add(f.vars.copyOf())
             for (v in f.vars) used.add(v)
             total += f.vars.size
@@ -175,13 +145,10 @@ internal class LagrangianBound(
         yield(chosen)
     }
 
-    /** Number of dualized linking constraints; the multiplier vector has this length. */
     override val multiplierCount: Int get() = linkVars.size
 
     private val numBlocks: Int get() = blockStart.size - 1
 
-    /** A subproblem evaluation at fixed multipliers: combined assignment cost and the value each
-     *  block variable took (indexed over [vars]); [feasible] is false when any block has no assignment. */
     private class Eval(val feasible: Boolean, val cost: Long, val values: LongArray)
 
     override fun computeBound(
@@ -192,16 +159,12 @@ internal class LagrangianBound(
     ): LagrangianResult? {
         if (!applicable) return null
 
-        // Per-block value set = union of the live domains of the block's variables; bail if any block
-        // is too large to assign over, prune if any has fewer distinct values than variables.
         val blockValueIndex = Array(numBlocks) { MutableLongIntMap() }
         val blockValueList = Array(numBlocks) { LongArrayList() }
         for (j in 0 until numBlocks) {
             val index = blockValueIndex[j]
             val list = blockValueList[j]
             for (pos in blockStart[j] until blockStart[j + 1]) {
-                // A domain too large to assign over, wide ones included, is never enumerated; skipping
-                // the bound (null) is sound.
                 if (session.intDomain(vars[pos]).spanOrNull(MAX_VALUES.toLong()) == null) return null
                 session.intDomain(vars[pos]).values.forEach { value ->
                     if (!index.containsKey(value)) {
@@ -212,7 +175,6 @@ internal class LagrangianBound(
             }
             val size = blockStart[j + 1] - blockStart[j]
             if (list.size < size) {
-                // Fewer distinct values than variables ⇒ this AllDifferent is infeasible ⇒ node infeasible.
                 return LagrangianResult(
                     prune = true,
                     boundNumerator = 0L,
@@ -220,23 +182,20 @@ internal class LagrangianBound(
                     multipliers = startMultipliers,
                 )
             }
-            if (list.size > MAX_VALUES) return null // too large to assign over here
+            if (list.size > MAX_VALUES) return null
         }
 
         val p = LongArray(multiplierCount) { startMultipliers.getOrElse(it) { 0L } }
         var bestNum = Long.MIN_VALUE
-        // Previous ascent direction, for deflected subgradient stabilization.
         val prevDir = DoubleArray(multiplierCount)
 
         try {
-            // Inside the try: a checked-arithmetic overflow here means "bound unavailable", the
-            // same sound skip as everywhere else — never a silently wrapped (wrong) bound.
             val rest = trivialRest(session)
             val steps = if (incumbent.isFinite()) iterations else 1
             repeat(steps) {
                 val eval = evaluate(session, blockValueIndex, blockValueList, p)
-                if (!eval.feasible) return LagrangianResult(true, 0L, Q, p) // infeasible ⇒ node infeasible
-                // numerator = Σ_blocks M_block − Σ_r p_r·b_r + Q·rest, with L = numerator / Q.
+                if (!eval.feasible) return LagrangianResult(true, 0L, Q, p)
+                // L = (Σ_blocks M_block − Σ_r p_r·b_r + Q·rest) / Q.
                 var num = eval.cost
                 for (r in 0 until multiplierCount) num = subExact(num, mulExact(p[r], linkRhs[r]))
                 num = addExact(num, mulExact(Q, rest))
@@ -251,11 +210,7 @@ internal class LagrangianBound(
         return if (bestNum == Long.MIN_VALUE) null else LagrangianResult(false, bestNum, Q, p)
     }
 
-    /**
-     * Solve every block's assignment for adjusted coefficients `Wᵢ = Q·cᵢ + Σ_r p_r·a_ri` and combine
-     * them: the total cost is the sum over blocks, the assigned value of each block variable is read
-     * back (as an actual value) for the subgradient. Infeasible as soon as any one block is.
-     */
+    // Adjusted coefficients `Wᵢ = Q·cᵢ + Σ_r p_r·a_ri`; infeasible as soon as any block is.
     private fun evaluate(
         session: PropagationSession,
         blockValueIndex: Array<MutableLongIntMap>,
@@ -306,15 +261,12 @@ internal class LagrangianBound(
         return p.deflectedSubgradientStep(g, num, incumbent, prevDir, Q, linkSign)
     }
 
-    /** Coefficient of [varId] in linking constraint [r], or 0. */
     private fun coeffOf(r: Int, varId: Int): Long {
         val vs = linkVars[r]
         for (k in vs.indices) if (vs[k] == varId) return linkCoeffs[r][k]
         return 0L
     }
 
-    /** Objective contribution of everything outside the assignment: non-V ints, bools, constant.
-     *  Checked arithmetic throughout — called inside [computeBound]'s overflow guard. */
     private fun trivialRest(session: PropagationSession): Long {
         var total = objConstant
         for (b in boolWeight.indices) {
@@ -328,7 +280,6 @@ internal class LagrangianBound(
 
                     pinned == false -> 0L
 
-                    // free: cheapest is true when the weight is negative
                     w < 0L -> w
 
                     else -> 0L
@@ -336,7 +287,7 @@ internal class LagrangianBound(
             )
         }
         for (i in intCoef.indices) {
-            if (inV[i]) continue // handled exactly by the assignment
+            if (inV[i]) continue
             val c = intCoef[i]
             if (c == 0L) continue
             val dom = session.intDomain(i)
@@ -345,22 +296,19 @@ internal class LagrangianBound(
         return total
     }
 
-    /** `ceil(incumbent)`, or `Long.MAX_VALUE` when there is no finite incumbent. */
     private fun incumbentCeil(incumbent: Double): Long =
         if (incumbent.isFinite()) ceil(incumbent).toLong() else Long.MAX_VALUE
 
     private companion object {
-        /** Fixed multiplier denominator: λ = p / Q. A power of two keeps the scaling exact and small. */
+        // A power of two keeps the scaling exact and small.
         const val Q: Long = 128L
         const val MAX_VARS: Int = 64
         const val MAX_VALUES: Int = 512
 
-        /** Cap on the total variables across all chosen blocks, bounding the per-node assignment work. */
         const val MAX_TOTAL_VARS: Int = 256
     }
 }
 
-/** Ceiling of `a / b` for `b > 0`. */
 private fun ceilDivLocal(a: Long, b: Long): Long {
     val q = a / b
     val r = a % b

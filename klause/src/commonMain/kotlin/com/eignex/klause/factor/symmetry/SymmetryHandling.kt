@@ -12,16 +12,13 @@ import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.toSortedIntArray
 
 /**
- * Whole-group symmetry handling as a single propagator-only factor: it carries the verified
- * automorphism [generators] and defers all filtering to [SymmetryPropagator], which enforces every
- * generator's lex-leader at each search node. Consulting the generators dynamically gives full-group
- * coverage without materialising one lex `Factor` per group element.
+ * Whole-group symmetry handling as one propagator-only factor: it carries the verified automorphism [generators],
+ * and [SymmetryPropagator] enforces every generator's lex-leader at each search node, covering the full group
+ * without one lex factor per element.
  *
- * Each generator is a kind-preserving permutation given as `(intImage, boolImage)` over the current
- * variable ids (`intImage[i]` / `boolImage[b]` is the image of integer / Boolean variable `i` / `b`;
- * an identity entry means the variable is fixed). The factor watches only the moved variables (the
- * group's support). Its local-search projection is [NoInvariant]: symmetry breaking is a backtrack-only
- * device, so local search skips it.
+ * Each generator is a kind-preserving permutation `(intImage, boolImage)` over the current variable ids; an
+ * identity entry fixes the variable. The factor watches only the group's support. Its local-search projection is
+ * [NoInvariant]: symmetry breaking is backtrack-only.
  */
 class SymmetryHandling internal constructor(
     /** The generators, each `(intImage, boolImage)` over the current variable ids. */
@@ -86,9 +83,6 @@ class SymmetryHandling internal constructor(
         return newInt to newBool
     }
 
-    /** Conjugate one permutation [perm] by [imageOf] (`out[imageOf(v)] = imageOf(perm[v])`); `null` if the
-     *  result is not a permutation — a remap that merges or sends a moved variable out of range (variable
-     *  elimination / column merge) cannot carry the symmetry. [identity] is the new identity array. */
     private fun conjugateOne(perm: IntArray, imageOf: (Int) -> Int, identity: IntArray): IntArray? {
         val out = identity
         for (v in perm.indices) {

@@ -11,12 +11,7 @@ import com.eignex.util.collections.IntHashSet
 import com.eignex.util.numbers.saturatedDistance
 import com.eignex.util.numbers.saturatedSub
 
-/**
- * Local-search invariant for [ComparisonClause]: violated iff no literal holds under the current
- * assignment. The graded degree is the smallest single-literal shortfall — the fewest units any one
- * variable would have to move for its literal to hold — so descent sees a gradient toward repairing
- * the clause through its cheapest literal.
- */
+// The degree is the smallest single-literal shortfall, so descent repairs through the cheapest literal.
 internal class ComparisonClauseInvariant(
     private val vars: IntArray,
     private val ops: Array<LinearOp>,
@@ -80,7 +75,6 @@ internal class ComparisonClauseInvariant(
         return best.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     }
 
-    /** Units the variable of literal [i] must move for that literal to hold; `0` when it already does. */
     private fun literalShortfall(i: Int, x: Long): Long {
         val c = consts[i]
         return when (ops[i]) {

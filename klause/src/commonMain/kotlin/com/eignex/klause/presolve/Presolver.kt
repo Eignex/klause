@@ -36,32 +36,25 @@ enum class PresolveTiming {
     /** Moderate cost (symmetry detection); run from the default level up. */
     MEDIUM,
 
-    /** Expensive (SAC probing); run only at the aggressive level. */
+    /** Expensive; run only at the aggressive level. */
     EXHAUSTIVE,
 }
 
-/** Round cap for the iterating emphasis levels; the fixpoint is almost always reached well before. */
+// The fixpoint is almost always reached well before.
 internal const val MAX_PRESOLVE_ROUNDS = 16
 
-/** Integer-variables-to-factors ratio above which a model is treated as *underdetermined*, so affine
- *  elimination caps its wide folds. Well below every model where affine folds
- *  productively (all observed ≤ ~2.4) and well below the pathological dense case (~23). */
+// Integer-variable-to-factor ratio above which affine elimination caps its wide folds.
 private const val UNDERDETERMINED_RATIO = 8
 
-/** Bake-time SAC probe budgets (the only EXHAUSTIVE-tier work). The unit is a `propagate` call.
- *  The capped tier bounds an EXHAUSTIVE pass turned on by an explicit override under a non-aggressive
- *  level so it can't dominate presolve time; the aggressive tier is larger but still bounded so a big
- *  instance with wide domains terminates. */
+// Bake-time SAC probe budgets, in `propagate` calls. The capped tier bounds an EXHAUSTIVE pass enabled by
+// override under a non-aggressive level; the aggressive tier is larger but still bounded.
 internal const val CAPPED_PROBE_BUDGET_PER_VAR = 256
 internal const val CAPPED_PROBE_TOTAL_BUDGET = 20_000
 internal const val AGGRESSIVE_PROBE_BUDGET_PER_VAR = 4_096
 internal const val AGGRESSIVE_PROBE_TOTAL_BUDGET = 250_000
 
-/**
- * Entry analysis beyond a pass's explicit charges, including fruitless full-model analysis and delta
- * construction. One unit per factor and variable occurrence, weighted by [baseWorkWeight]. Hosts cache
- * this aggregate per factor revision and apply sound eligibility checks before charging analysis.
- */
+// Entry analysis beyond a pass's explicit charges: one unit per factor and variable occurrence. Hosts cache
+// it per factor revision and apply sound eligibility checks before charging.
 internal fun passBaseUnits(factors: Array<Factor>, booleanPins: IntHashSet? = null): Long {
     var units = factors.size.toLong()
     for (f in factors) {
@@ -73,10 +66,7 @@ internal fun passBaseUnits(factors: Array<Factor>, booleanPins: IntHashSet? = nu
     return units
 }
 
-/**
- * Base work charge per [passBaseUnits] unit, relative to one simplex operation.
- * Added to the pass's own charges; unlisted passes use [DEFAULT_PASS_BASE_WORK_WEIGHT].
- */
+// Per [passBaseUnits] unit, relative to one simplex operation, on top of the pass's own charges.
 internal val PresolvePass.baseWorkWeight: Long
     get() = when (this) {
         // Relation admission and scans are metered before reading payloads, including declined diagrams.
@@ -95,14 +85,11 @@ internal val PresolvePass.baseWorkWeight: Long
         else -> DEFAULT_PASS_BASE_WORK_WEIGHT
     }
 
-/** Default base work weight for passes without a specific weight. */
 private const val DEFAULT_PASS_BASE_WORK_WEIGHT = 10L
 
-/** [liveFactors] plus every column of [problem], the scale a pass's change is weighed against. */
 private fun modelSizeOf(liveFactors: Int, problem: Problem): Long =
     liveFactors.toLong() + problem.numIntVars + problem.numBoolVars
 
-/** Factors [delta] drops or adds plus the columns it narrows from [domains]. */
 private fun changedUnitsOf(delta: PassDelta, domains: Array<IntDomain>, invocation: PresolveInvocation?): Long {
     var units = (delta.droppedIndices.size + delta.addedFactors.size).toLong()
     delta.domains?.let { next ->
@@ -119,7 +106,6 @@ private fun changedUnitsOf(delta: PassDelta, domains: Array<IntDomain>, invocati
     return units
 }
 
-/** Columns [proved] bounds more tightly than [current] does. */
 private fun narrowedColumns(current: IntBounds, proved: IntBounds, invocation: PresolveInvocation?): Int {
     var n = 0
     for (v in 0 until proved.size) {
@@ -138,13 +124,8 @@ private fun narrowedColumns(current: IntBounds, proved: IntBounds, invocation: P
 /** Runs enabled problem-transform passes to a bounded fixpoint. */
 object Presolver {
 
-    /**
-     * Run the factor-only part of presolve over a canonical source model.
-     *
-     * Source passes read declared bounds and factors; the [SourceDelta] they return cannot name a finite
-     * domain or lift a sample, so nothing here can cross the deferred baking boundary. The shared round
-     * engine keeps their scheduling and cancellation semantics aligned with the finite lane.
-     */
+    // Source passes return a [SourceDelta], which cannot name a finite domain or lift a sample, so nothing
+    // here crosses the deferred bake boundary.
     internal fun runSource(
         problem: Problem,
         config: PresolveConfig,
@@ -280,10 +261,10 @@ object Presolver {
         return if (preserveClauses) passes - PresolvePass.MERGE_AMO_CLIQUES else passes
     }
 
-    /** Apply [config]'s passes to [problem] under [context], returning the transformed problem and a
-     *  reconstruct mapping its solutions back to the original. [cancellation] is polled between passes
-     *  and rounds: a fired deadline returns the partial result so far — every pass is individually
-     *  sound, so stopping early only forgoes further reduction, never correctness. */
+    /**
+     * Apply [config]'s passes to [problem] under [context]. A fired [cancellation] returns the partial
+     * result, which stays sound because every pass is.
+     */
     fun run(
         problem: BakedProblem,
         config: PresolveConfig,
@@ -429,14 +410,8 @@ object Presolver {
         }
     }
 
-    /**
-     * Incremental variant of [run]'s round engine (default FAST+MEDIUM emphasis): identical
-     * scheduling — priority order, version-stamp fixpoint skip, [PresolvePass.skipAfterEmpty] parking,
-     * and the diminishing-returns abort — but a persistent [PresolveSession] absorbs each firing pass's
-     * delta instead of rebuilding a `Problem`. Each pass reads a cheap [PresolveSession.passInput] view
-     * and its delta is folded back via [PresolveSession.applyDelta]; the heavyweight solver `Problem`
-     * is materialized once at the end.
-     */
+    // [run]'s scheduling, but a persistent [PresolveSession] absorbs each firing pass's delta and the solver
+    // `Problem` is materialized once at the end.
     private fun runIncremental(
         problem: BakedProblem,
         passes: List<PresolvePass>,
@@ -627,15 +602,11 @@ object Presolver {
         }
     }
 
-    /** Compose per-pass reconstructs (application order) into the single solution-mapping function,
-     *  applied in reverse so a final-problem solution maps all the way back to the original. */
     private fun composeReconstructs(reconstructs: List<(Sample) -> Sample>): (Sample) -> Sample =
         PresolveRoundEngine.compose(reconstructs)
 
-    /** Build subsume's incremental input from the session: a full rebuild when it has no prior mark or the
-     *  mark predates a reseed, else the factors added / dropped since. A factor added then dropped between
-     *  firings has a null slot now, so `mapNotNull` omits it — it never entered the memo and needs no
-     *  retraction. */
+    // A factor added then dropped between firings has a null slot, so it never entered the memo and needs
+    // no retraction.
     private fun subsumeIncremental(
         session: PresolveSession,
         mark: PresolveSession.ChangeMark?,

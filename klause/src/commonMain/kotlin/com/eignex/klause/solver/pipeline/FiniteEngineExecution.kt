@@ -50,56 +50,35 @@ import com.eignex.util.numbers.BigFraction
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
-/** One finite solve request after a frontend has translated its flags and source-model annotations. */
 internal class FiniteExecutionRequest(
-    /** Prepared finite model to solve. */
     val problem: BakedProblem,
     val preparedPlan: PreparedSourcePlan,
-    /** Finite engine route selected by the frontend. */
     val engine: FiniteEngine,
-    /** Whether to minimize [objective]. */
     val optimize: Boolean,
-    /** Canonical objective minimized by complete engines, or null for satisfaction. */
     val objective: LinearObjective?,
-    /** Per-move objective view for local-search workers. */
     val localSearchObjective: IncrementalObjective?,
-    /** Optional source-level definitional sweep for local-search workers. */
     val definitionalSweep: DefinitionalSweep?,
-    /** Optional decoded source search hints. */
     val searchHints: SearchHints?,
-    /** Portfolio worker count. Ignored by the fixed route. */
+    // Ignored by the fixed route.
     val cores: Int,
-    /** Repeatable engine tuning parameters. */
     val executionOptions: ExecutionOptions,
-    /** Optional random seed. */
     val randomSeed: Long?,
-    /** Default portfolio arm count. */
     val defaultArms: Int,
-    /** Maximum LP emphasis for the selected route. */
     val lpConfig: LpConfig,
-    /** Entering-column policy for exactly zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing,
-    /** ExecutionControl shared by every engine worker. */
     val cancellation: ExecutionControl,
-    /** Invocation-wide node allowance. */
     val nodeBudget: NodeBudget?,
-    /** Advisory wall-clock allowance supplied to fixed-backtrack LP components. */
+    // Advisory, supplied to fixed-backtrack LP components.
     val solveBudgetMillis: Long?,
-    /** Whether satisfaction should enumerate models. */
     val allSolutions: Boolean,
-    /** Optional cap applied to satisfaction enumeration. */
     val solutionCap: Long?,
-    /** True after the frontend's shared wall-clock deadline has elapsed. */
+    // True after the frontend's shared wall-clock deadline has elapsed.
     val deadlineExceeded: () -> Boolean,
-    /** Optional fixed-backtrack engine event sink. */
     val onEvent: ((SearchEvent) -> Unit)?,
-    /** Optional per-worker portfolio engine event sink. */
     val onPortfolioEvent: ((worker: String, event: SearchEvent) -> Unit)?,
-    /** Told about each portfolio arm quarantined for a result the model refutes. */
+    // Told about each portfolio arm quarantined for a result the model refutes.
     val onPortfolioFault: ((ArmFault) -> Unit)? = null,
-    /** LP dependencies for the fixed complete route. */
     val lpSolveContext: LpSolveContext,
-    /** Tolerance semantics for continuous leaves; see [BacktrackParams.toleranceCheck]. */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
     val sourceInvocation: PreparedSourceInvocation? = null,
     val sourceMapping: SourceMapping? = null,
@@ -111,87 +90,63 @@ internal class FiniteExecutionRequest(
     val onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
     val onPortfolioSession: ((String, PropagationSession) -> Unit)? = null,
     val onPortfolioRootPoint: ((String, LpRootPointObservation) -> Unit)? = null,
-    /** Source optimality gap over [objective]; see [BacktrackParams.optimalityGap]. */
     val optimalityGap: OptimalityGap? = null,
 )
 
-/** Streaming hooks owned by a rendering frontend. */
 internal class FiniteExecutionCallbacks(
-    /** A satisfaction model or a fixed-backtrack improving incumbent. */
     val onSample: (Sample) -> Unit,
-    /** A portfolio improving incumbent, with its worker attribution. */
     val onImprovement: (FiniteImprovement) -> Unit,
 )
 
-/** A strict portfolio incumbent emitted while [FiniteExecutionRequest.optimize] is true. */
 internal class FiniteImprovement(
-    /** Improving assignment. */
     val sample: Sample,
-    /** Label of the portfolio worker that produced the assignment. */
     val workerLabel: String,
-    /** Elapsed milliseconds since portfolio minimization began. */
+    // Since portfolio minimization began.
     val elapsedMs: Long,
-    /** Engine-normalized objective value at [sample]. */
+    // Engine-normalized.
     val objective: Double,
 )
 
-/** Terminal outcome of a finite execution. */
 internal sealed class FiniteExecutionResult {
-    /** Execution completed and the frontend should render [verdict] plus [stats]. */
     class Completed(
-        /** Final finite-search verdict. */
         val verdict: FiniteExecutionVerdict,
-        /** Engine statistics for the execution. */
         val stats: SolveStats,
-        /** Number of streamed models. */
         val solutions: Long,
-        /** Best assignment, when optimization found one. */
         val bestSample: Sample?,
-        /** Elapsed execution time, excluding route planning and worker construction. */
+        // Excludes route planning and worker construction.
         val elapsedMs: Long,
-        /** On [FiniteExecutionVerdict.UNBOUNDED], the recession ray of the reals through [bestSample]. */
+        // On [FiniteExecutionVerdict.UNBOUNDED], the recession ray of the reals through [bestSample].
         val unboundedDirection: List<BigFraction>? = null,
         val nativeSourceResult: SolveResult? = null,
         val nativeSourceMinimum: MinimizeResult? = null,
         val terminationReason: TerminationReason? = null,
-        /** On [FiniteExecutionVerdict.OPTIMAL] within the optimality gap, the proved working objective bound. */
+        // On [FiniteExecutionVerdict.OPTIMAL] within the optimality gap, the proved working objective bound.
         val gapBound: Double? = null,
     ) : FiniteExecutionResult() {
         var completeSearchAdmitted: Boolean? = null
         var nativeObjectiveBound: FiniteObjectiveBound? = null
     }
 
-    /** The route was inspected instead of executed. */
     class DryRun(
-        /** Heading printed before [lines]. */
         val heading: String,
-        /** Render-ready dry-run detail lines. */
         val lines: List<String>,
     ) : FiniteExecutionResult()
 }
 
-/** Verdict vocabulary shared by finite engines, independent of a frontend protocol. */
 internal enum class FiniteExecutionVerdict {
-    /** A satisfying assignment was found. */
     SAT,
 
-    /** The model was proven infeasible. */
     UNSAT,
 
-    /** No definitive result was produced. */
     UNKNOWN,
 
-    /** An optimum was proven. */
     OPTIMAL,
 
-    /** A feasible incumbent was found without an optimality proof. */
     BEST_FOUND,
 
-    /** A feasible assignment and a ray along which the objective descends without limit were proven. */
     UNBOUNDED,
 }
 
-/** Owns finite engine planning, construction, and execution. */
 internal fun FinitePipeline.execute(
     request: FiniteExecutionRequest,
     callbacks: FiniteExecutionCallbacks,

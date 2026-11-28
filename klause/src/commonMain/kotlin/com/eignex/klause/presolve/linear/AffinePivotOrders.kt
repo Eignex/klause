@@ -7,7 +7,6 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongArrayList
 
-/** Selects the next affine pivot under the run's consumer admission. */
 internal object AffinePivotOrders {
 
     fun new(
@@ -58,12 +57,10 @@ internal object AffinePivotOrders {
         }
     }
 
-    /**
-     * Cheapest fill-in first, by the Markowitz count `(degree(x) − 1)·partners` (H. M. Markowitz, "The
-     * Elimination Form of the Inverse and Its Application to Linear Programming", Management Science
-     * 1957, https://doi.org/10.1287/mnsc.3.3.255). Heap keys are estimates that go stale as folds change
-     * degrees, so a popped candidate whose current cost exceeds its key is re-queued instead of taken.
-     */
+    // Cheapest fill-in first, by the Markowitz count `(degree(x) − 1)·partners` (H. M. Markowitz, "The
+    // Elimination Form of the Inverse and Its Application to Linear Programming", Management Science
+    // 1957, https://doi.org/10.1287/mnsc.3.3.255). Heap keys go stale as folds change degrees, so a popped
+    // candidate whose current cost exceeds its key is re-queued.
     private class MarkowitzOrder(
         private val ws: AffineSingletons.FactorOcc,
         private val eliminated: BooleanArray,

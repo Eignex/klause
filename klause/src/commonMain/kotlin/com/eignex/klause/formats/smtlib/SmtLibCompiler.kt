@@ -15,20 +15,12 @@ import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 
-/** Reject an unsupported construct with a clean [UnsupportedSmtException]. */
 internal fun smtUnsupported(msg: String): Nothing = throw UnsupportedSmtException(msg)
 
-/** One lowered linear relation `Σ coeffs·vars ⟨op⟩ bound` (shared by bound inference and lowering). */
 internal data class Rel(val vars: IntArray, val coeffs: LongArray, val op: LinearOp, val bound: Long)
 
-/** Compiler for the supported SMT-LIB linear-arithmetic subset (QF_LIA / QF_LRA / QF_LIRA
- *  fragments). The [Builder]'s per-concern compilation steps live in sibling files as extension
- *  functions: bound inference in `SmtLibBounds.kt`, boolean / assert / distinct compilation in
- *  `SmtLibExpr.kt`, linear-term / relation / objective lowering in `SmtLibLinear.kt`, and the real
- *  (LRA) lowering in `SmtLibReal.kt`. */
 internal object Compiler {
-    /** Mutable compilation state for one SMT-LIB parse. The heavy compilation logic is attached as
-     *  `internal fun Compiler.Builder.…` extension functions in the sibling `SmtLib*.kt` files. */
+    // Compilation steps are `Compiler.Builder` extensions in the sibling `SmtLib*.kt` files.
     internal class Builder(
         val unboundedIntLo: Long,
         val unboundedIntHi: Long,
@@ -55,7 +47,6 @@ internal object Compiler {
         internal val realPredicates = SmtRealPredicates(sourceCancellation)
         internal val affineRealTables = SmtLibAffineRealTables(sourceCancellation)
 
-        /** Open `ite`-on-equality chains and the equality atoms their conditions are read from. */
         internal val iteChains = IteChainTable()
 
         override val factors = ArrayList<Factor>()
@@ -63,8 +54,7 @@ internal object Compiler {
         internal var objectiveSpec: Pair<SExpr, Boolean>? = null // (term, negate)
         override var trueLitCache: Int = -1
 
-        /** Non-recursive `define-fun` macros: name to (parameter names, body term, Bool-return flag).
-         *  A call `(f a…)` is inlined by binding the parameters to the arguments like a `let`. */
+        // A call is inlined by binding the parameters to the arguments like a `let`.
         internal val macros = HashMap<String, Macro>()
 
         internal class Binding(val isBool: Boolean, val isReal: Boolean = false) {
@@ -78,10 +68,7 @@ internal object Compiler {
             var sourceScope: BindingSnapshot? = null
         }
 
-        // Let scoping as a heap-allocated stack, not recursion. `bindingStacks` maps each name to its
-        // shadow stack (innermost binding on top) for O(1) lookup; `scopeNames` records the names bound
-        // by each active scope so it can be popped. A deeply nested formula unwinds its `let` chain
-        // iteratively into these structures instead of recursing through the call stack.
+        // Heap-allocated `let` scoping, so a deeply nested formula never recurses through the call stack.
         internal class ScopedBinding(val depth: Int, val binding: Binding)
 
         // Deferred Boolean values exclude their simultaneous peers and later caller-local shadows.
@@ -117,7 +104,6 @@ internal object Compiler {
         internal var bindingScope = BindingScope()
         internal fun lookup(name: String): Binding? = bindingScope.lookup(name)
 
-        /** The literal for a Bool binding, compiling its held term on the first ask. */
         internal fun boolLit(b: Binding): Int {
             b.lit?.let { return it }
             val src = b.srcBool ?: throw UnsupportedSmtException("Bool binding has no value")
@@ -134,8 +120,7 @@ internal object Compiler {
             }
         }
 
-        /** Compile one `let`'s bindings (in parallel — their values don't see each other) and push them
-         *  as a new scope. */
+        // `let` bindings are parallel: their values do not see each other.
         internal fun pushLetScope(bindingList: SExpr) {
             val list = bindingList as? SExpr.SList ?: throw UnsupportedSmtException("malformed let bindings")
             val sourceScope = bindingScope.snapshot()
@@ -158,14 +143,11 @@ internal object Compiler {
             )
         }
 
-        /** Push already-compiled [bound] bindings as one new innermost scope. Used by the iterative
-         *  term evaluator, which folds a `let`'s binding values in-stack before building the scope. */
         internal fun pushScopeBindings(bound: List<Pair<String, Binding>>) {
             val names = ArrayList<String>(bound.size)
             val depth = bindingScope.scopeNames.size + 1
             for ((name, b) in bound) {
-                // A value reachable by name can be referenced any number of times, so an `ite` chain it
-                // holds is finished: nothing can extend it any more, and it must define its variable.
+                // A named value can be referenced any number of times, so an `ite` chain it holds is finished.
                 (b.lin as? IntComb.Narrow)?.lin?.asSimpleVar()?.let { closeIteChain(it) }
                 bindingScope.bindingStacks.getOrPut(name) { ArrayDeque() }.addLast(ScopedBinding(depth, b))
                 names.add(name)
@@ -191,12 +173,9 @@ internal object Compiler {
             return nextInt++
         }
 
-        /** The [i]-th item of this command as an atom's text, or a clean [UnsupportedSmtException]
-         *  naming [what] when the argument is absent or not an atom (instead of a raw cast/index crash). */
         internal fun SExpr.SList.atomAt(i: Int, what: String): String =
             (items.getOrNull(i) as? SExpr.Atom)?.text ?: throw UnsupportedSmtException("malformed $what")
 
-        /** The [i]-th item of this command, or a clean [UnsupportedSmtException] naming [what] when absent. */
         internal fun SExpr.SList.argAt(i: Int, what: String): SExpr =
             items.getOrNull(i) ?: throw UnsupportedSmtException("malformed $what")
 
@@ -234,18 +213,14 @@ internal object Compiler {
                     objectiveSpec = command.argAt(1, "maximize") to true
                 }
 
-                // These commands do not change the asserted model. Keep accepting common solver-driver
-                // commands, but reject every other head: silently ignoring a misspelled assertion command
-                // constructs a different problem from the source script.
+                // Every other head is rejected: ignoring a misspelled assertion command would build a different
+                // problem.
                 "set-logic", "set-info", "set-option", "check-sat", "get-model", "get-objectives", "exit" -> Unit
 
                 else -> throw UnsupportedSmtException("unsupported command '$head'")
             }
         }
 
-        /** Declare `(declare-fun name (argSorts…) sort)`. Only 0-arity functions (constants) are
-         *  supported; a non-empty argument list is a genuine function symbol, which QF_LIA-as-solved
-         *  here cannot treat as a variable, so reject it rather than silently declaring a constant. */
         private fun declareFun(e: SExpr.SList) {
             e.requireSize(4, "declare-fun")
             val name = e.atomAt(1, "declare-fun name")
@@ -258,7 +233,6 @@ internal object Compiler {
             declare(name, e.atomAt(3, "declare-fun '$name' sort"))
         }
 
-        // Record a non-recursive `(define-fun name ((p T)…) retSort body)` as an inlinable macro.
         private fun defineFun(e: SExpr.SList) {
             e.requireSize(5, "define-fun")
             val name = e.atomAt(1, "define-fun name")
@@ -417,10 +391,8 @@ internal object Compiler {
         }
     }
 
-    /** A non-recursive `define-fun` macro: its [params], [body] term, and its return sort. [isReal] is
-     *  what lets the syntactic real classifier see through a macro reference: a `Real`-returning macro
-     *  used in a relation is a real relation even when nothing else in the relation is syntactically
-     *  real, so its body is inlined in a real — not integer — context. */
+    // [isReal] lets the syntactic real classifier see through a macro reference, so a relation using a
+    // `Real`-returning macro inlines its body in a real context.
     internal class Macro(
         val params: List<String>,
         val parameterSorts: List<Sort>,

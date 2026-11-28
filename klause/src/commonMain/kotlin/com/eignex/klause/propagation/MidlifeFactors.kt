@@ -4,40 +4,22 @@ import com.eignex.klause.ir.Factor
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
-/**
- * Mid-life presolve factor overlay for [PropagationState.incremental] mode: a dedicated
- * append-only store for factors added during an incremental presolve bake. Distinct from
- * [LearnedClauseDb.store]: a presolve state never learns clauses and a search state never adds
- * presolve factors, so at most one of the two tail stores is non-empty and both occupy the id
- * range `[baseFactorCount, totalFactorCount)`. Ids are stable and never renumbered; dropping a
- * factor (base or mid-life) tombstones its id ([tombstoned]) and clears its `refPayload` slot.
- * A tombstoned slot is NEVER reused by a later add — reuse would resurrect a stale propagator
- * payload under a new factor id and silently corrupt a deduction.
- */
+// Append-only store for factors added during an incremental presolve bake. A presolve state never learns and a
+// search state never adds presolve factors, so this and [LearnedClauseDb.store] share the tail id range. A
+// tombstoned id is never reused: reuse would resurrect a stale propagator payload under a new factor and
+// silently corrupt a deduction.
 internal class MidlifeFactors {
-    /** The mid-life propagators, appended by `addMidlifeFactor` in factor-id order. */
     val store: ArrayList<Propagator> = ArrayList()
 
-    /** The `Factor` behind each mid-life propagator, parallel to [store]. Carried because
-     *  [Propagator] exposes no `boolVars` / `intVars`; the conflict and level machinery reads them
-     *  here for a mid-life factor the way it reads `Problem.factors` for a base one. */
+    // [Propagator] exposes no variables, so the conflict and level machinery reads them here.
     val factors: ArrayList<Factor> = ArrayList()
 
-    /** Tombstoned factor ids (base or mid-life). `factorAt` returns [NoPropagator] for a member,
-     *  so a dropped factor is inert without removing it from the watcher indices — its id stays
-     *  stable and is never reused. Empty until the first drop, so a state that only appends
-     *  allocates nothing. */
+    // A tombstoned factor reads as [NoPropagator], so it is inert without leaving the watcher indices.
     val tombstoned: IntHashSet = IntHashSet()
 
-    /** Delta overlay for occurrence-list bool wakeup of mid-life factors: `[v]` lists mid-life
-     *  factor ids that wake on any change to bool var `v` (those NOT using per-literal watchers).
-     *  `null` until the first such factor is added — a search state and a watcher-only presolve
-     *  never allocate it, so `enqueueForBoolChange` pays a single null-check. Complements
-     *  [PropagationProblem.nonBoolWatcherBoolOccurrences]. */
+    // Occurrence-list wakeup for mid-life factors without per-literal watchers; null until the first such factor,
+    // so a search state pays a single null check.
     var boolOccurrences: Array<IntArrayList>? = null
 
-    /** Int-side analog of [boolOccurrences]: `[v]` lists mid-life factor ids that wake on any
-     *  change to int var `v` and do not subscribe to a typed int-event on `v`. Complements
-     *  [PropagationProblem.nonIntEventWatcherIntOccurrences]. */
     var intOccurrences: Array<IntArrayList>? = null
 }

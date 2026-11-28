@@ -1,9 +1,8 @@
 package com.eignex.klause.solver.result
 
 /**
- * Run-level envelope: which backend ran, how long it took, and whether it hit its budget. Not a
- * counter cluster — a backend's [SolveStatsSink] measures its run window. A coordinator supplies
- * its own invocation envelope after merging worker snapshots.
+ * Run-level envelope: which backend ran, how long it took, and whether it hit its budget. A coordinator
+ * supplies its own invocation envelope after merging worker snapshots.
  * See [SolveStats].
  */
 data class RunStats(

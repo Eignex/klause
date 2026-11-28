@@ -1,20 +1,11 @@
 package com.eignex.klause.lp.engine
 
-/**
- * Deterministic work meter for an LP solve: floating-point operations, counted rather than timed.
- *
- * A budget spent against a wall clock is not reproducible: the same solve on a loaded machine reaches
- * the budget after less work. Counting operations makes a budget a property of the model and the pivot
- * path alone, so a policy keyed on it behaves identically on a busy machine and a quiet one.
- *
- * The count is a proxy, not a measurement: each kernel charges the entries it touches (`nnz` for a solve
- * through the factorization, `m` per eta application or dense pass). That is proportional to real cost
- * and, unlike time, exactly reproducible.
- */
+// Operations are counted rather than timed, so a budget depends only on the model and the pivot path and behaves
+// the same on a loaded machine. Each kernel charges the entries it touches (nnz for a solve through the
+// factorization, m per eta application or dense pass), a reproducible proxy proportional to real cost.
 internal class LpWork {
     private var limit = 0L
 
-    /** Operations charged since the last [reset]. */
     var ops: Long = 0L
         private set
 
@@ -35,7 +26,7 @@ internal class LpWork {
     }
 
     companion object {
-        /** Conversion factor that scales an operation count to the order of magnitude of a second. */
+        // Scales an operation count to the order of a second.
         const val SECONDS_PER_OP: Double = 2e-9
     }
 }

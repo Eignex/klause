@@ -28,65 +28,39 @@ class Presolved(
         SourceMapping(problem, problem, TransformationGuarantees.IDENTITY, lift = reconstruct)
 }
 
-/**
- * What the source lane made of a canonical model: the rewritten declarations and factors, and whether a
- * pass refuted it.
- *
- * [rebuild] recovers eliminated Boolean and integer columns in reverse transformation order.
- */
 internal class SourcePresolved(
-    /** The transformed model, or the input itself when no pass fired. */
+    // The input itself when no pass fired.
     val problem: Problem,
-    /** Source passes that changed the model, in first-fire order. */
+    // In first-fire order.
     val passesFired: List<PresolvePass> = emptyList(),
-    /** Whether the lane proved the input infeasible. */
     val infeasible: Boolean = false,
-    /** Recovers the columns the passes eliminated, in the order they are recovered. */
+    // Recovers eliminated columns in reverse transformation order.
     val rebuild: SourceRebuilds = SourceRebuilds.NONE,
     val objective: LinearObjective? = null,
 )
 
-/**
- * A source pass's explicit change to its input problem.
- *
- * Deliberately narrower than [PassDelta]: no finite domains, and a reconstruction stated as data rather
- * than as a closure over one lane's witness, so what a pass running before any finite projection exists
- * may produce is said by the type rather than checked on the way through. [bounds] is the one range it
- * may state, and a model-level range is not a finite domain — it says how far a column can reach, while
- * a domain says which values it may take. [rebuild] carries lane-neutral Boolean and integer steps.
- */
+// A source pass's change to its input. Narrower than [PassDelta]: no finite domains, and reconstruction as
+// lane-neutral data rather than a closure over one lane's witness, so the type states what a pass running
+// before any finite projection may produce. [bounds] is a model-level range (how far a column can reach),
+// not a finite domain (which values it may take).
 internal class SourceDelta(
-    /** Indices of input factors removed or replaced. */
     val droppedIndices: IntArray = emptyIntArray(),
-    /** New or replacement factors to append after the retained input factors. */
+    // Appended after the retained input factors.
     val addedFactors: List<Factor> = emptyList(),
-    /** Integer ranges the pass proved, or null when it left every column's range as declared. */
+    // Null when every column's range is left as declared.
     val bounds: IntBounds? = null,
-    /** Whether the pass proved infeasibility. */
     val infeasible: Boolean = false,
-    /** Recovers the columns this pass eliminated, or [SourceRebuilds.NONE] when it eliminated none. */
     val rebuild: SourceRebuilds = SourceRebuilds.NONE,
 ) {
     var objective: LinearObjective? = null
 
-    /**
-     * Whether the pass left the factor list, every column's range and every column unchanged.
-     *
-     * [rebuild] counts: an empty delta is reported `UNCHANGED` and never applied, so a pass that
-     * eliminated a column while rewriting nothing else would have its reconstruction silently dropped.
-     */
+    // [rebuild] counts: an empty delta is never applied, so a pass that only eliminated a column would
+    // otherwise lose its reconstruction.
     val isEmpty: Boolean
         get() = droppedIndices.isEmpty() && addedFactors.isEmpty() && bounds == null && rebuild.isEmpty
 
-    /**
-     * This change as the finite lane's delta, for a source pass running over a baked model.
-     *
-     * A proved range reaches the finite lane as a narrowing of [rootDomains], not as the range itself:
-     * the lane branches on values, so a bound it cannot fold into a domain would be a bound it never
-     * enforces. Intersecting can empty a column that neither endpoint crossed, which is a refutation.
-     *
-     * [rebuild] becomes that lane's sample lift, which is the same steps read over its own witness.
-     */
+    // A proved range reaches the finite lane as a narrowing of [rootDomains]: the lane branches on values,
+    // so a bound not folded into a domain would never be enforced. An emptied domain is a refutation.
     fun asPassDelta(rootDomains: Array<IntDomain>): PassDelta {
         val lift = rebuild.asSampleLift()
         val proved = bounds
@@ -117,7 +91,7 @@ internal class SourceDelta(
     }
 }
 
-/** This domain intersected with column [v]'s range in [bounds], or null when nothing remains. */
+// Null when nothing remains.
 private fun IntDomain.narrowedBy(bounds: IntBounds, v: Int): IntDomain? {
     var domain = this
     if (bounds.hasLower(v) && bounds.lower(v) > domain.min) {
@@ -156,15 +130,9 @@ class PassDelta(
         domains == null && reconstruct == null && rebuild.isEmpty
 }
 
-/**
- * This change as the source lane's delta, for a transform whose one implementation serves both lanes.
- *
- * The `require` is the boundary the narrower type states: a transform offered to the source lane may
- * rewrite factors and refute, and nothing else — a domain or a sample lift arriving here would be
- * dropped on the floor rather than rejected. A finite domain is not weakened into a proved range on the
- * way through either: its hull would state a bound the pass never proved of the columns it left alone,
- * and its holes would be lost. A transform that proves ranges for both lanes states them as ranges.
- */
+// A transform offered to the source lane may only rewrite factors and refute; a domain or sample lift is
+// rejected rather than dropped. A finite domain is not weakened into a range either: its hull would state
+// a bound the pass never proved, and its holes would be lost.
 internal fun PassDelta.asSourceDelta(): SourceDelta {
     require(domains == null && reconstruct == null) { "source presolve may only rewrite factors" }
     return SourceDelta(droppedIndices, addedFactors, infeasible = infeasible)

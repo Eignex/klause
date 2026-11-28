@@ -28,8 +28,7 @@ import com.eignex.klause.localsearch.scoring.MoveScoring
  *  - **perturbation** = [StallPerturbation] — after [perturbAfter] applied moves with no strict cost
  *    drop, inject one random hot-spot jump.
  *
- * Aggressive toward feasibility and orthogonal to the WalkSAT/CBLS/SA step families, so most valuable
- * raced alongside them in the parallel portfolio. Learns and prunes nothing, so no soundness obligation.
+ * Learns and prunes nothing, so it carries no soundness obligation.
  */
 @Suppress("FunctionNaming")
 fun FeasibilityJump(
@@ -63,13 +62,9 @@ fun FeasibilityJump(
 }
 
 /**
- * The Feasibility-Jump diversification kick as a driver [perturbation hook][SourceDrivenStrategy.perturbation]:
- * after [perturbAfter] applied moves with no strict cost drop, return one random hot-spot jump and
- * restart the no-progress window.
- *
- * Stateful (one per search): tracks the stall window off `state.step`, re-anchoring on a restart
- * (rewound step) and on every strict cost drop. Returns `null` when the window has not elapsed or no
- * variable is eligible.
+ * The Feasibility-Jump diversification kick as a [perturbation hook][SourceDrivenStrategy.perturbation]: after
+ * [perturbAfter] applied moves with no strict cost drop, returns one random hot-spot jump. Stateful: one instance
+ * per search.
  */
 class StallPerturbation(private val perturbAfter: Int) : (LocalSearchState) -> Move? {
     init {
@@ -86,9 +81,6 @@ class StallPerturbation(private val perturbAfter: Int) : (LocalSearchState) -> M
         return kick
     }
 
-    /** One diversification kick: jump a random variable of a random violated factor to a random
-     *  value (channeling-aware for int vars), or flip it. Skips frozen variables; returns null when
-     *  none is eligible. */
     private fun randomHotSpotJump(state: LocalSearchState): Move? {
         if (state.violated.isEmpty()) return null
         val fid = state.violated.random(state.rng)

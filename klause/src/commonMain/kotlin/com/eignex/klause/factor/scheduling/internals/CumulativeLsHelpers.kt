@@ -3,14 +3,8 @@ package com.eignex.klause.factor.scheduling.internals
 import kotlin.math.max
 import kotlin.math.min
 
-/**
- * Visit every timeline slot whose load changes when an equal-length task footprint moves from
- * `[oldStart, +d)` to `[newStart, +d)`. The two footprints share the overlap `[overlapLo,
- * overlapHi)`, whose load is unchanged, so only the symmetric difference is visited: [onRemove]
- * for slots the task leaves, [onAdd] for slots it enters. Work is `O(min(|newStart − oldStart|, d))`,
- * so a one-step shift touches two slots regardless of duration. Slots are clamped to
- * the timeline `[0, size)`.
- */
+// Visits only the symmetric difference of the old and new footprints, so a one-step shift touches two slots
+// regardless of duration.
 internal inline fun forEachStartShiftSlot(
     ls: CumulativeLsState,
     oldStart: Long,
@@ -36,7 +30,7 @@ internal inline fun forEachStartShiftSlot(
     }
 }
 
-/** Overage Δ of shifting task from [oldStart,+d) → [newStart,+d). Pure simulation. */
+/** Overage change of moving a task start from [oldStart] to [newStart], without applying it. */
 fun simulateCumulativeStartDelta(ls: CumulativeLsState, oldStart: Long, newStart: Long, d: Long, r: Long): Long {
     val cap = ls.cap
     val usage = ls.usage
@@ -197,8 +191,6 @@ fun applyCumulativeCapacityDelta(ls: CumulativeLsState, newCap: Long) {
     ls.overage = newOv
 }
 
-/** Clamp a Long timeline offset to a valid lower slot index in `[0, size]`. */
 private fun slotLo(v: Long, size: Int): Int = v.coerceIn(0L, size.toLong()).toInt()
 
-/** Clamp a Long timeline offset to a valid upper slot bound in `[0, size]`. */
 private fun slotHi(v: Long, size: Int): Int = v.coerceIn(0L, size.toLong()).toInt()

@@ -43,8 +43,6 @@ object Dimacs {
         var declaredClauses = -1
         var parsedClauses = 0
         val clauses = mutableListOf<IntArray>()
-        // A bare `0` with no accumulated literals is the empty clause (⊥) — an unsatisfiable instance —
-        // unless it sits in the legacy trailing `%` block, where a lone `0` is an end-of-file sentinel.
         var triviallyUnsat = false
         var sawTrailer = false
 
@@ -54,8 +52,8 @@ object Dimacs {
             val line = rawLine.trim()
             if (line.isEmpty()) continue
             if (line.startsWith("c")) continue
-            // `%` begins the SATLIB trailing block; keep reading (some files put a `%` comment before the
-            // header) but stop treating a bare `0` as ⊥ from here on — it is the trailer sentinel.
+            // `%` begins the SATLIB trailer, where a lone `0` is an end-of-file sentinel rather than the empty
+            // clause. Reading continues because some files put a `%` comment before the header.
             if (line.startsWith("%")) {
                 sawTrailer = true
                 continue
@@ -79,8 +77,6 @@ object Dimacs {
                     ?: dimacsError("Unparseable DIMACS token: '$token'")
                 if (lit == 0) {
                     val acc = current
-                    // A `0` terminates the clause; with no literals it is the empty clause (⊥), except in
-                    // the trailing `%` block where a lone `0` is a sentinel to ignore.
                     when {
                         acc != null && !acc.isEmpty() -> {
                             clauses += acc.toIntArray()
@@ -164,7 +160,6 @@ object Dimacs {
                 weight = tokens[0].toLongOrNull()
                     ?: dimacsError("Unparseable wcnf weight: '${tokens[0]}'")
                 dimacsRequire(weight >= 0) { "DIMACS wcnf weight must be non-negative: $weight" }
-                // Keep explicit hard clauses hard when `top` is omitted.
                 isHard = hasOldHeader && weight >= (top ?: HARD_WEIGHT_SENTINEL)
                 litStart = 1
             }
@@ -181,9 +176,7 @@ object Dimacs {
                 }
                 dimacsRequire(lit != Int.MIN_VALUE) { "wcnf literal index exceeds the supported 32-bit range: '$tok'" }
                 val v = abs(lit) - 1
-                // New-format instances carry no header, so the variable count grows to fit each literal;
-                // an old-header instance must stay within the declared `nvars`, as the CNF path enforces —
-                // a literal past it would index a nonexistent variable.
+                // Headerless files grow the variable count to fit; a header bounds it, as in CNF.
                 if (hasOldHeader) {
                     dimacsRequire(v in 0 until numVars) { "Literal $lit out of range [1, $numVars]" }
                 } else if (v + 1 > numVars) {
@@ -213,8 +206,6 @@ object Dimacs {
                 else -> softClauses.add(WeightedCnfClause(weight, clauseLits))
             }
         }
-        // New-format instances carry no header, so an instance with no variable-bearing clause
-        // (only empty/degenerate clauses) leaves numVars unset — it simply has zero variables.
         if (numVars < 0) numVars = 0
         if (hasOldHeader) {
             dimacsRequire(parsedClauses == declaredClauses) {

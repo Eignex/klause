@@ -19,12 +19,8 @@ import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-/**
- * Resolves [Format.MINIZINC] problems. The system `minizinc` CLI is used **only to compile**
- * `.mzn`(+`.dzn`) → `.fzn` against klause's redefinition library; the resulting FlatZinc is
- * passed to the CLI for subprocess solves. In-process consumers request parsing and
- * finite compatibility lazily through [ResolvedProblem].
- */
+// The system `minizinc` CLI only compiles to FlatZinc against klause's redefinition library; in-process consumers
+// request parsing lazily through ResolvedProblem.
 internal class MiniZincRunner(
     private val timeoutSec: Int = System.getProperty("klause.bench.mzn.timeoutSec")?.toIntOrNull() ?: 60,
     private val exactFloats: Boolean = false,
@@ -53,12 +49,8 @@ internal class MiniZincRunner(
         )
     }
 
-    /** Compile [ref]'s `.mzn`(+`.dzn`) to FlatZinc and return the `.fzn` file; [fresh] recompiles
-     *  even when a cached compile is up to date.
-     *
-     *  The cache binds model/data, compiler identity and solver-library contents to paired FlatZinc and `.ozn`
-     *  output mappings. Each compile publishes the output mapping before the `.fzn`, which acts as the commit
-     *  marker; concurrent compiles use unique temporary files and atomic replacement. */
+    // The cache binds model/data, compiler identity and solver-library contents to paired FlatZinc and `.ozn` output
+    // mappings. The output mapping is published before the `.fzn`, which acts as the commit marker.
     fun compileFzn(ref: ProblemRef, fresh: Boolean = false): File {
         require(supports(ref)) { "${ref.name}: MiniZincRunner only resolves MINIZINC problems" }
         val root = CorpusFetcher.workspaceRoot()
@@ -88,12 +80,8 @@ internal class MiniZincRunner(
 
     fun compileOutput(ref: ProblemRef): File = outputFile(compileFzn(ref))
 
-    /**
-     * [ref]'s model-level DZN for [flatSolution], one solution of a FlatZinc solver's DZN output for [ref]'s compiled
-     * FlatZinc: `minizinc --ozn-file` (solns2out) evaluates the compiled output mapping on it, so the result assigns
-     * the model's output variables, enum values by name and no FlatZinc-introduced variables, plus `_objective` for an
-     * optimisation model. Throws, saying why, when the mapping fails.
-     */
+    // solns2out evaluates the compiled output mapping, so the result assigns the model's output variables, enum values
+    // by name and `_objective`, never FlatZinc-introduced variables. Throws, saying why, when the mapping fails.
     fun modelOutput(ref: ProblemRef, flatSolution: Sequence<String>, maxChars: Int): String? {
         val ozn = compileOutput(ref)
         val dir = Files.createTempDirectory("klause-ozn-").toFile()
@@ -134,8 +122,7 @@ internal class MiniZincRunner(
         }
         val msc = File(root, "klause-mzn-lib/share/minizinc/solvers/klause.msc")
         val libDir = File(root, "klause-mzn-lib/share/minizinc/klause")
-        // Concurrent compiles of the same instance each write their own temp, and the atomic rename
-        // means a reader never sees a truncated file.
+        // Each concurrent compile writes its own temp; the atomic rename means a reader never sees a truncated file.
         val tmp = File.createTempFile("${out.nameWithoutExtension}-", ".fzn.tmp", out.parentFile)
         val tmpOzn = File.createTempFile("${out.nameWithoutExtension}-", ".ozn.tmp", out.parentFile)
         val cmd = buildList {
@@ -211,11 +198,8 @@ internal class MiniZincRunner(
     }
 }
 
-/**
- * The seed every MiniZinc compile and reference solve runs with. Some models draw their data at compile time
- * (`uniform`, `bernoulli`, ...), and an unseeded compile draws afresh on every run, so klause and the reference
- * would otherwise solve different instances.
- */
+// Some models draw their data at compile time (`uniform`, `bernoulli`, ...), so an unseeded compile would make klause
+// and the reference solve different instances.
 internal const val MZN_RANDOM_SEED = 1
 
 private const val OUTPUT_TIMEOUT_SECONDS = 30L

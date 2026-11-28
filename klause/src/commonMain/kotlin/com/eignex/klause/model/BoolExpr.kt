@@ -166,11 +166,7 @@ data class IntCompare(
     val right: IntExpr,
 ) : BoolExpr
 
-/**
- * Schema representation of a float linear comparison, built by FloatExpr/FloatHandle
- * operators. Compilation retains real source rows, including strictness and disequality.
- * This [BoolExpr] node supports Boolean composition before lowering.
- */
+/** Float linear comparison `Σ coeffs(i)·varNames(i) ⟨op⟩ bound`, including strictness and disequality. */
 @Serializable
 @SerialName("floatlin")
 data class FloatLinearConstraint(
@@ -417,11 +413,7 @@ data class CumulativeExpr(
     }
 }
 
-/**
- * Disjunctive (one-machine / unary-resource) constraint. Tasks may not overlap.
- * Special case of [CumulativeExpr] with all-1 resources and capacity = 1, but ships its own
- * stronger propagator (time-tabling + detectable precedences + edge-finding).
- */
+/** Unary-resource constraint: tasks may not overlap. [CumulativeExpr] with unit resources and capacity 1. */
 @Serializable
 @SerialName("disjunctive")
 data class DisjunctiveExpr(
@@ -591,12 +583,7 @@ data class PseudoBooleanExpr(
     }
 }
 
-// Set variables ship as a `(universe, indicator-bool array)` pair. The compiler allocates
-// one Boolean variable per universe element; the schema-level [SetSpec] carries the
-// universe so callers can later materialise unions / intersections / set literals over the
-// same element domain. A [MultipleSpec] is a set over a nominal universe of labels — the
-// nominal one-hot layer is materialised once and reused; both [SetSpec] and [MultipleSpec]
-// share the underlying indicator-bool encoding so set-expressions and -constraints work
+// SetSpec and MultipleSpec share one indicator-Boolean-per-element encoding, so set constraints work
 // uniformly on either kind.
 
 /** Membership: `elem ∈ setExpr`. */
@@ -609,8 +596,7 @@ data class SetIn(
     val set: SetExpr,
 ) : BoolExpr
 
-/** Nominal-label membership: `label ∈ setExpr`. Distinct AST node so the compiler can
- *  route through the nominal universe lookup rather than treating it as an int. */
+/** Nominal-label membership: `label ∈ setExpr`. */
 @Serializable
 @SerialName("setinnom")
 data class SetNominalIn(

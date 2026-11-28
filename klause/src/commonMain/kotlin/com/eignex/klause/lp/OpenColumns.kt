@@ -5,27 +5,15 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.Relation
 
-/**
- * The split column pair per variable, plus the builder they were added to.
- *
- * A variable with no finite bound cannot enter a bounded-variable simplex as one column, and giving it a
- * huge stand-in bound is worse than useless: at that magnitude a double's spacing swamps the right-hand
- * sides, which contaminates every component of `B⁻¹`. Each variable therefore enters split,
- * `x = x⁺ − x⁻`, over two non-negative columns ([openColumns]), and a row's terms are rewritten onto that
- * pair ([splitTerms]).
- *
- * Shared by the passes that reason over open ranges, so relaxation and Farkas checks build the same
- * columns from the same declared bounds.
- */
+// `negCol(v)` is -1 unless the variable enters split as `x = x⁺ − x⁻`. Shared by the passes that reason
+// over open ranges, so relaxation and Farkas checks build the same columns from the same declared bounds.
 internal class OpenColumns(val builder: LpBuilder, val posCol: IntArray, val negCol: IntArray)
 
 internal fun builderOf(): LpBuilder = LpBuilder()
 
-/**
- * Add one column per variable over its genuinely open range: a variable open below enters split as
- * `x = x⁺ − x⁻` with both parts non-negative, never as a probe-magnitude lower bound — the double view
- * folds a column's lower bound into the row rhs, and at that magnitude the fold absorbs the true rhs.
- */
+// A variable open below enters split over two non-negative columns, never with a huge stand-in lower bound:
+// the double view folds a column's lower bound into the row rhs, and at that magnitude the fold absorbs the
+// true rhs.
 internal fun openColumns(builder: LpBuilder, bounds: Array<OpenIntBounds>): OpenColumns {
     val n = bounds.size
     val posCol = IntArray(n)
@@ -47,7 +35,6 @@ internal fun openColumns(builder: LpBuilder, bounds: Array<OpenIntBounds>): Open
     return OpenColumns(builder, posCol, negCol)
 }
 
-/** The builder relation for a linear row, or null for an operator the relaxation cannot express. */
 internal fun relationOfLinear(f: Linear): Relation? = when (f.op) {
     LinearOp.LE -> Relation.LE
     LinearOp.GE -> Relation.GE
@@ -55,10 +42,7 @@ internal fun relationOfLinear(f: Linear): Relation? = when (f.op) {
     else -> null
 }
 
-/**
- * Row terms over the split column pairs: a variable represented `x = x⁺ − x⁻` contributes both halves.
- * Null for a row without 64-bit integer coefficients.
- */
+// Null for a row without 64-bit integer coefficients.
 internal fun splitTerms(f: Linear, posCol: IntArray, negCol: IntArray): Pair<IntArray, LongArray>? {
     val row = f.integerConstants ?: return null
     var extra = 0

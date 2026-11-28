@@ -3,8 +3,7 @@ package com.eignex.klause.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** Anything that can be coerced into a [SetExpr] inside the constraint DSL — the
- *  set-side analogue of [IntTerm] / [BoolTerm]. */
+/** Anything that can be coerced into a [SetExpr] inside the constraint DSL. */
 interface SetTerm {
     /** Coerce this term into a [SetExpr] node. */
     fun toSetExpr(): SetExpr
@@ -32,8 +31,7 @@ data class SetLiteral(
     val elements: List<Int>,
 ) : SetExpr
 
-/** Concrete set literal over a nominal universe. The compiler resolves [labels] against
- *  the operand's nominal universe at lowering time. */
+/** Concrete set literal over a nominal universe. */
 @Serializable
 @SerialName("setlitnom")
 data class SetNominalLiteral(

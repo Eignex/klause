@@ -78,7 +78,6 @@ class FactorCodecs(codecs: List<FactorCodec<*, *>>) {
 
     internal val catalog: JsonNodeCatalog = JsonNodeCatalog { listOf(nodeSerializer) }
 
-    /** Skema vocabulary of `{key: payload}` nodes, one per codec. */
     internal val nodeSerializer: CompactSerializer<Any> by lazy {
         CompactSerializer("com.eignex.klause.factor.codec.Factor", Any::class, catalog) {
             this.codecs.map { codec ->

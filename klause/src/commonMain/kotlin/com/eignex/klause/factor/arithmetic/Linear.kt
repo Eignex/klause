@@ -38,9 +38,8 @@ import com.eignex.util.numbers.unaryMinus
 
 /**
  * `Σ coeffs(i)·vars(i) ⟨op⟩ bound`. Terms pair [vars] with the coefficients in [constants]; the sum is
- * compared by [op] against that shape's bound. Local search keeps the current weighted sum as the
- * factor's payload, updated incrementally by [Invariant.applyIntSet], and repairs a violation by moving
- * one variable to the value that on its own would put the sum on the right side of `bound`.
+ * compared by [op] against that shape's bound. Local search keeps the weighted sum as the factor's
+ * payload, updated incrementally by [Invariant.applyIntSet].
  */
 class Linear private constructor(
     terms: CoalescedTerms,
@@ -48,32 +47,24 @@ class Linear private constructor(
     rawBound: Long,
     realVarsIn: IntArray = emptyIntArray(),
     realCoeffsIn: DoubleArray = emptyDoubleArray(),
-    // Double forms used only by an LP-only (real-bearing) row, where coefficients and the bound need not
-    // be integral: the double coefficient of each integer term (index-aligned with [vars]) and the double
-    // right-hand side. Empty / 0 for integer and wide rows.
+    // LP-only rows only, whose integer-term coefficients and bound need not be integral.
     intCoeffsRealIn: DoubleArray = emptyDoubleArray(),
     realBoundIn: Double = 0.0,
     strictRealIn: Boolean = false,
-    // Over-64-bit integer coefficients and bound, carried exactly. Null for the integer core and for real
-    // rows.
+    // Over-64-bit integer constants only.
     wideCoeffsIn: Array<BigInt>? = null,
     wideBoundIn: BigInt? = null,
 ) : Factor,
     LinearRow {
 
-    // Canonicalise inequalities to ≤ at construction — the LP/MIP convention the cut separators
-    // (FlowCoverSeparator, knapsack cover) expect. A ≥ becomes ≤ by negating the coefficients and bound;
-    // = / ≠ keep their orientation. So an inequality [Linear] always reports [op] `LE`, and a ≥ row and
-    // its negated ≤ form share a structural key (so the two dedup as one).
+    // Inequalities canonicalise to ≤, the convention cut separators expect, so a ≥ row and its negated ≤
+    // form share a structural key.
     val op: LinearOp = if (rawOp == LinearOp.GE) LinearOp.LE else rawOp
     val vars: IntArray = terms.vars
 
     /**
-     * The row's coefficients and right-hand side, at the width that holds them exactly. Their shape is the
-     * row's shape: a consumer narrows to [integerConstants], [wideConstants] or [realConstants] and reads
-     * exact values, so no reading is a stand-in for constants that do not fit it.
-     *
-     * The GE→LE canonicalisation negates the constants here, once.
+     * The row's coefficients and right-hand side at the width that holds them exactly; narrow through
+     * [integerConstants], [wideConstants] or [realConstants]. A `≥` row reports them negated.
      */
     override val constants: LinearConstants = run {
         val negate = rawOp == LinearOp.GE
@@ -111,12 +102,10 @@ class Linear private constructor(
         }
     }
 
-    /** The row read as plain 64-bit integer arithmetic — its terms, coefficients and bound — or `null`
-     *  when its constants are wider than that ([wideConstants], [realConstants]). */
+    /** The row's 64-bit integer constants, or `null` for a wide or real row. */
     val integerConstants: IntegerConstants? get() = constants as? IntegerConstants
 
-    /** The row read as exact integer arithmetic of any width, or `null` when it carries a continuous
-     *  constant ([realConstants]). */
+    /** The row's exact integer constants of any width, or `null` for a real row. */
     val integralConstants: IntegralConstants? get() = constants as? IntegralConstants
 
     /** The row's over-64-bit constants, or `null` when it is not one. */
@@ -126,11 +115,8 @@ class Linear private constructor(
     val realConstants: RealConstants? get() = constants as? RealConstants
 
     /**
-     * LP-only continuous (real) variable terms, additional to the integer terms: real var ids paired with
-     * the double coefficients in [RealConstants.realCoefficients]. Empty for the integer/Boolean core. When
-     * present the row reasons over a continuous variable, so it is absent from CP propagation
-     * (its propagation projection is [NoPropagator]) and its feasibility is enforced by the LP relaxation and the
-     * search leaf.
+     * Real variable terms, paired with [RealConstants.realCoefficients]. A row with any real term is
+     * LP-only: its propagator is [NoPropagator], and the LP relaxation and search leaf enforce it.
      */
     val realVars: IntArray = realVarsIn
 
@@ -151,9 +137,7 @@ class Linear private constructor(
         val wide = wideConstants
         require(wide == null || wide.coefficients.size == vars.size) { "wide coeff/var length mismatch" }
         require(wide == null || realVars.isEmpty()) { "a row cannot be both wide and real" }
-        // A wide or real form passes empty integer terms for the shape it does not use. Reaching the
-        // integer shape with them would read those placeholders as the row's own coefficients, so an
-        // integer row states that its coefficients are its own.
+        // Wide and real forms pass empty integer coefficients; an integer row must not carry those placeholders.
         val integer = integerConstants
         require(integer == null || integer.coefficients.size == vars.size) { "int coeff/var length mismatch" }
     }
@@ -164,14 +148,11 @@ class Linear private constructor(
         MixedVars(boundInts = vars, reals = realVars)
     }
 
-    /**
-     * `Σ coeffs(i) * vars(i) ⟨op⟩ bound`. Duplicate variables are coalesced (their coefficients
-     * summed) so the local-search payload stays consistent regardless of caller.
-     */
+    /** `Σ coeffs(i) * vars(i) ⟨op⟩ bound`. Duplicate variables are coalesced by summing coefficients. */
     constructor(coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int) :
         this(coalesceLinearTerms(vars, coeffs), op, bound.toLong())
 
-    /** Wide form: coefficients and bound that may exceed 32-bit range (SMT cut lemmas, dense folds). */
+    /** `Long` form of the coalescing constructor, for constants beyond 32-bit range. */
     constructor(coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long) :
         this(coalesceLinearTerms(vars, coeffs), op, bound)
 
@@ -189,10 +170,8 @@ class Linear private constructor(
     )
 
     /**
-     * Mixed integer + LP-only-real form with integer integer-side data: `Σ intCoeffs(i)·intVars(i) +
-     * Σ realCoeffs(j)·realVars(j) ⟨op⟩ bound`. [realVars] are ids in the problem's real-variable
-     * namespace. A row with any real term is LP-only — it does not propagate in CP (see [realVars]) — so
-     * integer-semantics consumers skip it. Terms are kept in the given order (no coalescing).
+     * LP-only mixed form with `Long` integer-side constants: `Σ intCoeffs(i)·intVars(i) +
+     * Σ realCoeffs(j)·realVars(j) ⟨op⟩ bound`. Terms keep their order; nothing is coalesced.
      */
     constructor(
         intCoeffs: LongArray,
@@ -212,11 +191,8 @@ class Linear private constructor(
     )
 
     /**
-     * General LP-only real form with **double** integer-side coefficients and bound (the MPS / float
-     * frontend case, where a row touching a continuous variable may carry fractional coefficients on its
-     * integer variables and a fractional bound): `Σ intCoeffs(i)·intVars(i) + Σ realCoeffs(j)·realVars(j)
-     * ⟨op⟩ bound`. [realVars] must be non-empty (it is what makes the row LP-only). Terms are kept in the
-     * given order.
+     * LP-only mixed form with fractional integer-side coefficients and bound: `Σ intCoeffs(i)·intVars(i) +
+     * Σ realCoeffs(j)·realVars(j) ⟨op⟩ bound`. [realVars] must be non-empty. Terms keep their order.
      */
     constructor(
         intVars: IntArray,
@@ -239,17 +215,13 @@ class Linear private constructor(
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.LINEAR, ::buildKey)
 
-    // Allocation-free per-incidence key hash via the two-mode [KeySink] — symmetry refinement rebuilds
-    // this once per incident variable each round. `pairsByVarKeyCoalescing` reproduces `remap()` (whose
-    // constructor coalesces same-image terms) followed by the key sort, so the port hash stays equal to
+    // Allocation-free because symmetry refinement calls it per incident variable each round.
+    // `pairsByVarKeyCoalescing` reproduces remap's coalescing, so the hash equals
     // `remap().structuralKey().hashCode()` even when the colouring map collapses two variables.
     override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.LINEAR, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.enum(op)
-        // Each shape keys on its own constants: a continuous row on its exact doubles, a wide row on its
-        // exact BigIntegers, an integer row on its bound and coalesced terms. No shape's key can collide
-        // with another's, since only one of them is ever fed.
         when (val c = constants) {
             is RealConstants -> {
                 sink.long(if (c.strict) 1L else 0L)
@@ -284,8 +256,6 @@ class Linear private constructor(
     }
 
     override fun remap(mapping: VarRemap): Factor = when (val c = constants) {
-        // Rows are canonical at construction (`>=` is negated), so re-emit as-is (op is
-        // LE/EQ/NE, never GE) via the double form to preserve the exact continuous coefficients and bound.
         is RealConstants -> Linear(
             mapping.ints(vars),
             c.intCoefficients.toDoubleArray(),
@@ -296,9 +266,7 @@ class Linear private constructor(
             c.strict,
         )
 
-        // Already canonical (op is LE/EQ/NE); re-emit over remapped vars. A colouring map can collapse two
-        // of the row's vars onto one image, so coalesce their exact coefficients (summing) to keep the term
-        // set duplicate-free — the propagator's interval reasoning requires one term per variable.
+        // A colouring map can collapse two vars onto one image, and the propagator needs one term per variable.
         is WideConstants -> {
             val (rv, rc) = coalesceWide(mapping.ints(vars), c.coefficients.toTypedArray())
             Linear(rv, rc, op, c.bound)
@@ -307,13 +275,7 @@ class Linear private constructor(
         is IntegerConstants -> Linear(c.coeffs, mapping.ints(vars), op, c.bound)
     }
 
-    /**
-     * A pure binary value relation `c·x ⟨=|≠⟩ c·y` — two terms with opposite-equal coefficients and a
-     * zero bound, comparing for equality or distinctness. Its allowed-tuple set (`{x = y}` / `{x ≠ y}`)
-     * is invariant under *any* uniform relabeling of values, so it is value-anonymous. Every
-     * other linear is value-meaningful: an ordering (`≤`/`≥`) is not relabeling-invariant, and a
-     * nonzero bound or non-opposite coefficients tie the variables to specific magnitudes.
-     */
+    // `c·x ⟨=|≠⟩ c·y` keeps its tuple set under any uniform value relabeling; other linear rows do not.
     private fun isBinaryValueRelation(): Boolean {
         val c = integerConstants ?: return false
         return (op == LinearOp.EQ || op == LinearOp.NE) && c.bound == 0L &&
@@ -336,12 +298,10 @@ class Linear private constructor(
     override val linearForm: LinearForm = LinearForm.Conjunction(listOf(this))
 }
 
-/** True when every coefficient and the bound fit 32-bit range. */
 internal fun fitsInt32(coeffs: LongArray, bound: Long): Boolean =
     bound in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() &&
         coeffs.all { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }
 
-/** True when every value in [values] fits 32-bit range. */
 internal fun fitsInt32(values: LongArray): Boolean = values.all { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }
 
 // Wide coefficients are exact, so callers must not lose a duplicate term before construction.
