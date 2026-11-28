@@ -93,9 +93,10 @@ are large but cancel is held to the same slack as a row of small terms; a relati
 component makes the slack grow with that scale. `LinearSourceWitness.exact` records whether the accepted point satisfies every row and
 bound without slack. Cancellation withholds the point.
 
-For a checked point with at most 4,096 coordinates, rendering may snap residuals
-within `1e-12` of zero to zero when the result is integral, fits `Long`, passes
-every original check and keeps the same source objective; otherwise the original
+For a checked point with at most 4,096 coordinates over at most 32,768 model entries,
+rendering may snap residuals within `1e-12` of zero to zero when the result is integral,
+fits `Long`, passes every original check without slack and keeps the same source
+objective; otherwise the original
 float witness is kept. This changes no search or optimization authority.
 
 With positive feasibility tolerance, completed native optimization and refutation
@@ -380,8 +381,8 @@ integer and real declarations. Endpoint overrides constrain every original
 declaration of that sort, including unused ones; assertions remain additional
 constraints, and an explicit open replacement never removes an asserted
 inequality. Linear factors keep real endpoints as exact comparisons and snapshots
-keep them as formula atoms. Grid, tolerance and absent-value overrides are
-rejected.
+keep them as formula atoms. Tolerance, optimality-gap and absent-value overrides
+are rejected.
 
 ### Lexical scope and refusals
 
@@ -565,14 +566,14 @@ fixed mathematical meanings independent of input helper names, and a decimal
 approximation never replaces their authority.
 
 Optimization emits `; objective=<value>` for each published incumbent and
-`; optimizationStatus=<status>` at completion (`optimal`, `best-found`, `unbounded`),
-without needing `-s`; `sat` alone never claims optimality. Incumbents stream as they
+`; optimizationStatus=<status>` at completion (the verdict, such as `optimal`,
+`best-found` or `unbounded`), without needing `-s`; `sat` alone never claims optimality. Incumbents stream as they
 are accepted, each with its complete model. Exact objectives print as
 arbitrary-precision integers or reduced `numerator/denominator` text. Linear
 integer optimization uses the complete theory route when its objective range
 exceeds binary64's consecutive integers.
 
-Quadratic objectives report a separate `objectiveBound`, `objectiveBoundDirection`
+Linear and quadratic objectives report a separate `objectiveBound`, `objectiveBoundDirection`
 and `objectiveBoundStrict` when a global bound is checked. An unattained boundary
 reports `optimizationStatus=unattained-infimum` or `unattained-supremum` beside a
 feasible incumbent, and is never printed as a model. Local search and ALNS report
