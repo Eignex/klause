@@ -237,6 +237,10 @@ and neighborhood exhaustion supplies no global claim.
 
 ### Statistics
 
+The CLI adds invocation and source-preparation statistics when statistics output
+is enabled. Witnesses, verdicts and their source qualifications use the format's
+output protocol for every invocation.
+
 Verbose portfolio diagnostics stream to stderr separately from the solution
 protocol. The subprocess caller owns retention, persistence and stream-completion
 tracking; a retained diagnostic prefix alone cannot establish a completed trace.

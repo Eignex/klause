@@ -55,11 +55,15 @@ internal fun solveCapturedSource(
             )
         }),
     )
-    val reporting = object : OutputProtocol by output {
-        override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
-            val observed = stats.copy(presolve = result.preparationStats ?: stats.presolve)
-            output.onStatistics(observed, solveTimeMs, solutions)
+    val reporting = if (common.statistics) {
+        object : OutputProtocol by output {
+            override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
+                val observed = stats.copy(presolve = result.preparationStats ?: stats.presolve)
+                output.onStatistics(observed, solveTimeMs, solutions)
+            }
         }
+    } else {
+        output
     }
     val complete = result.completeSearchAdmitted
     when (result) {
@@ -74,7 +78,7 @@ internal fun solveCapturedSource(
 
                 is OpenTheoryExecution.Satisfy -> {
                     val outcome = execution.result
-                    val stats = outcome.stats.copy(lp = outcome.stats.lp.mergedWith(solvable.routingLpStats))
+                    val stats = outcome.stats
                     reporting.onVerdictContext(VerdictContext(
                         budgetExhausted = budgetSpent(stats.run.timedOut),
                         terminationReason = (outcome as? OpenTheoryResult.Unknown)?.reason,
@@ -88,7 +92,8 @@ internal fun solveCapturedSource(
                         is OpenTheoryResult.Unknown -> reporting.onComplete(Verdict.UNKNOWN)
                     }
                     if (common.statistics) reporting.onStatistics(
-                        stats, stats.run.wallMs + solvable.routingElapsedMs,
+                        stats.copy(lp = stats.lp.mergedWith(solvable.routingLpStats)),
+                        stats.run.wallMs + solvable.routingElapsedMs,
                         if (outcome is OpenTheoryResult.Sat) 1L else 0L,
                     )
                 }

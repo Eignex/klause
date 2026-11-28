@@ -45,14 +45,18 @@ import kotlin.time.Duration
 internal object SolveCore {
 
     fun solve(rawSolvable: Solvable, common: CommonOptions, protocol: OutputProtocol) {
-        val invocationStats = cliInvocationStats(common, rawSolvable.rendering)
-        val output = object : OutputProtocol by protocol {
-            override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
-                protocol.onAllowanceStatistics(common.debugStats?.pairs().orEmpty())
-                protocol.onAllowanceStatistics(nodeBudgetStatPairs(common.nodeBudget))
-                protocol.onAllowanceStatistics(invocationStats.pairs(stats))
-                protocol.onStatistics(stats, solveTimeMs, solutions)
+        val output = if (common.statistics) {
+            val invocationStats = cliInvocationStats(common, rawSolvable.rendering)
+            object : OutputProtocol by protocol {
+                override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
+                    protocol.onAllowanceStatistics(common.debugStats?.pairs().orEmpty())
+                    protocol.onAllowanceStatistics(nodeBudgetStatPairs(common.nodeBudget))
+                    protocol.onAllowanceStatistics(invocationStats.pairs(stats))
+                    protocol.onStatistics(stats, solveTimeMs, solutions)
+                }
             }
+        } else {
+            protocol
         }
         val publication = ArithmeticPublication(output)
         val engine = common.resolvedEngine()
@@ -479,9 +483,7 @@ internal object SolveCore {
                     ),
                 )
                 output.onComplete(outcome.verdict.toCliVerdict())
-                stats(
-                    common,
-                    output,
+                if (common.statistics) output.onStatistics(
                     withModelObjective(
                         outcome.stats.copy(
                             presolve = (outcome.stats.presolve ?: PresolveStats()).copy(
@@ -517,10 +519,6 @@ internal object SolveCore {
         val continuousObjective = solvable.continuousObjectiveValue?.invoke(sample)
         output.onSolution(solvable.render(sample), objective, continuousObjective)
         return objective to continuousObjective
-    }
-
-    private fun stats(common: CommonOptions, output: OutputProtocol, s: SolveStats, ms: Long, solutions: Long) {
-        if (common.statistics) output.onStatistics(s, ms, solutions)
     }
 
     // The engine records the LS incumbent in its minimizing frame; the sign-corrected objectiveValue
@@ -606,8 +604,6 @@ internal fun reportOpenTheoryOptimum(
         )
         return
     }
-    val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(routingLpStats))
-
     fun solution(assignment: OpenTheoryAssignment?, value: BigFraction?): Boolean {
         receipt?.let {
             return publication.publish(render(OpenTheoryAssignment.Sampled(it.sample)), it.value, it.version)
@@ -633,7 +629,7 @@ internal fun reportOpenTheoryOptimum(
     }
     output.onVerdictContext(
         VerdictContext(
-            budgetExhausted = budgetExhausted(resultStats.run.timedOut),
+            budgetExhausted = budgetExhausted(result.stats.run.timedOut),
             terminationReason = (result as? OpenTheoryOptimum.Bounded)?.reason,
             completePool = completePool,
         ),
@@ -665,6 +661,7 @@ internal fun reportOpenTheoryOptimum(
         }
     }
     if (statistics) {
+        val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(routingLpStats))
         output.onStatistics(resultStats, resultStats.run.wallMs + routingElapsedMs, publication.solutions)
     }
 }
