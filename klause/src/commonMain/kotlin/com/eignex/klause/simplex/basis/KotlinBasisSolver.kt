@@ -540,7 +540,11 @@ internal class KotlinBasisSolver private constructor(
         val updateUnits = saturatedAdd(validationUnits, checkNotNull(current.ft.lastUpdateWork).units)
         workMeter.updateSuccess(updateUnits)
         operationMeter.success(BasisOperationKind.UPDATE, updateUnits)
-        return if (current.ft.updateCount >= updateLimit || current.ft.fillAdvice(fillFactor)) {
+        val atUpdateLimit = current.ft.updateCount >= updateLimit
+        val atFillLimit = current.ft.fillAdvice(fillFactor)
+        return if (atUpdateLimit || atFillLimit) {
+            println("; basis-trigger $n ${current.ft.updateCount} $atUpdateLimit $atFillLimit " +
+                "${current.factors.upper.nnz} ${current.ft.upperEntries} ${current.ft.transformEntries}")
             BasisUpdate.REFACTORIZE
         } else {
             BasisUpdate.APPLIED
