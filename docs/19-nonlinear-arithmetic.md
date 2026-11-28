@@ -731,10 +731,11 @@ Those extension restrictions do not exclude the prepared native finite peer.
 
 `TranscendentalTheoryService` owns conditioned weakening, proposal checks and
 publication eligibility. `TranscendentalRelaxationModel` builds the polynomial
-relaxation, `TranscendentalRepair` the symbolic repairs and
+relaxation, `repairTranscendentalCandidate` the symbolic repairs and
 `TranscendentalSourceCheck` the original-source check.
-`TranscendentalSearchComponent` consumes shared frames. The mechanisms depend only on
-other arithmetic kernels, never on factors, search, propagation or `lp.engine`.
+`TranscendentalSearchComponent` consumes shared frames. The mechanisms depend on
+arithmetic kernels, shared lowering and the polynomial theory's checks, never directly
+on factors, search, propagation or `lp.engine`.
 
 ---
 
