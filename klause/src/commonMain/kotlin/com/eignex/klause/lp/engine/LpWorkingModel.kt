@@ -82,6 +82,7 @@ internal class LpWorkingScope internal constructor(
 
     val state: LpExactState get() = model.state
     val lastFloatTermination: LpFloatTermination? get() = owner.lastFloatTermination
+    fun restrictPreparation(grant: LpCertificationGrant) = owner.restrictPreparation(grant)
     val metrics: LpWorkingMetrics get() = LpWorkingMetrics(
         attempts,
         solves,

@@ -18,6 +18,7 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpCertificationGrant
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
@@ -32,7 +33,6 @@ import com.eignex.klause.lp.engine.LpSolveCursor
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolveStep
 import com.eignex.klause.lp.engine.LpVerdict
-import com.eignex.klause.lp.engine.ReconstructionLimits
 import com.eignex.klause.lp.engine.certifyLpResult
 import com.eignex.klause.lp.engine.optimizeFeasibleExactLp
 import com.eignex.klause.lp.exactComparison
@@ -112,7 +112,7 @@ internal class RealLeafOptimization(
         override fun deadline() = invocation.deadline()
         override val accounting get() = invocation.accounting
         override val admission get() = admissionFrom(invocation)
-        override val workScheduled get() = invocation.workScheduled
+        override val workScheduled get() = caller.workScheduled
         override val stopPolling get() = caller.stopPolling
     }
 
@@ -384,36 +384,34 @@ internal class RealLeafOptimization(
                 val prepared = solver.metrics
                 val setup = (prepared.preparationWork - prepared.reservedConstructionWork).coerceAtLeast(0L)
                 chargeCell(saturatedAdd(saturatedAdd(used.workOps, used.preparationOps),
-                    saturatedAdd(setup, prepared.constructionWork)), solver.preparationAllocation)
+                    saturatedAdd(setup, prepared.constructionWork)), prepared.preparationAllocation)
                 chargePivots(used.pivots)
             }
-            if (proposal == null || token() || remainingWork == 0L || funding.remainingAllocation == 0L) {
+            if (proposal == null || token() || remainingWork == 0L || funding.remainingAllocation == 0L ||
+                spentPivots > limits.maxPivots
+            ) {
                 return@use null
             }
-            val work = remainingWork
-            val bytes = funding.remainingAllocation
-            val basis = context.basisLimits
-            fun funded(limits: ReconstructionLimits) = limits.copy(
-                maxWork = minOf(limits.maxWork, work),
-                maxAllocation = minOf(limits.maxAllocation, bytes),
+            val refinement = LpRefinementRequest(
+                solver, solver.refinementCache, CELL_REFINEMENT.copy(
+                    maxWork = remainingWork, maxAllocation = funding.remainingAllocation, maxPivots = remainingPivots,
+                ),
+                onBasisVerification = context.onRefinementBasisVerification,
             )
-            val refinement = LpRefinementRequest(solver, solver.refinementCache,
-                CELL_REFINEMENT.copy(maxWork = work, maxAllocation = bytes, maxPivots = remainingPivots),
-                onBasisVerification = context.onRefinementBasisVerification)
-            try {
+            val result = try {
                 certifyLpResult(
                     checkNotNull(state.ownerWorkingModel()), proposal.first, proposal.second, token,
                     observer = Metered(::chargeCell), policy = context.certificationPolicy, refinement = refinement,
-                    claim = LpClaim.ATTAINED_OPTIMUM, continueFeasibility = false,
-                    reconstructionLimits = funded(context.reconstructionLimits),
-                    basisLimits = basis.copy(
-                        factor = basis.factor.copy(work = minOf(basis.factor.work, work),
-                            allocationBytes = minOf(basis.factor.allocationBytes, bytes)),
-                        verification = funded(basis.verification),
-                    ),
-                ).takeUnless { funding.spent > limits.maxWork || funding.allocated > limits.maxAllocation }
+                    claim = LpClaim.ATTAINED_OPTIMUM, reconstructionLimits = context.reconstructionLimits,
+                    basisLimits = context.basisLimits,
+                    certificationGrant = { LpCertificationGrant(remainingWork, funding.remainingAllocation) },
+                )
             } finally {
                 chargePivots(solver.refinementCache.pivots)
+            }
+            result.takeUnless {
+                funding.spent > limits.maxWork || funding.allocated > limits.maxAllocation ||
+                    spentPivots > limits.maxPivots
             }
         }
     }

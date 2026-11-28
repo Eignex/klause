@@ -20,7 +20,7 @@ internal class LpScopedSolver(
     private val maxRetainedRows: Int = Int.MAX_VALUE,
     private val pricing: LpPricingOptions = LpPricingOptions(),
     private val componentSplit: Boolean = false,
-    private val preparationAllocationLimit: Long = Long.MAX_VALUE,
+    private var preparationAllocationLimit: Long = Long.MAX_VALUE,
 ) : AutoCloseable {
     private val queryOwner = context.onQuery?.let { Any() }
     private var querySequence = 0L
@@ -60,8 +60,8 @@ internal class LpScopedSolver(
     private var preparationAttempts = 0L
     private var preparationSuccesses = 0L
     private var preparationWork = 0L
-    var preparationAllocation = 0L
-        private set
+    private var preparationWorkLimit = Long.MAX_VALUE
+    private var preparationAllocation = 0L
     private var preparationRefactorizations = 0L
     private var createdOwners = 0L
     private var closedOwners = 0L
@@ -89,7 +89,7 @@ internal class LpScopedSolver(
         editAttempts, editSuccesses, preparationAttempts, preparationSuccesses,
         preparationWork, preparationRefactorizations, createdOwners, closedOwners, peakOwners,
         state.rows.size, state.rows.activeCount,
-        appendBasisWork, appendUnknownWork, reservedConstructionWork, constructionWork,
+        appendBasisWork, appendUnknownWork, reservedConstructionWork, constructionWork, preparationAllocation,
     )
 
     val primalGuidanceState: String
@@ -569,6 +569,23 @@ internal class LpScopedSolver(
 
     private fun adoptNumerical(next: LpExactState, token: ExecutionControl): Boolean {
         val current = solver ?: return !token.pollStop()
+        if (next !== state && (preparationAllocationLimit != Long.MAX_VALUE || preparationWorkLimit != Long.MAX_VALUE)) {
+            val projection = LpProjectionMeter(
+                workLimit = (preparationWorkLimit - preparationWork).coerceAtLeast(0L),
+                allocationLimit = (preparationAllocationLimit - preparationAllocation).coerceAtLeast(0L),
+                cancellation = token,
+            )
+            try {
+                if (next.ownerWorkingModel(projection) == null) return false
+                projection.reserveVectors(next.model)
+                return current.adopt(next, token)
+            } catch (_: LpProjectionStop) {
+                return false
+            } finally {
+                preparationWork = saturatedAdd(preparationWork, projection.work)
+                preparationAllocation = saturatedAdd(preparationAllocation, projection.allocation)
+            }
+        }
         if (next.canProjectWorkingModel(token)) return current.adopt(next, token)
         if (token.pollStop()) return false
         retireNumerical()
@@ -584,6 +601,12 @@ internal class LpScopedSolver(
 
     internal fun requireAvailable() {
         check(!workingActive) { "source owner is suspended by a working scope" }
+    }
+
+    internal fun restrictPreparation(grant: LpCertificationGrant) {
+        preparationWorkLimit = minOf(preparationWorkLimit, saturatedAdd(preparationWork, grant.work))
+        preparationAllocationLimit = minOf(preparationAllocationLimit,
+            saturatedAdd(preparationAllocation, grant.allocation))
     }
 
     fun <T> withWorkingModel(
@@ -872,7 +895,8 @@ internal class LpScopedSolver(
         var accepted = false
         var failure: Throwable? = null
         val projection = LpProjectionMeter(
-            workLimit = if (workBudget > 0L) workBudget else Long.MAX_VALUE,
+            workLimit = minOf(if (workBudget > 0L) workBudget else Long.MAX_VALUE,
+                (preparationWorkLimit - preparationWork).coerceAtLeast(0L)),
             allocationLimit = (preparationAllocationLimit - preparationAllocation).coerceAtLeast(0L),
             cancellation = token,
         )
