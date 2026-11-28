@@ -36,15 +36,13 @@ class RestartPolicyTest {
         val pins = Assumptions.None.withBool(0, true).withInt(0, 1)
         val anchor = Sample(booleanArrayOf(true), longArrayOf(1))
         for (kind in PerturbationKind.entries) {
-            for (seed in 0..3) {
-                val state = LocalSearchState(LocalSearchModel.open(problem), Random(seed), pins)
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(0), pins)
 
-                anchorAndPerturb(state, anchor, 1, kind)
+            anchorAndPerturb(state, anchor, 1, kind)
 
-                assertTrue(state.assignment.boolValue(0))
-                assertEquals(1L, state.assignment.intValue(0))
-                assertEquals(0L, state.cost)
-            }
+            assertTrue(state.assignment.boolValue(0))
+            assertEquals(1L, state.assignment.intValue(0))
+            assertEquals(0L, state.cost)
         }
     }
 

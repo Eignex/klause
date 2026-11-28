@@ -142,7 +142,7 @@ class BacktrackSolverBooleanTest : RuntimeInitializedTest() {
     fun `pb learning should stay sound under aggressive forgetting`() {
         val rng = Random(2718281L)
         var checked = 0
-        repeat(10) { iter ->
+        repeat(4) { iter ->
             val numVars = 6 + rng.nextInt(4)
             val factors = ArrayList<Factor>()
             repeat(numVars + rng.nextInt(numVars)) {

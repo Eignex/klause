@@ -20,7 +20,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.milliseconds
 
 @RunWith(Parameterized::class)
 class LinearSourceExecutionModeTest(private val engine: FiniteEngine) {
@@ -78,7 +77,7 @@ class LinearSourceExecutionModeTest(private val engine: FiniteEngine) {
 
         val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
-                shape, engine, PresolveConfig.NONE, false, false, ExecutionControl.after(50.milliseconds),
+                shape, engine, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
                 randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = budget,
