@@ -34,20 +34,6 @@ class SharingMemoryTest {
     }
 
     @Test
-    fun `four thousand permanent native rows should fit the default observation allowance`() {
-        val session = PropagationSession(Problem(4, 0, emptyArray(),
-            arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = true)
-        assertTrue(session.usesNativeSat)
-        repeat(4000) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 2, permanent = true) }
-        val expected = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
-
-        val sample = session.sharingMemory()
-
-        assertEquals(expected, sample.completeValues)
-        assertEquals(4000L, expected.getValue("learnedObjects"))
-    }
-
-    @Test
     fun `twenty thousand permanent native rows should fit the default observation allowance`() {
         val session = PropagationSession(Problem(4, 0, emptyArray(),
             arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = true)

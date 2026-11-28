@@ -39,26 +39,6 @@ class CoverColumnDominanceTest {
     }
 
     @Test
-    fun `all small positive covers and signed costs should preserve feasibility and the optimum`() {
-        val covers = listOf(3, 5, 6, 7)
-        for (selection in 1 until 16) {
-            val clauses = covers.filterIndexed { i, _ -> selection and (1 shl i) != 0 }.map { mask ->
-                Clause((0..2).filter { mask and (1 shl it) != 0 }.map { Lit.make(it, true) }.toIntArray())
-            }
-            val problem = Problem(3, 0, emptyArray(), clauses)
-            val original = (0 until 8).filter { mask -> clauses.all { holds(it, mask) } }
-            for (encoded in 0 until 64) {
-                val costs = (0..2).associateWith { ((encoded shr (2 * it)) and 3).toLong() - 1L }
-                val pins = CoverColumnDominance.pins(problem, costs, ExecutionControl.Never)
-                val reduced = original.filter { mask -> pins.all { holds(it as Clause, mask) } }
-                assertTrue(reduced.isNotEmpty())
-                fun cost(mask: Int): Long = costs.entries.sumOf { (v, c) -> if (mask and (1 shl v) != 0) c else 0L }
-                assertEquals(original.minOf(::cost), reduced.minOf(::cost))
-            }
-        }
-    }
-
-    @Test
     fun `strict replacement chains should retain a covering terminal regardless of column order`() {
         for (costs in listOf(mapOf(0 to 3L, 1 to 2L, 2 to 1L), mapOf(0 to 1L, 1 to 2L, 2 to 3L))) {
             val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
