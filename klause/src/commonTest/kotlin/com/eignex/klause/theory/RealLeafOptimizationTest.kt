@@ -159,7 +159,8 @@ class RealLeafOptimizationTest {
         val context = LpSolveContext(
             exactContinuationLimits = ExactContinuationLimits(maxAllocation = 0),
             onQuery = { query ->
-                objectiveQuery = objectiveQuery || (0 until query.model.n).any { query.model.costD(it) != 0.0 }
+                objectiveQuery = objectiveQuery ||
+                    (query.model.n >= 4 && query.model.costD(2) == 1.0 && query.model.costD(3) == -1.0)
             },
         )
 

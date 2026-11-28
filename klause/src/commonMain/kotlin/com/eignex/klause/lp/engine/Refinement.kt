@@ -212,7 +212,7 @@ private class RefinementRun(
         withChild(residual.working, anchor) { scope, firstAllowance ->
             for (round in 1..remainingRounds) {
                 meter.poll()
-                if (round > 1 && !scope.replaceState(residual.working)) {
+                if (round > 1 && !replaceResidual(scope, residual.working)) {
                     meter.poll()
                     meter.stop(LpRefinementDecline.ADOPTION)
                 }
@@ -277,6 +277,7 @@ private class RefinementRun(
     ): Pair<LpSolver, FloatLpResult?>? {
         val before = scope.metrics
         val allowance = if (first) firstAllowance else meter.allowance(false)
+        scope.restrictPreparation(LpCertificationGrant(meter.remainingWork, meter.remainingAllocation))
         return try {
             scope.solveFloat(warm, if (warm != null) null else allowance)
         } finally {
@@ -284,7 +285,8 @@ private class RefinementRun(
             val preparation = after.owners.preparationWork - before.owners.preparationWork
             val work = after.solves.workOps - before.solves.workOps
             val pivots = after.solves.pivots - before.solves.pivots
-            meter.completed(saturatedAdd(preparation, work), pivots = pivots)
+            meter.completed(saturatedAdd(preparation, work),
+                after.owners.preparationAllocation - before.owners.preparationAllocation, pivots)
             meter.metrics = meter.metrics.copy(
                 floatWork = saturatedAdd(meter.metrics.floatWork, work),
                 preparationWork = saturatedAdd(meter.metrics.preparationWork, preparation),
@@ -293,6 +295,19 @@ private class RefinementRun(
                 ) - floatFactorCount(before.solves),
                 observedPivots = meter.metrics.observedPivots + pivots,
             )
+        }
+    }
+
+    private fun replaceResidual(scope: LpWorkingScope, working: LpWorkingModel): Boolean {
+        val before = scope.metrics.owners
+        scope.restrictPreparation(LpCertificationGrant(meter.remainingWork, meter.remainingAllocation))
+        return try {
+            scope.replaceState(working)
+        } finally {
+            val after = scope.metrics.owners
+            val work = after.preparationWork - before.preparationWork
+            meter.completed(work, after.preparationAllocation - before.preparationAllocation)
+            meter.metrics = meter.metrics.copy(preparationWork = saturatedAdd(meter.metrics.preparationWork, work))
         }
     }
 
@@ -734,10 +749,18 @@ internal fun refineLp(
     additionalSourceWork: Long = 0L,
     diagnostic: LpRefinementPath? = null,
     claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
+    grant: LpCertificationGrant? = null,
 ): LpRefinementResult {
     val state = model.exactState
-    val limits = request.effectiveLimits(additionalSourceWork)
     val cache = request.cache
+    val allowed = request.effectiveLimits(additionalSourceWork)
+    val limits = grant?.let {
+        allowed.copy(
+            maxWork = minOf(allowed.maxWork, saturatedAdd(saturatedAdd(cache.work, directWork), it.work)),
+            maxAllocation = minOf(allowed.maxAllocation,
+                saturatedAdd(saturatedAdd(cache.allocation, directAllocation), it.allocation)),
+        )
+    } ?: allowed
     val meter = RefinementMeter(limits, cache, cancellation, request.onBasisVerification, diagnostic = diagnostic)
     var run: RefinementRun? = null
     var reason: LpRefinementDecline? = LpRefinementDecline.FAILURE

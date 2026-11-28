@@ -18,6 +18,7 @@ internal data class LpScopedMetrics(
     // the ledger swaps that bound for the work the owners reported building their scaling views.
     val reservedConstructionWork: Long = 0L,
     val constructionWork: Long = 0L,
+    val preparationAllocation: Long = 0L,
 ) {
     val editDeclines: Long get() = editAttempts - editSuccesses
     val preparationDeclines: Long get() = preparationAttempts - preparationSuccesses

@@ -86,6 +86,21 @@ class LpExactOptimizationTest {
     }
 
     @Test
+    fun `an explicit resource limit should terminate exact optimization`() {
+        val source = model(listOf(ExactLpBounds(lower = zero)), listOf(one))
+        val stops = listOf(
+            ExactContinuationLimits(maxPivots = 0) to ContinuationDecline.PIVOTS,
+            ExactContinuationLimits(maxTimeNs = 0) to ContinuationDecline.TIME,
+        )
+
+        for ((limits, stop) in stops) {
+            val result = immediateLpSolve { optimize(source, limits) }
+
+            assertEquals(stop, assertIs<LpExactOptimization.Declined>(result).reason)
+        }
+    }
+
+    @Test
     fun `a checked improving direction should survive an infeasible primal dual query`() {
         val source = model(listOf(ExactLpBounds()), listOf(one))
 
