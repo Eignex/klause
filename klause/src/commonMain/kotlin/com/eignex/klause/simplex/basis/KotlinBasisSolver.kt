@@ -117,10 +117,18 @@ internal class KotlinBasisSolver private constructor(
         validateBasis(basicIndex)
         operationMeter.attempt(BasisOperationKind.REFACTORIZATION)
         val proposedOrder = retainedOrder.takeIf { reusePivotOrder }
+        val precedingGeneration = generation
+        val precedingUpdates = updateCount
+        val precedingWork = workMeter.snapshot()
         // Invalidate before a numerical attempt: even an exceptional build cannot expose stale factors.
         invalidate()
         val meter = BasisBuildAccumulator(BasisBuildKind.REFACTORIZATION)
         val result = build(basicIndex, proposedOrder)
+        val build = result.report
+        println("; basis-build $n ${hashCode()} $precedingGeneration $precedingUpdates " +
+            "${precedingWork.ftran.units} ${precedingWork.btran.units} ${precedingWork.update.units} " +
+            "${build.proposedOrder} ${build.reusedOrder} ${build.proposedRejection} " +
+            "${build.proposedWork?.pivots} ${build.proposedWork?.units} ${build.selectedWork.units} ${build.units}")
         meter.add(result.report)
         val report = meter.report(
             result is LuBuildResult.Built,
@@ -544,7 +552,8 @@ internal class KotlinBasisSolver private constructor(
         val atFillLimit = current.ft.fillAdvice(fillFactor)
         return if (atUpdateLimit || atFillLimit) {
             println("; basis-trigger $n ${current.ft.updateCount} $atUpdateLimit $atFillLimit " +
-                "${current.factors.upper.nnz} ${current.ft.upperEntries} ${current.ft.transformEntries}")
+                "${current.factors.upper.nnz} ${current.ft.upperEntries} ${current.ft.transformEntries} " +
+                "${hashCode()} $generation")
             BasisUpdate.REFACTORIZE
         } else {
             BasisUpdate.APPLIED
@@ -578,11 +587,13 @@ internal class KotlinBasisSolver private constructor(
         var scale = 1.0
         for (i in 0 until n) {
             if (!product[i].isFinite() || !rhs[i].isFinite() || !solution[i].isFinite()) {
+                println("; basis-quality $n ${hashCode()} $generation $updateCount $transpose Infinity")
                 return BasisSolveQuality(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY)
             }
             residual = max(residual, abs(product[i] - rhs[i]))
             scale = max(scale, max(abs(product[i]), abs(rhs[i])))
         }
+        println("; basis-quality $n ${hashCode()} $generation $updateCount $transpose ${residual / scale}")
         return BasisSolveQuality(residual, residual / scale)
     }
 
