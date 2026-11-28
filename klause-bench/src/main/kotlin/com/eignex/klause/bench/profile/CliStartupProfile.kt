@@ -48,6 +48,7 @@ object CliStartupProfile {
                 runProcess(launcher + options, runtime, root, directory.resolve("fresh-$iteration"))
             }
             captureWarm(root, input, directory, repeats, 1)
+            requireRepeatedOutput(directory, repeats, input)
             val expected = directory.resolve("fresh-1.out").readBytes()
             for (iteration in 1..repeats) {
                 check(expected.contentEquals(directory.resolve("fresh-$iteration.out").readBytes())) { input }
@@ -84,6 +85,9 @@ object CliStartupProfile {
         val invocation = listOf("-cp", classpath, javaClass.name, "warm", "$repeats", out.absolutePath)
         runProcess(listOf(java) + defaults + runtime + invocation + solveOptions(input, seed),
             emptyList(), root, out.resolve("warm"))
+    }
+
+    private fun requireRepeatedOutput(out: File, repeats: Int, input: File) {
         val expected = out.resolve("warm-1.out").readBytes()
         for (iteration in 2..repeats) {
             check(expected.contentEquals(out.resolve("warm-$iteration.out").readBytes())) { input }
