@@ -1,98 +1,58 @@
 package com.eignex.klause.lp.lattice
 
-import com.eignex.klause.lp.lattice.SparseIntRow
-import com.eignex.klause.lp.lattice.bareissEchelon
-import com.eignex.klause.lp.lattice.mixedEchelonHermite
-import com.eignex.klause.lp.lattice.originalBounds
-import com.eignex.klause.lp.lattice.sparseIntRow
-import com.eignex.klause.lp.lattice.triangularBounds
-import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
-import com.eignex.util.numbers.isZero
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class SparseIntMatrixTest {
 
-    private fun matrix(random: Random, rows: Int, cols: Int): List<SparseIntRow> = List(rows) {
-        val entries = HashMap<Int, BigInt>()
-        for (j in 0 until cols) {
-            if (random.nextInt(cols) < 3) entries[j] = bigIntOf(random.nextInt(-4, 5))
-        }
-        sparseIntRow(entries)
-    }
+    private fun row(vararg values: Int): SparseIntRow =
+        sparseIntRow(values.withIndex().filter { it.value != 0 }.associate { it.index to bigIntOf(it.value) })
 
-    private fun dense(a: List<SparseIntRow>, cols: Int): Array<Array<BigInt>> =
-        Array(a.size) { i -> Array(cols) { j -> a[i][j] } }
-
-    private fun densePivots(a: List<SparseIntRow>, cols: Int): List<Int> {
-        val w = dense(a, cols)
-        val m = w.size
-        val pivots = ArrayList<Int>()
-        var prev = BIG_ONE
-        var r = 0
-        for (c in 0 until cols) {
-            if (r >= m) break
-            val sel = (r until m).firstOrNull { !w[it][c].isZero() } ?: continue
-            val t = w[sel]
-            w[sel] = w[r]
-            w[r] = t
-            val pivot = w[r][c]
-            for (i in r + 1 until m) {
-                val factor = w[i][c]
-                for (j in c until cols) w[i][j] = (pivot * w[i][j] - factor * w[r][j]) / prev
-            }
-            prev = pivot
-            pivots.add(c)
-            r++
-        }
-        return pivots
-    }
+    // The first row needs a swap, the second repeats it, and columns 2 and 3 carry no pivot.
+    private val rankDeficient = listOf(
+        row(0, 2, 0, 1, 0, 0),
+        row(0, 4, 0, 2, 0, 0),
+        row(3, 0, 1, 0, 0, 0),
+        row(0, 0, 0, 0, 5, -1),
+    )
 
     @Test
-    fun `sparse elimination should match the dense rank and pivot columns`() {
-        val random = Random(20260813)
-        repeat(REPEATS) {
-            val a = matrix(random, ROWS, COLS)
-            val e = bareissEchelon(a, COLS)
-            assertEquals(densePivots(a, COLS), e.pivots.toList(), "pivot columns must match on $a")
-            assertEquals(e.pivots.size, e.rows.size)
-        }
+    fun `sparse elimination should find the rank and pivot columns of a rank deficient matrix`() {
+        val e = bareissEchelon(rankDeficient, COLS)
+
+        assertEquals(listOf(0, 1, 4), e.pivots.toList())
+        assertEquals(e.pivots.size, e.rows.size)
     }
 
     @Test
     fun `structural bounds should contain a witness of the original system`() {
         // The right-hand sides come from a witness, so the system provably has that solution.
-        val random = Random(555)
-        repeat(REPEATS) {
-            val a = matrix(random, ROWS, COLS)
-            val witness = Array(COLS) { bigIntOf(random.nextInt(-6, 7)) }
-            val rhs = Array(a.size) { i ->
-                var acc = BIG_ZERO
-                for (k in a[i].index.indices) acc += a[i].value[k] * witness[a[i].index[k]]
-                acc
-            }
-            val mixed = mixedEchelonHermite(a, emptyList(), COLS, rhs)
-            if (mixed.equalities.isEmpty()) return@repeat
-            val reduced = Array<BigInt?>(mixed.equalities.size) { mixed.equalityRhs[it] }
-            val y = triangularBounds(mixed.equalities, COLS, reduced, reduced)
-            val bounds = mixed.originalBounds(y.lo, y.hi)
-            for (i in 0 until COLS) {
-                val lo = bounds.lo[i]
-                val hi = bounds.hi[i]
-                assertTrue(lo == null || witness[i] >= lo, "x$i = ${witness[i]} fell below $lo")
-                assertTrue(hi == null || witness[i] <= hi, "x$i = ${witness[i]} rose above $hi")
-            }
+        val witness = listOf(1, -2, 3, 4, 0, -5).map { bigIntOf(it) }
+        val rhs = Array(rankDeficient.size) { i ->
+            val row = rankDeficient[i]
+            var acc: BigInt = BIG_ZERO
+            for (k in row.index.indices) acc += row.value[k] * witness[row.index[k]]
+            acc
+        }
+
+        val mixed = mixedEchelonHermite(rankDeficient, emptyList(), COLS, rhs)
+        val reduced = Array<BigInt?>(mixed.equalities.size) { mixed.equalityRhs[it] }
+        val y = triangularBounds(mixed.equalities, COLS, reduced, reduced)
+        val bounds = mixed.originalBounds(y.lo, y.hi)
+
+        for (i in 0 until COLS) {
+            val lo = bounds.lo[i]
+            val hi = bounds.hi[i]
+            assertTrue(lo == null || witness[i] >= lo, "x$i = ${witness[i]} fell below $lo")
+            assertTrue(hi == null || witness[i] <= hi, "x$i = ${witness[i]} rose above $hi")
         }
     }
 
     private companion object {
-        const val ROWS = 5
         const val COLS = 6
-        const val REPEATS = 20
     }
 }

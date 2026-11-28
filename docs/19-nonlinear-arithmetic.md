@@ -20,17 +20,26 @@ keeps the source expression DAG; products and fixed powers are not expanded, and
 integer arithmetic stays arbitrary precision. SMT admission keeps the snapshot
 through `SmtLibProblem.source`.
 
-Library setup can also project a factor model into this execution when it contains
-open integer declarations and every factor has a complete selected polynomial
-encoding. The projection emits declared endpoints and membership holes exactly and
-creates no finite CP domains for open integers; unsupported scopes decline.
-An encoding decline retains the failing canonical factor and unmet conditions,
-including when another relation in the whole-source scope caused route selection.
-An open integer read by a nonlinear factor requires arithmetic ownership even
-when that factor also has finite propagation. Polynomial route selection uses that
-demand and the captured encoder; a real-valued relation is not required to select it.
+Library setup can also project a factor model with open integer declarations.
+Every factor requires an exact owner. When a finite factor needs native checking,
+the compact CP peer owns finite integer domains, holes and finite factors.
+Arithmetic owns open integers, reals and their encoded relations, and embeds the
+finite integers those relations read. It preserves declared open endpoints at
+arbitrary precision without materializing a finite domain. An encoding decline
+retains the failing canonical factor and unmet conditions. A nonlinear factor
+that reads an open integer requires arithmetic ownership even when it also has
+finite propagation.
 
 ### Solving and composition
+
+Satisfaction with a native finite peer uses backtracking, including in mixed
+execution. At a partial state, the certified envelope LP consumes active Boolean
+facts and the bounds of the shared finite integers. Certified integer deductions return to CP
+with those facts as trailed premises. A fixed finite leaf checks its native
+factors and pins the shared values for nonlinear integer search and exact real
+completion. Only open integer coordinates enter arithmetic candidate traversal.
+A source witness combines the checked finite leaf with the checked arithmetic
+completion in original declaration order.
 
 Every strategy starts from the same two facts about the source.
 
@@ -136,11 +145,17 @@ refutes the whole source. Each applies
 within the caller's Boolean and numeric assumptions. No finite-box exhaustion,
 including exhaustion of nonempty root sets, claims UNSAT.
 
+With a finite peer, shared traversal can refute the source when every finite
+branch has a proof under its own conditions. An undecided nonlinear completion
+leaves that branch unresolved. When source acceptance reads feasibility slack,
+exact completions can supply witnesses and failed exact checks leave the source
+undecided.
+
 #### Quadratic objectives
 
-`OpenTheoryPipeline.minimize` accepts the same request with an exact source
-`QuadraticObjectiveSpec`. Every incumbent checks integrality, the original formula
-and the exact objective before publication.
+For sources with full arithmetic ownership, `OpenTheoryPipeline.minimize`
+accepts an exact source `QuadraticObjectiveSpec`. Every incumbent checks
+integrality, the original formula and the exact objective before publication.
 
 Complete traversal uses `SearchSession` with a theory component. Exact real
 optimization supplies node lower bounds, and fractional integer coordinates split
@@ -180,6 +195,12 @@ segments, while cancellation still polls inside arithmetic. One cancellation and
 work scope spans candidate generation, all completion queries and the final source
 check. Conditioned calls keep original Boolean pins and numeric windows; candidate
 fixings never widen them.
+
+With a finite peer, its LP checks and conditioned integer completions share the
+invocation's native work and cancellation. The integer candidate allowance spans
+finite leaves. A leaf can still check its relaxation after that allowance is spent
+if the caller has funded the check. Finite decisions and attempted open tuples use
+the same caller node allowance when supplied.
 
 The optional producer and integer consumer are independently controlled and disabled
 by default. Each cursor retains at most eight source cells. Admission, integer hull
@@ -345,8 +366,10 @@ exact completion; a caller stop remains terminal.
 Numerical or representational declines leave exact completion responsible for the
 remaining scope. A bounded exact witness probe precedes LP construction; unresolved
 regions enter envelope pruning before cylindrical projection. The caller's matrix
-ceiling admits envelope rows, refinement and retained spatial windows. Declining
-an optional envelope allocation leaves exact completion available.
+ceiling admits envelope rows, refinement and retained spatial windows. Envelope
+consultations debit the enclosing arithmetic ledger across queries, including
+when called through a transcendental relaxation. An optional envelope decline
+leaves exact completion available under the remaining caller allowance.
 
 #### Quadratic strategy execution
 
@@ -708,10 +731,11 @@ Those extension restrictions do not exclude the prepared native finite peer.
 
 `TranscendentalTheoryService` owns conditioned weakening, proposal checks and
 publication eligibility. `TranscendentalRelaxationModel` builds the polynomial
-relaxation, `TranscendentalRepair` the symbolic repairs and
+relaxation, `repairTranscendentalCandidate` the symbolic repairs and
 `TranscendentalSourceCheck` the original-source check.
-`TranscendentalSearchComponent` consumes shared frames. The mechanisms depend only on
-other arithmetic kernels, never on factors, search, propagation or `lp.engine`.
+`TranscendentalSearchComponent` consumes shared frames. The mechanisms depend on
+arithmetic kernels, shared lowering and the polynomial theory's checks, never directly
+on factors, search, propagation or `lp.engine`.
 
 ---
 

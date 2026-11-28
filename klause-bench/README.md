@@ -170,7 +170,9 @@ JVM CI exercises the pinned Gradle and SDK release assets with
 requires Linux, `gh`, `sha256sum` and the JDK archive tool. It checks the Gradle asset against the wrapper
 version and SHA-256, verifies every SDK artifact, and extracts only verified bytes into a private
 temporary directory removed after Gradle exits, with daemon reuse disabled for that distribution.
-It keeps the caller's Gradle dependency cache.
+It keeps the caller's Gradle dependency cache. The JVM coverage step opts into one refreshed Gradle
+retry when the `buildSrc` plugin classpath reports missing Kotlin POMs before any task starts and
+each reported Plugin Portal POM responds with HTTP 200.
 Lab workers use their JDK transport and do not invoke this shell entry point.
 
 Gradle stages the checksum-pinned Lab Bench SDK `0.1.1` through the public GitHub release-asset API using the JDK.
@@ -913,14 +915,9 @@ LP work and certification counters and whole-process measurements retain the cos
 of numerical repair and final completion. The incremental route is the ordinary
 default; explicit false selects the comparison control.
 
-`lp-component-split` supplies existing separable MPS and MiniZinc sources plus
-`mzn-linked-8x24` as a connected control. For immutable node lifecycle controls use
-`param.lp-component-ownership=true|false` with identical source hashes, presolve,
-LP effort and containing work limits. This option also dispatches root tableau
-cuts to their owning blocks. It leaves automatic component admission unchanged;
-record prepared block counts and actual bound edits before interpreting a zero
-reuse or zero-cut result. Component count alone establishes no saved work or
-whole-source improvement.
+`lp-component-split` supplies separable MPS and MiniZinc sources plus
+`mzn-linked-8x24` as a connected control. `param.lp-component-split=true|false`
+controls component splitting for continuous leaf completion.
 `param.lp-component-reuse=true|false` isolates cost-admitted numerical node reuse
 from component guidance and private rounding. Its admission observations retain
 the child count, modeled child-model storage and shared basis-storage reservation
@@ -930,11 +927,8 @@ the existing route ledger; numerical work, pivots and factors count actual solve
 `SOLVED` counts invocations, including attempts that stop without a result.
 `set=lp-component-lifecycle-v1` selects two binary covering MPS sources with direct
 additive objectives. Each block needs two selected columns but has a fractional
-LP optimum, admitting local tableau cuts without an objective-definition row that
-connects the blocks. Compare ownership and `param.lp-root-cuts` independently;
-retain prepared block counts, child reuses, cut consumption and ordinary outcomes.
-Pin `param.bt-arm=lp-aggressive` and `param.arms=1` for lifecycle controls so an
-LP-free portfolio arm cannot finish the source before the component owner runs.
+LP optimum. There is no objective-definition row connecting the blocks. Pin
+`param.bt-arm=lp-aggressive` and `param.arms=1` to isolate an LP worker.
 
 Cut lifecycle controls retain `lpPhase_CUT_ROOT_*` and `lpPhase_CUT_NODE_*` phases
 alongside the ordinary LP totals. Family tags distinguish construction, mapping,
@@ -1082,6 +1076,26 @@ root bound, prunes and fixings establish progress and consumption. An admitted
 trial or completed lab job alone establishes no useful deduction or source proof.
 Keep physical RSS separate from modeled storage reservations. Source checking and
 all preparation, failed work and retirement belong to the containing comparison.
+
+For a bounded lifecycle diagnostic, run `FinitePortfolioLpCapture` with
+`capture-root-points=true capture-worker=any portfolio-policy=ordinary handoff=false
+portfolio-progress=false captures=0 lp-ceiling=default`. The separate
+`automatic-sparse=true` treatment probes automatic admission within the same
+portfolio allocation. Single-core root lifecycle capture allows up to 60,000 ms and limits
+source input to 2 MiB and 6,000 rows and columns. It checks the decoded source
+hash and journals admission,
+query, handoff and consumer events. An optional `source-archive-sha256` binds the
+committed corpus entry and records the worker's stored encoding separately.
+Reuse receipts retain the reader's current preparation charge and the original
+preparation work in separate fields. They distinguish the funded source pass
+from the compact query forecast, which can still decline.
+Guard masks cover evaluated operands only. Missing or interrupted events leave
+the corresponding outcome unknown. The journal associates a committed integer
+split with the full root target that supplied its preferred value when it can
+trace the split through ordinary search. Checked continuation bounds carry their
+root model identity, and an applied bound records the prior shared objective floor.
+The benchmark JVM profile and observer
+overhead have a separate cost scope from ordinary CLI solves.
 
 `ROOT_ADMISSION_ROOT` distinguishes duty-cycle skips, declined relaxers and queries.
 `ROOT_LAYOUT_PREPARATION_ROOT` records active cold construction and exact-state
@@ -1258,6 +1272,9 @@ attribution=false|true`.
 `route=catalog seed=N` instead runs the ordinary single-core automatic CP catalog
 through source setup and execution. This mode rejects `nodes` and attribution;
 the ordinary elapsed schedule and recipe settings supply their own controls.
+Catalog `trace=first-integer-attachment` compares integer derivation with admission
+disabled and enabled under the same typed settings. It records the first publication
+frontier, separate row and clause fixpoint boundaries, and their net bound changes.
 `route=single` is the default fixed-seed backtrack traversal below and rejects `seed`.
 Catalog capture records at most four native sessions in creation order, with worker
 labels, initial levels and learned counts, canonical source and actual worker models,
@@ -1393,8 +1410,7 @@ and `heap-mib`. Contradicting evidence makes a row `invalid`, an arm without
 completed comparable work `incomparable`, a missing arm `incomplete`, and a missing
 receipt, frame, digest, hash or identity `unverifiable`. These rows list their
 reasons and keep their trajectory diagnostic, but contribute no ratio. The lab
-attaches worker receipts to solver records only, so fixed-work rows without one are
-`unverifiable`.
+attaches the accepted worker receipt and execution frame to each fixed-work record.
 
 Valid rows whose limit-point digests agree, or whose arms both reach a verdict with
 equal full digests, are `matched` and report candidate/control wall and CPU ratios

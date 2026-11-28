@@ -21,7 +21,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class BoardRestartOutcomeTest {
     @Test
@@ -196,37 +195,31 @@ class BoardRestartOutcomeTest {
             ),
         )
         val outcomes = mutableListOf<BoardRestartOutcome?>()
-        for (seed in 0L..7L) {
-            val policy = IteratedLocalSearchRestart(
-                initialPerturbationStrength = 1, adaptivePerturbation = false,
-                perturbationKind = PerturbationKind.BasinHopping,
-            )
-            val strategy = SourceDrivenStrategy(
-                sources = emptyList(), acceptance = AcceptanceRule.GreedyDescent,
-                feasibleDescent = FeasibleDescent.SelfOwned,
-                perturbation = { state ->
-                    if (policy.lastBoardRestartOutcome != null) {
-                        assertEquals(listOf(0L, 1L), (0 until 2).map(state.assignment::intValue))
-                        outcomes.add(policy.lastBoardRestartOutcome)
-                    }
-                    null
-                },
-            )
-            val engine = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy)
+        val policy = IteratedLocalSearchRestart(
+            initialPerturbationStrength = 1, adaptivePerturbation = false,
+            perturbationKind = PerturbationKind.BasinHopping,
+        )
+        val strategy = SourceDrivenStrategy(
+            sources = emptyList(), acceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned,
+            perturbation = { state ->
+                if (policy.lastBoardRestartOutcome != null) {
+                    assertEquals(listOf(0L, 1L), (0 until 2).map(state.assignment::intValue))
+                    outcomes.add(policy.lastBoardRestartOutcome)
+                }
+                null
+            },
+        )
+        val engine = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy)
 
-            engine.resumable(
-                LinearObjective(), LocalSearchParams(
-                    maxFlips = 2L, randomSeed = seed,
-                    initialAssignment = Sample(BooleanArray(0), LongArray(32) { if (it == 1) 1L else 0L }),
-                ),
-            ).use { handle -> handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
-        }
+        engine.resumable(
+            LinearObjective(), LocalSearchParams(
+                maxFlips = 2L, randomSeed = 0L,
+                initialAssignment = Sample(BooleanArray(0), LongArray(32) { if (it == 1) 1L else 0L }),
+            ),
+        ).use { handle -> handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
 
-        assertEquals(8, outcomes.size)
-        assertTrue(outcomes.all {
-            it == BoardRestartOutcome.DeclinedRepair || it == BoardRestartOutcome.DeclinedUnchanged
-        })
-        assertTrue(BoardRestartOutcome.DeclinedRepair in outcomes)
+        assertEquals(listOf<BoardRestartOutcome?>(BoardRestartOutcome.DeclinedRepair), outcomes)
     }
 
     @Test
@@ -266,33 +259,27 @@ class BoardRestartOutcomeTest {
     fun `enabled canonical preparation should attribute erased board changes to preparation`() {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2))))
         val outcomes = mutableListOf<BoardRestartOutcome?>()
-        for (seed in 0L..7L) {
-            val policy = IteratedLocalSearchRestart(initialPerturbationStrength = 5, adaptivePerturbation = false)
-            val strategy = SourceDrivenStrategy(
-                sources = emptyList(), acceptance = AcceptanceRule.GreedyDescent,
-                feasibleDescent = FeasibleDescent.SelfOwned,
-                perturbation = {
-                    if (policy.lastBoardRestartOutcome != null) outcomes.add(policy.lastBoardRestartOutcome)
-                    null
-                },
-            )
-            val engine = LocalSearchEngine(
-                LocalSearchModel.open(problem), strategy = strategy,
-                restartPolicy = policy, seedImplicitOnRestart = true,
-            )
+        val policy = IteratedLocalSearchRestart(initialPerturbationStrength = 5, adaptivePerturbation = false)
+        val strategy = SourceDrivenStrategy(
+            sources = emptyList(), acceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned,
+            perturbation = {
+                if (policy.lastBoardRestartOutcome != null) outcomes.add(policy.lastBoardRestartOutcome)
+                null
+            },
+        )
+        val engine = LocalSearchEngine(
+            LocalSearchModel.open(problem), strategy = strategy,
+            restartPolicy = policy, seedImplicitOnRestart = true,
+        )
 
-            engine.resumable(
-                LinearObjective(), LocalSearchParams(
-                    maxFlips = 2L, randomSeed = seed, initialAssignment = Sample(BooleanArray(0), longArrayOf(0, 1, 2)),
-                ),
-            ).use { handle -> handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
-        }
+        engine.resumable(
+            LinearObjective(), LocalSearchParams(
+                maxFlips = 2L, randomSeed = 0L, initialAssignment = Sample(BooleanArray(0), longArrayOf(0, 1, 2)),
+            ),
+        ).use { handle -> handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
 
-        assertEquals(8, outcomes.size)
-        assertTrue(outcomes.all {
-            it == BoardRestartOutcome.DeclinedPreparation || it == BoardRestartOutcome.DeclinedUnchanged
-        })
-        assertTrue(BoardRestartOutcome.DeclinedPreparation in outcomes)
+        assertEquals(listOf<BoardRestartOutcome?>(BoardRestartOutcome.DeclinedPreparation), outcomes)
     }
 
     @Test

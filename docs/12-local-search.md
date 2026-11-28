@@ -115,8 +115,9 @@ objects for primitives. Each declares a **phase** and a **pool**:
 | `stall-kick` | One flattened perturbation from a random walk over the variable–factor graph |
 | `unused-values` | Opt-in owner moves of a satisfied implicitly seeded plain AllDifferent onto unused values |
 
-The opt-in `extended-*` variants of `violated`, `structured` and `elected` draw
-richer moves that cost more to generate and are not always net-positive, such as a
+The opt-in `extended-repairs`, `extended-structured` and `extended-elected` variants
+of `violated`, `structured` and `elected` draw richer moves that cost more to
+generate and are not always net-positive, such as a
 Circuit 2-opt reversal, an AllDifferent 3-cycle or a DP-optimal accepting run for
 Regular. Default arms never pay for them. Each
 configured source carries a per-pick candidate cap and an enable gate. The reserved
@@ -262,6 +263,13 @@ draws; mixed-pool arms over the same model share it, including ALNS's inner loca
 search. Each variable's occurrence index lists each active factor once, so a move
 updates every invariant reading the coordinate exactly once. Assignments, random
 generators, weights and invariant payloads belong to each live state.
+
+Dense Cumulative profiles hold at most 1,048,576 time slots. Wider horizons and
+task ends outside the signed integer range use a sweep of start and end events
+with storage proportional to task count. The sweep grades proposed and committed
+moves over the full footprint of each task. Timeline-based relocations require the
+dense profile. Search windows bound candidate generation and supply no source
+refutation.
 
 Unmaintained flat Boolean objective folds have a private reader index from leaf
 coordinates to priced terms. A primitive flip evaluates only those terms; compound

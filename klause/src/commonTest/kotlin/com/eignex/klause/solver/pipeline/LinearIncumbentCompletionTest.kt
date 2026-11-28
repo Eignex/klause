@@ -42,6 +42,22 @@ class LinearIncumbentCompletionTest {
     private val seed = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.333))
 
     @Test
+    fun `seed completion should reject violated receiving integer rows before recourse`() {
+        val condition = scope.condition.integerBound(
+            SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ZERO))
+        val restricted = SourceProofContext(scope.copy(condition = condition),
+            source.coordinates, source.premises, source.objective, source.objectiveConstant)
+
+        val stages = mutableListOf<String>()
+        val point = LinearIncumbentCompletion(SourceLpBudget()) { stage, _ -> stages += stage }.use {
+            it.complete(restricted, seed, ExecutionControl.Never)
+        }
+
+        assertNull(point)
+        assertTrue("PrimalRecoveryDiscreteRows" in stages)
+    }
+
+    @Test
     fun `residual completion should optimize disconnected real components in the source direction`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val premises = mapOf(

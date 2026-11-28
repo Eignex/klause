@@ -158,3 +158,26 @@ smtlib-qfrdl/skdmxa/skdmxa-3x3-5
 # MIPLIB source of the pp08a-2000 relaxation
 miplib3/pp08a
 miplib2003/pp08a
+
+# #3828 early-contradiction families
+klause-generated-3828-conflict-v1/trade-ledger-primary
+klause-generated-3828-conflict-v1/trade-ledger-guard
+klause-generated-3828-conflict-v1/resin-grades-primary
+klause-generated-3828-conflict-v1/resin-grades-guard
+
+# Core-guided query learning development sources, including the censored pairs.
+# Receipts: https://github.com/Eignex/klause/issues/4655#issuecomment-7229706473
+maxsat-unweighted/c-inference-pre-processing_c_inference_50_65_vq16
+maxsat-unweighted/packup-4ede8d96-c17a-11df-a7c5-00163e3d3b7c_l3
+maxsat-unweighted/ramsey-ram_k3_n10.ra0
+maxsat-unweighted/rna-alignment-random-same-7.rna.pre
+maxsat-unweighted/wqueens-wqueens8_6.wcsp.dir
+maxsat-weighted/auctions_wt-cat_paths_60_90_0005.txt
+maxsat-weighted/metro_wt-inst2.lp.sm-extracted
+maxsat-weighted/mpe_wt-random-net-20-3_network-7.net
+maxsat-weighted/preference_planning_wt-WCNF_storage_p03
+maxsat-weighted/spot5_wt-8.wcsp.log
+maxsat-weighted/warehouses_wt-warehouse0.wcsp
+pb07-opb/OPT-SMALLINT-LIN/submittedPB07/aksoy/area_opers/normalized-fir01_area_opers
+pb07-opb/OPT-SMALLINT-LIN/submittedPB07/poldner/PB/testset/normalized-10_20
+pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/mds/normalized-mds_100_25_3

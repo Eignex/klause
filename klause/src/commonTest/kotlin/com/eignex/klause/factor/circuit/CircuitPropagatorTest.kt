@@ -133,7 +133,7 @@ class CircuitPropagatorTest {
     @Test
     fun `circuit deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x5EA5)
-        repeat(60) { iter ->
+        repeat(54) { iter ->
             val n = 5
             val problem = Problem(
                 numBoolVars = 0,

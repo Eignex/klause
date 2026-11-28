@@ -127,10 +127,10 @@ zero-violation proposal is offered.
 
 An integer move updates every task reading the coordinate as a start, duration or
 demand, including aliases and coordinates shared with capacity, and deltas use the
-final combined load rather than summing independent scores. Overload start swaps
-filter on the joint profile change of both coordinates, applying and restoring only
-the affected footprints; at most four are offered, around the peak task and its
-partners.
+final combined load. Overload start swaps filter on the joint profile change of
+both coordinates. Dense profiles apply and restore the affected footprints. Wide
+profiles grade at most 16 swaps with task events. A call offers up to four swaps
+around the peak task and its partners.
 
 Overload repair can also remove a conditional duration through its binary channel
 or swap duration choices between task pairs, with per-worker cursors rotating the
@@ -139,7 +139,8 @@ infeasibility, ranking adds a fraction below one grade unit per overloaded facto
 so moves that shrink an overload rank ahead at equal integer cost, and the weight
 schedule treats a lower fraction as progress.
 
-A satisfied resource offers compaction and reorder moves for tasks of any duration.
+A satisfied resource with a dense profile offers compaction and reorder moves for
+tasks of any duration.
 Its latest-ending task and one sampled task move to the earliest start that every
 Cumulative sharing the start coordinate admits, read from each timeline without the
 task's own load. When a demand or presence is a defined channel of `x = v`, up to
@@ -223,8 +224,9 @@ Models whose coordinates are all decided by an exact theory use a different move
 owner. The retained exact-coordinate driver proposes rational coordinate windows and
 Boolean pins to a source-bound completion adapter. A coordinate repair relaxes one
 pin; compound repairs relax a block, and adaptive neighborhood search weights block
-sizes by accepted improvements. Centers, radii, random state, weights and incumbents
-survive slices. A rejected repair widens the windows without changing the source
+sizes by accepted improvements. Completed root preparation and the center copy
+positions survive slices, along with centers, radii, random state, weights and
+incumbents. A rejected repair widens the windows without changing the source
 domain or establishing infeasibility.
 
 The linear adapter asserts exact rational bounds and strict objective cutoffs into

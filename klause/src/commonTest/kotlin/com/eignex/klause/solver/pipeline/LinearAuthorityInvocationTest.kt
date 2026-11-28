@@ -35,6 +35,7 @@ import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -48,6 +49,153 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
         SourceRevision("conditioned-linear", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
     )
+
+    @Test
+    fun `ordinary linear optimization should cross the former cumulative defaults`() {
+        val source = SourceProofContext(scope, setOf(bool, real), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+            "guarded" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ofLong(-2)),
+                mapOf(0 to true)),
+        ), mapOf(real to BigFraction.ONE))
+        val params = TheoryParams()
+        val formerWork = 1_000_000_000L
+        val formerAllocation = 512L * 1024L * 1024L
+
+        for ((work, allocation) in listOf((formerWork - 1L) to 0L, 0L to (formerAllocation - 512L))) {
+            val funding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
+            funding.charge(work, allocation)
+
+            val result = LinearAuthorityInvocation(source, params, funding = funding).use { it.run { _, _ -> } }
+
+            assertEquals(TerminationReason.SearchExhausted, result.reason)
+            assertEquals(SourceValue.Rational(BigFraction.ONE),
+                assertIs<SourceClaim.Optimal>(result.terminal?.claim).value)
+            assertTrue(funding.spent > formerWork || funding.allocated > formerAllocation)
+        }
+    }
+
+    @Test
+    fun `a caller limit should end an ordinary query without a renewed slice`() {
+        val source = SourceProofContext(scope, setOf(real), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE))
+
+        for (params in listOf(TheoryParams(sourceLpWorkLimit = 1), TheoryParams(sourceLpOperations = 0))) {
+            LinearAuthorityInvocation(source, params).use { invocation ->
+                val result = invocation.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> }
+
+                assertEquals(TerminationReason.BudgetExhausted, assertNotNull(result).reason)
+                assertNull(result.terminal)
+                assertEquals(0L, result.stats.smt.sourceLp.operations)
+                assertEquals(result, invocation.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> })
+            }
+        }
+    }
+
+    @Test
+    fun `an unfunded coverage split should leave both alternatives unclaimed`() {
+        val source = SourceProofContext(scope, setOf(bool, real), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE))
+        val params = TheoryParams(sourceLpAllocationLimit = 1023L)
+
+        val result = LinearAuthorityInvocation(source, params).use { it.run { _, _ -> } }
+
+        assertEquals(TerminationReason.BudgetExhausted, result.reason)
+        assertNull(result.terminal)
+        val stages = assertNotNull(result.stats.smt.completeSearchStages)
+        assertEquals(1L, stages["numericalRetainedNodes"])
+        assertEquals(0L, stages["numericalFundedAllocation"])
+    }
+
+    @Test
+    fun `a caller allocation refusal should precede sparse owner construction`() {
+        val source = SourceProofContext(scope, setOf(real), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE))
+        val params = TheoryParams(sourceLpAllocationLimit = 1023L, sourceCuts = false)
+
+        val result = LinearAuthorityInvocation(source, params, boundOrdered = true).use { it.run { _, _ -> } }
+
+        assertEquals(TerminationReason.BudgetExhausted, result.reason)
+        assertNull(result.terminal)
+        val stages = assertNotNull(result.stats.smt.completeSearchStages)
+        assertEquals(0L, stages["numericalLpPreparations"])
+        assertEquals(0L, stages["numericalFundedAllocation"])
+    }
+
+    @Test
+    fun `a sparse allocation guard should leave the caller budget available`() {
+        val source = SourceProofContext(scope, setOf(real), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE))
+        val params = TheoryParams(sourceCuts = false)
+        val funding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
+        val budget = SourceLpBudget(funding = funding)
+        val safety = SparseSourceLpPolicy()
+        val policy = safety.copy(preparation = safety.preparation.copy(allocation = 1023L))
+
+        val result = LinearAuthority(budget, retainLp = true, guidancePolicy = policy).use { authority ->
+            LinearAuthorityInvocation(source, params, borrowedAuthority = authority, boundOrdered = true).use {
+                it.run { _, _ -> }
+            }
+        }
+
+        assertEquals(TerminationReason.Unsupported, result.reason)
+        assertNull(result.terminal)
+        assertFalse(funding.exhausted)
+        assertEquals(0L, funding.allocated)
+    }
+
+    @Test
+    fun `an ordinary strict leaf should finish its certificate across a grant boundary`() {
+        val source = SourceProofContext(scope, setOf(real), mapOf(
+            "positive" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO,
+                strict = true)),
+        ), mapOf(real to BigFraction.ONE))
+        val params = TheoryParams(sourceLpWorkLimit = 100_000L)
+        val funding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
+        var admissions = 0L
+        val budget = SourceLpBudget(funding = funding, onWork = {
+            admissions += it.operations
+            if (admissions == 2L && it.operations > 0L) funding.grant(0L)
+        })
+
+        val result = LinearAuthority(budget, retainLp = true).use { authority ->
+            LinearAuthorityInvocation(source, params, borrowedAuthority = authority).use { it.run { _, _ -> } }
+        }
+
+        val terminal = assertNotNull(result.terminal)
+        assertEquals(SourceValue.Rational(BigFraction.ZERO), assertIs<SourceClaim.Limit>(terminal.claim).value)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        assertTrue(admissions > 2L)
+        assertFalse(funding.exhausted)
+    }
+
+    @Test
+    fun `cancelling a paused sparse query should spend no further funding`() {
+        val source = SourceProofContext(scope, setOf(real), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE))
+        val params = TheoryParams(sourceLpWorkLimit = 100_000L, sourceCuts = false)
+        val funding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
+        val budget = SourceLpBudget(funding = funding, onWork = {
+            if (it.operations > 0L) funding.grant(0L)
+        })
+
+        LinearAuthority(budget, retainLp = true).use { authority ->
+            LinearAuthorityInvocation(source, params, borrowedAuthority = authority, boundOrdered = true).use {
+                assertNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> })
+                val spent = funding.spent
+
+                val result = it.runSlice(ExecutionControl { true }, Long.MAX_VALUE, -1) { _, _ -> }
+
+                assertEquals(TerminationReason.Cancelled, assertNotNull(result).reason)
+                assertNull(result.terminal)
+                assertEquals(spent, funding.spent)
+            }
+        }
+    }
 
     @Test
     fun `a checked root incumbent should survive a stop in numerical observation`() {
@@ -299,7 +447,7 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
         ), mapOf(real to BigFraction.ONE))
         val params = TheoryParams(sourceCuts = false)
 
-        for ((recordFeedback, resolution) in listOf(false to false, true to false, true to true)) {
+        for (recordFeedback in listOf(false, true)) {
             var baselineFeedback = 0
             var reusedFeedback = 0
             val baselineObserver: (SourceNumericalFeedbackResult) -> Unit = { baselineFeedback++ }
@@ -308,7 +456,7 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
             val baseline = LinearAuthorityInvocation(source, params, boundOrdered = true,
                 onNumericalFeedback = baselineObserver.takeIf { recordFeedback }).use { it.run { _, _ -> } }
             val reused = LinearAuthorityInvocation(source, params.copy(sourceRefutationReuse = true,
-                sourceRefutationPropagation = recordFeedback, sourceRefutationResolution = resolution),
+                sourceRefutationPropagation = recordFeedback),
                 boundOrdered = true, onNumericalFeedback = reusedObserver.takeIf { recordFeedback }).use {
                 if (!recordFeedback) it.run { _, _ -> } else {
                     var result: LinearInvocationResult? = null
@@ -607,6 +755,54 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
     }
 
     @Test
+    fun `another grant should resume the same sparse query under one cumulative allowance`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(real, other), mapOf(
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                other to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+            "x" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(real to BigFraction.ONE, other to BigFraction.ofLong(2)))
+        val params = TheoryParams(sourceLpWorkLimit = 100_000L, sourceCuts = false)
+        fun solve(pauseAfterAdmission: Boolean): LinearInvocationResult {
+            val funding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
+            var pause = pauseAfterAdmission
+            val budget = SourceLpBudget(maxOperations = 1, funding = funding, onWork = {
+                if (pause && it.operations == 1L) {
+                    pause = false
+                    funding.grant(0L)
+                }
+            })
+            return LinearAuthority(budget, retainLp = true).use { authority ->
+                LinearAuthorityInvocation(source, params, borrowedAuthority = authority, boundOrdered = true).use {
+                    if (pauseAfterAdmission) {
+                        assertNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> })
+                        assertTrue(funding.paused)
+                        assertFalse(funding.exhausted)
+                        assertEquals(1, budget.operations)
+                    }
+                    it.run { _, _ -> }
+                }
+            }.also {
+                assertEquals(1, budget.operations)
+                assertFalse(funding.exhausted)
+            }
+        }
+
+        val uninterrupted = solve(false)
+        val resumed = solve(true)
+
+        val terminal = assertNotNull(resumed.terminal)
+        assertEquals(assertNotNull(uninterrupted.terminal).claim, terminal.claim)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        val uninterruptedStages = assertNotNull(uninterrupted.stats.smt.completeSearchStages)
+        val resumedStages = assertNotNull(resumed.stats.smt.completeSearchStages)
+        for (key in listOf("numericalFundedWork", "numericalFundedAllocation")) {
+            assertEquals(uninterruptedStages.getValue(key), resumedStages.getValue(key))
+        }
+    }
+
+    @Test
     fun `frontier should close inherited bounds after an incumbent improves without new LP checks`() {
         val source = SourceProofContext(scope, setOf(bool, integer), mapOf(
             "false" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2)),
@@ -700,9 +896,7 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
     @Test
     fun `bound frontier should preserve complete sibling proofs across slices`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
-        for ((sense, resolution) in ObjectiveSense.entries.flatMap { sense ->
-            listOf(false, true).map { sense to it }
-        }) {
+        for (sense in ObjectiveSense.entries) {
             val direction = if (sense == ObjectiveSense.MINIMIZE) BigFraction.ONE else BigFraction.MINUS_ONE
             val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", sense)),
                 setOf(integer, other), mapOf(
@@ -712,8 +906,7 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
                         BigFraction.MINUS_ONE)),
                 ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
 
-            LinearAuthorityInvocation(source, TheoryParams(sourceRefutationPropagation = true,
-                sourceRefutationResolution = resolution),
+            LinearAuthorityInvocation(source, TheoryParams(sourceRefutationPropagation = true),
                 boundOrdered = true).use { invocation ->
                 var result: LinearInvocationResult? = null
                 repeat(32) {
@@ -747,31 +940,6 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
             assertNotNull(snapshot.incumbent)
             assertNull(snapshot.bound)
             assertNull(snapshot.terminal)
-        }
-    }
-
-    @Test
-    fun `directional history should preserve exhaustive fractional sibling proofs`() {
-        val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
-        for (sense in ObjectiveSense.entries) {
-            val direction = if (sense == ObjectiveSense.MINIMIZE) BigFraction.ONE else BigFraction.MINUS_ONE
-            val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", sense)),
-                setOf(integer, other), mapOf(
-                    "first" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2) * direction),
-                        BigFraction.MINUS_ONE)),
-                    "second" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ofLong(-2) * direction),
-                        BigFraction.MINUS_ONE)),
-                ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
-
-            val result = assertNotNull(LinearAuthorityInvocation(source, TheoryParams(), useBranchHistory = true).use {
-                it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> }
-            })
-
-            val terminal = assertNotNull(result.terminal)
-            val claim = assertIs<SourceClaim.Optimal>(terminal.claim)
-            assertEquals(SourceValue.Rational(BigFraction.ofLong(2) * direction), claim.value)
-            assertEquals(SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
         }
     }
 

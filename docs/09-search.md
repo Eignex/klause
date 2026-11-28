@@ -57,8 +57,8 @@ condition and learned backjumps below it fall back to chronological traversal.
 Unsupported paused states reseed the task; a sibling query resets the original root.
 A completed source probe needs neither a
 partition nor a peer root. Lost probes and task attempts retain charges.
-It runs through an explicit internal entry point; ordinary portfolio selection
-retains its existing policy.
+Source pipeline admission is described in
+[Boolean task sharing](15-portfolio-scheduling.md#boolean-task-sharing).
 
 `SearchBranchAttemptObserver` observes
 a tightening alternative before assertion, including immediate conflicts. Finite
@@ -219,16 +219,6 @@ clause reason over the established prefix facts; an unnamed premise declines the
 deduction. The coverage tree retains the excluded sibling's checked refutation
 alongside the surviving branch. Retraction removes the implication, and replay
 restores it only after its named antecedents hold again.
-
-Opt-in numerical refutation resolution combines checked clauses across an already
-named complementary integral predicate. Shared clause resolution removes the pivot;
-an exhaustive source integer split checks both imported refutations in the resulting
-scope. Only a fresh checked import can exclude a queued region. Such exclusions and
-unit deductions retain ordinary coverage-tree accounting. Complete Boolean scope and
-opening restrictions remain premises; stopped resolution leaves alternatives open.
-Unit reasons select established support predicates, including stronger endpoints,
-and omit unrelated integer decisions. Clause and proof storage share the bounded
-invocation-local refutation index and cumulative source allowances.
 
 A model policy can pause required completion with `SearchModelDisposition.Pause`.
 The run retains the assembled model and its decision trail, and retries that policy
@@ -449,6 +439,7 @@ Initial scope capture reports no invalidation. The additional reason observation
 charges the existing LP work allowance.
 Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
+Passive commitment checks inline the freshness callback at the matching decision.
 Directions expire after 256 node visits without a sample. At most 8,192 variable
 histories and 128 ancestor splits are retained. Ancestor records use depth-indexed
 slots allocated on the first usable split; allocation is charged once and trimming
@@ -659,14 +650,14 @@ then removes unsupported interior values.
 #### Difference systems
 
 The finite difference system is posted after presolve only when its fragment has a
-guarded edge between two unfixed root integer columns; edges to fixed columns act as
-unary bounds. Finite preparation can also append a redundant difference system over
-exact real rows and real table selections, whose vertices are private arithmetic
-coordinates rather than finite real domains. Source guards and table index atoms enter
-the graph directly, so a contradictory selection is excluded before all discrete
-columns are fixed. A consistent graph supplies no model; all original factors and
+guarded edge and an edge between two unfixed root integer columns; edges to fixed
+columns act as unary bounds. Finite preparation can also append a redundant
+difference system over exact real rows and real table selections, whose vertices
+are private arithmetic coordinates rather than finite real domains. Source guards
+and table index atoms enter the graph directly, so a contradictory selection is
+excluded before all discrete columns are fixed. A consistent graph supplies no model; all original factors and
 source checks remain. See
-[real graph admission](17-theories.md#real-graph-admission-and-checks).
+[finite real propagation](17-theories.md#finite-real-propagation).
 
 ### Selected propagation projections
 

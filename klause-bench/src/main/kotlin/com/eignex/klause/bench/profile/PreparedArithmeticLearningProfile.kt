@@ -249,6 +249,7 @@ internal object PreparedArithmeticLearningProfile {
         private val maxWords: Int = 8192,
         captureFirstInteger: Boolean = false,
         captureFirstPb: Boolean = false,
+        captureFirstIntegerAttachment: Boolean = false,
     ) {
         private val field = LivePropagationState.require(native).javaClass.getDeclaredField("arithmeticLearningTrace")
             .apply { isAccessible = true }
@@ -260,6 +261,8 @@ internal object PreparedArithmeticLearningProfile {
                 .invoke(trace, captureFirstInteger)
             trace.javaClass.getMethod("setCaptureFirstPb", Boolean::class.javaPrimitiveType)
                 .invoke(trace, captureFirstPb)
+            trace.javaClass.getMethod("setCaptureFirstIntegerAttachment", Boolean::class.javaPrimitiveType)
+                .invoke(trace, captureFirstIntegerAttachment)
             field.set(LivePropagationState.require(native), trace)
         }
 

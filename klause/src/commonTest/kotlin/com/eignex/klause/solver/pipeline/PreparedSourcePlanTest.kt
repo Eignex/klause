@@ -122,7 +122,7 @@ class PreparedSourcePlanTest {
         )
 
         val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-            if (factor is AllDifferent && target == EncodingTarget.POLYNOMIAL) Encoder(EncoderSupport.UNSUPPORTED)
+            if (factor is Linear && target == EncodingTarget.POLYNOMIAL) Encoder(EncoderSupport.UNSUPPORTED)
             else BuiltInEncoderProvider.select(factor, target)
         })
         val plan = source.prepareExecutionPlan(providers)
@@ -130,7 +130,9 @@ class PreparedSourcePlanTest {
         val ownership = assertNotNull(plan.componentPlan)
         val finite = ownership.cpProjection(source, ownership.cpSourceDomains(source)).problem
         assertEquals(PreparedPlanDecline.OPEN_POLYNOMIAL_INTEGER, plan.decline)
-        assertFalse(plan.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
+        val admission = plan.capabilities.admission(ExecutionStrategy.COMPLETE)
+        assertFalse(admission.runnable)
+        assertTrue(admission.declines.any { it.encoding?.factorIndex == 2 })
         assertEquals(
             listOf(1),
             plan.components.single {

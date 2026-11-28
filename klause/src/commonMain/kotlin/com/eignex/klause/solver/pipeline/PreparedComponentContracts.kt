@@ -100,6 +100,7 @@ internal fun Problem.finiteComponentContract(
     exactNeighborhood: Boolean,
     projections: PreparedFactorProjections? = null,
     enforcingFactors: Set<Int> = emptySet(),
+    authorities: Set<ExecutionClaimAuthority> = completeAuthority,
 ): ComponentExecutionContract {
     projections?.requireSource(this)
     fun capabilities(index: Int) = projections?.capabilities(index) ?: this.factors[index].executionCapabilities()
@@ -142,7 +143,7 @@ internal fun Problem.finiteComponentContract(
         incompleteProjection -> refusal(ExecutionDeclineCause.FINITE_PROJECTION, unboundedFactor)
         unsupportedPropagation != null -> refusal(ExecutionDeclineCause.FINITE_PROJECTION, unsupportedPropagation)
         missingCheck != null -> refusal(ExecutionDeclineCause.SOURCE_COMPLETION, missingCheck)
-        else -> ComponentStrategySupport(ProcedureCompleteness.DECISION, completeAuthority)
+        else -> ComponentStrategySupport(ProcedureCompleteness.DECISION, authorities)
     }
     val missingScore = factors.firstOrNull {
         capabilities(it).scoring == ScoringCapability.UNSUPPORTED

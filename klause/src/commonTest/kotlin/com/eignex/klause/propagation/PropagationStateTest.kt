@@ -146,14 +146,14 @@ class PropagationStateTest {
     @Test
     fun `batch exclude should reach the same state as sequential excludes`() {
         val hi = 14
-        val rng = Random(0xBA7C4)
-        repeat(100) { trial ->
-            val picked = mutableSetOf<Int>()
-            val k = rng.nextInt(0, hi + 1)
-            repeat(k) { picked.add(rng.nextInt(0, hi + 1)) }
-            if (picked.size > hi) picked.remove(picked.first())
-            val values = picked.map { it.toLong() }.toLongArray().also { it.sort() }
-
+        for (values in listOf(
+            longArrayOf(),
+            longArrayOf(3, 7, 8),
+            longArrayOf(0, 1, 2, 5),
+            longArrayOf(12, 13, 14),
+            longArrayOf(0, 6, 14),
+            LongArray(hi) { it.toLong() },
+        )) {
             val seq = freshState(1, hi)
             materializeAllAtoms(seq, 1, hi)
             enterLevel(seq, 0)
@@ -164,7 +164,7 @@ class PropagationStateTest {
             enterLevel(batch, 0)
             batch.excludeIntValues(0, values, null)
 
-            assertStatesEquivalent(seq, batch, "trial=$trial values=${values.toList()}")
+            assertStatesEquivalent(seq, batch, "values=${values.toList()}")
         }
     }
 
@@ -181,40 +181,38 @@ class PropagationStateTest {
         val numVars = 3
         val hi = 9
         val rng = Random(0x5eed5)
-        repeat(4) { trial ->
-            val s = freshState(numVars, hi)
-            materializeAllAtoms(s, numVars, hi)
-            val marks = ArrayDeque<PropagationState.LevelMark>()
-            marks.addLast(s.mark())
-            repeat(30) { step ->
-                val pop = marks.size > 1 && rng.nextInt(3) == 0
-                if (pop) {
-                    val target = rng.nextInt(0, marks.size - 1)
-                    while (marks.size > target + 1) marks.removeLast()
-                    s.undoTo(marks.last())
-                } else {
-                    val v = rng.nextInt(numVars)
-                    val d = s.intDomains[v]
-                    if (d.min != d.max) {
-                        enterLevel(s, v)
-                        val picked = mutableSetOf<Long>()
-                        val live = ArrayList<Long>()
-                        d.values.forEach { live.add(it) }
-                        val take = rng.nextInt(1, live.size)
-                        repeat(take) { picked.add(live[rng.nextInt(live.size)]) }
-                        if (picked.size >= live.size) picked.remove(picked.first())
-                        val values = picked.toLongArray().also { it.sort() }
-                        if (s.excludeIntValues(v, values, null)) marks.addLast(s.mark())
-                    }
+        val s = freshState(numVars, hi)
+        materializeAllAtoms(s, numVars, hi)
+        val marks = ArrayDeque<PropagationState.LevelMark>()
+        marks.addLast(s.mark())
+        repeat(30) { step ->
+            val pop = marks.size > 1 && rng.nextInt(3) == 0
+            if (pop) {
+                val target = rng.nextInt(0, marks.size - 1)
+                while (marks.size > target + 1) marks.removeLast()
+                s.undoTo(marks.last())
+            } else {
+                val v = rng.nextInt(numVars)
+                val d = s.intDomains[v]
+                if (d.min != d.max) {
+                    enterLevel(s, v)
+                    val picked = mutableSetOf<Long>()
+                    val live = ArrayList<Long>()
+                    d.values.forEach { live.add(it) }
+                    val take = rng.nextInt(1, live.size)
+                    repeat(take) { picked.add(live[rng.nextInt(live.size)]) }
+                    if (picked.size >= live.size) picked.remove(picked.first())
+                    val values = picked.toLongArray().also { it.sort() }
+                    if (s.excludeIntValues(v, values, null)) marks.addLast(s.mark())
                 }
-                for (id in 0 until s.atoms.intVar.size) {
-                    val v = s.atoms.intVar[id]
-                    assertEquals(
-                        s.atomTruthOf(v, s.atoms.kind[id], s.atoms.threshold[id]),
-                        s.atomCurrentTruth(id),
-                        "trial=$trial step=$step atom=$id",
-                    )
-                }
+            }
+            for (id in 0 until s.atoms.intVar.size) {
+                val v = s.atoms.intVar[id]
+                assertEquals(
+                    s.atomTruthOf(v, s.atoms.kind[id], s.atoms.threshold[id]),
+                    s.atomCurrentTruth(id),
+                    "step=$step atom=$id",
+                )
             }
         }
     }

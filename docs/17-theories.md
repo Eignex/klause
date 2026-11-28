@@ -13,7 +13,7 @@ Boolean/integer domains; arithmetic components own open integers and reals.
 | [Linear real arithmetic](18-linear-arithmetic.md) | Linear real constraints with Boolean structure | Exact rational LP checks |
 | [Linear integer arithmetic](18-linear-arithmetic.md#linear-integer-arithmetic) | Linear integer constraints with Boolean structure | Linear real checks plus integer reductions and branching |
 | [Linear mixed arithmetic](18-linear-arithmetic.md#linear-mixed-arithmetic) | Coupled linear integer/real constraints | The integer route with real completion and point recovery |
-| [Nonlinear integer arithmetic](19-nonlinear-arithmetic.md) | Polynomial Int/Real/Bool satisfaction | Incomplete integer search with exact polynomial real completion |
+| [Nonlinear integer arithmetic](19-nonlinear-arithmetic.md) | Polynomial Int/Real/Bool satisfaction and quadratic objectives | Incomplete integer search with exact polynomial real completion |
 | [Polynomial real arithmetic](19-nonlinear-arithmetic.md#polynomial-real-arithmetic) | Polynomial real constraints, optionally beside finite factors | Exact algebraic completion and cylindrical algebraic decomposition |
 | [Transcendental real arithmetic](19-nonlinear-arithmetic.md#transcendental-real-arithmetic) | exp/log/sin/cos constraints with mixed declarations | Certified enclosures, polynomial relaxation and symbolic checks |
 
@@ -188,6 +188,14 @@ guard and every active path guard; source rows and declared bounds need no premi
 Transient published integer bounds take part in feasibility checks but are excluded
 from proof paths. A sweep processes at most 64 open heads; deferred heads remain
 searchable. Activity changes and retraction invalidate completed query coverage.
+
+#### Root bounds
+
+When finite integers share the graph, initialization derives level-zero bounds for
+those connected by unconditional source edges, from shortest paths to and from the
+zero vertex over those edges and the current root bounds. Their antecedents are
+fixed for the root lifetime, so the bounds need no Boolean premise. A graph whose
+relaxation could exceed 65,536 edge visits skips the derivation.
 
 #### Relative intervals
 

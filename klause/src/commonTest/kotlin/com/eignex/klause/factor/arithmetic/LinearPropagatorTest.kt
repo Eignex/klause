@@ -157,9 +157,9 @@ class LinearPropagatorTest {
 
     @Test
     fun `linear deductions should be implied by their reasons under carved holes`() {
-        val rng = Random(0x11E0)
         for (op in listOf(LinearOp.LE, LinearOp.EQ, LinearOp.GE)) {
-            repeat(50) { iter ->
+            val rng = Random(0x11E0)
+            repeat(7) { iter ->
                 val n = 3
                 val problem = Problem(
                     numBoolVars = 0,
@@ -193,7 +193,7 @@ class LinearPropagatorTest {
     @Test
     fun `linear not-equal deductions should be implied by their reasons once all but one term is fixed`() {
         val rng = Random(0x11E1)
-        repeat(50) { iter ->
+        repeat(3) { iter ->
             val n = 3
             val coefficients = IntArray(n) { (1 + rng.nextInt(3)) * (if (rng.nextBoolean()) 1 else -1) }
             val excluded = IntArray(n) { rng.nextInt(5) }

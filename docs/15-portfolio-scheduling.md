@@ -338,9 +338,10 @@ is allocated only when the pause creates the board. Probe work is part of each
 worker's cumulative work, not an extra charge. Without a live decision the query
 continues, and a fast completion creates no board.
 
-The source pipeline admits single-core satisfaction portfolios with two identical
-native first-fail recipes and the ordinary work schedule automatically, polling
-cancellation while it checks clauses and mappings; other shapes solve ordinarily.
+The source pipeline admits single-core clausal satisfaction portfolios with two
+identical native first-fail recipes and the ordinary work schedule automatically,
+polling cancellation while it checks clauses and mappings; other shapes solve
+ordinarily.
 `boolean-proof-tasks=false` disables admission, and `true` also permits the bare
 recipe, reports declines, and rejects optimization and parallel requests. Task
 statistics distinguish partitions, closures, probe effort, retained-root transfers
@@ -510,9 +511,10 @@ completion.
 
 `source-incumbent-completion=true` (default false) lets both companions use an
 approximate incumbent's Boolean and finite integer coordinates as advisory pins, with
-approximate real coordinates guiding rational reconstruction without authority. A
-reconstructed point must satisfy every active affine row exactly; otherwise
-connected continuous residuals use the exact recovery path, priced by their source
+approximate real coordinates guiding rational reconstruction without authority.
+One scope construction applies all discrete pins and retains the receiving bounds
+and integer rows. A reconstructed point must satisfy every active affine row exactly.
+When it fails this check, connected continuous residuals use exact recovery, priced by their source
 objective costs where those are nonzero and as feasibility completion otherwise.
 Recovery supplies a checked point and no global bound. Linear sources reconstruct the
 point through the captured presolve mapping, check the original declarations and
@@ -725,10 +727,12 @@ rank, as every arm of a single-engine pool does. A selected `WorkerAdmission` ev
 carries the same name.
 
 On continuous columns with a continuous objective, single-core pools reserve half
-the scheduled time for the default LP arm until the first incumbent. A default-size
-sequential pool over continuous columns evaluates that arm as an auxiliary: without
-progress it receives a [bounded evaluation](#auxiliary-incumbent-evaluation), and an
-unproductive trial retires it without claiming exhaustion.
+the scheduled time for the default LP arm until the first incumbent, unless
+continuous columns outnumber the discrete ones and some integer is not binary. A
+default-size sequential pool over continuous columns evaluates that arm as an
+auxiliary: without progress it receives a
+[bounded evaluation](#auxiliary-incumbent-evaluation), and an unproductive trial
+retires it without claiming exhaustion.
 
 ### Satisfaction pools
 

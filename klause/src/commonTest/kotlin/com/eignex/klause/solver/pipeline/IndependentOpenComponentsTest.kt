@@ -3,15 +3,16 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.scheduling.Cumulative
-import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderProvider
@@ -60,11 +61,11 @@ class IndependentOpenComponentsTest {
     @Test
     fun `satisfaction should join a complete open coordinate with a heuristic component witness`() {
         val source = Problem(0, 3, Array(3) { IntDomain(0, 1) }, listOf(
-            Diffn(intArrayOf(0), intArrayOf(0), longArrayOf(1), longArrayOf(1)),
+            Cumulative(intArrayOf(0), longArrayOf(1), longArrayOf(1), 1),
             Linear(longArrayOf(1), intArrayOf(2), LinearOp.EQ, 1_000_000_000_000),
         ), openIntHi = booleanArrayOf(true, false, true))
 
-        val result = OpenTheoryPipeline.searchWithoutTheory(source, TheoryParams(maxFlips = 100),
+        val result = OpenTheoryPipeline.searchWithoutTheory(source, TheoryParams(maxFlips = 100, randomSeed = 3),
             objective = null, engine = FiniteEngine.MIXED)
 
         val verdict = assertIs<OpenTheoryExecution.Satisfy>(result).result
@@ -73,6 +74,7 @@ class IndependentOpenComponentsTest {
         assertEquals("1000000000000", point.intValue(2))
         assertTrue(point.intValue(0).toLong() >= 0L)
         assertEquals("0", point.intValue(1))
+        assertIs<Verification.Accepted<*, *>>(verifyOpenWitness(source, point.toSample(source)))
     }
 
     @Test

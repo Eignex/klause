@@ -194,33 +194,33 @@ private fun LocalSearchState.runRepairChain(
     var bestPrefixCost = Long.MAX_VALUE
     var next: Move? = first
     var depth = 0
-    while (next != null) {
-        when (val m = next) {
-            is Move.Compound -> for (q in m.parts) applyPart(q)
-            else -> applyPart(m)
+    try {
+        while (next != null) {
+            when (val m = next) {
+                is Move.Compound -> for (q in m.parts) applyPart(q)
+                else -> applyPart(m)
+            }
+            depth++
+            if (parts.size >= 2 && cost < bestPrefixCost) {
+                bestPrefixCost = cost
+                bestPrefixLen = parts.size
+            }
+            if (cost < startCost || depth >= maxDepth) break
+            val target = worstRegressedFactor(baseDegree)
+            next = if (target < 0) null else pickChainRepair(target, pinnedSlots, propose)
         }
-        depth++
-        if (parts.size >= 2 && cost < bestPrefixCost) {
-            bestPrefixCost = cost
-            bestPrefixLen = parts.size
+        return if (bestPrefixLen >= 2) parts.subList(0, bestPrefixLen) else null
+    } finally {
+        for (i in inverses.indices.reversed()) apply(inverses[i])
+        tabu.step = oldStep
+        for (i in 0 until savedSlots.size) {
+            tabu.lastTouched[savedSlots[i]] = savedTouched[i]
+            tabu.touchCount[savedSlots[i]] = savedCounts[i]
         }
-        if (cost < startCost || depth >= maxDepth) break
-        val target = worstRegressedFactor(baseDegree)
-        next = if (target < 0) null else pickChainRepair(target, pinnedSlots, propose)
+        oldBoolConf.copyInto(boolConfChange)
+        oldIntConf.copyInto(intConfChange)
+        bestCostSeen = oldBest
     }
-    val keep = bestPrefixLen >= 2
-
-    for (i in inverses.indices.reversed()) apply(inverses[i])
-    tabu.step = oldStep
-    for (i in 0 until savedSlots.size) {
-        tabu.lastTouched[savedSlots[i]] = savedTouched[i]
-        tabu.touchCount[savedSlots[i]] = savedCounts[i]
-    }
-    for (i in oldBoolConf.indices) boolConfChange[i] = oldBoolConf[i]
-    for (i in oldIntConf.indices) intConfChange[i] = oldIntConf[i]
-    bestCostSeen = oldBest
-
-    return if (keep) parts.subList(0, bestPrefixLen) else null
 }
 
 /** Record into [base] the current degree of every factor [p] could affect — factors over

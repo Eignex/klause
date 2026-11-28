@@ -298,6 +298,7 @@ final enum class com.eignex.klause.lp.bounding/LpEmphasis : kotlin/Enum<com.eign
 }
 
 final enum class com.eignex.klause.lp.bounding/LpTechnique : kotlin/Enum<com.eignex.klause.lp.bounding/LpTechnique> { // com.eignex.klause.lp.bounding/LpTechnique|null[0]
+    enum entry AUTOMATIC_SPARSE // com.eignex.klause.lp.bounding/LpTechnique.AUTOMATIC_SPARSE|null[0]
     enum entry BOOLEAN_RLT // com.eignex.klause.lp.bounding/LpTechnique.BOOLEAN_RLT|null[0]
     enum entry BOUNDING // com.eignex.klause.lp.bounding/LpTechnique.BOUNDING|null[0]
     enum entry CIRCUIT // com.eignex.klause.lp.bounding/LpTechnique.CIRCUIT|null[0]

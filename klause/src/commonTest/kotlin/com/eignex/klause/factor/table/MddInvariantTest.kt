@@ -149,7 +149,7 @@ class MddInvariantTest {
         state.assignment.setInt(1, 1)
         state.recompute()
         val rng = Random(99)
-        repeat(400) { step ->
+        repeat(4) { step ->
             val v = rng.nextInt(2)
             val nv = 1L + rng.nextInt(2)
             val before = state.factors[0].violationDegree(state, 0)

@@ -129,9 +129,26 @@ private fun LpEngine.retainedRootLpRelaxationBound(
     retainRootPrimalOwner(relaxation)
     var pausedBound = Double.NaN
     try {
-        while (retainedRootRemainingWork() > 0L && !cancellation.pollStop()) {
+        while (true) {
+            if (retainedRootRemainingWork() <= 0L) {
+                if (rootPointObservationEnabled) {
+                    observeRootPoint(LpRootPointStage.QUERY_CALL, LpRootPointDisposition.ROOT_WORK, relaxation.model)
+                }
+                break
+            }
+            if (cancellation.pollStop()) {
+                if (rootPointObservationEnabled) {
+                    observeRootPoint(LpRootPointStage.QUERY_CALL, LpRootPointDisposition.CANCELLED, relaxation.model)
+                }
+                break
+            }
             observeStage("AT_NUMERICAL_QUERY")
+            beginRootPointQuery(relaxation.model)
             val attempt = solveNode(relaxation.model, null, cancellation, continuation)
+            if (rootPointObservationEnabled) {
+                endRootPointQuery(relaxation.model, attempt?.second,
+                    propagator.floatPaused, propagator.floatTermination)
+            }
             if (attempt == null) {
                 val metrics = propagator.lastMetrics.copy(preparationOps = 0L)
                 observeRootWork(metrics, finished = !propagator.floatPaused)
@@ -165,12 +182,13 @@ private fun LpEngine.retainedRootLpRelaxationBound(
             if (attempt.second?.optimal != true) {
                 retainRootPartialPrimalGuidance(relaxation, component, cancellation)
             }
+            if (automaticSparseTrial) retainRootPrimalGuidance(relaxation, attempt.second, cancellation)
             observeStage("AT_CERTIFICATION")
             val lower = retainedRootLowerBound(
                 relaxation.model, attempt.second, cancellation,
                 component,
             )
-            retainRootPrimalGuidance(relaxation, attempt.second, cancellation)
+            if (!automaticSparseTrial) retainRootPrimalGuidance(relaxation, attempt.second, cancellation)
             val stopped = cancellation.pollStop()
             val bound = if (stopped) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
             observeStage(
@@ -286,11 +304,18 @@ internal fun LpEngine.checkContinuedRootBound(
     // Only the original source-root state supplies a global bound; later CP assertions replace it.
     if (relaxation.model !== model || !ownsRootPrimalModel(model)) return
     val paused = result == null && propagator.floatPaused
+    val attempt = if (paused && automaticSparseTrial) propagator.pausedTrialAttempt else null
+    if (attempt != null && attempt == checkedRootPauseAttempt) return
     val lower = retainedRootLowerBound(model, result, cancellation, pausedProposal = paused)
     val bound = projectCertifiedLowerBound(relaxation, lower)
     if (!bound.isFinite() || cancellation.pollStop()) return
+    if (attempt != null) checkedRootPauseAttempt = attempt
     if (bound <= (continuedRootLowerBound ?: Double.NEGATIVE_INFINITY)) return
     continuedRootLowerBound = bound
+    if (automaticSparseTrial && rootPointObservationEnabled) {
+        observeRootPoint(LpRootPointStage.BOUND, LpRootPointDisposition.BOUND_CHECKED,
+            model, sourceRoot = true, paused = paused, bound = bound)
+    }
     val outcome = if (paused) "ContinuedPausedBounds" else "ContinuedCompletedBounds"
     sink.lp.sparseTrial = sink.lp.sparseTrial + (outcome to ((sink.lp.sparseTrial[outcome] ?: 0L) + 1L))
     recordRootLowerBound(bound)

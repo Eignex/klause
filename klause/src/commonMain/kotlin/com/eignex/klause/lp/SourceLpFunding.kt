@@ -1,5 +1,7 @@
 package com.eignex.klause.lp
 
+internal const val SOURCE_LP_WORK_QUANTUM = 20_000_000L
+
 internal class SourceLpFunding(
     private val workLimit: Long,
     private val allocationLimit: Long,
@@ -28,5 +30,12 @@ internal class SourceLpFunding(
         require(work >= 0 && allocation >= 0)
         spent += minOf(work, Long.MAX_VALUE - spent)
         allocated += minOf(allocation, Long.MAX_VALUE - allocated)
+    }
+
+    fun reserveAllocation(bytes: Long): Boolean {
+        require(bytes >= 0L)
+        if (bytes > remainingAllocation) return false
+        charge(0L, bytes)
+        return true
     }
 }

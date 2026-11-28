@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.backtrack.LP_WORK_PER_NODE
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.OptimalityTolerance
+import com.eignex.klause.lp.SOURCE_LP_WORK_QUANTUM
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearAuthority
@@ -50,7 +51,6 @@ internal class LinearAuthorityInvocation(
     private val params: TheoryParams,
     private val external: () -> Sample? = { null },
     private val state: OpenTheorySolveState = OpenTheorySolveState(params),
-    useBranchHistory: Boolean = false,
     borrowedAuthority: LinearAuthority? = null,
     private val boundOrdered: Boolean = false,
     guidance: Boolean = false,
@@ -112,7 +112,7 @@ internal class LinearAuthorityInvocation(
     val hasIncumbent: Boolean get() = incumbent != null
     val incumbentIsImported: Boolean get() = incumbent != null && incumbent === importedIncumbent
     fun captureTo(journal: LinearAuthorityCapture) = component.captureTo(journal)
-    val work: Long get() = state.work.spent + funding.spent / LP_WORK_PER_NODE
+    val work: Long get() = state.work.spent.let { it + minOf(funding.spent / LP_WORK_PER_NODE, Long.MAX_VALUE - it) }
     val stats: SolveStats get() = SolveStats(
         run = SolveStats.EMPTY.run.copy(backend = "linear-authority",
             wallMs = started.elapsedNow().inWholeMilliseconds, timedOut = params.timeout()),
@@ -142,19 +142,18 @@ internal class LinearAuthorityInvocation(
                     sample to it
                 }
             }
-        }, useBranchHistory, borrowedAuthority,
+        }, borrowedAuthority = borrowedAuthority,
         useGuidance = boundOrdered || guidance || supportBranching || onNumericalFeedback != null,
         inheritBounds = boundOrdered, useCuts = cuts,
         useActiveRows = activeRows, useRefutationReuse = params.sourceRefutationReuse,
-        useRefutationPropagation = params.sourceRefutationPropagation,
-        useRefutationResolution = params.sourceRefutationResolution, useSupportBranching = supportBranching,
+        propagateRefutations = params.sourceRefutationPropagation, useSupportBranching = supportBranching,
         pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
         aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback,
         feedbackRequest = feedbackRequest, aggregateBranching = aggregateBranching, repairGuidance = repairGuidance,
         gap = gap, useSourceGap = useSourceGap, gapTolerance = gapTolerance,
         guideIncumbent = guideIncumbent)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
-        atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(
+        atoms = if (params.sourceRefutationPropagation) SearchAtomRegistry(
             context.coordinates.filter {
                 it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
             }.maxOfOrNull { it.id + 1 } ?: 0) else null).also {
@@ -215,8 +214,7 @@ internal class LinearAuthorityInvocation(
             if (!context.affineObjectiveAvailable || !context.linearCoordinatesSupported()) {
                 return finish(null, TerminationReason.Unsupported)
             }
-            funding.grant(if (work < 0) 20_000_000L else maxOf(20_000_000L,
-                work.coerceIn(1L, 150_000L) * LP_WORK_PER_NODE))
+            funding.grant(maxOf(SOURCE_LP_WORK_QUANTUM, work.coerceIn(0L, 150_000L) * LP_WORK_PER_NODE))
             external()?.takeUnless { it === incumbent }?.let { sample ->
                 val before = incumbentRevision
                 val completed = if (completion != null)
@@ -242,20 +240,18 @@ internal class LinearAuthorityInvocation(
             component.ray?.let { return finish(it, TerminationReason.SearchExhausted) }
             if (component.gapBound() != null) return finish(null, TerminationReason.SearchExhausted, gapClosed = true)
             return when (event) {
-                SearchRunEvent.Paused -> null
+                SearchRunEvent.Paused -> {
+                    if (stop() || funding.exhausted || component.allocationStop != null) {
+                        finish(null, incompleteReason())
+                    } else null
+                }
                 SearchRunEvent.Exhausted -> {
                     val terminal = component.completed()
-                    finish(terminal, if (terminal == null) TerminationReason.Unsupported
-                    else TerminationReason.SearchExhausted)
+                    finish(terminal, if (terminal == null) incompleteReason() else TerminationReason.SearchExhausted)
                 }
-                is SearchRunEvent.Indeterminate -> finish(null, when {
-                    params.timeout() -> TerminationReason.Timeout
-                    stop() -> TerminationReason.Cancelled
-                    event == SearchRunEvent.Indeterminate.Budget -> TerminationReason.BudgetExhausted
-                    session.workExhausted() || session.checkBudgetExhausted() ||
-                        session.decisionBudgetExhausted() -> TerminationReason.BudgetExhausted
-                    else -> TerminationReason.Unsupported
-                })
+                is SearchRunEvent.Indeterminate -> finish(null,
+                    if (event == SearchRunEvent.Indeterminate.Budget) TerminationReason.BudgetExhausted
+                    else incompleteReason())
                 is SearchRunEvent.Satisfied ->
                     error("linear authority resolves an optimized node before model assembly")
             }
@@ -270,6 +266,12 @@ internal class LinearAuthorityInvocation(
             callback = { _, _ -> }
             currentStop = params.timeout.withAccounting(params.cancellation) or params.cancellation
         }
+    }
+
+    private fun incompleteReason(): TerminationReason = when {
+        funding.exhausted || component.operationDenied || session.workExhausted() ||
+            session.checkBudgetExhausted() || session.decisionBudgetExhausted() -> TerminationReason.BudgetExhausted
+        else -> component.allocationStop ?: TerminationReason.Unsupported
     }
 
     private fun paused(): Boolean = work > startWork && (work >= endWork || sliceEnd?.hasPassedNow() == true)

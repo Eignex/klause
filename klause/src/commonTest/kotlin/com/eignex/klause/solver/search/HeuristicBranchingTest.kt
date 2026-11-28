@@ -9,6 +9,32 @@ import kotlin.test.assertNull
 class HeuristicBranchingTest {
 
     @Test
+    fun `the first restart should switch Boolean order within the same decision budget`() {
+        val session = SearchSession(emptyList())
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        val branching = ActivityRestartBooleanBranching(numBoolVars = 4, initialDecisions = 2L)
+        val variables = mutableListOf<Int>()
+        val restarts = mutableListOf<Long>()
+        val observer = object : SearchRunObserver by branching {
+            override fun onRestart(decisions: Long) {
+                restarts += decisions
+            }
+
+            override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
+                variables += (decision as SearchDecision.Bool).literal ushr 1
+            }
+        }
+        val run = session.openRun(4, SearchSolveParams(maxDecisions = 4L, restart = branching),
+            booleanBranching = branching, observer = observer)
+
+        val result = run.next()
+
+        assertEquals(listOf(2L), restarts)
+        assertEquals(listOf(0, 1, 0, 3), variables)
+        assertIs<SearchRunEvent.Indeterminate.Budget>(result)
+    }
+
+    @Test
     fun `heuristic branching should offer the false polarity before the true one`() {
         val session = SearchSession(emptyList())
         val branching = HeuristicBooleanBranching(Vsids(), numBoolVars = 1)

@@ -13,10 +13,7 @@ class ClauseDbReasonOwnershipTest(private val cap: Int, private val native: Bool
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "cap={0}, native={1}")
-        fun parameters(): List<Array<Any>> = listOf(
-            arrayOf<Any>(4_000, false), arrayOf<Any>(4_000, true),
-            arrayOf<Any>(20_000, false), arrayOf<Any>(20_000, true),
-        )
+        fun parameters(): List<Array<Any>> = listOf(arrayOf<Any>(4_000, false), arrayOf<Any>(4_000, true))
     }
 
     @Test

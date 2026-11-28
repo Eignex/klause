@@ -92,6 +92,10 @@ A check proceeds in four steps:
    out until search selects a disjunct.
 2. **Check.** The LP solves the asserted system with exact certification. Partial Boolean
    states are checked once at least one arithmetic row is determined.
+   The default single-lane real feasibility portfolio can postpone one partial
+   numerical query between solve attempts after a retained point fails rechecking.
+   Direct bound conflicts remain eligible, and assigning the last Boolean requires
+   an exact check even when its assignment changes no arithmetic row.
    Partial states retain a 128-row exact-continuation allowance. Boolean-complete
    checks in complete search use the [kernel's storage admission](21-lp-engine.md#certification-mechanisms)
    under the same cumulative work and allocation ceilings.
@@ -101,6 +105,11 @@ A check proceeds in four steps:
    reported rather than one with stale premises.
 4. **Complete.** Once every Boolean is assigned, the exact candidate point is
    checked against every selected source row before it becomes a witness.
+
+In the default single-lane real feasibility portfolio, the complete worker starts
+with source-order Boolean decisions. A traversal that reaches 768 decisions can
+restart once and use conflict-activity order. The restart repropagates retained
+learned clauses and spends the same solve-wide allowances.
 
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.
@@ -269,6 +278,9 @@ and optimality; a checked witness remains available without a terminal claim.
 
 CLI reporting derives the verdict from the accepted claim or gap completion;
 budget exhaustion and termination reasons remain separate diagnostic metadata.
+Unfinished search retains the checked incumbent and bound. A caller ceiling can
+stop a worker with `BudgetExhausted`; a coverage allocation refusal returns
+`RepresentationDeclined`. A cooperative slice pause leaves the traversal live.
 
 A declared positive optimality gap can complete the traversal once a checked source
 incumbent and a checked global bound satisfy it in original objective units.
@@ -281,6 +293,15 @@ gap in working objective units separately from their original source semantics.
 Exact feasibility keeps exact termination.
 
 ### State and resources
+
+Source LP slices use the cumulative [invocation ledger](06-sessions.md#native-arithmetic-allowances).
+Sparse preparation reserves modeled allocation within its per-query safety envelope
+and any remaining caller allocation ceiling. The traversal reserves modeled storage
+for both children and their condition maps before opening a branch. Its retained
+coverage has a 512 MiB safety envelope independent of cumulative allocation for
+temporary LP preparation and proof work.
+An allocation refusal in optional guidance or candidate completion leaves the
+caller ledger available to admit other queries.
 
 Immutable row addresses, forms and Boolean dependencies can be shared by fresh
 components over one canonical fragment. `prepareExactLiraSource` returns an opaque
@@ -447,7 +468,8 @@ nonlinear products use [polynomial completion](19-nonlinear-arithmetic.md#polyno
 Shared Boolean choices select active rows in one LP containing integer and real
 columns. The [integer branch order](#solving-and-composition-1) applies unchanged.
 The double-bounded transform preserves integer/real sorts and branches only on
-integer coordinates.
+integer coordinates. When the default point hints are installed, automatic
+branching orders Boolean decisions by conflict activity.
 
 Finite integers count as decided only when their finite owner fixes them. A completed
 point can guide an equality-first split followed by lower and upper remainders;

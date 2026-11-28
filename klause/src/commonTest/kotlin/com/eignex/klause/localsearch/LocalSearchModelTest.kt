@@ -1,14 +1,22 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.scheduling.internals.CumulativeEventProfile
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.util.collections.Bits
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -51,6 +59,50 @@ class LocalSearchModelTest {
         assertEquals(-(1L shl 30) + 1, model.domains[0].min)
         assertEquals((1L shl 30) - 1, model.domains[0].max)
         assertFalse(model.refutesModel)
+    }
+
+    @Test
+    fun `wide open cumulative windows should use task events in either constructor`() {
+        val last = 1L shl 21
+        val windows = arrayOf(IntDomain(0, last))
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 0)), listOf(
+            Cumulative(intArrayOf(0), longArrayOf(1), longArrayOf(1), 1),
+        ), openIntHi = booleanArrayOf(true))
+        val selection = FactorProjectionProviders.Default.prepare(source)
+        val models = listOf(
+            LocalSearchModel.open(source, windows),
+            LocalSearchModel.open(source, selection, windows),
+        )
+        for (model in models) {
+            val state = LocalSearchState(model, Random(3))
+            state.assignment.setInt(0, last)
+
+            state.recompute()
+
+            assertIs<CumulativeEventProfile>(state.refPayload[0])
+        }
+    }
+
+    @Test
+    fun `exhausting a cumulative search window should leave the open source undecided`() {
+        val blockerLength = 1L shl 21
+        val windows = arrayOf(IntDomain(0, 1), IntDomain(0, 0))
+        val source = Problem(0, 2, windows, listOf(
+            Cumulative(intArrayOf(0, 1), longArrayOf(1, blockerLength), longArrayOf(1, 1), 1),
+        ), openIntHi = booleanArrayOf(true, false))
+        val selection = FactorProjectionProviders.Default.prepare(source)
+        val witness = Sample(booleanArrayOf(), longArrayOf(blockerLength, 0))
+        assertIs<Verification.Accepted<*, *>>(verifyOpenWitness(source, witness))
+
+        val models = listOf(
+            LocalSearchModel.open(source, windows),
+            LocalSearchModel.open(source, selection, windows),
+        )
+        for (model in models) {
+            val result = LocalSearchEngine(model).solve(LocalSearchParams(maxFlips = 8, randomSeed = 3), warm = null)
+
+            assertEquals(TerminationReason.BudgetExhausted, assertIs<SolveResult.Unknown>(result).reason)
+        }
     }
 
     @Test

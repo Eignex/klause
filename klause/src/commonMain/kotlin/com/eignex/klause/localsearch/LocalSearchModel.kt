@@ -110,7 +110,7 @@ private fun Problem.declaredSearchDomain(v: Int): IntDomain {
     return IntDomain(lo, hi)
 }
 
-/** Window wide [Cumulative] columns only when their selected scorer uses the built-in dense timeline. */
+/** Window wide [Cumulative] columns only when their selected scorer is the built-in scheduling scorer. */
 private fun scheduleWindows(problem: BakedProblem, domains: Array<IntDomain>): Array<IntDomain> {
     val selection = problem.factorProjections
     val windowed = problem.factors.indices.filter {

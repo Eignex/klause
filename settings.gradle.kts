@@ -9,7 +9,16 @@ pluginManagement {
             metadataSources { gradleMetadata() }
             content { includeModule("com.eignex", "kbuild") }
         }
-        mavenCentral()
+        mavenCentral {
+            content {
+                // The Foojay marker and resolver are published through the Plugin Portal.
+                excludeModule(
+                    "org.gradle.toolchains.foojay-resolver-convention",
+                    "org.gradle.toolchains.foojay-resolver-convention.gradle.plugin",
+                )
+                excludeModule("org.gradle.toolchains", "foojay-resolver")
+            }
+        }
         gradlePluginPortal()
     }
     resolutionStrategy.eachPlugin {

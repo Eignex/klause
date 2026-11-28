@@ -63,6 +63,7 @@ class SourceCondition(
     internal val hasNumericBounds: Boolean get() = capturedLower.isNotEmpty() || capturedUpper.isNotEmpty()
     internal val coordinateRestrictionCount: Long get() =
         capturedBools.size.toLong() + capturedLower.size + capturedUpper.size
+    internal val integerRowStorageEntries: Long get() = capturedIntegerRows.sumOf { it.supportSize.toLong() + 1L }
 
     internal fun copy(bools: Map<Int, Boolean> = capturedBools,
         lower: Map<SourceCoordinate, BigFraction> = capturedLower,

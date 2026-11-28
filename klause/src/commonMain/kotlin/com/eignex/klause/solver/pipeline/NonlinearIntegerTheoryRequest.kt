@@ -99,6 +99,11 @@ fun OpenTheoryPipeline.execute(
     cores: Int,
 ): PolynomialTheoryExecution {
     require(cores > 0)
+    val projection = (request.preparedPlan.execution as? PreparedExecution.NonlinearInteger)?.projection
+    if (projection?.finiteOwnership != null) {
+        return executeFiniteNonlinearInteger(request, projection, params, engine)
+            .withSourceSemantics(request.preparedPlan.sourceSemantics)
+    }
     return (
         if (engine == FiniteEngine.MIXED || (engine != FiniteEngine.FIXED && cores > 1)) {
             NonlinearIntegerPortfolio(request, params, cores, engine).execute()

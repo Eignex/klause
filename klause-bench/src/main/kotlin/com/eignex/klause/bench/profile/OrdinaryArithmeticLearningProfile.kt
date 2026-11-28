@@ -56,7 +56,7 @@ internal object OrdinaryArithmeticLearningProfile {
         val timeout = (options["timeout-ms"] ?: "10000").toLong().also { require(it in 1..30_000L) }
         val nodes = (options["nodes"] ?: "4096").toLong().also { require(it in 1..100_000L) }
         val traceMode = options["trace"] ?: "first-integer"
-        require(traceMode in setOf("initial", "first-integer", "first-pb"))
+        require(traceMode in setOf("initial", "first-integer", "first-pb", "first-integer-attachment"))
         val lp = options["lp"] ?: "auto"
         require(lp in setOf("auto", "off"))
         val attribution = (options["attribution"] ?: "false").toBooleanStrict()
@@ -106,6 +106,7 @@ internal object OrdinaryArithmeticLearningProfile {
             Category.CSP, Expected.Unknown)
         val route = options["route"] ?: "single"
         require(route in setOf("single", "catalog"))
+        require(traceMode != "first-integer-attachment" || (route == "catalog" && learningKind != "pb"))
         if (route == "catalog") {
             require(!attribution && "nodes" !in options)
             PortfolioArithmeticLearningCapture.inspect(options, ref, bytes, out, fingerprint)

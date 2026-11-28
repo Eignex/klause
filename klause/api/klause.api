@@ -6860,6 +6860,7 @@ public final class com/eignex/klause/lp/bounding/LpPlan {
 }
 
 public final class com/eignex/klause/lp/bounding/LpTechnique : java/lang/Enum {
+	public static final field AUTOMATIC_SPARSE Lcom/eignex/klause/lp/bounding/LpTechnique;
 	public static final field BOOLEAN_RLT Lcom/eignex/klause/lp/bounding/LpTechnique;
 	public static final field BOUNDING Lcom/eignex/klause/lp/bounding/LpTechnique;
 	public static final field CIRCUIT Lcom/eignex/klause/lp/bounding/LpTechnique;

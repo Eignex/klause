@@ -85,7 +85,7 @@ internal class LinearResidualCompletion(
             val packed = LinearAuthorityModel.prepare(residual, variables, cancellation) ?: return null
             admission = budget.admitSparse(cancellation) { active ->
                 SparseSourceLp.prepare(packed.rows, packed.columns, costs ?: List(variables) { BigFraction.ZERO },
-                    BigFraction.ZERO, policy, active).also {
+                    BigFraction.ZERO, policy, active, funding = budget.funding).also {
                     observe("PrimalRecoverySparseInputEntries", it.metrics.inputEntries)
                     observe("PrimalRecoverySparseInputBits", it.metrics.scalarBits)
                     observe("PrimalRecoverySparsePreparationWork", it.metrics.work)

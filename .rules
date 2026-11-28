@@ -32,6 +32,9 @@ When running the full gate locally:
 
 - check runs tests and some light checks.
 - lintDocs runs detekt and dokka linting.
+- detekt in the gate is read-only, the same check CI runs, and never edits the working tree. To apply
+  its formatting corrections, run `formatKotlin` on the module you touched (for example
+  `:klause:formatKotlin`) and review the diff it writes.
 - Do NOT add `--rerun-tasks`. detekt re-analyses new and edited files on its own; the flag only
   forces the whole graph to redo work the cache already has.
 - An idle-box gate is ~4 minutes, over half of it detekt. Batch every edit and gate once at the end
@@ -39,15 +42,16 @@ When running the full gate locally:
   gate.
 - detekt and dokka run on alpha analysis engines. Two crash shapes look alike and are not:
   - **It names one of your files.** `No receiver found in qualified expression`, or an offsets error
-    like `Range [0, 27) out of bounds for length 4`, means the file changed under the analysis. Usually
-    detekt's own `autoCorrect` resorting that file's imports mid-run, so a later rule reads a stale
-    context. Real and repeatable: run detekt, commit the autocorrection it writes, and it goes. Editing
-    a source file while the gate runs does the same thing, so don't. Reproducing it needs the whole
-    `check` graph — a bare detekt run has no binding context, so the rule that crashes never fires.
+    like `Range [0, 27) out of bounds for length 4`, means the file changed under the analysis, so a
+    later rule read a stale context. Editing a source file while the gate runs, or running
+    `formatKotlin` alongside it, causes it, so don't; re-run once the tree is still.
   - **No file of yours appears in it.** `AsyncExecutionService.getService must not return null`, with
     every stack frame inside the Kotlin analysis API, is a flake: re-run before investigating.
   A dokka `Error in translating of symbol` can be either; one on an untouched file was a real broken
   link. Check the symbol it names first. A finding that names your file and a rule is always genuine.
+
+Never use `gh pr merge --auto`: the repo has auto-merge disabled, so `gh` merges immediately. Poll the
+checks (`statusCheckRollup`) rather than `mergeStateStatus`, which reads `CLEAN` while checks still run.
 
 ## Tests
 
@@ -61,7 +65,16 @@ When running the full gate locally:
 - Reuse existing fixtures/helpers; don't add new ones unless asked.
 - Use the parameterized form for variants of the same behavior; separate tests for semantically different ones.
 - Keep comments minimal and let the test name carry the intent.
-- No JVM test over 300ms.
+- No JVM test over 300ms, and nothing close to it: aim for ~150ms.
+- Unit tests are not exhaustive. Cut randomized batteries, brute-force oracles and seed sweeps to one
+  representative case per distinct outcome; exhaustive checking belongs in the lab.
+- Tests that could stall use logical clocks (cancellation tokens counting polls), never wall clocks.
+  LS and ALNS tests stop on `node-limit`, not on short deadlines.
+- A regression test must fail with the fix reverted; check that before relying on it.
+- Test names must not contain `(`, `)`, `#` or `,`: Kotlin/Native rejects them. Common source sets use
+  only the common stdlib (no `toSortedSet`, `TreeMap`, `sortedSetOf`).
+- No test reads source files: no import greps, no snippet checks. Enforce boundaries with visibility
+  and module structure.
 
 ## Bench
 
@@ -81,6 +94,14 @@ Read `klause-bench/README.md` before benchmarking. In short:
   problem with klause-cli and writes its record, and the `bench.profile` mains run as `lab profile` jobs.
 - `solve-one` runs the installed CLI as a subprocess, so rebuild it with `:klause-cli:installJvmDist` first.
   `installDist` is a no-op that serves a stale binary, so suspect it when a bench result contradicts a passing test.
+- Decide at PR-open whether a change needs a lab A/B and say so. Run one when it can move verdicts or search;
+  skip it for tooling, refactors, docs, test-only and narrow fixes covered by a test.
+- A/B at a fixed node limit with a pinned arm, comparing arms only within one job and over several seeds. A
+  time-budgeted A/B measures the host, not the change. Pin the base arm to the branch's merge-base.
+- Validate witnesses, not verdict labels, before quoting verdict counts.
+- A clear net gain is not blocked by one reproducible loss. Report every loss; escalate when losses are
+  systematic or a verdict conflicts with a reference.
+- Submit lab jobs at priority 0 and never above jobs other sessions have queued or running.
 
 ## Style
 
@@ -93,6 +114,18 @@ Read `klause-bench/README.md` before benchmarking. In short:
   on its own line at the top only when the session was created to close that issue.
 - Issues: follow `.github/issue_template.md`. Keep them short, a few plain sentences,
   and link code/PRs instead of pasting.
+- File an issue for every leftover finding unless it is very small. Issues are for real bugs (wrong verdicts,
+  invalid solutions, wrong optima, crashes, nondeterminism); portfolio balance and search quality are not bugs.
+- Comments and KDoc name no external solver products; describe the mechanism. Keep academic citations.
+
+## Design policy
+
+- Never ship a simplified or shortcut implementation as the deliverable. Do the full version or surface the
+  real scope.
+- Never cap constraint size (rows, arity, domain span, factor count) to avoid cost. Routing to a weaker but
+  correct encoding is fine; refusing a solvable model is not.
+- When an encoding cannot match the source semantics, reject the input. A wrong answer is worse than a
+  missing feature.
 
 ## Documentation
 
@@ -160,3 +193,9 @@ Read `klause-bench/README.md` before benchmarking. In short:
 - Dependencies point from policy to mechanism: pipeline and theories may depend on solver model types
   and arithmetic kernels; propagation may depend on immutable arithmetic representations; arithmetic
   kernels do not depend on propagation or search.
+- Parsing takes no deadline. Front-ends run no work that needs a budget; that work belongs in presolve.
+- Propagators are stateless and shared by portfolio arms. Per-search state is keyed by factor id in
+  `state.refPayload`.
+- Values wider than `Long` live only on the factor and in transient propagator arithmetic, never in
+  `IntDomain`, the trail or the LP core.
+- Per-literal, per-node, per-conflict and per-pivot paths use the `util` primitive collections.

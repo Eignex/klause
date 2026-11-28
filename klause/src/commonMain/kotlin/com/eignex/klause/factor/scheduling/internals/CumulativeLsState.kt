@@ -12,7 +12,11 @@ class CumulativeLsState(
     /** Current capacity ceiling (mirrors the capacity variable's assigned value). */
     var cap: Long,
 ) {
-    internal var durationRepairCursor: Int = 0
-    internal var choiceRepairCursor: Int = 0
-    internal var choicePartnerCursor: Int = 0
+    internal val repairs = CumulativeRepairCursors()
+}
+
+internal class CumulativeRepairCursors {
+    var duration: Int = 0
+    var choice: Int = 0
+    var choicePartner: Int = 0
 }

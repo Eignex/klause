@@ -52,7 +52,8 @@ coverage requires an integral threshold with both `x <= threshold` and
 their guards, and a conditional row cannot establish its own pin. Bounds are checked
 in original objective units and direction; refutations must derive an exact
 contradiction. A branch flag, traversal exhaustion or engine identity supplies no
-authority.
+authority. A Boolean `Clause` claim needs a `Discharge`: a checked refutation scoped
+to exactly the negations of its literals, each an unpinned declared Boolean.
 
 A common inequality proved with `BooleanSplit` can enter another nonnegative
 combination through `Import` of its checked `Consequence`. The import keeps its
@@ -133,10 +134,12 @@ An unattained limit also requires approach and nonattainment derivations.
 `SourceResultCapture` attaches optional evidence to completed satisfaction and
 minimization results, keeping source assignments and exact objective values. A
 caller can supply bound or traversal derivations; without them optimum and
-refutation coverage stays unavailable. Recapture cannot erase a result's existing
-scope or restrictions. Cancellation of optional capture preserves the completed
-result. A cancelled verification yields unavailable evidence without rewriting that
-result or preventing a later verification under a fresh allowance.
+refutation coverage stays unavailable. An optimum within an optimality gap is
+captured only as its witness, because its gap bound has no derivation. Recapture
+cannot erase a result's existing scope or restrictions. Cancellation of optional
+capture preserves the completed result. A cancelled verification yields unavailable
+evidence without rewriting that result or preventing a later verification under a
+fresh allowance.
 `PreparedSourcePlan.sourceResultCapture` uses the plan's
 original IR, explicit pins and objective direction; narrowed execution bounds are
 not original premises.
@@ -195,8 +198,11 @@ point but no global bound, and unbound workers withhold shared root deductions.
 
 Linear runtime terminal admission checks the captured typed terminal directly under
 the bounded `SourceEvidenceVerifier` policy, after checking its invocation and
-retained evidence scopes. Consumer-selected result packages use claim matching
-under their containing replay allowance.
+retained evidence scopes. When a run stops at the declared optimality gap,
+admission instead checks its incumbent witness and rational global bound
+separately and requires the witness's exact original objective and that bound to
+close the gap. Consumer-selected result packages use claim matching under their
+containing replay allowance.
 
 ## Tolerance claim transfer
 

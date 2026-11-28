@@ -274,8 +274,9 @@ form.
 
 ## Consumers, explanations and cuts
 
-Polynomial adapters use `LinearEnvelopes` and `CertifiedEnvelopeLp` to assemble
-exact square and bilinear relaxations outside the engine. An owner retains its
+Polynomial adapters use the envelope rows of `LinearEnvelopes.kt` and
+`CertifiedEnvelopeLp` to assemble exact square and bilinear relaxations outside the
+engine. An owner retains its
 matrix for coordinate objectives and tangent additions inside one immutable query
 scope. A forward and reverse pass of exact row certificates tightens its bounds
 before numerical solving. Row
@@ -381,10 +382,12 @@ quantum; resuming a cursor keeps its original lifetime grant and charges each sl
 actual work to the same ledger.
 
 Primal consultations check the preceding paused dual before advancing and completed
-results before rounding. Numerical work, checking and source projection spend the
-same cumulative allowance. Only the identical source-root model and exact state
-qualify; later CP assertions supply no global bound. Search publishes accepted
-bounds to its objective floor and retains them in its terminal bound.
+results before rounding. An automatic worker can check a fresh paused dual at
+the end of its quantum when work and time remain. A checked pause need not be
+checked again before resumption. Numerical work, checking and source projection
+spend the same cumulative allowance. A global bound requires the identical
+source-root model and exact state. Search publishes accepted bounds to its
+objective floor and retains them in its terminal bound.
 With a checked bound and a positive decision allowance, a sliced monolithic finite
 worker can enter discrete search before its root numerical query completes.
 The handoff retires the unfinished cursor and skips further root consultations for
@@ -403,6 +406,29 @@ scratch and factor construction. Each sparse factor attempt reserves entries
 before writing and stops at two million entries or eight million work units;
 declines publish no factors or rank claim. Sparse admission never changes the dense
 exact-continuation caps.
+
+Opt-in automatic admission (`+automatic-sparse`) applies only to pure-integer
+optimization over closed declarations whose dense tableau exceeds the ordinary cell
+cap, without component ownership, the best-bound tree or the objective cone. It
+evaluates source and work guards inside the LP owner
+under the existing root and solve allowances. Resolved cut plans keep the ordinary
+LP path. A scan can decline once its nonzero and fill counts exceed the funded
+pass forecast. The diagnostic observer records completed admission decisions and their evaluated
+guards, including preparation and query allowances at the producer and helper.
+The compact forecast covers the initial factor attempt and full source pass.
+Later attempts draw on the live continuation allowance.
+Automatic workers on the same baked source can reuse one admitted compact layout
+and its forecasts from the preparation cache. The identical source and objective
+and grants covering its preparation and source pass allow a paid lookup. Each
+worker still needs a query grant covering the compact forecast to consume the
+layout. An unfunded compact forecast returns the query decline. Each admitted
+worker installs its own root state and pays for its numerical preparation and queries.
+Root point events identify the original owner, model and point through queries,
+retention and search consultations. A consultation supplies ordering guidance.
+The automatic root path can hand a complete point from the same source
+directly to ordinary search. The first root choice can use its value preference
+without preparing the component order or running another root simplex query.
+Auxiliary and partial points remain eligible for the existing rounding paths.
 
 Completed root points can guide rounding under the same objective identity, within a
 one-MiB guidance cap. Rounding pins through propagation with nearest targets, and
@@ -467,14 +493,15 @@ A declined partition uses the ordinary monolithic preparation limit and charges
 the inspection to the containing allowance. An admitted sparse trial retains its
 own numerical route. Scalar trail edits preserve a structural admission decline. Admitted
 children retain their numerical state through ordinary node edits. Composed component
-points publish node branching hints only under `lp-component-ownership`, which also
-selects root component guidance, ordering and private rounding. Automatic retention
+points publish node branching hints only when the direct finite-worker `LpPlan`
+enables component ownership, which also selects root component guidance, ordering
+and private rounding. Automatic retention
 uses component results for bounds, fixing and separation without replacing branching
 advice. Earlier monolithic advice can survive a withheld point, as it can a skipped
 query; monolithic results keep their ordinary hint publication.
 
-The explicit `lp-component-ownership=true` setting lets finite node bounding retain
-one numerical owner per independent row-coupled block. Each child keeps its basis
+Finite node bounding retains one numerical owner per admitted row-coupled block.
+Each child keeps its basis
 and exact result authority; empty structural rows form one logical-only child that
 retains feasibility, strict sides and logical costs. Bound, cost, row activation and
 premise changes invalidate only affected children, and unchanged children reuse
@@ -503,7 +530,7 @@ without a result before projection. Node consumers may prune against the existin
 cutoff, but publish no branching coordinates or directional history from a partial
 aggregate. Returned child coordinates can feed a masked rounding guide.
 
-The same setting dispatches root tableau separation to the owning block. Lifted cuts
+The component plan dispatches root tableau separation to the owning block. Lifted cuts
 keep every row multiplier, bound substitution, integrality premise and source
 address for the ordinary source mapper and cut pool. The replacement checks
 columns by identity or exact prefix and checks row identities before retaining an
@@ -709,9 +736,10 @@ bounds and basis; changed bounds, objective, rows or trail scope discard the cur
 Sparse source preparation transposes emitted support into exact CSC once per
 admission, which neither authorizes ordinary admission nor bounds basis fill;
 `SparseSourceLpPolicy` carries the preparation, floating, consultation and
-certificate allowances, and retained MIP callers fund consultations through
-`SourceLpFunding`, where caller cancellation closes the owner and exhaustion is an
-incomplete result.
+certificate allowances. Retained source callers fund consultations through
+`SourceLpFunding`. Sparse preparation intersects its allocation safeguard with the
+remaining caller allowance before reserving storage. Caller cancellation closes the
+owner and cumulative exhaustion is an incomplete result.
 
 Source primal statistics report each returned guidance consultation's native phase,
 floating termination, native and projected point availability and pause status.
@@ -752,9 +780,7 @@ invocation window and Boolean substitution stay bound to each entry.
 `source-refutation-propagation=true` adds integral unit-prefix deductions: the only
 eligible case is a single missing inclusive bound on a source integer with an
 integral endpoint, and the augmented scope's import check proves the excluded
-sibling. `source-refutation-resolution=true` adds bounded pairwise resolution over
-named integral predicates, checking each resolvent through a source integer-split
-derivation. The index bounds entries, proof storage and support traversal, evicts
+sibling. The index bounds entries, proof storage and support traversal, evicts
 its oldest entry and charges cumulative source funding; reaching its separate
 allocation limit clears it and leaves ordinary traversal running. Unknown or
 cancelled checks close nothing.

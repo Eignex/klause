@@ -79,6 +79,7 @@ the numerical mechanisms beneath them.
 | `klause` | Kotlin Multiplatform model, DSL, compilation, formats and solving |
 | `klause-cli` | Shared command-line driver, format dispatch, output protocols and platform seams |
 | `klause-bench` | Non-published JVM tooling; workflow and evidence live in its [README](../klause-bench/README.md) |
+| `klause-mzn-lib` | MiniZinc solver configuration, predicate declarations and CLI wrappers; setup lives in its [README](../klause-mzn-lib/README.md) |
 
 The CLI depends on the library and adds no solving behavior of its own: every
 route it runs is reachable through the [library API](23-api.md).
@@ -101,6 +102,7 @@ Packages below are under `com.eignex.klause` in
 | `arithmetic.transcendental` | Certified rational function enclosures and affine relaxations | Shared Util arithmetic and Klause `util` execution controls |
 | `arithmetic.real` | Exact symbolic real values with certified comparison | Only numerical kernels; no model or solver state |
 | `arithmetic.difference` | Difference constraints, extraction and non-incremental graph operations | No propagation or search state |
+| `arithmetic.json` | Exact integer, rational and real JSON codecs shared by `factor.codec` and `formats.json` | Reads `ir` and the arithmetic kernels; depends on neither consumer |
 | `simplex.exact` | Fixed-width rational arithmetic and exact feasibility primitives | Uses shared exact rationals from Eignex Util |
 | `simplex.basis` | Sparse floating and rational basis operations | Numerical types, `util` and koblas; no search policy |
 | `lp.lattice` | Exact integer echelon/Hermite reduction, transforms and triangular bounds | Leaf depending only on `util` |

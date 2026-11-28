@@ -54,6 +54,7 @@ internal data class LpAdmission(
     val plan: LpPlan,
     val elementIndexes: Set<Int>? = null,
     val sparseTrial: SparseLpAdmission? = null,
+    val observation: LpRootAdmissionObservation? = null,
 )
 
 /**
@@ -161,7 +162,10 @@ object LpAutoConfig {
         cancellation: ExecutionControl = ExecutionControl.Never,
         sparseTrialAllowed: Boolean = true,
         sparseTrialWork: Long = SPARSE_LP_MAX_WORK,
+        sparseTrialQueryWork: Long = SPARSE_LP_MAX_WORK,
         sourcePreparation: LpSourcePreparation = config.sourcePreparation ?: base.sourcePreparation,
+        allowAutomaticSparse: Boolean = false,
+        captureSparseAdmission: Boolean = false,
         observe: ((LpAdmission) -> Unit)? = null,
     ): LpPlan {
         var visits = 0
@@ -406,18 +410,56 @@ object LpAutoConfig {
                 base.energeticEvery
             },
         )
-        val sparse = if (config.resolved(LpTechnique.SPARSE_TRIAL) && !base.bounding &&
-            structApplicable && config.resolved(LpTechnique.BOUNDING)
+        val sparseOverride = config.overrides[LpTechnique.SPARSE_TRIAL]
+        val explicitSparse = sparseOverride == true
+        val sparsePermitted = explicitSparse || (allowAutomaticSparse && config.permitsAutomaticSparse())
+        val trace = if (captureSparseAdmission) SparseAdmissionTrace() else null
+        val automaticSparse = sparseGuard(trace, true, 0, !explicitSparse) &&
+            sparseGuard(trace, true, 1, sparsePermitted) &&
+            sparseGuard(trace, true, 2, !base.bounding) &&
+            sparseGuard(trace, true, 3, objective != null) &&
+            sparseGuard(trace, true, 4, problem.numRealVars == 0) &&
+            sparseGuard(trace, true, 5, !problem.intBounds.hasOpenSides) &&
+            sparseGuard(trace, true, 6, !base.componentOwnership) &&
+            sparseGuard(trace, true, 7, !base.lbTreeSearch) &&
+            sparseGuard(trace, true, 8, !coneRequested) &&
+            sparseGuard(trace, true, 9, cells > baseCap) &&
+            sparseGuard(trace, true, 10, !plan.cuts) &&
+            sparseGuard(trace, true, 11, !plan.booleanRlt) &&
+            sparseGuard(trace, true, 12, !plan.impliedBoundCuts) &&
+            sparseGuard(trace, true, 13, !plan.flowCoverCuts) &&
+            sparseGuard(trace, true, 14, config.overrides.none { (technique, enabled) ->
+                enabled && technique.timing == LpTiming.EXHAUSTIVE
+            })
+        val sparse = if (sparseGuard(trace, false, 0, true) &&
+            sparseGuard(trace, false, 1, sparsePermitted) &&
+            sparseGuard(trace, false, 2, !base.bounding) &&
+            sparseGuard(trace, false, 3, explicitSparse || automaticSparse) &&
+            sparseGuard(trace, false, 4, structApplicable) &&
+            sparseGuard(trace, false, 5, config.resolved(LpTechnique.BOUNDING))
         ) {
             if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation,
-                minOf(sparseTrialWork, base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK),
-                sourcePreparation)
-            else SparseLpAdmission(mapOf("DeclineProjection" to 1L))
+                minOf(sparseTrialWork, base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK).also {
+                    trace?.helperPreparationWork = it
+                }, sourcePreparation, automatic = automaticSparse,
+                queryWorkAllowance = minOf(sparseTrialQueryWork,
+                    base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK).also {
+                    trace?.helperQueryWork = it
+                }).also {
+                trace?.disposition = if (it.admitted) LpRootAdmissionDisposition.ADMITTED
+                else LpRootAdmissionDisposition.ATTEMPTED_DECLINED
+            }
+            else SparseLpAdmission(mapOf("DeclineProjection" to 1L,
+                "Automatic" to if (automaticSparse) 1L else 0L)).also {
+                trace?.disposition = LpRootAdmissionDisposition.PROJECTION_SKIPPED
+            }
         } else null
         if (sparse?.admitted == true) {
-            plan = LpPlan(
-                bounding = true, boundMaxDepth = 0, learn = true, probe = true, rootCutHarvest = false,
-                rootMaxWork = minOf(base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK, SPARSE_LP_MAX_WORK),
+            plan = (if (explicitSparse) LpPlan() else plan).copy(
+                bounding = true, boundMaxDepth = if (automaticSparse && plan.bounding) plan.boundMaxDepth else 0,
+                learn = true, probe = true, rootCutHarvest = false,
+                rootMaxWork = minOf(base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK, SPARSE_LP_MAX_WORK,
+                    if (automaticSparse) sparseTrialQueryWork else SPARSE_LP_MAX_WORK),
                 rootBudgetFraction = base.rootBudgetFraction, rootBudgetMillis = base.rootBudgetMillis,
                 lpWorkBudgetFraction = base.lpWorkBudgetFraction, boundMaxPivots = base.boundMaxPivots,
                 boundEvery = base.boundEvery, warmStart = base.warmStart, branching = base.branching,
@@ -426,8 +468,12 @@ object LpAutoConfig {
             )
         }
         observe?.invoke(LpAdmission(rows, baseCols, cells, structApplicable,
-            config.resolved(LpTechnique.BOUNDING), coneRequested || cells <= ceilingCap, base.bounding, plan,
-            if (base.element) null else selection.elementIndexes.toSet(), sparse))
+            config.resolved(LpTechnique.BOUNDING).also { trace?.boundingPermitted = it },
+            (coneRequested || cells <= ceilingCap).also { trace?.withinCeiling = it }, base.bounding, plan,
+            if (base.element) null else selection.elementIndexes.toSet(), sparse,
+            trace?.snapshot(config.emphasis, sparseOverride, sparsePermitted, automaticSparse,
+                rows, baseCols, cells, baseCap, ceilingCap, structApplicable, sparseTrialAllowed,
+                sparseTrialQueryWork, sparseTrialWork, plan, sparse?.metrics.orEmpty())))
         return plan
     }
 
@@ -598,4 +644,50 @@ object LpAutoConfig {
         }
         return if (any) HullEstimate(LpTechnique.CUMULATIVE_TIME_INDEXED, cols, rows) else null
     }
+}
+
+private class SparseAdmissionTrace {
+    var disposition = LpRootAdmissionDisposition.NOT_CONSIDERED
+    var automaticEvaluated = 0L
+    var automaticPassed = 0L
+    var outerEvaluated = 0L
+    var outerPassed = 0L
+    var helperQueryWork: Long? = null
+    var helperPreparationWork: Long? = null
+    var boundingPermitted: Boolean? = null
+    var withinCeiling: Boolean? = null
+
+    fun snapshot(emphasis: LpEmphasis, sparseOverride: Boolean?, sparsePermitted: Boolean,
+        automaticEligible: Boolean, rows: Long, columns: Long, cells: Long, baseCap: Long, ceilingCap: Long,
+        structurallyApplicable: Boolean, projectionAllowed: Boolean, producerQueryWork: Long,
+        producerPreparationWork: Long, plan: LpPlan, metrics: Map<String, Long>): LpRootAdmissionObservation =
+        LpRootAdmissionObservation(disposition, emphasis = emphasis, sparseOverride = sparseOverride,
+            sparsePermitted = sparsePermitted, automaticEligible = automaticEligible,
+            automaticEvaluated = automaticEvaluated, automaticPassed = automaticPassed,
+            outerEvaluated = outerEvaluated, outerPassed = outerPassed,
+            estimatedRows = rows, estimatedColumns = columns, estimatedCells = cells,
+            baseCellCap = baseCap, ceilingCellCap = ceilingCap, boundingPermitted = boundingPermitted,
+            withinCeiling = withinCeiling, structurallyApplicable = structurallyApplicable,
+            projectionAllowed = projectionAllowed, producerQueryWork = producerQueryWork,
+            producerPreparationWork = producerPreparationWork, helperQueryWork = helperQueryWork,
+            helperPreparationWork = helperPreparationWork, resolvedBounding = plan.bounding,
+            resolvedProbe = plan.probe, resolvedBranching = plan.branching,
+            resolvedComponentOwnership = plan.componentOwnership, resolvedLbTreeSearch = plan.lbTreeSearch,
+            resolvedRootMaxWork = plan.rootMaxWork, resolvedBoundMaxDepth = plan.boundMaxDepth,
+            resolvedRootBudgetMillis = plan.rootBudgetMillis, resolvedRootBudgetFraction = plan.rootBudgetFraction,
+            resolvedLpWorkBudgetFraction = plan.lpWorkBudgetFraction, metrics = metrics)
+}
+
+private fun sparseGuard(trace: SparseAdmissionTrace?, automatic: Boolean, index: Int, result: Boolean): Boolean {
+    if (trace != null) {
+        val bit = 1L shl index
+        if (automatic) {
+            trace.automaticEvaluated = trace.automaticEvaluated or bit
+            if (result) trace.automaticPassed = trace.automaticPassed or bit
+        } else {
+            trace.outerEvaluated = trace.outerEvaluated or bit
+            if (result) trace.outerPassed = trace.outerPassed or bit
+        }
+    }
+    return result
 }

@@ -34,6 +34,8 @@ internal class NonlinearIntegerCursor(
     private val params: NonlinearIntegerParams,
     private var condition: PolynomialCondition,
     roots: NonlinearIntegerRootStore? = null,
+    private val coordinates: List<Int> = problem.integerCoordinates,
+    private val relaxWithoutCandidates: Boolean = false,
 ) : AutoCloseable {
     private var closed = false
     private var initialized = false
@@ -42,12 +44,11 @@ internal class NonlinearIntegerCursor(
     private val arithmetic = PolynomialArithmetic(work, params.arithmetic.polynomialLimits).also {
         work.execution = it.execution
     }
-    private val cells = NonlinearIntegerCells(problem.formula, problem.integerCoordinates, arithmetic)
+    private val cells = NonlinearIntegerCells(problem.formula, coordinates, arithmetic)
     private var invocation = PolynomialTheoryService(problem.formula, problem.boolCount, problem.numericCount)
         .invocation(params.arithmetic.copy(cancellation = work, maximumWork = null))
         .also { if (params.arithmetic.cellRefinement) it.checkedCellObserver = cells::retain }
     private val random = Random(params.seed)
-    private val coordinates = problem.integerCoordinates
     private var current = List(coordinates.size) { BIG_ZERO }
     private var candidates = 0L
     private var moves = 0L
@@ -117,7 +118,7 @@ internal class NonlinearIntegerCursor(
 
     private fun initialize(): QfNraResult? {
         arithmetic.step()
-        if (params.maximumCandidates == 0L) return unknown()
+        if (params.maximumCandidates == 0L && !relaxWithoutCandidates) return unknown()
         if (params.residueRefutation) {
             val residues = NonlinearIntegerResidues(problem, arithmetic, params.arithmetic.polynomialLimits)
             try {

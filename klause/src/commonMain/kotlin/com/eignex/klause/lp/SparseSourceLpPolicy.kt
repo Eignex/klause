@@ -6,7 +6,7 @@ import com.eignex.klause.lp.engine.ReconstructionLimits
 internal data class SparseSourceLpPolicy(
     val preparation: SparseSourceLpLimits = SparseSourceLpLimits(2_000_000L, 64L * 1024L * 1024L),
     val floating: LpFloatAllowance = LpFloatAllowance(150_000_000L, 1024),
-    val quantum: Long = 20_000_000L,
+    val quantum: Long = SOURCE_LP_WORK_QUANTUM,
     val certificate: ReconstructionLimits = ReconstructionLimits(
         maxCoordinates = Int.MAX_VALUE,
         maxEntries = Int.MAX_VALUE,

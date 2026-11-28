@@ -78,7 +78,7 @@ jobs:
         run: bash klause-bench/scripts/run-verified-gradle.sh -p buildSrc test
 
       - name: Run JVM tests with coverage
-        run: bash klause-bench/scripts/run-verified-gradle.sh --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport :klause-cli:installJvmDist :klause:stageLpProfileJvm
+        run: bash klause-bench/scripts/run-verified-gradle.sh --retry-buildsrc-metadata --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport :klause-cli:installJvmDist :klause:stageLpProfileJvm
 
       - name: Start the installed JVM CLI
         run: klause-cli/build/install/klause-cli-jvm/bin/klause-cli --version

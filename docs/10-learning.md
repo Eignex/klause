@@ -152,16 +152,10 @@ an interrupted preflight withholds the unfinished analysis result.
 
 Two analyzers share this construction. The native CP analyzer learns over CP reasons
 and stores into the native clause database. The shared first-UIP analyzer in
-`SearchLearning` learns over component reasons; a shared conflict with usable reasons
-asserts and backjumps, while a sound resolvent that cannot assert keeps chronological
-fallback. Unexplained component publications cannot supply missing antecedents.
-
-The numerical frontier also uses the shared clause-resolution operation on checked
-source refutations. Each retained resolvent carries an exhaustive integer-split
-derivation over its two input proofs. It enters the numerical coverage tree only
-after a new source check, preserving proof authority independently of clause names
-and queue order. This bounded opt-in policy keeps complete Boolean scope and
-opening restrictions; unsupported predicates cannot produce a resolvent.
+`SearchSession` learns over component reasons and stores into `SearchLearning`; a
+shared conflict with usable reasons asserts and backjumps, while a sound resolvent
+that cannot assert keeps chronological fallback. Unexplained component
+publications cannot supply missing antecedents.
 
 ## Learned-object authority and lifetime
 
@@ -188,7 +182,7 @@ Retraction removes assignments, not admitted deductions. Learned units and objec
 whose implications retract are examined again after undo. Pending attachments survive
 earlier conflicts and cancellation. Suspension keeps stores and pending attachment;
 cancellation withholds unfinished analysis or checking and grants no refutation.
-Retiring a source cache releases its indexes and names under the containing
+Retiring a source cache releases its indexes under the containing
 allowance. An optional recheck after a consumed implication retracts can retire with
 its object; it does not keep a reason of its own. First assertions and live or
 historical native reasons remain protected. Native fixpoint cancellation stays sticky
@@ -502,6 +496,11 @@ replacement sessions. Observation does not select a recipe or grant source autho
 its work spends the containing invocation allowance.
 Native diagnostic snapshots preserve factor indices, including generated difference
 systems, and record each graph edge with its weight and guard.
+The first integer attachment observation records the visible domain intervals and
+Boolean pins at publication, then records net integer bounds and their final reasons
+after each native fixpoint. The capture labels interrupted and conflicting stages
+before retraction. Coordinate and journal caps and interior holes can omit payloads.
+The visible frontier is an observation of selected native state.
 
 An optional native-session `ArithmeticLearningTrace` records bounded arithmetic
 analysis events before conflict retraction: seed and fallback literals, integer
@@ -538,7 +537,7 @@ preset enables capped tiered retention:
 | Mid | Through LBD 6 | Survives reduction; idle clauses demote to local |
 | Local | Above LBD 6 | Aggressively deleted; conflict use promotes to mid |
 
-Tiers persist independently of later LBD. [ClauseDb](../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/ClauseDb.kt)
+Tiers persist independently of later LBD. [LearnedClauseDb](../klause/src/commonMain/kotlin/com/eignex/klause/propagation/LearnedClauseDb.kt)
 and [SearchLearning](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchLearning.kt)
 own the native and shared stores.
 

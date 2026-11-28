@@ -99,7 +99,7 @@ internal class LpPropagator(
     // Each bound edit costs the scoped solver a pass over the model's columns; the engine charges it as LP work.
     private val onEdit: (Long) -> Unit = {},
     private val queryWorkAllowance: () -> Long? = { null },
-    private val onPreparation: ((LpSolveMetrics) -> Unit)? = null,
+    private var onPreparation: ((LpSolveMetrics) -> Unit)? = null,
     private val continuationAllowance: () -> Long? = { null },
 ) : SearchComponent,
     SearchBrancher,
@@ -108,6 +108,11 @@ internal class LpPropagator(
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
     private var owner: LpScopedSolver? = null
+    internal fun accountPreparation(observer: (LpSolveMetrics) -> Unit) {
+        check(owner == null)
+        onPreparation = observer
+    }
+
     private var proofContext: SearchContext? = null
     private var modelKey: Any? = null
 
@@ -121,6 +126,8 @@ internal class LpPropagator(
     private var preparedRowStages = 0L
     private var preparedJoinStages = 0L
     private var solved = false
+    private var floatAttempt = 0L
+    private var floatContinuation = 0L
     private val witnesses = HashMap<Long, SearchAtomPremise>()
     var sourcePremises: LpSourcePremises? = null
         private set
@@ -131,6 +138,9 @@ internal class LpPropagator(
     val floatTermination get() = owner?.lastFloatTermination
     val floatPaused: Boolean get() = owner?.floatPaused == true
     val pausedTrialProgress: Map<String, Long> get() = owner?.pausedTrialProgress.orEmpty()
+    val pausedTrialAttempt: Long?
+        get() = floatAttempt.takeIf { floatPaused && floatContinuation > 0L && it < Long.MAX_VALUE }
+    val pausedTrialContinuation: Long? get() = pausedTrialAttempt?.let { floatContinuation }
 
     fun pausedDualProposal(token: ExecutionControl): DoubleArray? = owner?.pausedDualProposal(token)
 
@@ -451,11 +461,14 @@ internal class LpPropagator(
             val continuation = (continuationWorkAllowance ?: continuationAllowance)()
             if (continuation != null && current.state.depth == 0) {
                 val profile = effort()
+                if (floatAttempt < Long.MAX_VALUE) floatAttempt++
+                if (!current.floatPaused || floatContinuation == 0L) floatContinuation = floatAttempt
                 return@solveOwned current.advanceFloat(
                     (offered ?: profile.work).coerceAtLeast(1L),
                     LpFloatAllowance(continuation.coerceAtLeast(1L), profile.iterations), queryToken,
                 ).also { solved = true }
             }
+            floatContinuation = 0L
             val allowance = if (solved || offered != null) {
                 effort().let { LpFloatAllowance((offered ?: it.work).coerceAtLeast(0L), it.iterations) }
             } else null
@@ -469,6 +482,7 @@ internal class LpPropagator(
         claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     ): CertifiedLpResult? =
         solveOwned {
+            floatContinuation = 0L
             val profile = effort()
             it.solve(
                 token = if (token === cancellation) cancellation else cancellation or token,
@@ -519,6 +533,7 @@ internal class LpPropagator(
     }
 
     fun resetRoot(): Boolean {
+        floatContinuation = 0L
         lastMetrics = LpSolveMetrics()
         if (withOwner { it.resetRoot(cancellation) } != true) return invalidate()
         witnesses.clear()
@@ -645,6 +660,7 @@ internal class LpPropagator(
     override fun onRestart(context: SearchContext) = policy.restart(context)
 
     fun releaseSolver() {
+        floatContinuation = 0L
         val current = owner ?: return
         val retained = current.state
         owner = null
@@ -660,6 +676,7 @@ internal class LpPropagator(
     }
 
     fun reset() {
+        floatContinuation = 0L
         val previous = owner
         owner = null
         invalidated = false

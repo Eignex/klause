@@ -28,3 +28,14 @@ klause-generated-4657-v1/production-2
 # #4651 owns these generated source families and their related encodings.
 klause-generated-4651-v1/asset-lots
 klause-generated-4651-v1/thermal-duty
+
+# #3828 owns these generated source families and their related encodings.
+klause-generated-3828-v1/folio-lines
+klause-generated-3828-v1/district-spectrum
+
+# #4655 owns both generated lineages and all related encodings.
+# Provenance and custody: https://github.com/Eignex/klause/issues/4695#issuecomment-7229443576
+klause-generated-4655-v1/signal-mesh-11
+klause-generated-4655-v1/signal-mesh-17
+klause-generated-4655-v1/kiln-windows-10
+klause-generated-4655-v1/kiln-windows-16

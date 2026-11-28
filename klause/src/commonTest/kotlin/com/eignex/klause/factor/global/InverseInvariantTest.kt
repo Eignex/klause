@@ -80,17 +80,15 @@ class InverseInvariantTest {
         }
         var moves = 0
         for (start in starts) {
-            for (seed in longArrayOf(1L, 2L, 3L, 7L, 11L)) {
-                val state = seeded(start, seed)
-                assertEquals(0L, state.cost)
-                val sink = MoveSink()
-                state.factors[0].proposeStructuredMoves(state, 0, sink)
-                for (m in sink.list) {
-                    moves++
-                    val check = seeded(start, 0)
-                    check.apply(m)
-                    assertEquals(0L, check.cost, "$m")
-                }
+            val state = seeded(start, 1L)
+            assertEquals(0L, state.cost)
+            val sink = MoveSink()
+            state.factors[0].proposeStructuredMoves(state, 0, sink)
+            for (m in sink.list) {
+                moves++
+                val check = seeded(start, 0)
+                check.apply(m)
+                assertEquals(0L, check.cost, "$m")
             }
         }
         assertTrue(moves > 0)

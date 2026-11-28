@@ -69,14 +69,19 @@ internal object SolveEvidence {
         }
     }
 
-    /** [raw]'s final candidate as [SolveRecord.finalWitness], or null when it holds none or it exceeds 8 MiB.
+    /** [raw]'s final candidate as [SolveRecord.finalWitness], or null when it holds none or it exceeds [maxChars].
      *  [modelOutput], when given, maps a MiniZinc solution's FlatZinc-level DZN to the model's own output
      *  (see [com.eignex.klause.bench.runner.MiniZincRunner.modelOutput]) before its comment lines are appended. */
-    fun finalWitness(format: Format, raw: String, modelOutput: ((String) -> String)? = null): String? {
+    fun finalWitness(
+        format: Format,
+        raw: String,
+        maxChars: Int = MAX_WITNESS_CHARS,
+        modelOutput: ((String) -> String)? = null,
+    ): String? {
         val witness = when (format) {
             Format.MINIZINC -> miniZincWitness(raw, modelOutput)
 
-            Format.SMTLIB -> finalSmtModel(raw)
+            Format.SMTLIB -> finalSmtModel(raw, maxChars)
 
             Format.XCSP3 -> xcspInstantiation(raw)?.let { "v $it" }
 
@@ -85,7 +90,7 @@ internal object SolveEvidence {
 
             else -> null
         }
-        return witness?.takeIf { it.length <= MAX_WITNESS_CHARS }
+        return witness?.takeIf { it.length <= maxChars }
     }
 
     /** The assignments of the last complete DZN solution in [raw], from its first assignment line on. */
@@ -135,7 +140,7 @@ internal object SolveEvidence {
         return witness
     }
 
-    private fun finalSmtModel(raw: String): String? {
+    private fun finalSmtModel(raw: String, maxChars: Int): String? {
         var witnessStart = -1
         var witnessEnd = 0
         var sat = false
@@ -144,7 +149,7 @@ internal object SolveEvidence {
             witnessStart = -1
         }, model = { start, end ->
             if (sat) {
-                witnessStart = if (end - start <= MAX_WITNESS_CHARS) start else -1
+                witnessStart = if (end - start <= maxChars) start else -1
                 witnessEnd = end
             }
         })

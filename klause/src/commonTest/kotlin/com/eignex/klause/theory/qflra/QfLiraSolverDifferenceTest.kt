@@ -16,6 +16,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
@@ -62,6 +63,38 @@ class QfLiraSolverDifferenceTest {
                 val point = assertNotNull(session.model().valueOf(component.realAssignmentKey)).reals.single()
                 assertTrue(if (truth) point <= BigFraction.ZERO else point > BigFraction.ONE)
             }
+        }
+    }
+
+    @Test
+    fun `an unrelated final Boolean should resolve a deferred partial real query`() {
+        val model = Problem(2, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY), factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.0),
+            ))
+        ExactLiraSearchComponent(model).use { component ->
+            val stats = SmtStatsSink()
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            component.useIncrementalSourceRows()
+            component.deferAlternatePartialNumericalChecks()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+            session.popTo(0)
+            val before = stats.snapshot().completeSearchStages?.get("LP_PARTIAL_QUERY_DEFERRED") ?: 0L
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertEquals(before + 1L, stats.snapshot().completeSearchStages?.get("LP_PARTIAL_QUERY_DEFERRED"))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+            val point = assertNotNull(session.model().valueOf(component.realAssignmentKey)).reals.single()
+            assertTrue(point > BigFraction.ZERO)
         }
     }
 

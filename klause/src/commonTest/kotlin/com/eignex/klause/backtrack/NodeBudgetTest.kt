@@ -92,7 +92,7 @@ class NodeBudgetTest {
     fun `an optimize should charge the allowance rather than only its per-slice limit`() {
         val problem = php(pigeons = 8, holes = 7).bake()
         val objective = LinearObjective(boolWeights = LongArray(8 * 7) { 1L })
-        val spent = listOf(64L, 256L).map { limit ->
+        val spent = listOf(16L, 64L).map { limit ->
             val budget = NodeBudget(limit = limit)
             BacktrackSolver(problem).minimize(objective, params(budget))
             budget.spent

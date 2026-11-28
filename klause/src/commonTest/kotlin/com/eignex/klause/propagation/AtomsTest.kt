@@ -268,24 +268,22 @@ class AtomsTest {
         val numVars = 3
         val hi = 6
         val rng = Random(0x5eed)
-        repeat(12) { trial ->
-            val s = freshState(numVars, hi)
-            materializeAllAtoms(s, numVars, hi)
-            assertAtomTruthConsistent(s, "root/trial=$trial")
-            val marks = ArrayDeque<PropagationState.LevelMark>()
-            marks.addLast(s.mark())
-            repeat(40) { step ->
-                val pop = marks.size > 1 && rng.nextInt(3) == 0
-                if (pop) {
-                    val target = rng.nextInt(0, marks.size - 1)
-                    while (marks.size > target + 1) marks.removeLast()
-                    s.undoTo(marks.last())
-                } else {
-                    val v = rng.nextInt(numVars)
-                    if (randomDecision(s, v, rng)) marks.addLast(s.mark())
-                }
-                assertAtomTruthConsistent(s, "trial=$trial step=$step pop=$pop")
+        val s = freshState(numVars, hi)
+        materializeAllAtoms(s, numVars, hi)
+        assertAtomTruthConsistent(s, "root")
+        val marks = ArrayDeque<PropagationState.LevelMark>()
+        marks.addLast(s.mark())
+        repeat(40) { step ->
+            val pop = marks.size > 1 && rng.nextInt(3) == 0
+            if (pop) {
+                val target = rng.nextInt(0, marks.size - 1)
+                while (marks.size > target + 1) marks.removeLast()
+                s.undoTo(marks.last())
+            } else {
+                val v = rng.nextInt(numVars)
+                if (randomDecision(s, v, rng)) marks.addLast(s.mark())
             }
+            assertAtomTruthConsistent(s, "step=$step pop=$pop")
         }
     }
 

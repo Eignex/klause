@@ -45,7 +45,7 @@ class LinearAuthorityTraversalTest : RuntimeInitializedTest() {
             val offers = mutableListOf<Sample>()
             val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
             LinearAuthorityTraversal(source, SourceLpBudget(funding = funding), ExecutionControl.Never,
-                { false }, { offers += it }, { standing }, useRefutationPropagation = registered,
+                { false }, { offers += it }, { standing }, propagateRefutations = registered,
                 guideIncumbent = true).use { component ->
                 val session = SearchComponentSet(listOf(component)).session(
                     atoms = if (registered) SearchAtomRegistry(0) else null)
@@ -252,7 +252,7 @@ class LinearAuthorityTraversalTest : RuntimeInitializedTest() {
         val funding = SourceLpFunding(1_000_000L, 1_000_000L).apply { grant(1_000_000L) }
         val budget = SourceLpBudget(funding = funding)
         LinearAuthorityTraversal(source, budget, ExecutionControl.Never, { false }, {}, { null },
-            useRefutationPropagation = true).use { component ->
+            propagateRefutations = true).use { component ->
             val session = SearchComponentSet(listOf(component)).session(atoms = SearchAtomRegistry(0))
             assertEquals(ComponentResult.Consistent, session.initialize())
             assertEquals(SearchNodeDisposition.Expand, component.beforeBranch(session))

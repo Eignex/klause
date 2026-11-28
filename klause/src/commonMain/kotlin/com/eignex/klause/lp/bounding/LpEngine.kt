@@ -48,6 +48,7 @@ import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpPrimalGuidance
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveCursor
+import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpSolveSession
 import com.eignex.klause.lp.engine.LpSolveStep
@@ -90,11 +91,25 @@ import com.eignex.util.collections.IntHashSet
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.saturatedAdd
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
 import kotlin.time.TimeSource
 
 private const val ROOT_PRIMAL_GUIDANCE_BYTES = 1024L * 1024L
 private const val ROOT_PRIMAL_TARGET_HEADER_BYTES = 64L
+private const val ROOT_PROGRESS_CHECK_WORK = 16L
+private val ROOT_PROGRESS_PHASES = setOf("ProgressPhaseDUAL", "ProgressPhaseBOXED_DUAL",
+    "ProgressPhasePRIMAL_FEASIBILITY", "ProgressPhasePRIMAL_OBJECTIVE")
+
+private class RootProgress(
+    val continuation: Long,
+    val attempt: Long,
+    val work: Long,
+    val samples: Long,
+    val violated: Long,
+    val phase: String,
+    val defer: Boolean,
+)
 
 // Magnitude below which every Long and the cutoff it is compared to are exact doubles.
 private const val EXACT_LONG_DOUBLE = 9_007_199_254_740_992.0
@@ -164,6 +179,7 @@ internal class LpEngine(
     internal val sourcePreparation: LpSourcePreparation =
         params0.lpConfig?.sourcePreparation ?: params0.lpPlan.sourcePreparation,
     private val eagerSourcePreparation: Boolean = false,
+    rootPointObserver: LpRootPointObserver? = null,
 ) : AutoCloseable {
     init {
         projections?.requireSource(problem)
@@ -171,29 +187,55 @@ internal class LpEngine(
             lpWorkAllowance(params0.solveBudgetMillis, params0.lpPlan.lpWorkBudgetFraction) > 0L))
     }
 
+    private var rootPointObserver = rootPointObserver
+    private val rootPointOwner = rootPointObserver?.let { Any() }
+    private var rootPointSequence = 0L
+    private var rootPointQuery = 0L
+    private var rootPointRetiring = false
     private var closed = false
     private val requestedPlan = params0.lpPlan
     internal var sparseTrialActive = false
         private set
     private var rootBoundHandedOff = false
+    private var rootProgress: RootProgress? = null
+    private var automaticOrdinaryNodes = false
+    private var sparseRootWork = false
     private var admittedSourceLayout: LpRelaxation? = null
-    private val sparseTrialRequested = params0.lpConfig?.resolved(LpTechnique.SPARSE_TRIAL) == true
+    private val sparseTrialRequested = params0.lpConfig?.overrides?.get(LpTechnique.SPARSE_TRIAL) == true
     internal var primalPropagationWork: Long = 0L
     internal var primalSearchWork: Long = 0L
     internal var rootPrimalTargets: RootPrimalTargets? = null
-        private set
+        private set(value) {
+            val previous = field
+            field = value
+            if (rootPointObservationEnabled && previous !== value) {
+                observeRootPoint(LpRootPointStage.TARGETS,
+                    if (value == null) LpRootPointDisposition.CLEARED else LpRootPointDisposition.RETAINED,
+                    point = value?.coordinates, previousPoint = previous?.coordinates,
+                    auxiliary = value?.auxiliary == true, partial = value?.knownColumns != null)
+            }
+        }
     private var restartRootTargets: RootPrimalTargets? = null
     internal var rootComponentValues: RootComponentValues? = null
         private set
     internal var rootRoundingWarmStart: RootRoundingWarmStart? = null
         set(value) {
+            val previous = field
             if (field !== value) {
+                rootProgress = null
                 field?.pinning?.releaseRetainedState()
                 if (value != null) {
                     clearRootPrimalTargets(retainComponentValues = true, retainRestartTargets = true)
                 }
             }
             field = value
+            if (rootPointObservationEnabled && previous !== value) {
+                observeRootPoint(LpRootPointStage.GUIDANCE,
+                    if (value == null) LpRootPointDisposition.CLEARED else LpRootPointDisposition.REPLACED,
+                    model = value?.relaxation?.model, point = value?.primal, previousPoint = previous?.primal,
+                    auxiliary = value?.auxiliaryPoint == true, partial = value?.knownColumns != null,
+                    pointObjective = value?.objective)
+            }
         }
     internal var rootRoundingInterrupted: Boolean = false
     internal fun handoffRootBoundSearch() {
@@ -204,7 +246,9 @@ internal class LpEngine(
     }
 
     internal fun resetRootBoundSearch() {
+        rootProgress = null
         rootBoundHandedOff = false
+        sparseRootWork = sparseTrialActive
     }
 
     internal val rootRoundingQueryPaused: Boolean
@@ -213,6 +257,48 @@ internal class LpEngine(
             return guidance.primal == null && ownsRootPrimalModel(guidance.relaxation.model) &&
                 propagator.floatPaused
         }
+
+    internal fun deferAutomaticRootHandoff(afterQuery: Boolean): Boolean {
+        val guidance = rootRoundingWarmStart
+        if (!automaticSparseTrial || guidance == null || guidance.objective !== objective ||
+            guidance.sourceProblem !== problem || !rootRoundingQueryPaused ||
+            retainedRootCumulativeWork() <= ROOT_PROGRESS_CHECK_WORK ||
+            lpWorkAllowanceSpent(ROOT_PROGRESS_CHECK_WORK)
+        ) {
+            rootProgress = null
+            return false
+        }
+        noteNodeOverhead(ROOT_PROGRESS_CHECK_WORK)
+        val continuation = propagator.pausedTrialContinuation
+        val attempt = propagator.pausedTrialAttempt
+        val progress = propagator.pausedTrialProgress
+        val work = progress["NumericalWork"]
+        val samples = progress["ProgressSamples"]
+        val violated = progress["LastViolatedBasics"]
+        val phase = progress.entries.singleOrNull { it.key.startsWith("ProgressPhase") }
+            ?.takeIf { it.value == 1L && it.key in ROOT_PROGRESS_PHASES }?.key
+        if (continuation == null || attempt == null || work == null || work < 0L ||
+            samples == null || samples !in 1L..255L || violated == null ||
+            violated !in 0L..guidance.relaxation.model.m.toLong() || phase == null
+        ) {
+            rootProgress = null
+            return false
+        }
+        val previous = rootProgress
+        // A permission bridges a pre-query check; another attempt must earn its own fresh sample.
+        val defer = if (previous == null || previous.continuation != continuation || previous.phase != phase) {
+            false
+        } else if (previous.attempt == attempt && previous.work == work &&
+            previous.samples == samples && previous.violated == violated
+        ) {
+            !afterQuery && previous.defer
+        } else {
+            previous.attempt < attempt && work > previous.work && samples > previous.samples &&
+                violated < previous.violated
+        }
+        rootProgress = RootProgress(continuation, attempt, work, samples, violated, phase, defer)
+        return defer && retainedRootCumulativeWork() > 0L
+    }
     private val selectedSourceRelaxation: CpToLpRelaxation? by lazy {
         if (projections?.builtInRelaxation == false) {
             CpToLpRelaxation(problem, objective, realResidual = true, projections = null)
@@ -222,6 +308,7 @@ internal class LpEngine(
     // Retain the model and discrete warm-start caches; only native factor-owning solvers are released.
     @Suppress("TooGenericExceptionCaught") // cleanup must preserve arbitrary failures from owned solvers
     internal fun releasePersistentSolvers() {
+        rootProgress = null
         var failure: Throwable? = null
         val node = nodeSimplex
         nodeSimplex = null
@@ -251,6 +338,25 @@ internal class LpEngine(
     override fun close() {
         if (closed) return
         closed = true
+        try {
+            if (rootPointObservationEnabled) {
+                observeRootPoint(LpRootPointStage.CLOSE_BEGIN, LpRootPointDisposition.BEGIN,
+                    point = rootRoundingWarmStart?.primal, previousPoint = rootPrimalTargets?.coordinates)
+            }
+        } finally {
+            rootPointRetiring = true
+            try {
+                releaseOnClose()
+            } finally {
+                rootPointRetiring = false
+            }
+        }
+        if (rootPointObservationEnabled) {
+            observeRootPoint(LpRootPointStage.CLOSE_END, LpRootPointDisposition.END)
+        }
+    }
+
+    private fun releaseOnClose() {
         discardRootLayoutPreparation()
         preparedRootRelaxation = null
         persistentRelaxation = null
@@ -310,7 +416,74 @@ internal class LpEngine(
             containingWork = { work -> if (rootProbe) chargeWork(work) },
             sourcePreparation = sourcePreparation,
             eagerSourcePreparation = eagerSourcePreparation,
+            rootPointObserver = rootPointObserver,
         ).also { it.structuralCutSupport = structuralCutSupport }
+    }
+
+    internal val rootPointObservationEnabled: Boolean get() = rootPointObserver != null && !rootPointRetiring
+
+    internal fun beginRootPointQuery(model: LpModel) {
+        if (rootPointObserver == null) return
+        if (rootPointQuery == Long.MAX_VALUE) {
+            disableRootPointObservation()
+            return
+        }
+        rootPointQuery++
+        if (rootPointObservationEnabled) {
+            observeRootPoint(LpRootPointStage.QUERY_CALL, LpRootPointDisposition.ENTERED, model)
+        }
+    }
+
+    internal fun endRootPointQuery(model: LpModel, result: FloatLpResult?, paused: Boolean? = null,
+        termination: LpFloatTermination? = null) {
+        if (!rootPointObservationEnabled) return
+        observeRootPoint(LpRootPointStage.QUERY_CALL, when {
+            result?.optimal == true -> LpRootPointDisposition.OPTIMAL
+            result != null -> LpRootPointDisposition.NON_OPTIMAL
+            else -> LpRootPointDisposition.NO_RESULT
+        }, model, result?.primal, paused = paused, termination = termination)
+    }
+
+    @Suppress("TooGenericExceptionCaught") // Observer failures must not interrupt the solve.
+    internal fun observeRootPoint(
+        stage: LpRootPointStage,
+        disposition: LpRootPointDisposition,
+        model: Any? = null,
+        point: Any? = null,
+        previousPoint: Any? = null,
+        auxiliary: Boolean = false,
+        partial: Boolean = false,
+        sourceRoot: Boolean? = null,
+        paused: Boolean? = null,
+        termination: LpFloatTermination? = null,
+        pointObjective: Any? = null,
+        admission: LpRootAdmissionObservation? = null,
+        valueCommit: LpRootValueCommit? = null,
+        bound: Double? = null,
+        priorSharedBound: Double? = null,
+    ) {
+        if (rootPointRetiring) return
+        val observer = rootPointObserver ?: return
+        if (rootPointSequence == Long.MAX_VALUE) {
+            disableRootPointObservation()
+            return
+        }
+        val event = LpRootPointObservation(checkNotNull(rootPointOwner), problem, objective,
+            ++rootPointSequence, rootPointQuery, stage, disposition, model, point, previousPoint,
+            automaticSparseTrial, auxiliary, partial, sourceRoot, paused, termination, pointObjective, admission,
+            valueCommit, bound, priorSharedBound)
+        try {
+            observer.onRootPoint(event)
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            disableRootPointObservation()
+        }
+    }
+
+    private fun disableRootPointObservation() {
+        rootPointObserver = null
+        sink.lp.observePrimalPhase("ROOT_POINT_OBSERVATION", "FAILED", 0L)
     }
 
     internal fun requireOpen() {
@@ -341,17 +514,55 @@ internal class LpEngine(
         result: FloatLpResult?,
         cancellation: ExecutionControl,
     ) {
-        if (!params.lpPlan.probe || result?.optimal != true || cancellation()) return
-        val work = result.primal.size.toLong()
-        if (!rootGuidanceFits(work * Double.SIZE_BYTES) || lpWorkAllowanceSpent(work)) return
+        val declined = when {
+            !params.lpPlan.probe -> LpRootPointDisposition.PROBE_DISABLED
+            result?.optimal != true -> LpRootPointDisposition.NO_POINT
+            cancellation() -> LpRootPointDisposition.CANCELLED
+            else -> null
+        }
+        if (declined != null) {
+            if (rootPointObservationEnabled) {
+                observeRootPoint(LpRootPointStage.COPY, declined, relaxation.model, result?.primal)
+            }
+            return
+        }
+        val completed = checkNotNull(result)
+        val work = completed.primal.size.toLong()
+        val allowance = when {
+            !rootGuidanceFits(work * Double.SIZE_BYTES) -> LpRootPointDisposition.STORAGE
+            lpWorkAllowanceSpent(work) -> LpRootPointDisposition.LP_WORK
+            else -> null
+        }
+        if (allowance != null) {
+            if (rootPointObservationEnabled) {
+                observeRootPoint(LpRootPointStage.COPY, allowance, relaxation.model, completed.primal)
+            }
+            return
+        }
         val remaining = if (retainedRootEnabled) retainedRootRemainingWork() else rootPrimalWorkBudget()
-        if ((retainedRootEnabled || remaining > 0L) && remaining <= work) return
+        if ((retainedRootEnabled || remaining > 0L) && remaining <= work) {
+            if (rootPointObservationEnabled) {
+                observeRootPoint(LpRootPointStage.COPY, LpRootPointDisposition.ROOT_WORK,
+                    relaxation.model, completed.primal)
+            }
+            return
+        }
         val started = TimeSource.Monotonic.markNow()
         noteNodeOverhead(work)
-        val primal = result.primal.copyOf()
-        if (cancellation()) return
-        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, result.basis, primal,
+        val primal = completed.primal.copyOf()
+        if (cancellation()) {
+            if (rootPointObservationEnabled) {
+                observeRootPoint(LpRootPointStage.COPY, LpRootPointDisposition.CANCELLED,
+                    relaxation.model, primal, completed.primal)
+            }
+            return
+        }
+        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, completed.basis, primal,
             sourceProblem = problem)
+        if (rootPointObservationEnabled) {
+            observeRootPoint(LpRootPointStage.COPY, LpRootPointDisposition.RETAINED,
+                relaxation.model, primal, completed.primal)
+        }
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
     }
 
@@ -482,16 +693,39 @@ internal class LpEngine(
             SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalOverheadOps))
 
     internal fun retainRootPrimalTargets(cancellation: ExecutionControl): Boolean {
-        val guide = rootRoundingWarmStart ?: return false
-        val coordinates = guide.primal ?: return false
+        val guide = rootRoundingWarmStart ?: run {
+            if (rootPointObservationEnabled) {
+                observeRootPoint(LpRootPointStage.TARGETS, LpRootPointDisposition.NO_GUIDANCE)
+            }
+            return false
+        }
+        val coordinates = guide.primal ?: run {
+            if (rootPointObservationEnabled) {
+                observeRootPoint(LpRootPointStage.TARGETS, LpRootPointDisposition.NO_POINT, guide.relaxation.model)
+            }
+            return false
+        }
         val mapBytes = (guide.relaxation.intColOf.size.toLong() + guide.relaxation.boolColOf.size) * Int.SIZE_BYTES
-        if (!params.lpPlan.branching || problem.numRealVars != 0 || guide.objective !== objective ||
-            coordinates.size != guide.relaxation.model.n ||
-            (guide.knownColumns != null && guide.knownColumns.size != coordinates.size) ||
-            !rootPrimalGuidanceMatches(guide) || cancellation() ||
-            !rootGuidanceFits(ROOT_PRIMAL_TARGET_HEADER_BYTES + mapBytes) || lpWorkAllowanceSpent(1L) ||
-            retainedRootRemainingWork() <= 1L
-        ) return false
+        val declined = when {
+            !params.lpPlan.branching -> LpRootPointDisposition.BRANCH_DISABLED
+            problem.numRealVars != 0 -> LpRootPointDisposition.REAL_VARIABLES
+            guide.objective !== objective -> LpRootPointDisposition.OBJECTIVE
+            coordinates.size != guide.relaxation.model.n -> LpRootPointDisposition.SHAPE
+            guide.knownColumns != null && guide.knownColumns.size != coordinates.size -> LpRootPointDisposition.MASK
+            !rootPrimalGuidanceMatches(guide) -> LpRootPointDisposition.OWNER
+            cancellation() -> LpRootPointDisposition.CANCELLED
+            !rootGuidanceFits(ROOT_PRIMAL_TARGET_HEADER_BYTES + mapBytes) -> LpRootPointDisposition.STORAGE
+            lpWorkAllowanceSpent(1L) -> LpRootPointDisposition.LP_WORK
+            retainedRootRemainingWork() <= 1L -> LpRootPointDisposition.ROOT_WORK
+            else -> null
+        }
+        if (declined != null) {
+            if (rootPointObservationEnabled) {
+                observeRootPoint(LpRootPointStage.TARGETS, declined, guide.relaxation.model, coordinates,
+                    auxiliary = guide.auxiliaryPoint, partial = guide.knownColumns != null)
+            }
+            return false
+        }
         noteNodeOverhead(1L)
         // Transfer the private buffers; pinning state and basis remain owned by the rounding attempt.
         rootPrimalTargets = RootPrimalTargets(guide.relaxation.intColOf, guide.relaxation.boolColOf,
@@ -600,6 +834,9 @@ internal class LpEngine(
         noteNodeOverhead(1L)
         rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, sourceProblem = problem)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "OWNER_RETAINED", 0L)
+        if (rootPointObservationEnabled) {
+            observeRootPoint(LpRootPointStage.OWNER, LpRootPointDisposition.RETAINED, relaxation.model)
+        }
     }
 
     internal fun retainRootPartialPrimalGuidance(
@@ -753,6 +990,7 @@ internal class LpEngine(
             if (retainedRootEnabled) SPARSE_LP_MAX_FACTOR_WORK else Long.MAX_VALUE)
 
     internal val retainedRootEnabled: Boolean get() = sparseTrialActive || params.lpPlan.componentOwnership
+    internal val automaticSparseTrial: Boolean get() = sparseTrialActive && !sparseTrialRequested
 
     private val auxiliarySources = LpAuxiliarySources()
     private var structuralCutSupport = params0.lpPlan.cuts || params0.lpPlan.circuit
@@ -1043,7 +1281,7 @@ internal class LpEngine(
     }
 
     internal fun nodeWorkBudget(): Long {
-        if (sparseTrialActive) return retainedRootRemainingWork().coerceAtLeast(1L)
+        if (sparseRootWork) return retainedRootRemainingWork().coerceAtLeast(1L)
         val budget = when {
             !adaptiveWork -> 0L
             lpEffortGovernor.isDemoted -> MIN_NODE_WORK_OPS
@@ -1055,23 +1293,23 @@ internal class LpEngine(
     }
 
     internal fun nodeQueryWorkBudget(): Long? {
-        if (sparseTrialActive) return minOf(retainedRootRemainingWork().coerceAtLeast(1L),
+        if (sparseRootWork) return minOf(retainedRootRemainingWork().coerceAtLeast(1L),
             if (adaptiveWork) lpWorkBudget.ops() else SPARSE_LP_MAX_WORK)
         val offered = nodeWorkAllowance()?.coerceAtLeast(1L) ?: return null
         val containing = nodeWorkBudget()
         return if (containing == 0L) offered else minOf(containing, offered)
     }
 
-    internal fun nodePreparationWorkBudget(): Long = if (sparseTrialActive) {
+    internal fun nodePreparationWorkBudget(): Long = if (sparseRootWork) {
         retainedRootCumulativeWork().coerceAtLeast(1L)
     } else if (automaticComponentReuse && !params.lpPlan.componentOwnership) {
         componentReusePreparationWork(lpEffortGovernor.remainingWork())
     } else ordinaryNodePreparationWorkBudget()
 
-    private fun ordinaryNodePreparationWorkBudget(): Long = if (sparseTrialActive) {
+    private fun ordinaryNodePreparationWorkBudget(): Long = if (sparseRootWork) {
         retainedRootCumulativeWork().coerceAtLeast(1L)
     } else if (ordinarySeparateNodePreparation) {
-        val containing = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: if (retainedRootEnabled) {
+        val containing = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: if (params.lpPlan.componentOwnership) {
             retainedRootRemainingWork().coerceAtLeast(1L)
         } else nodeWorkBudget()
         val offered = nodeWorkAllowance()?.coerceAtLeast(1L)
@@ -1169,7 +1407,7 @@ internal class LpEngine(
         ) lpWorkBudget.observeWorkStop()
     }
 
-    private val ordinarySeparateNodePreparation: Boolean get() = sparseTrialRequested ||
+    private val ordinarySeparateNodePreparation: Boolean get() = sparseTrialActive || sparseTrialRequested ||
         requestedPlan.componentOwnership || rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK
 
     private val separateNodePreparation: Boolean get() =
@@ -1238,6 +1476,7 @@ internal class LpEngine(
     internal var sourceRootBoundLayout: LpRelaxation? = null
         private set
     internal var continuedRootLowerBound: Double? = null
+    internal var checkedRootPauseAttempt: Long? = null
     private var layoutPreparation: Iterator<Unit>? = null
     private var layoutPreparationRelaxer: CpToLpRelaxation? = null
 
@@ -1267,15 +1506,17 @@ internal class LpEngine(
         queryWorkAllowance = {
             nodeQueryWorkBudget() ?: nodeWorkBudget().takeIf { separateNodePreparation }
         },
-        onPreparation = if (separateNodePreparation) { metrics ->
-            sink.lp.observeEngineCost(LpRoute.NODE, metrics)
-            noteSolveOps(metrics.workOps)
-        } else null,
+        onPreparation = if (separateNodePreparation) ::observeNodePreparation else null,
         continuationAllowance = {
-            if (sparseTrialActive) retainedRootCumulativeWork() else
+            if (sparseRootWork) retainedRootCumulativeWork() else
                 lpEffortGovernor.remainingWork()?.takeIf { rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK }
         },
     )
+
+    private fun observeNodePreparation(metrics: LpSolveMetrics) {
+        sink.lp.observeEngineCost(LpRoute.NODE, metrics)
+        noteSolveOps(metrics.workOps)
+    }
 
     internal fun nodeRelaxation(
         relaxer: CpToLpRelaxation,
@@ -1631,6 +1872,7 @@ internal class LpEngine(
         deferSimplex: Boolean = false,
     ): Boolean {
         requireOpen()
+        if (automaticOrdinaryNodes) sparseRootWork = session.decisionLevel == 0
         lpBackjump = null
         lastPruneBound = effectiveBound
         for (b in bounds) {
@@ -1907,22 +2149,62 @@ internal class LpEngine(
         if (!deferred) preparation().forEach { }
     }
 
+    private fun sparseAdmissionQueryWork(config: LpConfig): Long {
+        val cumulative = retainedRootCumulativeWork()
+        if (!config.permitsAutomaticSparse() || sparseTrialRequested ||
+            params.lpPlan.lpWorkBudgetFraction <= 0.0) return cumulative
+        val remainingMillis = params.cancellation.deadline()?.let {
+            (-it.elapsedNow()).inWholeMilliseconds.coerceAtLeast(0L)
+        } ?: return cumulative
+        return minOf(cumulative,
+            (remainingMillis * params.lpPlan.lpWorkBudgetFraction * LP_WORK_PER_MILLI).toLong().coerceAtLeast(0L))
+    }
+
+    private fun observeRootAdmission(admission: LpRootAdmissionObservation) {
+        if (!rootPointObservationEnabled) return
+        val disposition = when (admission.disposition) {
+            LpRootAdmissionDisposition.NOT_CONFIGURED -> LpRootPointDisposition.NOT_CONFIGURED
+            LpRootAdmissionDisposition.NOT_CONSIDERED -> LpRootPointDisposition.NOT_CONSIDERED
+            LpRootAdmissionDisposition.PROJECTION_SKIPPED -> LpRootPointDisposition.PROJECTION_SKIPPED
+            LpRootAdmissionDisposition.ATTEMPTED_DECLINED -> LpRootPointDisposition.ATTEMPTED_DECLINED
+            LpRootAdmissionDisposition.ADMITTED -> LpRootPointDisposition.ADMITTED
+        }
+        observeRootPoint(LpRootPointStage.ADMISSION, disposition, admission = admission)
+    }
+
     internal fun preparation(): Iterator<Unit> = sequence {
         params.lpConfig?.let { config ->
+            val queryWork = sparseAdmissionQueryWork(config)
+            val admissionCancellation = params.cancellation
+            val projectionAllowed = projections?.builtInRelaxation != false
+            val preparationWork = retainedRootRemainingWork()
             val plan = with(LpAutoConfig) {
-                prepare(problem, config, requestedPlan, objective, params.cancellation,
-                    sparseTrialAllowed = projections?.builtInRelaxation != false,
-                    sparseTrialWork = retainedRootRemainingWork(), sourcePreparation = sourcePreparation) { admission ->
+                prepare(problem, config, requestedPlan, objective, admissionCancellation,
+                    sparseTrialAllowed = projectionAllowed,
+                    sparseTrialWork = preparationWork, sparseTrialQueryWork = queryWork,
+                    sourcePreparation = sourcePreparation, allowAutomaticSparse = true,
+                    captureSparseAdmission = rootPointObservationEnabled) { admission ->
                     elementIndexes = admission.elementIndexes
                     admission.sparseTrial?.let { trial ->
                         sparseTrialActive = trial.admitted
+                        sparseRootWork = trial.admitted
+                        automaticOrdinaryNodes = trial.admitted && trial.metrics["Automatic"] == 1L &&
+                            admission.withinCeiling
+                        if (trial.admitted && trial.metrics["Automatic"] == 1L) {
+                            propagator.accountPreparation(::observeNodePreparation)
+                        }
                         admittedSourceLayout = trial.sourceLayout.takeIf { trial.admitted }
                         sink.lp.sparseTrial = trial.metrics
                         noteNodeOverhead(trial.work)
                     }
+                    admission.observation?.let { observeRootAdmission(it) }
                 }
             }
             params = params.copy(lpPlan = plan)
+        } ?: run {
+            if (rootPointObservationEnabled) {
+                observeRootAdmission(LpRootAdmissionObservation(LpRootAdmissionDisposition.NOT_CONFIGURED))
+            }
         }
         if (params.lpPlan.bounding && params.lpPlan.componentReuse && !componentReuseFunded &&
             !params.lpPlan.componentOwnership && !sparseTrialActive && !componentFundingDeclineObserved

@@ -244,8 +244,9 @@ checks and exact rendering; an approximate coordinate is display or heuristic da
 
 - `ExactLraAssignment` owns Boolean and rational real values; `ExactLiraAssignment`
   adds arbitrary-precision integers. Difference checks contribute their potentials.
-- `ExactNraAssignment.algebraicRealValue(id)` returns the typed algebraic scalar;
-  `realValue(id)` renders rationals as reduced text and others as
+- `ExactNraAssignment.realValue(id)` returns the typed algebraic scalar, and
+  `OpenTheoryAssignment.algebraicRealValue(id)` reads it through source reconstruction.
+  `OpenTheoryAssignment.realValue(id)` renders rationals as reduced text and others as
   `root(index;[c0,c1,...])` with ascending coefficients and a one-based root index.
   `Sample.algebraicReals` carries the same coordinates.
 - `TranscendentalAssignment.exactRealValue(id)` and `symbolicRealValue(id)` expose

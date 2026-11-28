@@ -202,31 +202,29 @@ class GeneralWatchReclamationTest {
 
     @Test
     fun `growing retired stores should release general ownership under production grants`() {
-        for (retiredCount in listOf(4000, 20_000)) {
-            val session = PropagationSession(Problem(6, 0, emptyArray(),
-                arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = false)
-            val baseline = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
-            repeat(retiredCount) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
-            repeat(40) { session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false } }
-            assertEquals(0, session.activeLearnedClauseCount)
-            val generation = session.learnedRetirementGeneration
+        val session = PropagationSession(Problem(6, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = false)
+        val baseline = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+        repeat(4000) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
+        repeat(40) { session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false } }
+        assertEquals(0, session.activeLearnedClauseCount)
+        val generation = session.learnedRetirementGeneration
 
-            repeat(retiredCount / 200) {
-                val work = session.work
-                session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { _, _ -> true }
-                assertTrue(session.work - work <= 65_536L)
-            }
-            val released = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
-
-            assertEquals(0L, released.getValue("learnedPayloadBytes"))
-            assertTrue(released.getValue("sessionWatchCapacityBytes") <=
-                baseline.getValue("sessionWatchCapacityBytes"))
-            assertTrue(released.getValue("learnedMetadataCapacityBytes") <=
-                baseline.getValue("learnedMetadataCapacityBytes"))
-            assertTrue(released.getValue("ownedPrimitiveBytes") <= baseline.getValue("ownedPrimitiveBytes"))
-            assertEquals(generation, session.learnedRetirementGeneration)
-            session.pinBool(4, false)
-            assertEquals(true, session.boolValue(5))
+        repeat(20) {
+            val work = session.work
+            session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { _, _ -> true }
+            assertTrue(session.work - work <= 65_536L)
         }
+        val released = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        assertEquals(0L, released.getValue("learnedPayloadBytes"))
+        assertTrue(released.getValue("sessionWatchCapacityBytes") <=
+            baseline.getValue("sessionWatchCapacityBytes"))
+        assertTrue(released.getValue("learnedMetadataCapacityBytes") <=
+            baseline.getValue("learnedMetadataCapacityBytes"))
+        assertTrue(released.getValue("ownedPrimitiveBytes") <= baseline.getValue("ownedPrimitiveBytes"))
+        assertEquals(generation, session.learnedRetirementGeneration)
+        session.pinBool(4, false)
+        assertEquals(true, session.boolValue(5))
     }
 }

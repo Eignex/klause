@@ -236,20 +236,34 @@ class SourceExecutionControlsTest {
         assertTrue("nia-residues" in assertNotNull(failure.message))
     }
 
+    @Suppress("DEPRECATION_ERROR")
     @Test
-    fun `numerical refutation resolution should require explicit opt in`() {
+    fun `retired numerical resolution settings should be rejected during source setup`() {
         val source = SourceAttachment(
             LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
         )
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
         ))
-        for ((options, expected) in listOf(emptyList<String>() to false,
-            listOf("source-refutation-resolution=true") to true)) {
-            val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
+        val settings = listOf(
+            ExecutionOptions.parse(listOf("source-refutation-resolution=true")),
+            ExecutionOptions.parse(listOf("source-refutation-resolution=false")),
+            ExecutionOptions(ExecutionOption.sourceRefutationResolution(true)),
+        )
+        for (options in settings) {
+            val failure = assertFailsWith<PipelineConfigException> { SourceExecutionRequest(invocation, options) }
 
-            assertEquals(expected, request.theory.sourceRefutationResolution)
+            assertTrue("source-refutation-resolution" in assertNotNull(failure.message))
         }
+    }
+
+    @Test
+    fun `legacy theory parameters should reject numerical resolution`() {
+        val failure = assertFailsWith<IllegalArgumentException> {
+            TheoryParams(sourceRefutationResolution = true)
+        }
+
+        assertTrue("source-refutation-resolution" in assertNotNull(failure.message))
     }
 
     @Test

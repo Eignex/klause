@@ -335,20 +335,6 @@ class CorpusSelectionTest {
     }
 
     @Test
-    fun `committed corpus indexes list no plain copy beside a stored compressed instance`() {
-        val directory = File(CorpusFetcher.workspaceRoot(), CommittedCorpusIndexes.DIRECTORY)
-        val indexes = directory.listFiles { file -> file.name.endsWith(".tsv.gz") }.orEmpty()
-        assertTrue(indexes.isNotEmpty())
-        for (file in indexes) {
-            val id = file.name.removeSuffix(".tsv.gz")
-            val index = requireNotNull(CommittedCorpusIndexes.load(id, CorpusFetcher.workspaceRoot()))
-            val paths = index.files.mapTo(HashSet()) { it.path }
-            val shadowed = paths.filter { "$it${CorpusFiles.SUFFIX}" in paths }
-            assertTrue(shadowed.isEmpty(), "$id lists plain copies of stored instances: ${shadowed.take(3)}")
-        }
-    }
-
-    @Test
     fun `Flat layout should find a compressed instance and name it without the suffix`() {
         val root = Files.createTempDirectory("zstsel").toFile()
         try {

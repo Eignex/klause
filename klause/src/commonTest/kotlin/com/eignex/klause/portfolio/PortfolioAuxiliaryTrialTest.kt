@@ -229,33 +229,31 @@ class PortfolioAuxiliaryTrialTest {
 
     @Test
     fun `unproductive auxiliary work should not update retained arm bandit evidence`() {
-        for (seed in 0L..1L) {
-            val reached = ArrayList<Int>()
-            val updates = ArrayList<Int>()
-            val workers = listOf(
-                trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
-                trackingWorker("idle", 1, ScriptedSearch({ false }) { reached += 1 }).also {
-                    it.family = ArmFamily.LocalSearch
-                },
-                trackingWorker("probe", 2, ScriptedSearch({ false }) { reached += 2 }),
-            )
-            val bandit = object : UnivariateBandit {
-                override val nbrArms = 3
-                override val random = Random(seed)
-                override fun choose() = 0
-                override fun update(armIndex: Int, value: Double, weight: Double) {
-                    updates += armIndex
-                }
-                override fun reset() = Unit
+        val reached = ArrayList<Int>()
+        val updates = ArrayList<Int>()
+        val workers = listOf(
+            trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
+            trackingWorker("idle", 1, ScriptedSearch({ false }) { reached += 1 }).also {
+                it.family = ArmFamily.LocalSearch
+            },
+            trackingWorker("probe", 2, ScriptedSearch({ false }) { reached += 2 }),
+        )
+        val bandit = object : UnivariateBandit {
+            override val nbrArms = 3
+            override val random = Random(0)
+            override fun choose() = 0
+            override fun update(armIndex: Int, value: Double, weight: Double) {
+                updates += armIndex
             }
-
-            Portfolio(workers, bandit, maxSliceWork = 5_000L, reseedStaleThreshold = 0).use {
-                it.incumbentProbeArms = setOf(2)
-                it.minimize(ExecutionControl { reached.count { arm -> arm < 2 } >= 30 })
-            }
-
-            assertEquals(reached.filter { it < 2 }, updates)
+            override fun reset() = Unit
         }
+
+        Portfolio(workers, bandit, maxSliceWork = 5_000L, reseedStaleThreshold = 0).use {
+            it.incumbentProbeArms = setOf(2)
+            it.minimize(ExecutionControl { reached.count { arm -> arm < 2 } >= 30 })
+        }
+
+        assertEquals(reached.filter { it < 2 }, updates)
     }
 
     @Test

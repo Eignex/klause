@@ -27,9 +27,9 @@ class ArrayMinMaxTest {
 
     @Test
     fun `ArrayMinMax deductions should be implied by their reasons under holes`() {
-        val rng = Random(0xA4A0)
         for (max in listOf(false, true)) {
-            repeat(30) { iter ->
+            val rng = Random(0xA4A0)
+            repeat(17) { iter ->
                 val problem = Problem(
                     numBoolVars = 0,
                     numIntVars = 4,

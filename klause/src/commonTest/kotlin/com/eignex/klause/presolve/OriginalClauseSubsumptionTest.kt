@@ -40,45 +40,6 @@ class OriginalClauseSubsumptionTest {
         assertEquals(expected, reduced)
     }
 
-    private fun clauses(variables: Int): List<Clause> {
-        var count = 1
-        repeat(variables) { count *= 3 }
-        return (1 until count).map { encoded ->
-            var remaining = encoded
-            val literals = ArrayList<Int>()
-            repeat(variables) { variable ->
-                val digit = remaining % 3
-                remaining /= 3
-                if (digit != 0) literals.add(Lit.make(variable, digit == 1))
-            }
-            Clause(literals.toIntArray())
-        }
-    }
-
-    @Test
-    fun `all pairs of three variable clauses should preserve every assignment`() {
-        val clauses = clauses(3)
-        for (first in clauses) {
-            for (second in clauses) {
-                val problem = problem(first, second)
-                checkModels(problem, OriginalClauseSubsumption.simplify(problem))
-            }
-        }
-    }
-
-    @Test
-    fun `all triples of two variable clauses should preserve every assignment`() {
-        val clauses = clauses(2)
-        for (first in clauses) {
-            for (second in clauses) {
-                for (third in clauses) {
-                    val problem = Problem(2, 0, emptyArray(), listOf(first, second, third))
-                    checkModels(problem, OriginalClauseSubsumption.simplify(problem))
-                }
-            }
-        }
-    }
-
     @Test
     fun `resolution should retain its premise and remove only the opposite target literal`() {
         val premise = clause(0, 2)

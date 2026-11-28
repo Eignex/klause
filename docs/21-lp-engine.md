@@ -82,7 +82,8 @@ owns sparse and small dense elimination, DFS reach, Forrest-Tomlin updates, logi
 repair, indexed forward/transpose solves and rational factors. Each owner has fixed
 dimension, both permutations and three-valued update results. Mutable coefficient
 inputs are captured defensively before use. Dense partial-pivot LU is selected only
-for dimensions 2–6 with at least 50% density in the selected basis; it produces the
+for dimensions 2–6 with at least 50% density in the selected basis and a pivot policy
+without entry or work limits; it produces the
 same CSC factors as sparse LU, and a numerical decline retries sparse. Rational
 factors reuse orderings but never approximate numeric factors, and only complete
 exact rank determination establishes singularity. Koblas supplies the containers
@@ -441,7 +442,8 @@ policy supplies pruning or proof authority.
 Joint repair binds separation, point selection and aggregation to its shared
 numerical owner for root preparation and retained neighborhood queries. Before its
 first checked incumbent, it can seed a neighborhood with integer pins cited by refuted
-root queries, and `source-refutation-center-step=true` lets a compatible root
+root queries, and `source-refutation-center-step=true`, which requires
+`source-incumbent-completion=true`, lets a compatible root
 refutation move its center one legal integer step away from a cited bound side.
 These seeds and centers are advisory: the refutation keeps its complete scope and
 every discovered point needs full source checking. Each owner also keeps at most four
@@ -454,12 +456,16 @@ that rechecks source derivations and cannot publish into the original traversal.
 
 ### Tolerance recovery
 
-MPS finite-leaf tolerance recovery can justify a tolerance gap with exact basis
-duals. `exactBasisDuals` refines the duals on one floating factorization, solving
+Finite-leaf tolerance acceptance, for any source with a positive feasibility
+tolerance, can justify a tolerance gap with exact basis duals. `exactBasisDuals`
+refines the duals on one floating factorization, solving
 for a correction from the exact residual `c(B) - B^T y` scaled by a power of two,
 which stays dyadic when every basic column and cost is dyadic. Continued fractions
 then recover the duals and `B^T y = c(B)` is checked exactly; non-dyadic authority
-declines. Exact duals do not turn a floating primal into an exact witness.
+declines. When the exact duals decline or leave a reduced cost wrong-signed, one
+cleanup of at most 100 primal pivots from the same basis, at a tighter pricing
+tolerance, can reach an optimum that passes the same dual check. Exact duals do not
+turn a floating primal into an exact witness.
 
 ### Resources and cancellation
 

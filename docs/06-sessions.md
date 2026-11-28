@@ -186,7 +186,7 @@ optional work. Resource exhaustion does not establish search-space exhaustion.
 
 `ExecutionOptions` distinguishes `auto`, `unlimited` and a nonnegative remaining
 amount; omission selects `auto`. For `node-limit`, automatic and unlimited both mean
-no solve work cap and `0` is an exhausted `NodeBudget`. For `presolve-work-limit`,
+no solve work cap and `0` is an exhausted `NodeBudget`. For the CLI's `presolve-work-limit`,
 automatic derives work from the preparation time policy, unlimited removes the cap
 and `0` stops optional preparation; the preparation clock and solve deadline still
 apply. The legacy nonpositive `klause.presolve.budget.ms` disables the derived cap
@@ -380,32 +380,36 @@ quantum pause leaves it available for the next slice.
 Single-shot numerical execution resumes these pauses until it obtains a result or
 the containing cancellation stops it.
 
-Numerical MIP traversal and joint repair use caller-funded source LP work. Each
-slice grants a quantum from one cumulative work and sparse preparation allocation
-allowance. Admission costs 1024 work units, including declined and resumed attempts;
+Open linear optimization, numerical MIP traversal and joint repair use caller-funded
+source LP work. Each slice grants work from the same cumulative ledger. Admission
+costs 1024 work units, including declined and resumed attempts;
 source metadata visits, sparse preparation, floating work, exact continuation,
-refinement and certification debit
-their measured work. Atomic phases can overspend, and the next admission pauses.
-An unfunded query keeps its pending alternative and owner; cumulative exhaustion
-ends the worker without proving exhaustion. Coverage splits debit modeled storage
-for both children and their captured condition maps. Resuming cannot renew either ceiling.
-`source-lp-work-limit` defaults to one billion units and
-`source-lp-allocation-limit` to 512 MiB. Opt-in checked refutation reuse charges
+refinement and certification debit their measured work. An admitted small exact
+query can finish its bounded certificate checks across a slice boundary.
+Exhausting caller work prevents admission to the next phase.
+At the end of a slice the pending alternative and its owner remain available.
+Standalone optimization advances subsequent slices automatically. The caller may
+set cumulative `source-lp-work-limit` and `source-lp-allocation-limit` ceilings.
+Both default to unlimited and resuming preserves all charges. Cumulative exhaustion
+ends the worker with any checked incumbent and bound it already holds. Sparse
+preparation and retained branch coverage apply separate
+[allocation safeguards](18-linear-arithmetic.md#state-and-resources).
+Opt-in checked refutation reuse charges
 support indexing, source reconstruction, proof replay, storage and eviction to
 these same ceilings. Reuse admits at most 64 MiB of cumulative modeled allocation
 and one eighth of the allocation remaining at its opening. Reaching that local
 allowance retires the cache and leaves ordinary numerical queries available.
 `source-cuts` controls checked source-row
 separation in numerical frontier traversal. `source-lp-operations` supplies an independent
-operation ceiling for controlled comparisons. Other source LP clients retain their
-operation-based admission policy.
+operation ceiling. A suspended sparse query retains its operation reservation.
+Other source LP clients retain their operation-based admission policy.
 Optional numerical decision feedback debits journal construction, latest-query
 replacement, retention and support scoring to the same cumulative source funding. Exhausted feedback retains
 source-order branching and every complementary alternative.
 Point-based source separation debits its scoring and projection storage to that
 same ledger; its extra relaxation receives no renewed work or allocation ceiling.
 
-Each retained sparse query takes its finite numerical lifetime from the caller's
+Each retained sparse query takes its numerical lifetime from the caller's
 remaining cumulative work, with a proportional pivot allowance. Slice grants limit
 individual advances and do not renew that lifetime. Unfunded clients keep the fixed
 query policy. Preparation, certification and atomic overspend debit the same caller.

@@ -226,8 +226,6 @@ private fun TheoryParams.withSourceCompanionControls(reader: ExecutionOptionRead
     sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: sourceRefutationReuse,
     sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
         ?: sourceRefutationPropagation,
-    sourceRefutationResolution = reader[ExecutionOption.sourceRefutationResolution]
-        ?: sourceRefutationResolution,
 )
 
 private fun FiniteSolveRequest.withSourceControls(
@@ -276,6 +274,6 @@ private fun FiniteSolveRequest.withSourceControls(
 private fun ExecutionOptions.withoutSourceCompanionControls(): ExecutionOptions = without(
     "source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
     "source-cuts", "source-point-cuts", "source-cut-branching", "source-aggregate-cuts",
-    "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution",
+    "source-refutation-reuse", "source-refutation-propagation",
     "source-incumbent-completion", "source-refutation-center-step",
 )

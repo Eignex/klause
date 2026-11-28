@@ -14,7 +14,7 @@ enum class OpenBranching(
     /** Conflict-activity order over the shared session. */
     Activity("activity"),
 
-    /** Activity for a complete mixed default point owner; source order for other openings. */
+    /** Select branching from the complete traversal and its opening. */
     Automatic("auto"),
     ;
 
@@ -25,7 +25,7 @@ enum class OpenBranching(
     }
 }
 
-private const val DEFAULT_HINT_MIN_SPLITS = 128L
+internal const val DEFAULT_HINT_MIN_SPLITS = 128L
 
 /** Cooperative limits shared by complete open-model theories. */
 data class TheoryParams(
@@ -35,7 +35,7 @@ data class TheoryParams(
     val openWorkLimit: Long = Long.MAX_VALUE,
     /** Maximum committed shared decisions, independent of open-theory work accounting. */
     val maxDecisions: Long = Long.MAX_VALUE,
-    /** Positive shared-decision restart cadence within each feasibility traversal, or null for none. */
+    /** Explicit shared-decision restart cadence, or null to use the traversal's default. */
     val sharedRestart: Long? = null,
     /** Retained shared learned-clause cap within each feasibility traversal, or null for no cap. */
     val maxLearnedClauses: Int? = null,
@@ -67,9 +67,10 @@ data class TheoryParams(
     /**
      * Boolean branching for each feasibility traversal.
      *
-     * [OpenBranching.Automatic] selects activity for a complete mixed worker with one default point owner,
-     * and source order for other openings, including private queries and explicit hint allowances.
-     * The theory decides the arithmetic residual at a leaf.
+     * [OpenBranching.Automatic] selects activity for a complete mixed worker with one default point owner.
+     * A complete pure-real worker in the default single-lane feasibility portfolio can switch from source order
+     * to activity at a single restart. Other automatic openings use source order. The theory decides the
+     * arithmetic residual at a leaf.
      */
     val openBranching: OpenBranching = OpenBranching.Automatic,
     /**
@@ -95,10 +96,10 @@ data class TheoryParams(
     val maxFlips: Long = Long.MAX_VALUE,
     /** Solve-wide heuristic instruction cap, including completion work. */
     val maxInstructions: Long? = null,
-    /** Cumulative source LP preparation, numerical and certification work, including admission overhead. */
-    val sourceLpWorkLimit: Long = 1_000_000_000L,
-    /** Cumulative source preparation, proof replay and modeled retained coverage allocation in bytes. */
-    val sourceLpAllocationLimit: Long = 512L * 1024L * 1024L,
+    /** Caller ceiling on cumulative source LP work, or [Long.MAX_VALUE] for no ceiling. */
+    val sourceLpWorkLimit: Long = Long.MAX_VALUE,
+    /** Caller ceiling on cumulative modeled source LP allocation in bytes, or [Long.MAX_VALUE] for no ceiling. */
+    val sourceLpAllocationLimit: Long = Long.MAX_VALUE,
     /** Optional source LP operation ceiling, independent of cumulative numerical work. */
     val sourceLpOperations: Int = Int.MAX_VALUE,
     /** Enable checked source-row separation for numerical frontier traversal. */
@@ -111,7 +112,7 @@ data class TheoryParams(
     val sourceRefutationReuse: Boolean = false,
     /** Imply integral source bounds from checked refutations at unit prefixes in numerical traversal. */
     val sourceRefutationPropagation: Boolean = false,
-    /** Resolve checked refutations across named integral source predicates within numerical traversal. */
+    /** Compatibility field for older callers. Must be false. */
     val sourceRefutationResolution: Boolean = false,
     /** Complete advisory discrete incumbent coordinates before exact companion admission. */
     val sourceIncumbentCompletion: Boolean = false,
@@ -123,6 +124,7 @@ data class TheoryParams(
     val sourceRefutationCenterStep: Boolean = false,
 ) {
     init {
+        require(!sourceRefutationResolution) { "source-refutation-resolution has been removed" }
         require(!sourceRefutationCenterStep || sourceIncumbentCompletion) {
             "source-refutation-center-step requires source-incumbent-completion"
         }

@@ -25,7 +25,8 @@ internal fun sourceLpPoint(
     val policy = SparseSourceLpPolicy()
     return budget.runSparse(cancellation, { token ->
         SparseSourceLp.prepare(rows, ConstantList(variables, ExactLpColumn(ExactLpBounds(), integral = false)),
-            ConstantList(variables, BigFraction.ZERO), BigFraction.ZERO, policy, token, pointMargin = true)
+            ConstantList(variables, BigFraction.ZERO), BigFraction.ZERO, policy, token,
+            pointMargin = true, funding = budget.funding)
     }) { prepared, token ->
         val observer = object : LpCertificationObserver {
             override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {

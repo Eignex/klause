@@ -205,10 +205,10 @@ internal class ExactLpModel private constructor(
         require(n.toLong() + m == numVars.toLong() && rightHandSide.size == m && objective.size == numVars)
         if (validateMatrix) {
             for (column in this.matrix) {
-                var previous = -1
+                var previousRow = -1
                 for (entry in column) {
-                    require(entry.row in 0 until m && entry.row > previous)
-                    previous = entry.row
+                    require(entry.row > previousRow && entry.row < m)
+                    previousRow = entry.row
                 }
             }
             require((n until numVars).all { this.columns[it].origin.value.isZero }) { "slack origins must be zero" }
