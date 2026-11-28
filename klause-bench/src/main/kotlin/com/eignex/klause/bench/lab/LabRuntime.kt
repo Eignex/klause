@@ -7,6 +7,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.TimeUnit
 
 internal object LabRuntime {
     fun harnessCommand(case: BenchCase, input: Path, report: Path): List<String> = buildList {
@@ -55,6 +56,30 @@ internal object LabRuntime {
             Files.writeString(path, values.joinToString("\n") { quote(it) } + "\n")
             return quote("@$path")
         }
+        val javaHome = System.getProperty("java.home")
+        val tree = requireNotNull(context.worktree)
+        val archive = context.outputDirectory.resolve("klause.aot")
+        val launcher = tree.resolve("klause-cli/build/install/klause-cli-jvm/bin/klause-cli")
+        val input = tree.resolve("klause-bench/smoke-corpus/dimacs/php4.cnf")
+        val trainingOptions = argumentFile("aot-training.args", runtime + "-XX:AOTCacheOutput=$archive")
+        val training = ProcessBuilder(
+            launcher.toString(), "--exact", "-p", "1", "-r", "1", "-t", "30000",
+            "--param", "node-limit=100000", input.toString(),
+        ).directory(tree.toFile()).redirectErrorStream(true)
+            .redirectOutput(context.outputDirectory.resolve("aot-training.log").toFile()).apply {
+                environment()["JAVA_HOME"] = javaHome
+                environment()["JAVA_OPTS"] = ""
+                environment()["KLAUSE_CLI_OPTS"] = trainingOptions
+                environment()["KLAUSE_DEBUG"] = "false"
+                environment().keys.removeAll { it in setOf("JDK_JAVA_OPTIONS", "JAVA_TOOL_OPTIONS", "_JAVA_OPTIONS") }
+            }.start()
+        val complete = training.waitFor(90, TimeUnit.SECONDS)
+        if (!complete) {
+            training.descendants().forEach { it.destroyForcibly() }
+            training.destroyForcibly()
+        }
+        check(complete && training.exitValue() == 0 && Files.size(archive) > 0) { "AOT cache training failed" }
+        val startupOptions = listOf("-XX:AOTCache=$archive", "-XX:AOTMode=on")
         Files.writeString(
             context.outputDirectory.resolve("runtime.json"),
             buildJsonObject {
@@ -73,7 +98,7 @@ internal object LabRuntime {
                 )
                 put("resourceScope", "GNU time CLI process tree; peak RSS in KiB")
                 put("validationPolicy", "reported-result-v1")
-                putJsonArray("javaOptions") { options.forEach { add(it) } }
+                putJsonArray("javaOptions") { (options + startupOptions).forEach { add(it) } }
                 putJsonArray("metricSources") {
                     add("solve-record.json")
                     if (measurement != "none") add("resources.txt")
@@ -82,9 +107,9 @@ internal object LabRuntime {
         )
         return mapOf(
             "JAVA_OPTS" to "",
-            "JAVA_HOME" to System.getProperty("java.home"),
+            "JAVA_HOME" to javaHome,
             "KLAUSE_DEBUG" to p.getValue("debug"),
-            "KLAUSE_CLI_OPTS" to argumentFile("cli.args", options),
+            "KLAUSE_CLI_OPTS" to argumentFile("cli.args", options + startupOptions),
             "KLAUSE_CLI_PREFLIGHT_OPTS" to argumentFile("preflight.args", runtime),
             "LAB_WORKTREE" to requireNotNull(context.worktree).toString(),
         ) +
