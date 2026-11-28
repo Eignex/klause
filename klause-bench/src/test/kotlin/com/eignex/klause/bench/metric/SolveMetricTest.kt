@@ -24,6 +24,29 @@ import kotlin.test.assertNull
 class SolveMetricTest {
     private val ref = ProblemRef("fam/inst", Format.MINIZINC, corpus("absent.mzn"), Category.CSP, Expected.Unknown)
 
+    @Test
+    fun `an unreadable stdout spool leaves the reported incumbent intact`() {
+        val directory = Files.createTempDirectory("solve-stdout-").toFile()
+        try {
+            val invocation = SolverInvocation.Result(
+                true, 2.0, 4L, proven = false, stats = emptyMap(),
+                stdout = SolverOutput.Spool(directory.resolve("missing.stdout")), command = "cli",
+                exactObjective = "2",
+            )
+
+            val (record, _) = SolveMetric.solve(entry(), SolverInvocation.Settings(), Budget(), "now", "fixture",
+                installedBuild = { null }, invoke = { _, _, _, _ -> invocation })
+
+            assertEquals(true, record.feasible)
+            assertEquals("2", record.exactObjective)
+            assertEquals(4L, record.timeToBestMs)
+            assertNull(record.finalWitness)
+            assertNotNull(record.stats["finalWitnessUnavailable"])
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["unsupported", "multiple"])
     fun `uncheckable SMT invocations retain their verdict without a validation witness`(kind: String) {
