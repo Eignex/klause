@@ -405,7 +405,7 @@ internal class LpScopedSolver(
         var solveStarted = false
         val result = try {
             try {
-                if (!current.adopt(state, token)) return null
+                if (!adoptPrepared(current, state, token)) return null
                 solveStarted = true
                 val queryAllowance = allowance ?: if (current is ComponentLpSolver) {
                     LpFloatAllowance(workLimit, iterationLimit)
@@ -471,9 +471,8 @@ internal class LpScopedSolver(
             pending.allowance = allowance
         }
         if (pending == null) {
-            if (!current.adopt(state, floatInvocationToken)) {
-                solver = null
-                closeOwner(current)
+            if (!adoptPrepared(current, state, floatInvocationToken)) {
+                retireNumerical()
                 return null
             }
             observeFloatQuery(current, current === previous, allowance, token,
@@ -578,11 +577,18 @@ internal class LpScopedSolver(
 
     private fun adoptNumerical(next: LpExactState, token: ExecutionControl): Boolean {
         val current = solver ?: return !token.pollStop()
-        if (next.canProjectWorkingModel(token)) return current.adopt(next, token)
+        if (next.canProjectWorkingModel(token)) return adoptPrepared(current, next, token)
         if (token.pollStop()) return false
         retireNumerical()
         return !token.pollStop()
     }
+
+    private fun adoptPrepared(current: RetainedLpSolver, next: LpExactState, token: ExecutionControl): Boolean =
+        try {
+            current.adopt(next, token)
+        } finally {
+            if (current is ComponentLpSolver && current.isClosed) retireNumerical()
+        }
 
     private fun retireNumerical() {
         val current = solver ?: return
@@ -610,10 +616,13 @@ internal class LpScopedSolver(
         val childIterations = allowance?.iterations?.let {
             if (iterationLimit > 0) minOf(it, iterationLimit) else it
         } ?: iterationLimit
+        val childMonolithicPreparationWork = monolithicPreparationWork?.let {
+            if (allowance == null) it else preparationCeiling(it, allowance.work)
+        }
         val scopeToken = cancellation or token
         val child = LpScopedSolver(
             working.state, scopeToken, context, refactorUpdateLimit, childIterations, childWork,
-            trackDegeneracy, maxRetainedRows, pricing, componentSplit, componentAdmission, monolithicPreparationWork,
+            trackDegeneracy, maxRetainedRows, pricing, componentSplit, componentAdmission, childMonolithicPreparationWork,
         )
         val scope = LpWorkingScope(working, child, scopeToken)
         workingActive = true

@@ -57,7 +57,8 @@ internal class ComponentLpSolver(
         private set
     var constructionReportComplete = false
         private set
-    private var closed = false
+    internal var isClosed = false
+        private set
     private var continuationTarget: Basis? = null
     override var recessionDirection: DoubleArray? = null
         private set
@@ -95,8 +96,8 @@ internal class ComponentLpSolver(
 
     @Suppress("TooGenericExceptionCaught")
     override fun close() {
-        if (closed) return
-        closed = true
+        if (isClosed) return
+        isClosed = true
         val pending = activeSolve
         activeSolve = null
         var failure: Throwable? = null
@@ -146,7 +147,7 @@ internal class ComponentLpSolver(
 
     @Suppress("TooGenericExceptionCaught")
     override fun openSolve(allowance: LpFloatAllowance?, retainFundingStop: Boolean): LpSolveCursor<FloatLpResult?> {
-        check(!closed && activeSolve == null) { "LP solve is closed or suspended" }
+        check(!isClosed && activeSolve == null) { "LP solve is closed or suspended" }
         return LpSolveCursor<FloatLpResult?>(completed = { activeSolve = null }) {
             val reuse = solveStarted
             solveStarted = true
@@ -189,7 +190,7 @@ internal class ComponentLpSolver(
     override fun adopt(state: LpExactState, token: ExecutionControl): Boolean {
         if (activeSolve != null) return false
         val previous = model.exactState ?: return false
-        if (closed || !previous.sameMatrix(state) || token() || solvers.any { it !is RetainedLpSolver }) return false
+        if (isClosed || !previous.sameMatrix(state) || token() || solvers.any { it !is RetainedLpSolver }) return false
         val nextModel = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return false
         val changes = if (state.rows === previous.rows) state.projectedScalarChanges(model, nextModel) else null
         val nextParts = ArrayList<LpNeighborhood>(parts.size)
@@ -219,8 +220,8 @@ internal class ComponentLpSolver(
                 return false
             }
         } catch (primary: Throwable) {
-            if (!closed) {
-                closed = true
+            if (!isClosed) {
+                isClosed = true
                 clearEvidence()
                 reusable.fill(null)
                 checkedBounds.fill(null)
@@ -284,7 +285,7 @@ internal class ComponentLpSolver(
         fork: ((LpSolver, LpModel, LpModel, Basis, ExecutionControl, LpComponentStaging) -> LpScalarFork?)? = null,
         engine: (LpModel, ExecutionControl, Long) -> PersistentLpSolver,
     ): Boolean {
-        check(!closed && activeSolve == null)
+        check(!isClosed && activeSolve == null)
         metrics = LpSolveMetrics()
         lastReservedConstructionWork = 0L
         lastLocalEditDecline = LpComponentEditDecline.UNAVAILABLE
@@ -507,7 +508,7 @@ internal class ComponentLpSolver(
         allowance: LpFloatAllowance?,
         op: suspend (LpSolver) -> FloatLpResult?,
     ): FloatLpResult? {
-        check(!closed)
+        check(!isClosed)
         lastTermination = null
         infeasibleRay = null
         blockResults = null
@@ -669,7 +670,7 @@ internal class ComponentLpSolver(
     }
 
     override fun partialPrimalGuidance(cancellation: ExecutionControl): LpPrimalGuidance? {
-        val paused = !closed && model.exactState != null && activeSolve?.isAdvancing == false
+        val paused = !isClosed && model.exactState != null && activeSolve?.isAdvancing == false
         if ((!paused && !currentAuthority()) || cancellation()) return null
         val termination = lastTermination
         if (!paused && termination != LpFloatTermination.WORK && termination != LpFloatTermination.PIVOTS &&
@@ -831,7 +832,7 @@ internal class ComponentLpSolver(
         return checkedLpWitness(model, point)
     }
 
-    private fun currentAuthority(): Boolean = !closed && activeSolve == null && if (model.exactState != null) {
+    private fun currentAuthority(): Boolean = !isClosed && activeSolve == null && if (model.exactState != null) {
         solvedExactState === model.exactState
     } else {
         certificationKey?.let { exactLpStateKey(model)?.contentEquals(it) } == true

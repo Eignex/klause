@@ -566,6 +566,26 @@ class SparseLpAdmissionTest {
     }
 
     @Test
+    fun `admitted sparse queries should keep their cadence after ordinary node credit would run out`() {
+        val problem = boundedLpEngineProblem().withSettings(
+            ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L))
+        val params = LpParams(lpConfig = LpConfig.parse("default,+sparse-trial"),
+            lpPlan = LpPlan(boundEvery = 2, boundMaxOpsPerNode = 1L))
+        val sink = SolveStatsSink("sparse-node-cadence")
+        LpEngine(problem, objective, params, sink).use { engine ->
+            assertTrue(engine.sparseTrialActive)
+            val session = PropagationSession(problem)
+            engine.pruneNode(session, 100.0, -1, true)
+            engine.noteNodeOverhead(128L)
+
+            engine.pruneNode(session, 100.0, -1, true)
+
+            assertEquals(1.0, sink.snapshot().lp.nodePasses.sum)
+        }
+    }
+
+    @Test
     fun `spent sparse root grant prevents another root node query`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),

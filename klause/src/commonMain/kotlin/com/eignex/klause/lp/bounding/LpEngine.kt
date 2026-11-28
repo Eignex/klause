@@ -1998,12 +1998,15 @@ internal class LpEngine(
             if (rootBoundHandedOff && session.decisionLevel == 0) return false
             if (sparseTrialActive && session.decisionLevel == 0 && retainedRootCumulativeWork() <= 0L) return false
             lpEffortGovernor.observeNode()
-            if (!params.lpPlan.realResidual) nodeQueryFunding.observeWork(totalSolveWork())
-            nodeQueryFunding.observeNode()
+            val usesNodeCredit = !params.lpPlan.realResidual && !sparseTrialActive
+            if (usesNodeCredit) {
+                nodeQueryFunding.observeWork(totalSolveWork())
+                nodeQueryFunding.observeNode()
+            }
             if (!params.lpPlan.realResidual && (
                     session.decisionLevel > params.lpPlan.boundMaxDepth ||
                         ++lpCheckCounter % params.lpPlan.boundEvery != 0 ||
-                        !nodeQueryFunding.available ||
+                        (usesNodeCredit && !nodeQueryFunding.available) ||
                         !lpLadder.shouldRun()
                     )
             ) {
@@ -2035,7 +2038,7 @@ internal class LpEngine(
                     cutsAllowed = cutsAllowed,
                 )
             } finally {
-                if (!params.lpPlan.realResidual) {
+                if (usesNodeCredit) {
                     nodeQueryFunding.observeWork(totalSolveWork())
                 }
             }

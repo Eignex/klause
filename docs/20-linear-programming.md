@@ -490,8 +490,10 @@ limit is divided among the admitted children. Construction and declined inspecti
 spend the containing LP grant separately from each adaptive numerical query. Owner
 preparation has a bounded atomic grant; search accounts any slice excess as work debt.
 A declined partition uses the ordinary monolithic preparation limit and charges
-the inspection to the containing allowance. An admitted sparse trial retains its
-own numerical route. Scalar trail edits preserve a structural admission decline. Admitted
+the inspection to the containing allowance. A bounded working scope also caps
+monolithic preparation at its offered work. Admitted sparse trials keep their
+own query cadence and work accounting. Scalar trail edits preserve a structural
+admission decline. Admitted
 children retain their numerical state through ordinary node edits. Composed component
 points publish node branching hints only when the direct finite-worker `LpPlan`
 enables component ownership, which also selects root component guidance, ordering
@@ -545,8 +547,9 @@ logicals complete it, and the fresh child validates and refactors it. Other chil
 retain their owners and evidence. New columns and unsupported structural edits
 retire every child. The replacement may form a fresh collection
 under the same admission policy and remaining work grant; a declined collection
-uses the ordinary owner. Callers that need one retained basis keep the monolithic
-constructor.
+uses the ordinary owner. A component collection retired during partial scalar
+adoption leaves the accepted exact trail in place for the next preparation.
+Callers that need one retained basis keep the monolithic constructor.
 
 A scalar replacement with the same exact matrix, coordinates and ordered basis can
 fork the current factors through an explicit factory capability. Its matrix views
