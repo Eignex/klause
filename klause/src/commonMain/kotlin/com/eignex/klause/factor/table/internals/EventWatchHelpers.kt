@@ -2,7 +2,6 @@ package com.eignex.klause.factor.table.internals
 
 import com.eignex.klause.propagation.IntEvent
 
-/** Subscribes to all four event types for each distinct variable in [vars]. */
 internal fun allEventWatches(vars: IntArray): IntArray {
     val distinct = vars.toHashSet()
     val out = IntArray(distinct.size * IntEvent.COUNT)

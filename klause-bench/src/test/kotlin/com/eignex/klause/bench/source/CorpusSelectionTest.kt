@@ -129,7 +129,6 @@ class CorpusSelectionTest {
             (1..4).map { Discovered("famB/$it", "famB/m.mzn", "famB/$it.dzn") }
         val sel = CorpusSelection.applySelection(all, Selection(perFamily = 2, maxInstances = 3))
         assertEquals(3, sel.size)
-        // 2 per family, interleaved -> A1,B1,A2 ; capped at 3.
         assertEquals(listOf("famA/1", "famB/1", "famA/2"), sel.map { it.name })
     }
 

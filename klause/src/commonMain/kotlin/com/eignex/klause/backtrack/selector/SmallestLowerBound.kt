@@ -5,9 +5,8 @@ import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 
 /**
- * Smallest lower bound first (MiniZinc's `smallest`): the free variable whose domain
- * minimum is lowest. Free bools count as minimum 0. Ties broken by variable id, bools
- * before ints. The scheduling staple — branching on the task that can start earliest.
+ * Smallest lower bound first (MiniZinc's `smallest`). Free bools count as minimum 0. Ties broken by variable
+ * id, bools before ints.
  */
 object SmallestLowerBound : VariableSelector {
     override fun fresh() = this

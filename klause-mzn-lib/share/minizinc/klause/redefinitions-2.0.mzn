@@ -8,8 +8,7 @@ predicate bool_clause_reif(array [int] of var bool: as, array [int] of var bool:
     forall (i in index_set(as)) (as[i] -> b) /\
     forall (i in index_set(bs)) (bs[i] \/ b);
 
-% klause has no native float-array min/max (floats are bucketed to ints), so keep the std
-% decomposition for these.
+% No native float-array min/max, so these keep the std decomposition.
 predicate array_float_maximum(var float: m, array [int] of var float: x) =
   let {
     int: l = min(index_set(x));

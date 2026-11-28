@@ -34,8 +34,7 @@ data class FlatZincProgram(
     val floatRepresentations: Map<String, FloatRepresentation> = emptyMap(),
     /** Declared defaults and effective caller policy captured before lowering. */
     val semantics: EffectiveSourceSemantics = problem.semantics,
-    /** Source integer/Boolean definitions in [problem]'s coordinates; rewrites must remap these hints.
-     * No consumer state or dependency order is retained here. */
+    /** Source integer/Boolean definitions in [problem]'s coordinates; rewrites must remap these hints. */
     val definitionHints: List<DefinitionHint> = emptyList(),
 ) {
     /** Original source declarations and metadata. */

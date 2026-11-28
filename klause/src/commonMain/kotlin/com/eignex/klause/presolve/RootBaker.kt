@@ -22,12 +22,8 @@ import kotlin.random.Random
 /**
  * Bake-time root probing, owned by the presolve lane rather than the immutable model.
  *
- * The propagation projection performs the cheap unconditional base bake. The heavier failed-literal /
- * singleton arc consistency (SAC) probing tiers, enabled only by the compile / presolve layers, live here
- * so the engine never depends on `presolve`.
- *
- * [bake] runs the probing fixpoint against an already-base-baked [BakedProblem] and returns the accumulated
- * deductions; [reseed] builds a [BakedProblem] carrying them.
+ * The propagation projection performs the cheap base bake; the failed-literal and singleton arc
+ * consistency (SAC) probing tiers live here so the engine never depends on `presolve`.
  *
  * SAC: Debruyne and Bessière, "Some Practicable Filtering Techniques for the Constraint Satisfaction
  * Problem", IJCAI 1997, https://mlanthology.org/ijcai/1997/debruyne1997ijcai-some
@@ -35,11 +31,8 @@ import kotlin.random.Random
 object RootBaker {
 
     /**
-     * Re-seed a base-baked [problem] with the [config]-enabled probing tiers: run [bake] and, when it
-     * found extra deductions, return a folded [BakedProblem] over the same factors and domains.
-     * Returns [problem] unchanged when no tier is enabled, the problem is an already-folded pass view
-     * (which never bakes), or the base bake is already `Unsat`. The kernel never initiates it, so the
-     * engine carries no dependency on presolve.
+     * [problem] re-baked with the deductions of the [config]-enabled probing tiers. Returns [problem]
+     * unchanged when no tier is enabled, it is an already-folded pass view, or its base bake is `Unsat`.
      */
     fun reseed(problem: BakedProblem, config: BakeConfig): BakedProblem {
         if (!config.anyEnabled || problem.alreadyFolded) return problem
@@ -83,11 +76,8 @@ object RootBaker {
     }
 
     /**
-     * Run the [config]-enabled probing tiers against the base-baked [problem] and return the resulting
-     * deductions — the base bake merged with every probing finding, ready for a rebuilt [BakedProblem].
-     * Returns [problem]'s existing bake unchanged when no tier is enabled or the base bake is already
-     * `Unsat`. ExecutionControl is polled between phases and probes; a fired deadline yields a sound partial
-     * bake (probing only ever tightens).
+     * The base bake of [problem] merged with every finding of the [config]-enabled probing tiers. A fired
+     * deadline yields a sound partial bake, since probing only ever tightens.
      */
     fun bake(problem: BakedProblem, config: BakeConfig): PropagationResult {
         val base = problem.baked
@@ -177,9 +167,6 @@ object RootBaker {
         narrowedColumns = result.numInts - base.numInts + narrowed.size
     }
 
-    /** Interior-value SAC: probe every value strictly between each multi-value int var's current min
-     *  and max. Iterates with bound-SAC interleaved so hole-discovered tightenings can lift bounds and
-     *  vice versa. */
     private fun probeIntHoles(
         problem: BakedProblem,
         base: PropagationResult.Implied,
@@ -251,11 +238,9 @@ object RootBaker {
         return acc
     }
 
-    /** Probe order: descending `Σ factorWeights(f) / dom(v)`, so the budget is spent first on vars that
-     *  are heavily constrained relative to their remaining domain. Each Unsat probe bumps the weights of
-     *  the factors in its conflict via [bumpFactorWeights], steering the next pass toward related vars
-     *  (Boussemart, Hemery, Lecoutre and Sais, "Boosting Systematic Search by Weighting Constraints",
-     *  ECAI 2004). Ties break by a seeded per-pass random key, avoiding variable-id order bias. */
+    // Descending `Σ factorWeights(f) / dom(v)`, spending the budget first on heavily constrained variables;
+    // conflict weights steer later passes toward related variables (Boussemart, Hemery, Lecoutre and Sais,
+    // "Boosting Systematic Search by Weighting Constraints", ECAI 2004). Seeded random ties avoid id bias.
     internal fun sacProbeOrder(
         problem: BakedProblem,
         acc: PropagationResult.Implied,
@@ -294,18 +279,12 @@ object RootBaker {
         return order
     }
 
-    /** Bump every factor implicated in an Unsat conflict by 1.0, the wdeg update rule. */
     private fun bumpFactorWeights(unsat: PropagationResult.Unsat, factorWeights: DoubleArray) {
         for (f in unsat.conflictFactors) {
             if (f in factorWeights.indices) factorWeights[f] += 1.0
         }
     }
 
-    /**
-     * Bound-SAC fixed-point loop. Probes the min and max of each multi-value int var under the current
-     * [base]; an Unsat result tightens that bound by one and re-probes. Returns the strengthened
-     * [PropagationResult.Implied], or `Unsat` if the problem turns out to be infeasible.
-     */
     private fun probeBoundSac(
         problem: BakedProblem,
         base: PropagationResult.Implied,
@@ -386,11 +365,6 @@ object RootBaker {
         return acc
     }
 
-    /**
-     * Iteratively strengthens [initial] by probing each free bool with both polarities. If one polarity
-     * is Unsat under the current accumulated base, the opposite polarity is forced. Repeats until a full
-     * pass finds no new forcings.
-     */
     private fun probeFreeBools(
         problem: BakedProblem,
         initial: PropagationResult.Implied,
@@ -435,17 +409,12 @@ object RootBaker {
     }
 
     /**
-     * [problem] with an explicit contradiction appended so its bake propagation reports `Unsat` — the
-     * materialization a caller uses when an oracle (e.g. the LP harvest) has certified infeasibility but a
-     * concrete infeasible model is needed. Two equalities pinning one variable to consecutive values
-     * (or a Boolean forced both ways) are jointly unsatisfiable regardless of domains, so the conflict is
-     * witnessed without depending on the certifying proof being re-derivable downstream.
+     * [problem] with an explicit contradiction appended, for a caller whose oracle certified infeasibility
+     * but needs a concrete infeasible model. Two equalities pinning one variable to consecutive values (or a
+     * Boolean forced both ways) conflict regardless of domains.
      *
-     * Every part of the model that is not the appended contradiction is carried through, the open-side
-     * marks included: a column the front-end closed with an invented endpoint must keep saying so, or the
-     * refutation reads as one derived inside a box the model never stated — which is the difference
-     * between `unsat` and `unknown` for whoever reports it. The mask is extended over the added rows,
-     * which are not implied ones.
+     * The open-side marks are carried through, so the refutation is not read as one derived inside a box
+     * the model never stated, which is the difference between `unsat` and `unknown`.
      */
     fun provenInfeasible(problem: BakedProblem, config: BakeConfig): BakedProblem {
         val factors = ArrayList<Factor>(problem.factors.size + 2)
@@ -459,8 +428,8 @@ object RootBaker {
             }
 
             problem.numBoolVars > 0 -> {
-                factors.add(Clause(intArrayOf(Lit.make(0, true)))) // b0 = true
-                factors.add(Clause(intArrayOf(Lit.make(0, false)))) // b0 = false
+                factors.add(Clause(intArrayOf(Lit.make(0, true))))
+                factors.add(Clause(intArrayOf(Lit.make(0, false))))
             }
 
             else -> return problem // no variable to pin a contradiction on

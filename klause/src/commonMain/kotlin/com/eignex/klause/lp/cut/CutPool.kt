@@ -15,12 +15,9 @@ import com.eignex.util.collections.MutableIntLongMap
 import kotlin.math.abs
 import kotlin.math.sqrt
 
-/**
- * An activity-managed cut pool. Portable entries retain their source proof and become available only
- * while their guards hold in [remap]'s context. Raw cuts belong to their original column layout and
- * become unavailable after remapping. Eviction only loosens a relaxation; insertion order breaks
- * activity ties, and [retainMostActive] enforces the [maxCuts] cap.
- */
+// Portable entries retain their source proof and are available only while their guards hold in remap's
+// context; raw cuts belong to their original column layout and are unavailable after remapping. Eviction
+// only loosens a relaxation.
 internal class CutPool(
     val maxCuts: Int = DEFAULT_MAX_CUTS,
     private val maxConsecutiveInactive: Int = DEFAULT_MAX_CONSECUTIVE_INACTIVE,
@@ -55,10 +52,8 @@ internal class CutPool(
     // Selections of imported cuts, by the source each came from.
     private val importUses = OriginCounts()
 
-    /** Number of pooled cuts. */
     val size: Int get() = entries.size
 
-    /** Add [cut] unless an equal one (by [Cut.key]) is already pooled; returns true if newly added. */
     fun add(cut: Cut, origin: Int = NO_ORIGIN): Boolean {
         val proof = cut.provenance
         val row = proof?.conclusion
@@ -70,7 +65,6 @@ internal class CutPool(
         return store(cut, source, origin)
     }
 
-    /** Add [cut] mapped onto [relaxation]; [origin] names the source a shared cut was imported from. */
     fun add(cut: Cut, relaxation: LpRelaxation, origin: Int = NO_ORIGIN): Boolean =
         when (val mapped = SourceCut.fromCut(cut, relaxation)) {
             is CutMapping.Mapped -> add(mapped.value, checkNotNull(relaxation.sourceMap), origin)
@@ -243,21 +237,18 @@ internal class CutPool(
         entry.source?.takeIf { it.provenance.global }?.let { SharedCut(it) }
     }
 
-    /** Add each of [cuts] (deduplicated); returns how many were newly added. */
     fun addAll(cuts: Iterable<Cut>): Int {
         var added = 0
         for (c in cuts) if (add(c)) added++
         return added
     }
 
-    /** The pooled cuts, in insertion order (after any [retainMostActive] eviction). */
     fun cuts(): List<Cut> = entries.mapNotNull { it.cut }
 
     fun constantContradiction(): Cut? = entries.firstNotNullOfOrNull { entry ->
         entry.cut?.takeIf { it.cols.isEmpty() && efficacy(it, emptyDoubleArray(), 0.0) > 0.0 }
     }
 
-    /** Observe one solved LP point, update decayed tightness, and expire cuts inactive for too long. */
     fun observe(primal: DoubleArray) {
         for (entry in entries) {
             val cut = entry.cut ?: continue
@@ -283,7 +274,7 @@ internal class CutPool(
         rebuildSeen()
     }
 
-    /** Enforce [maxCuts], keeping highest decayed activity with insertion order breaking ties. */
+    // The stable sort lets insertion order break activity ties.
     fun retainMostActive() {
         if (entries.size <= maxCuts) return
         entries.sortByDescending { it.activity }
@@ -300,7 +291,6 @@ internal class CutPool(
         for (entry in entries) seen.add(entry.key)
     }
 
-    /** Distance of the LP [primal] point from cut tightness — 0 when the point sits on the cut. */
     private fun slack(cut: Cut, primal: DoubleArray): Double {
         var lhs = 0.0
         for (k in cut.cols.indices) {
@@ -310,24 +300,9 @@ internal class CutPool(
         return abs(cut.rhs - lhs)
     }
 
-    /**
-     * Select up to [max] pooled cuts to add to the LP at the current point [primal]: rank by
-     * **efficacy plus objective parallelism**: the normalised violation
-     * `violation / ‖coeffs‖₂` is added to the absolute cosine with the objective direction (Achterberg,
-     * "Constraint Integer Programming", PhD thesis, TU Berlin 2007,
-     * https://nbn-resolving.org/urn:nbn:de:kobv:83-opus-16117). Candidates are then added greedily,
-     * skipping a candidate that is near-parallel to one already chosen (an **orthogonality** filter on
-     * the cosine of their coefficient vectors). A cut the point already satisfies (efficacy below
-     * [minEfficacy]) is dropped — adding it would not move the bound. The returned cuts are a subset of
-     * the pool, so the relaxation stays valid: selecting fewer cuts only loosens the bound, never
-     * removes a feasible point. Insertion order breaks ties (the score sort is stable).
-     *
-     * @param primal the current LP point cuts are scored against.
-     * @param objective the LP objective direction used for parallelism scoring.
-     * @param max the maximum number of cuts to return.
-     * @param minEfficacy reject cuts whose normalised violation is below this.
-     * @param minOrthogonality require each added cut's cosine-to-nearest-selected `≤ 1 − this`.
-     */
+    // Score is efficacy plus objective parallelism (Achterberg, "Constraint Integer Programming", PhD thesis,
+    // TU Berlin 2007, https://nbn-resolving.org/urn:nbn:de:kobv:83-opus-16117); greedy selection then skips
+    // cuts near-parallel to one already chosen. Selecting a subset of the pool only loosens the bound.
     fun select(
         primal: DoubleArray,
         objective: DoubleArray,
@@ -372,8 +347,6 @@ internal class CutPool(
         return abs(dot) / (cutNorm * objectiveNorm)
     }
 
-    /** Normalised violation of [cut] at [primal] — `violation / ‖coeffs‖₂`, `0` when satisfied. The
-     *  violation is how far the point sits on the infeasible side of the inequality. */
     private fun efficacy(cut: Cut, primal: DoubleArray, norm: Double): Double {
         var lhs = 0.0
         for (k in cut.cols.indices) {
@@ -392,7 +365,6 @@ internal class CutPool(
         return if (norm > 0.0) violation / norm else Double.POSITIVE_INFINITY
     }
 
-    /** Euclidean norm of [cut]'s coefficient vector. */
     private fun l2(cut: Cut): Double {
         var s = 0.0
         for (c in cut.coeffs) s += c.toDouble() * c.toDouble()
@@ -405,8 +377,6 @@ internal class CutPool(
         return sqrt(s)
     }
 
-    /** Cosine similarity of two cuts' coefficient vectors over their shared columns (`0` when disjoint,
-     *  `1` when parallel). Used to keep the selected set near-orthogonal. */
     private fun cosine(a: ScoredCut, b: ScoredCut): Double {
         val na = a.norm
         val nb = b.norm
@@ -423,32 +393,21 @@ internal class CutPool(
         return abs(dot) / (na * nb)
     }
 
-    /** Hand [action] how often imported cuts from each source were selected since the last drain, and reset. */
     fun drainImportUses(action: (origin: Int, uses: Long) -> Unit) = importUses.drain(action)
 
     internal companion object {
-        /** The origin of a cut derived in this pool rather than imported. */
         const val NO_ORIGIN: Int = -1
 
-        /**
-         * Default cap on the pooled cuts. Bounds the per-node LP solve a large root harvest would
-         * otherwise impose, while sitting well above a normal harvest's output so it only bites on a
-         * pathological over-harvest. The reported cut count ([size]) reflects any eviction.
-         */
+        // Bounds the per-node LP cost of a pathological root over-harvest; a normal harvest stays well below.
         const val DEFAULT_MAX_CUTS: Int = 2048
         private const val MAX_PREPARATION_UNITS = 262_144L
 
-        /** Minimum normalised violation for [select] to add a cut (efficacy floor). */
         const val MIN_EFFICACY: Double = 1e-4
 
-        /** Minimum orthogonality for [select]: an added cut's cosine to any already-selected cut must
-         *  be at most `1 − this`, so near-duplicate faces are not piled onto the LP. */
         const val MIN_ORTHOGONALITY: Double = 0.05
 
-        /** Decay factor for the bounded cut-activity accumulator. */
         const val ACTIVITY_DECAY: Double = 0.8
 
-        /** Consecutive inactive LP observations tolerated before cut eviction. */
         const val DEFAULT_MAX_CONSECUTIVE_INACTIVE: Int = 100
 
         const val ACTIVE_TOLERANCE: Double = 1e-6

@@ -1,11 +1,8 @@
 package com.eignex.klause.factor
 
-// 16: balanced between raw (≈ ∞) and pure-log (≈ 0) compression; see compressViolation.
 internal const val DEFAULT_VIOLATION_SOFT_CAP: Int = 16
 
-// raw ≤ softCap: returned verbatim (exact gradient near feasibility).
-// raw > softCap: softCap + ⌊log2(raw − softCap + 1)⌋ — log tail prevents a handful of
-// large-magnitude constraints from dominating the cost and starving the many small violations.
+// Exact up to softCap, then a log tail so a few large violations cannot drown out many small ones.
 internal fun compressViolation(raw: Long, softCap: Int): Int {
     if (raw <= 0L) return 0
     val cap = softCap.toLong()

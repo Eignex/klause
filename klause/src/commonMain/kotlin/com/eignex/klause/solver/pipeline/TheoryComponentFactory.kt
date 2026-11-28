@@ -18,7 +18,6 @@ import com.eignex.klause.theory.qflra.PreparedExactLiraComponentFactory
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
 import com.eignex.klause.util.ExecutionControl
 
-/** Builds the theory component selected by this plan. */
 internal fun ComponentPlan.theoryComponent(
     spec: Problem,
     smtStats: SmtStatsSink? = null,

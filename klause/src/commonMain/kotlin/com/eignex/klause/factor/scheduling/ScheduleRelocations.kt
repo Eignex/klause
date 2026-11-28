@@ -15,13 +15,11 @@ import com.eignex.util.arrays.argsortBy
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 
-/**
- * Compaction and reorder moves for a satisfied [Cumulative]. A task moves to the earliest start that
- * every scheduling resource sharing its start coordinate admits, on its current or another choice of
- * a channelled demand or presence, a task swaps order with its successor, and a window of tasks is
- * left-justified in start order. Each compound is
- * replayed on the timeline of every resource it reaches before it is offered.
- */
+// Compaction and reorder moves for a satisfied [Cumulative]. A task moves to the earliest start that
+// every scheduling resource sharing its start coordinate admits, on its current or another choice of
+// a channelled demand or presence, a task swaps order with its successor, and a window of tasks is
+// left-justified in start order. Each compound is replayed on the timeline of every resource it reaches
+// before it is offered.
 internal class ScheduleRelocations(
     private val own: Cumulative,
     factorId: Int,
@@ -180,10 +178,8 @@ internal class ScheduleRelocations(
         return Channel(predicate.input, predicate.value, Lit.isPositive(literal), 1L)
     }
 
-    /**
-     * Left-justifies a window of the resource's tasks in start order as one compound, each task placed on the
-     * timelines its predecessors in the window already moved on.
-     */
+    // Left-justifies a window of the resource's tasks in start order as one compound, each task placed on the
+    // timelines its predecessors in the window already moved on.
     private fun compactBlock(tasks: IntArrayList) {
         if (tasks.size < 2) return
         val order = argsortBy(tasks.size) { a, b ->
@@ -224,7 +220,7 @@ internal class ScheduleRelocations(
         if (admitted && placements.size >= 2) offer(placements, replayed = true)
     }
 
-    /** Earliest start below the current one, from [from] on, whose window every footprint admits. */
+    // Earliest start below the current one, from [from] on, whose window every footprint admits.
     private fun earliestStart(task: Task, choiceVar: Int, choice: Long, from: Long = Long.MIN_VALUE): Long? {
         val domain = state.rootDomains[task.start]
         var t = maxOf(domain.min, from)
@@ -281,7 +277,7 @@ internal class ScheduleRelocations(
         emitted++
     }
 
-    /** The coordinated indicator writes of setting [choiceVar] to [value], or null when one is not admissible. */
+    // The coordinated indicator writes of setting [choiceVar] to [value], or null when one is not admissible.
     private fun channelParts(choiceVar: Int, value: Long): List<Move>? {
         val move = state.synthesizeChannelingMove(choiceVar, value) as? Move.Compound ?: return emptyList()
         val net = state.invariants
@@ -304,7 +300,7 @@ internal class ScheduleRelocations(
         return parts
     }
 
-    /** Whether every scheduling coordinate the move's definitions recompute is a decoded footprint channel. */
+    // Whether every scheduling coordinate the move's definitions recompute is a decoded footprint channel.
     private fun reachesOnlyFootprints(
         placements: List<Placement>,
         geometry: List<Move.IntSet>,
@@ -342,7 +338,7 @@ internal class ScheduleRelocations(
     private fun cumulativeReads(factorIds: IntArray): Boolean =
         factorIds.any { state.problem.factors[it] is Cumulative }
 
-    /** Replays [placements] on every footprint's timeline and accepts them when no resource gains overload. */
+    // Replays [placements] on every footprint's timeline and accepts them when no resource gains overload.
     private fun admissible(placements: List<Placement>): Boolean {
         var cost = 0L
         for (placement in placements) {
@@ -392,14 +388,14 @@ internal class ScheduleRelocations(
         }
     }
 
-    /** `output = scale · [input = value]` for a positive literal, its complement otherwise. */
+    // `output = scale · [input = value]` for a positive literal, its complement otherwise.
     private class Channel(val input: Int, val value: Long, val positive: Boolean, val scale: Long) {
         fun holds(choice: Long): Boolean = (choice == value) == positive
 
         fun demand(choice: Long): Long = if (holds(choice)) scale else 0L
     }
 
-    /** One task's demand on one resource that shares its start coordinate. */
+    // One task's demand on one resource that shares its start coordinate.
     private class Footprint(
         val factorId: Int,
         val ls: CumulativeLsState,

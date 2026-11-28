@@ -2,40 +2,22 @@ package com.eignex.klause.factor.table.internals
 
 import kotlin.concurrent.Volatile
 
-/**
- * Immutable root reachability for a layered diagram, valid for any factor whose positions all still admit
- * the whole alphabet (so the per-position domain filter is a no-op and reachability is purely structural).
- * [fwd]/[bwd] are the forward/backward state-reachability bitsets (`(n+1) * w` longs, the same layout the
- * per-factor sweeps use); [survivors] is, per position, the bitset of alphabet symbols — offset by the
- * diagram's `minSym` — that keep the position alive. A reusing factor copies [fwd]/[bwd] and derives its
- * own exclusions by testing its live domain against [survivors], instead of re-scanning the diagram.
- */
+// Root reachability, valid for any factor whose positions all admit the whole alphabet, where reachability is
+// purely structural. [survivors] holds per position the symbols, offset by `minSym`, that keep it alive; a reusing
+// factor tests its live domain against them instead of re-scanning the diagram.
 internal class MddRootSnapshot(val fwd: LongArray, val bwd: LongArray, val survivors: Array<LongArray>)
 
-/**
- * Per-layer CSR indices over a layered MDD's transition records, keyed by source state ([fwdHead] into
- * [fwdPtr]) and by destination state ([bwdHead] into [bwdSrc]/[bwdSym]). In layer `i`, the records leaving
- * source state `s` are `fwdPtr(i)` over the half-open range `fwdHead(i)(s) .. fwdHead(i)(s+1)`, each entry
- * a base offset into the transition array. The incoming records for destination state `d` are `bwdHead(i)`
- * over `bwdHead(i)(d) .. bwdHead(i)(d+1)`; their source and symbol are stored *inline* in [bwdSrc]/[bwdSym]
- * rather than as offsets into the transition array. Transitions are laid out source-major, so a backward
- * sweep that dereferenced offsets would touch the transition array at scattered addresses (one cache miss
- * per incoming edge); the inline copy keeps the backward sweep's reads sequential. Records whose source
- * (resp. destination) is outside its layer's state range are dropped — such a record never matches a set
- * reachability bit, so the sweeps behave identically.
- *
- * The index depends only on the diagram's structure (`transitions`, `layerStarts`, `numStatesPerLayer`),
- * including their symbols, but not on the sequence variables or the cost weights. A propagation
- * projection shares it across factors over the same immutable diagram and acceptance language.
- * Variable remapping preserves that relation; value remapping prepares a new index.
- */
+// Per-layer CSR indices over the transition records, by source state ([fwdHead] into [fwdPtr], offsets into the
+// transition array) and by destination ([bwdHead] into [bwdSrc]/[bwdSym]). The backward side stores source and
+// symbol inline: transitions are source-major, so dereferencing offsets would cost a cache miss per incoming edge.
+// Records outside their layer's state range are dropped, since they never match a reachability bit. The index
+// depends only on the diagram's structure, so factors over the same diagram share it.
 internal class MddTransitionIndex(
     val fwdHead: Array<IntArray>,
     val fwdPtr: Array<IntArray>,
     val bwdHead: Array<IntArray>,
     val bwdSrc: Array<IntArray>,
     val bwdSym: Array<LongArray>,
-    /** Smallest and largest symbol over every transition (the full alphabet the diagram uses). */
     val minSym: Long,
     val maxSym: Long,
 ) {
@@ -64,12 +46,8 @@ internal class MddTransitionIndex(
         return columns.toTypedArray().also { preparedSymbols = PreparedSymbols(it) }
     }
 
-    /**
-     * Root reachability shared across a `<group>`'s factors, computed once by the first factor whose
-     * positions all still admit the whole alphabet and reused by the rest instead of re-scanning the
-     * diagram (the structural forward/backward bitsets are domain-independent there). Written at most once
-     * with an immutable value; a benign race under parallel search recomputes the same snapshot.
-     */
+    // Set by the first factor whose positions admit the whole alphabet. Written at most once with an immutable
+    // value; a race under parallel search recomputes the same snapshot.
     var rootSnapshot: MddRootSnapshot? = null
     companion object {
         fun build(

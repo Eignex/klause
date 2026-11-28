@@ -27,26 +27,20 @@ interface Factor {
     val intVars: IntArray get() = variables.ints
 
     /**
-     * A copy of this factor with every variable id renumbered through [mapping]. Non-variable data — coefficients,
-     * bounds, constant arrays, domain offsets, DFA tables — is carried over unchanged. Used by
-     * presolve passes that renumber or substitute variables.
+     * A copy of this factor with every variable id renumbered through [mapping]; non-variable data is
+     * carried over unchanged.
      *
-     * Every factor must implement this (no default): a variable being renumbered or substituted can
-     * appear in any factor, so a silent miss would leave stale ids in the rewritten problem. A
-     * factor that genuinely touches no variables returns `this`.
+     * There is no default: a renumbered variable can appear in any factor, so a silent miss would leave
+     * stale ids. A factor that touches no variables returns `this`.
      */
     fun remap(mapping: VarRemap): Factor
 
     /**
-     * A copy of this factor with integer variable [x] replaced by the affine expression
-     * `scale·replacement + offset`, or `null` when this factor cannot represent that substitution
-     * exactly. Lets affine variable elimination (`AffineSingletons`) project out an `x` defined by
-     * `x = scale·y + offset` even when it appears in a non-linear global — provided the global can
-     * absorb the affine view (e.g. an [com.eignex.klause.factor.table.Element] index shift
-     * folds into its offset). The default declines (`null`): substituting an affine expression for a
-     * bare variable is unsound for a factor that reasons over the variable's value directly, so a
-     * factor opts in only for forms it can rewrite faithfully. Must replace **every** occurrence of
-     * [x] (or return `null`); the pure-rename case (`scale = 1, offset = 0`) is handled by [remap].
+     * A copy of this factor with integer variable [x] replaced by `scale·replacement + offset` at
+     * **every** occurrence, or `null` when this factor cannot represent that substitution exactly.
+     *
+     * The default declines: substituting an affine expression is unsound for a factor that reasons over
+     * the variable's value directly, so a factor opts in only for forms it can rewrite faithfully.
      */
     fun substituteAffine(
         @Suppress("UNUSED_PARAMETER") x: Int,
@@ -56,89 +50,60 @@ interface Factor {
     ): Factor? = null
 
     /**
-     * Whether [substituteAffine] with these arguments would succeed (return non-null), decided without
-     * materialising the rewritten factor. Affine elimination's candidate scan tests the substitutability
-     * of a candidate's other occurrences repeatedly, but only the *accepted* candidate is ever rewritten;
-     * a factor whose [substituteAffine] is expensive (a [com.eignex.klause.factor.table.Table] rewrites
-     * every tuple) overrides this with a cheap early-exit test so the scan does not pay the full rewrite
-     * per check. The default runs [substituteAffine] and discards the result, so it agrees by construction.
+     * Whether [substituteAffine] with these arguments would return non-null. Candidate scans call this
+     * repeatedly but rewrite only the accepted candidate, so a factor with an expensive rewrite
+     * overrides it with a cheap test. The default runs [substituteAffine] and discards the result.
      */
     fun canSubstituteAffine(x: Int, scale: Int, offset: Int, replacement: Int): Boolean =
         substituteAffine(x, scale, offset, replacement) != null
 
     /**
      * A canonical [StructuralKey] identifying this constraint up to variable identity: same factor
-     * type, same constants (coefficients, bounds, polarities), and the same multiset of variables — in
-     * a representation that does not depend on internal ordering — produce equal keys. Used by symmetry
-     * detection to check whether permuting variables maps the factor set to itself (an automorphism).
-     * Every factor type supplies one.
+     * type, same constants and the same multiset of variables produce equal keys, independent of
+     * internal ordering. Symmetry detection compares them to test automorphisms.
      */
     fun structuralKey(): StructuralKey
 
     /**
-     * `hashCode` of `remap(mapping).structuralKey()`, the per-incidence port signature symmetry
-     * refinement computes for every variable–factor arc each round. The default builds the remapped
-     * factor and its key; a hot factor type overrides to fold the same hash directly from its remapped
-     * variables, skipping the intermediate `Factor` and [StructuralKey] allocations. An override must
-     * return a value that *discriminates* ports as well as the key's hash — soundness never rests on it
-     * (every candidate is re-checked by an automorphism test), so a collision only coarsens the
-     * colouring, but the result should match the key hash to keep the colouring (and the symmetries
-     * found) unchanged.
+     * `hashCode` of `remap(mapping).structuralKey()`, computed by symmetry refinement for every
+     * variable–factor arc each round. A hot factor type overrides it to fold the hash without allocating
+     * the remapped factor and key. Soundness never rests on it, since every candidate is re-checked by an
+     * automorphism test, but an override should match the key hash so the symmetries found are unchanged.
      */
     fun remapStructuralHash(mapping: VarRemap): Int = remap(mapping).structuralKey().hashCode()
 
     /**
-     * An estimate of [structuralKey]'s size — the cost of building and hashing it once. Symmetry
-     * detection's colour refinement rebuilds a factor's key once per incident variable each round, so a
-     * factor with a large constant payload (a [com.eignex.klause.factor.table.Table]'s tuple set,
-     * an Element constant array) costs `Θ(weight)` per such rebuild; the search uses `Σ degree·weight`
-     * to decide when refinement is too expensive to attempt. The default — the variable count — fits
-     * factors whose key is just their variables; data-heavy factors override to add their constant size.
+     * An estimate of the cost of building and hashing [structuralKey] once. Symmetry detection uses
+     * `Σ degree·weight` to decide when refinement is too expensive. The default is the variable count;
+     * factors with a large constant payload add its size.
      */
     val structuralKeyWeight: Int get() = intVars.size + boolVars.size
 
     /**
-     * Whether this factor's meaning is invariant under *any* relabeling of domain values — i.e. it
-     * treats values as interchangeable symbols (AllDifferent: distinctness ignores which values).
-     * Used by value-symmetry detection: a value permutation is a symmetry only if every
-     * factor is value-anonymous (and every variable's domain is invariant under it). Arithmetic and
-     * value-meaningful constraints return `false` (the default), conservatively blocking value
-     * symmetry for the whole problem.
+     * Whether this factor's meaning is invariant under any relabeling of domain values, as for
+     * AllDifferent. A value permutation is a symmetry only if every factor is value-anonymous, so the
+     * default `false` conservatively blocks value symmetry for the whole problem.
      */
     fun isValueAnonymous(): Boolean = false
 
     /**
-     * A copy of this factor with every *value-dependent constant* relabeled through [valueMap]
-     * (`newValue = valueMap(oldValue)`) — the value analog of [remap]. Relabels things that
-     * name domain values: an [com.eignex.klause.factor.global.GlobalCardinality] cover, a
-     * [com.eignex.klause.factor.table.Table]'s tuples, an Element constant array, Regular/Mdd
-     * symbols. Variable ids, coefficients, and structural positions are unchanged.
+     * A copy of this factor with every constant that names a domain value relabeled through [valueMap],
+     * the value analog of [remap]. Value-symmetry detection compares the resulting [structuralKey]
+     * multiset to verify a permutation.
      *
-     * Used by value-symmetry detection to *verify* that a value permutation maps the factor set to
-     * itself: applying it to every factor and comparing the [structuralKey] multiset proves the
-     * permutation is a symmetry, the value analog of the [remap]-based automorphism check.
-     *
-     * `null` (the default) means "not value-relabelable" — arithmetic / value-meaningful factors
-     * ([com.eignex.klause.factor.arithmetic.Linear], Product) where a value carries magnitude, not just
-     * identity, and a factor whose values live in more than one universe (e.g. a GCC with count
-     * *variables*) which can't be relabeled by a single map. A `null` anywhere conservatively blocks
-     * value symmetry for the whole problem. A [isValueAnonymous] factor returns `this` (no constant
-     * names a value).
+     * `null` (the default) means not relabelable: a value carries magnitude, or values live in more than
+     * one universe. A `null` anywhere blocks value symmetry for the whole problem. An [isValueAnonymous]
+     * factor returns `this`.
      */
     fun remapValues(valueMap: (Long) -> Long): Factor? = null
 
     /**
      * A structural self-reduction of this factor under the current integer [domains]: a rewrite into
-     * simpler / lower-arity factors when the factor's own structure (a fixed selector, a degenerate
-     * arity, a constant table) pins it, which plain propagation cannot do — propagation filters the
-     * domains, it never removes the constraint. [FactorReduction.Unchanged] (the default) means no
-     * structural reduction applies.
+     * simpler or lower-arity factors when its own structure (a fixed selector, a degenerate arity, a
+     * constant table) pins it. [FactorReduction.Unchanged] (the default) means none applies.
      *
-     * The contract is **solution-set exact**: the returned [FactorReduction.Rewrite.replacement]
-     * (conjoined with its [FactorReduction.Rewrite.tightenedBounds]) must accept exactly the same
-     * assignments as this factor — so the driving pass can stay solution-set-preserving. A factor that
-     * needs a *relaxation* (a superset, for deduction harvesting) belongs to a different hook, not this
-     * one.
+     * The contract is **solution-set exact**: the [FactorReduction.Rewrite.replacement] conjoined with
+     * its [FactorReduction.Rewrite.tightenedBounds] must accept exactly the assignments this factor does.
      */
     fun structuralReduce(domains: Array<IntDomain>): FactorReduction = FactorReduction.Unchanged
 

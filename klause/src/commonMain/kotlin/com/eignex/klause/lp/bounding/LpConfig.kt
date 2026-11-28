@@ -3,15 +3,10 @@ package com.eignex.klause.lp.bounding
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
 
 /**
- * Cost tier of an LP-relaxation technique — the LP analogue of
- * [com.eignex.klause.presolve.PresolveTiming]. [LpEmphasis] enables a *set* of tiers, so the
- * emphasis level is "how expensive an LP technique may be" — a config-time cost ceiling.
- *
- * This is the **static** half of the LP cost model: it decides which techniques a solve may build. Its
- * **runtime** counterpart is [LpEffort] — the per-node effort the
- * controller actually pushes the simplex to, descending under cost. The simplex tiers line up rung for
- * rung: [MEDIUM] ↔ `LpEffort.BOUND`, [EXHAUSTIVE] ↔ `LpEffort.CUTS`; [FAST] is the combinatorial arms
- * that sit outside the simplex ladder.
+ * Cost tier of an LP-relaxation technique, the LP analogue of [com.eignex.klause.presolve.PresolveTiming].
+ * [LpEmphasis] enables a set of tiers as a config-time cost ceiling. The runtime per-node counterpart is
+ * [LpEffort]: [MEDIUM] matches `LpEffort.BOUND`, [EXHAUSTIVE] matches `LpEffort.CUTS`, and [FAST] covers
+ * the combinatorial checks outside the simplex.
  */
 enum class LpTiming {
     /** Cheap, no dense tableau: the combinatorial feasibility / bound checks. */
@@ -26,15 +21,9 @@ enum class LpTiming {
 }
 
 /**
- * The LP-relaxation techniques the selector ranges over — the LP analogue of
- * [com.eignex.klause.presolve.PresolvePass]. Each declares a serializable [id] (for the
- * `--lp` spec list and `klause.lp`) and its cost [timing]. Whether a technique actually runs is
- * `override ?: (timing in emphasis.timings)` *and* its structural applicability (resolved in
- * [LpAutoConfig]); a technique can never run above the emphasis ceiling.
- *
- * The everyday dial is the [LpEmphasis] level (`--lp default|aggressive|…`); the per-technique
- * `+/-<technique>` overrides ([LpConfig.overrides]) are an **advanced / benchmarking** surface for
- * isolating one technique (A/B a single cut family, force a hull off), not a knob a normal solve sets.
+ * An LP-relaxation technique, the LP analogue of [com.eignex.klause.presolve.PresolvePass]. A technique
+ * runs when [LpConfig.resolved] permits it and [LpAutoConfig] finds it structurally applicable. The
+ * per-technique overrides isolate one technique; normal solves set only the [LpEmphasis] level.
  *
  * @property id serializable token for the `--lp` spec list and the `klause.lp` property.
  * @property timing the cost tier gating which emphasis levels may run this technique.
@@ -43,7 +32,7 @@ enum class LpTechnique(val id: String, val timing: LpTiming) {
     /** Explicit bounded sparse root trial; emphasis levels leave it disabled. */
     SPARSE_TRIAL("sparse-trial", LpTiming.MEDIUM),
 
-    /** Experimental control for the automatic admission policy. */
+    /** Automatic sparse admission policy; emphasis levels leave it disabled. */
     AUTOMATIC_SPARSE("automatic-sparse", LpTiming.MEDIUM),
 
     /** Cumulative / Disjunctive energetic over-subscription feasibility check. */
@@ -55,9 +44,8 @@ enum class LpTechnique(val id: String, val timing: LpTiming) {
     /** Subgradient Lagrangian bound for an AllDifferent. */
     LAGRANGIAN("lagrangian", LpTiming.FAST),
 
-    /** The per-node dual-simplex relaxation bound + objective propagation + Farkas learning +
-     *  LP↔propagation fixpoint + rounding probe (the bounding stack), and the cumulative energetic
-     *  makespan row, which is one row in that relaxation. */
+    /** The per-node dual-simplex bounding stack: relaxation bound, objective propagation, Farkas
+     *  learning, LP-propagation fixpoint, rounding probe, and the cumulative energetic makespan row. */
     BOUNDING("bounding", LpTiming.MEDIUM),
 
     /** Structural + Gomory/MIR cut separation rounds and the persistent root pool. */
@@ -139,16 +127,14 @@ enum class LpTechnique(val id: String, val timing: LpTiming) {
 }
 
 /**
- * The LP emphasis level — an ordered cost ceiling, the LP analogue of
- * [com.eignex.klause.presolve.PresolveEmphasis]. Each level enables the set of [LpTiming]
- * tiers up to its cost, so the order `OFF < CONSERVATIVE < DEFAULT < AGGRESSIVE` is a strict ceiling
- * the portfolio caps arms against.
+ * The LP emphasis level, an ordered cost ceiling and the LP analogue of
+ * [com.eignex.klause.presolve.PresolveEmphasis]. The portfolio caps arms against the order
+ * `OFF < CONSERVATIVE < DEFAULT < AGGRESSIVE`.
  */
 enum class LpEmphasis(
     /** Canonical token shown in `--lp` / `--help` and error messages. */
     val id: String,
-    /** The [LpTiming] cost tiers this level permits — a technique runs only if its tier is in this
-     *  set (absent an override). */
+    /** The [LpTiming] tiers this level permits absent an override. */
     val timings: Set<LpTiming>,
     /** Accepted spellings besides [id]. */
     private val aliases: List<String> = emptyList(),
@@ -156,14 +142,13 @@ enum class LpEmphasis(
     /** No LP at all. */
     OFF("off", emptySet(), aliases = listOf("none")),
 
-    /** Cheap combinatorial bounds only (energetic / flow / Lagrangian) — no per-node simplex. */
+    /** Cheap combinatorial bounds only (energetic / flow / Lagrangian), no per-node simplex. */
     CONSERVATIVE("conservative", setOf(LpTiming.FAST), aliases = listOf("fast")),
 
-    /** + the per-node simplex bounding (relaxation bound, objective propagation, the cumulative
-     *  makespan row). No cut rounds or hull models. The shipped single-config default. */
+    /** Adds the per-node simplex bounding; no cut rounds or hull models. */
     DEFAULT("default", setOf(LpTiming.FAST, LpTiming.MEDIUM), aliases = listOf("auto")),
 
-    /** + the expensive add-ons (cuts, hulls, time-indexed). */
+    /** Adds the expensive techniques: cuts, hulls, time-indexed. */
     AGGRESSIVE("aggressive", setOf(LpTiming.FAST, LpTiming.MEDIUM, LpTiming.EXHAUSTIVE)),
     ;
 
@@ -185,14 +170,12 @@ enum class LpEmphasis(
 }
 
 /**
- * An LP configuration: an [emphasis] cost ceiling plus per-technique [overrides] (force a single
- * technique on or off regardless of the level — what the benchmarking toggle drives). The LP analogue
- * of [com.eignex.klause.presolve.PresolveConfig]; [resolved] answers whether a technique is
- * *permitted* by the config (an override wins, else the emphasis tier rule), and [LpAutoConfig.resolve]
- * combines that with structural applicability and the dense-tableau size guard.
+ * An LP configuration, the LP analogue of [com.eignex.klause.presolve.PresolveConfig]. [resolved] answers
+ * whether the config permits a technique; [LpAutoConfig.resolve] adds structural applicability and the
+ * dense-tableau size guard.
  *
- * @property emphasis the cost ceiling — the highest [LpTiming] tier any technique may run at.
- * @property overrides per-technique force-on/off that wins over the emphasis (the benchmarking toggle).
+ * @property emphasis the cost ceiling.
+ * @property overrides per-technique force-on/off that wins over the emphasis.
  * @property sourcePreparation source-template policy override, or null to preserve the resolved plan.
  */
 class LpConfig(
@@ -201,7 +184,8 @@ class LpConfig(
     val sourcePreparation: LpSourcePreparation? = null,
 ) {
 
-    /** Whether [technique] is permitted: an explicit override wins, else its tier ≤ the emphasis. */
+    /** Whether [technique] is permitted: an explicit override wins, else its tier must be in the emphasis.
+     *  Sparse techniques need an override. */
     fun resolved(technique: LpTechnique): Boolean = overrides[technique]
         ?: (technique != LpTechnique.SPARSE_TRIAL && technique != LpTechnique.AUTOMATIC_SPARSE &&
             technique.timing in emphasis.timings)
@@ -210,9 +194,7 @@ class LpConfig(
         LpTechnique.SPARSE_TRIAL.timing in emphasis.timings && overrides[LpTechnique.SPARSE_TRIAL] != false
 
     /** This config capped under [ceiling] for a portfolio arm: the lower emphasis, with the ceiling's
-     *  per-technique overrides applied on top (so a `--lp aggressive,-cuts` ceiling forces cuts off on
-     *  every arm, and a `--lp off,+energetic` ceiling forces just that one on). The ceiling's overrides
-     *  win over the arm's own; an all-`AGGRESSIVE`, no-override ceiling leaves the arm unchanged. */
+     *  overrides and source preparation winning over the arm's own. */
     fun cappedUnder(ceiling: LpConfig): LpConfig {
         val capped = if (emphasis.ordinal <= ceiling.emphasis.ordinal) emphasis else ceiling.emphasis
         return LpConfig(capped, overrides + ceiling.overrides, ceiling.sourcePreparation ?: sourcePreparation)
@@ -220,19 +202,13 @@ class LpConfig(
 
     /** Predefined configs and the spec-string [parse]r. */
     companion object {
-        /**
-         * The library default: [LpEmphasis.DEFAULT] with no overrides, permitting `FAST` and `MEDIUM`
-         * techniques. The simplex supplies bounds; cut separators require `EXHAUSTIVE`.
-         *
-         * The CLI applies [AGGRESSIVE]: it leaves pooled arms uncapped or selects aggressive emphasis
-         * for a single solver.
-         */
+        /** The library default: [LpEmphasis.DEFAULT] with no overrides. The CLI defaults to [AGGRESSIVE]. */
         val AUTO = LpConfig(LpEmphasis.DEFAULT)
 
         /** No LP at all. */
         val OFF = LpConfig(LpEmphasis.OFF)
 
-        /** Every technique permitted — the AGGRESSIVE ceiling, no overrides. */
+        /** The [LpEmphasis.AGGRESSIVE] ceiling with no overrides. */
         val AGGRESSIVE = LpConfig(LpEmphasis.AGGRESSIVE)
 
         /**
@@ -240,9 +216,7 @@ class LpConfig(
          *  - an emphasis level alone (`default`/`auto`, `off`/`none`, `conservative`/`fast`,
          *    `aggressive`) — e.g. `aggressive`;
          *  - an emphasis level followed by `+<technique>` / `-<technique>` deltas that force individual
-         *    techniques on/off on top of it — e.g. `aggressive,-cuts` (full LP but no cut rounds),
-         *    `off,+cumulative-flow` (no LP except the flow prune). This is what enables/disables a
-         *    single technique, which a bare list cannot;
+         *    techniques on/off on top of it — e.g. `aggressive,-cuts`;
          *  - `all` — every ordinary technique forced on; sparse trials require their explicit option;
          *  - a bare comma-separated technique-id list — each forced on, all others off (force-exactly).
          *
@@ -268,7 +242,6 @@ class LpConfig(
                 it != LpTechnique.SPARSE_TRIAL && it != LpTechnique.AUTOMATIC_SPARSE
             })
             val tokens = s.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-            // Emphasis-base form: first token is a level, the rest are +/- deltas.
             LpEmphasis.fromId(tokens.first())?.let { base ->
                 val overrides = HashMap<LpTechnique, Boolean>()
                 for (tok in tokens.drop(1)) {
@@ -281,7 +254,6 @@ class LpConfig(
                 }
                 return LpConfig(base, overrides)
             }
-            // Bare force-list: the named techniques on, all others off.
             val on = tokens.map { techniqueOf(it) }.toSet()
             return LpConfig(LpEmphasis.AGGRESSIVE, LpTechnique.entries.associateWith { it in on })
         }

@@ -5,8 +5,8 @@ import com.eignex.klause.util.ExecutionControl
 internal const val LP_CAPTURE_VERSION: Int = 2
 internal const val LP_EVENT_VERSION: Int = 1
 
-/** Which captured numeric view is authoritative. A double view preserves the IEEE bits presented to
- * the engine; it deliberately does not claim to reconstruct source decimal or rational input. */
+// A double view preserves the IEEE bits presented to the engine; it does not reconstruct source decimal or
+// rational input.
 internal enum class LpNumericAuthority(val wireCode: Int) {
     LONG_EXACT(1),
     IEEE754_BITS_SOURCE_RATIONAL_ABSENT(2),
@@ -18,10 +18,9 @@ internal enum class LpReplaySolverKind(val wireCode: Int) {
     PERSISTENT(3),
 }
 
-/** Fixed engine capabilities and budgets for one solver lifetime. A replay creates exactly one engine;
- * persistent events reuse its basis/factors, while a portable warm start contains only discrete basis
- * columns and statuses. [cancellationPollLimit] is the initial deterministic token, zero means never
- * cancel, and a rebind replaces it only when that event carries an explicit override. */
+// A replay creates exactly one engine; persistent events reuse its basis and factors, while a portable warm start
+// holds only basis columns and statuses. [cancellationPollLimit] is the initial deterministic token, zero meaning
+// never cancel; a rebind replaces it only when that event carries an explicit override.
 internal class LpReplaySettings(
     val label: String,
     val seed: Long,
@@ -52,9 +51,9 @@ internal class LpCapturedPremises(
     )
 }
 
-/** Authoritative IEEE-754 input. Its CSC is independent of the Long placeholder CSC because a
- * real-only coefficient can be absent from the integer view; both stores preserve ascending rows. The exact
- * values of shifted entries that rounded travel with the bits, so a replayed view certifies what its source did. */
+// The CSC is independent of the Long placeholder CSC because a real-only coefficient can be absent from the integer
+// view; both keep ascending rows. Exact values of shifted entries that rounded travel with the bits, so a replayed
+// view certifies what its source did.
 internal class LpCapturedDoubleView(
     val colPtr: IntArray,
     val rowIdx: IntArray,
@@ -408,8 +407,7 @@ internal sealed class LpReplayEvent(open val eventVersion: Int) {
     class Rebind(
         val lo: LongArray,
         val hi: LongArray,
-        /** Optional replacement cancellation budget for this and later events; null preserves the
-         * lifetime token and its consumed poll count. */
+        // Null preserves the lifetime token and its consumed poll count.
         val cancellationPollLimit: Int? = null,
         override val eventVersion: Int = LP_EVENT_VERSION,
     ) : LpReplayEvent(eventVersion)
@@ -460,8 +458,7 @@ internal class LpCapture internal constructor(
     val model: LpCapturedModel,
     val events: List<LpReplayEvent>,
 ) {
-    /** Encode the complete snapshot and event stream. Every nested array was copied by [capture], so
-     * later model, basis, premise, objective or event-buffer mutations cannot alter these bytes. */
+    // Every nested array was copied by [capture], so later mutations cannot alter these bytes.
     fun encode(): ByteArray {
         validateFormat()
         val out = CaptureWriter()
@@ -490,9 +487,8 @@ internal class LpCapture internal constructor(
     }
 
     companion object {
-        /** Freeze [model] and caller-recorded [events] at this call. There is no instrumented producer:
-         * callers record only events exposed by their public engine seam. The capture contains no
-         * factorization snapshot or other solver-private cache. */
+        // Callers record only events exposed by their engine seam. The capture holds no factorization snapshot or
+        // other solver-private cache.
         fun capture(model: ExactLpModel, settings: LpReplaySettings, events: List<LpReplayEvent>): LpCapture = capture(
             requireNotNull(model.toIntegerModel()) { "exact model is outside capture v1 authority" },
             settings,
@@ -506,8 +502,7 @@ internal class LpCapture internal constructor(
             events.map(LpReplayEvent::copyForCapture),
         ).also { it.validateFormat() }
 
-        /** Decode and validate a whole capture before returning it; malformed or unknown input never
-         * reaches replay and therefore cannot partially execute an event prefix. */
+        // Validates the whole capture first, so malformed input never partially executes an event prefix.
         fun decode(bytes: ByteArray): LpCapture {
             val input = CaptureReader(bytes)
             require(input.bytes(CAPTURE_MAGIC.size).contentEquals(CAPTURE_MAGIC)) { "invalid LP capture magic" }

@@ -74,14 +74,6 @@ import com.eignex.klause.factor.scheduling.Cumulative as CumulativeFactor
 import com.eignex.klause.factor.scheduling.Diffn as DiffnFactor
 import com.eignex.klause.factor.table.Regular as RegularFactor
 
-/**
- * Top-level constraint assertion handlers for [Lowering]. The DSL drops a tree of
- * [BoolExpr] into [assertExpr]; this file owns the dispatch into per-shape emitters
- * ([assertAllDifferent], [assertCircuit], [assertCumulative], ...) and the integer-
- * comparison normalisation ([assertIntCompare] / [emitTopLevelCmp] / [emitSingleVar]).
- * Sub-expression-level lowering (`lowerToLit`, `reify*`, `tseitin*`) lives in
- * `Compiler.kt`; affine-fragment lift lives in `CompilerLift`.
- */
 internal fun Lowering.assertExpr(expr: BoolExpr) {
     when (expr) {
         is And -> for (c in expr.children) assertExpr(c)
@@ -255,14 +247,9 @@ internal fun Lowering.assertAllDifferent(terms: List<IntExpr>) {
     }
 }
 
-/** Lift `e` to a solver int-var id, materialising an aux var pinned equal when the lifted
- *  form carries an arithmetic residual rather than being a bare variable reference. The
- *  channeling globals below need concrete var ids to post their native factor. */
+// Channeling globals need concrete var ids, so a lifted residual is materialised as a pinned aux var.
 internal fun Lowering.varIdOfLifted(e: IntExpr): Int = intVarOf(materializeIntVar(lift(e)).name)
 
-/** Lift each operand to a bare [IntRef] and resolve it to its int-var id. Globals only accept
- *  bare variable references (no arithmetic residual); a non-bare operand fails with a
- *  [context]-tagged message naming the operand role [term]. */
 private fun Lowering.liftToIntRefIds(exprs: List<IntExpr>, context: String, term: String = "start"): IntArray {
     val lifted = exprs.map { lift(it) }
     require(lifted.all { it is IntRef }) {
@@ -271,8 +258,6 @@ private fun Lowering.liftToIntRefIds(exprs: List<IntExpr>, context: String, term
     return IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
 }
 
-/** Smallest domain min and total value span (`max − min + 1`) across [ids]' current domains —
- *  the value-occurrence range an [AllDifferentFactor] indexes over. */
 private fun Lowering.domainMinAndSpan(ids: IntArray): Pair<Long, Long> {
     var dMin = intDomains[ids[0]].min
     var dMax = intDomains[ids[0]].max
@@ -295,12 +280,7 @@ internal fun Lowering.assertInverse(expr: InverseChannel) {
     factors += InverseFactor(f, g, fOffset = expr.fOffset, gOffset = expr.gOffset)
 }
 
-/**
- * Lower [CircuitExpr] / [SubcircuitExpr] to its native factor. Each `succ` term must
- * lift to a bare [IntRef]. When [valueOffset] is nonzero (e.g. 1 for FlatZinc-style
- * 1-indexed inputs), aux 0-indexed int vars are allocated and channeled to the original
- * vars via a Linear factor — the factor itself stays 0-indexed.
- */
+// The factor is 0-indexed; a nonzero valueOffset channels 0-indexed aux vars to the originals.
 internal fun Lowering.assertCircuit(succ: List<IntExpr>, valueOffset: Int, sub: Boolean) {
     val n = succ.size
     val lifted = succ.map { lift(it) }
@@ -337,18 +317,12 @@ internal fun Lowering.assertCumulative(expr: CumulativeExpr) {
     )
 }
 
-/**
- * Lower each presence [BoolExpr] in [presents] to a solver literal. Used by every opt-aware
- * global to thread presence into its factor's `presents: IntArray`.
- */
 private fun Lowering.lowerPresences(presents: List<BoolExpr>): IntArray {
     val out = IntArray(presents.size)
     for (i in presents.indices) out[i] = lowerToLit(presents[i])
     return out
 }
 
-/** AllDifferent over an opt-presence-gated subset. Bare-IntRef operands map directly to the
- *  global factor; non-bare operands fall back to presence-guarded pairwise NE. */
 internal fun Lowering.assertAllDifferentOpt(expr: AllDifferentOpt) {
     val lifted = expr.terms.map { lift(it) }
     val presentLits = lowerPresences(expr.presents)
@@ -373,8 +347,6 @@ internal fun Lowering.assertAllDifferentOpt(expr: AllDifferentOpt) {
     }
 }
 
-/** Reconstruct a [BoolExpr] from a solver literal — used to thread already-lowered
- *  presence literals back through the AST-level guards in the pairwise fallback path. */
 private fun Lowering.boolFromLit(lit: Int): BoolExpr {
     val v = Lit.variable(lit)
     val name = idToBoolName[v]

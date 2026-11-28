@@ -12,37 +12,13 @@ import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.mulExact
 import com.eignex.util.numbers.subExact
 
-/**
- * Preemptive min-cost-flow feasibility bound for the scheduling globals. The exact
- * **preemptive** relaxation of a [com.eignex.klause.factor.scheduling.Cumulative]
- * (including its unary no-overlap mode): every task `i` must place its work `Eᵢ = durᵢ·resᵢ`
- * somewhere in its release/deadline window `[estᵢ, lstᵢ + durᵢ)` at a rate of at most `resᵢ` per time
- * unit, and at every instant the total rate stays ≤ `capacity`. That is feasible iff a max-flow
- * saturates a transportation network
- *
- * ```
- *   source ──Eᵢ──► task i ──resᵢ·|J|──► time-interval J ──capacity·|J|──► sink
- * ```
- * (the `task i → J` arc exists only when `J ⊆ [estᵢ, lstᵢ + durᵢ)`). Any real non-preemptive schedule
- * induces a feasible flow, so **max-flow `< Σ Eᵢ` proves the node infeasible** — a sound prune. The
- * network is the preemptive-scheduling flow of Horn, "Some simple scheduling algorithms", Naval
- * Research Logistics Quarterly 1974 (https://doi.org/10.1002/nav.3800210113).
- *
- * This is strictly stronger than the pairwise-window [CumulativeEnergeticBound] scan (which checks
- * one window at a time): the flow balances all release/deadline windows simultaneously. It is also
- * horizon-independent — the network's time nodes are the `O(n)` distinct start-bound breakpoints, not
- * the time axis — so it complements the horizon-gated time-indexed LP. Under an incumbent that
- * has tightened the makespan (hence the task deadlines `lstᵢ`), the same feasibility test prunes
- * objective-suboptimal subtrees, which is its bounding contribution.
- *
- * Soundness mirrors [CumulativeEnergeticBound]: work uses each task's **minimum** (declared) demand
- * and the capacity its **maximum**, the release/deadline windows are the **live** start bounds, and
- * all products are checked ([mulExact]) — an overflow reports "cannot prove infeasible" rather than a
- * wrapped value. Optional tasks and variable durations are excluded by [schedulingViews]. The nogood
- * negates exactly the live start-bound atoms the network was built from (the declared demand/capacity
- * hold at every node, so they need not be cited), so it is all-false at the dead node and globally
- * valid.
- */
+// The preemptive relaxation of a cumulative: each task places work `Eᵢ = durᵢ·resᵢ` in `[estᵢ, lstᵢ + durᵢ)` at
+// rate at most `resᵢ` under `capacity`, feasible iff a max flow saturates
+// `source ─Eᵢ→ task i ─resᵢ·|J|→ interval J ─capacity·|J|→ sink` (Horn, "Some simple scheduling algorithms",
+// Naval Research Logistics Quarterly 1974, https://doi.org/10.1002/nav.3800210113). Every real schedule induces a
+// feasible flow, so a deficit prunes the node. It balances all windows at once and its time nodes are start-bound
+// breakpoints, so it is horizon-independent. Work uses declared minimum demands and capacity its maximum, so the
+// nogood cites only live start bounds.
 internal class CumulativeFlowBound(
     problem: Problem,
     private val views: List<SchedulingView> = schedulingViews(problem).filter { it.starts.size in 2..MAX_TASKS },
@@ -50,16 +26,14 @@ internal class CumulativeFlowBound(
 
     val applicable: Boolean get() = views.isNotEmpty()
 
-    /** True if some scheduling factor is preemptively infeasible at the current node (⇒ prune). */
     override fun isInfeasible(session: PropagationSession): Boolean = views.any { infeasible(it, session) }
 
     private fun infeasible(view: SchedulingView, session: PropagationSession): Boolean = try {
         deficit(view, session) > 0L
     } catch (_: CheckedLongOverflowException) {
-        false // overflow ⇒ cannot prove infeasible (sound skip), never a wrapped verdict
+        false
     }
 
-    /** A bound-atom nogood for the first preemptively infeasible factor, or null when none / overflow. */
     override fun explain(session: PropagationSession): IntArray? {
         for (view in views) {
             val clause = try {
@@ -72,11 +46,11 @@ internal class CumulativeFlowBound(
         return null
     }
 
-    /** `Σ Eᵢ − maxflow`: the work that cannot be preemptively placed (positive ⇒ infeasible). */
+    // `Σ Eᵢ − maxflow`: positive means infeasible.
     private fun deficit(view: SchedulingView, session: PropagationSession): Long {
         val n = view.starts.size
         val est = LongArray(n)
-        val deadline = LongArray(n) // lstᵢ + durᵢ
+        val deadline = LongArray(n)
         var totalWork = 0L
         val active = BooleanArray(n)
         for (i in 0 until n) {
@@ -90,12 +64,10 @@ internal class CumulativeFlowBound(
         }
         if (totalWork == 0L) return 0L
 
-        // Breakpoint-compressed time intervals keep the network horizon-independent.
         val bps = breakpoints(est, deadline, active)
         if (bps.size < 2) return 0L
         val intervals = bps.size - 1
 
-        // Node layout: 0 = source, 1..n = tasks, n+1 .. n+intervals = intervals, last = sink.
         val source = 0
         val sink = n + intervals + 1
         val flow = MaxFlow(sink + 1)
@@ -110,7 +82,6 @@ internal class CumulativeFlowBound(
             flow.addEdge(node, sink, mulExact(cap, len))
             for (i in 0 until n) {
                 if (!active[i]) continue
-                // Interval [bps[k], bps[k+1]) is usable by task i iff it lies inside [estᵢ, deadlineᵢ).
                 if (bps[k] >= est[i] && bps[k + 1] <= deadline[i]) {
                     flow.addEdge(1 + i, node, mulExact(view.resources[i], len))
                 }
@@ -119,7 +90,6 @@ internal class CumulativeFlowBound(
         return subExact(totalWork, flow.solve(source, sink))
     }
 
-    /** Sorted distinct release/deadline values over the active tasks — the interval boundaries. */
     private fun breakpoints(est: LongArray, deadline: LongArray, active: BooleanArray): LongArray {
         val set = LongHashSet()
         for (i in est.indices) {
@@ -132,9 +102,6 @@ internal class CumulativeFlowBound(
         return arr
     }
 
-    /** Negate the live start-bound atoms the infeasible network rests on: per active task,
-     *  `start ≥ est` and `start ≤ lst`. Relaxing any one could free the deadlock, so the disjunction
-     *  of their negations is implied by the constraint and globally valid. */
     private fun windowClause(view: SchedulingView, session: PropagationSession): IntArray {
         val lits = IntArrayList()
         for (i in view.starts.indices) {
@@ -147,19 +114,15 @@ internal class CumulativeFlowBound(
     }
 
     internal companion object {
-        /** Per-factor task cap: above it the max-flow is skipped (sound loosening). */
         internal const val MAX_TASKS: Int = 512
     }
 }
 
-/**
- * Dinic (1970) max-flow over a small dense scheduling network (`O(n)` nodes): BFS levels plus DFS
- * blocking flow, ample for networks gated to [CumulativeFlowBound.MAX_TASKS] tasks.
- */
+// Dinic (1970) max flow.
 private class MaxFlow(private val numNodes: Int) {
     private val to = IntArrayList()
     private val cap = LongArrayList()
-    private val head = Array(numNodes) { IntArrayList() } // node → indices into [to]/[cap]
+    private val head = Array(numNodes) { IntArrayList() }
 
     fun addEdge(u: Int, v: Int, c: Long) {
         head[u].add(to.size)
@@ -167,7 +130,7 @@ private class MaxFlow(private val numNodes: Int) {
         cap.add(c)
         head[v].add(to.size)
         to.add(u)
-        cap.add(0L) // residual edge (edges added in pairs ⇒ e and e xor 1 are partners)
+        cap.add(0L) // edges come in pairs, so e xor 1 is the partner
     }
 
     fun solve(s: Int, t: Int): Long {
@@ -215,7 +178,7 @@ private class MaxFlow(private val numNodes: Int) {
                 val d = dfs(v, t, minOf(pushed, cap[e]), level, iter)
                 if (d > 0L) {
                     cap[e] -= d
-                    cap[e xor 1] += d // paired residual edge (edges added two at a time)
+                    cap[e xor 1] += d
                     return d
                 }
             }

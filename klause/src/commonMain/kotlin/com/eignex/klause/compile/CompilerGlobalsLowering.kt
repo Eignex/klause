@@ -23,7 +23,6 @@ import com.eignex.util.collections.IntArrayList
  * They are unsupported in reified contexts.
  */
 
-/** Emit the [Mdd] factor when `seq` is all bare IntRefs; returns whether it was emitted. */
 internal fun Lowering.assertMddNative(
     seqExpr: List<IntExpr>,
     numStatesPerLayer: List<Int>,
@@ -225,8 +224,6 @@ internal fun Lowering.assertCostRegular(expr: CostRegularExpr) {
         }
     }
 
-    // Decomposition path: always emitted so the bit-blast pipeline (which skips the
-    // propagation-only Mdd factor) still sees the constraint as primitive Table + Linear.
     val stateRefs = Array(n + 1) { IntRef(newAuxIntVar(IntDomain(0L, (numStates - 1).toLong()))) }
     assertExpr(IntCompare(stateRefs[0], IntCmpOp.EQ, IntLit(expr.initial)))
     if (expr.accepting.isEmpty()) {
@@ -235,12 +232,12 @@ internal fun Lowering.assertCostRegular(expr: CostRegularExpr) {
     }
     assertExpr(Or(expr.accepting.map { a -> IntCompare(stateRefs[n], IntCmpOp.EQ, IntLit(a)) }))
 
-    // Build the transition table as tuples (src, sym, dst, weight) — same shape across layers.
+    // Tuples (src, sym, dst, weight), the same for every layer.
     val tuples = mutableListOf<List<Int>>()
     for (q in 0 until numStates) {
         for (s in 0 until numSymbols) {
             val dst = expr.transitions[q * numSymbols + s]
-            if (dst == 0) continue // 0 means no transition (matches FlatZinc's `regular` convention)
+            if (dst == 0) continue // FlatZinc `regular` convention: 0 means no transition
             tuples += listOf(q, s + off, dst - 1, expr.weights[q * numSymbols + s])
         }
     }

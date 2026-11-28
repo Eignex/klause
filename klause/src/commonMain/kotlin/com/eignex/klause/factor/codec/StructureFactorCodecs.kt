@@ -10,10 +10,7 @@ import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import kotlinx.serialization.Serializable
 
-/**
- * Tasks with constant [durations] and [resources]; a task whose duration, demand or the capacity is a
- * column also names it in [durationVars], [resourceVars] or [capacityVar].
- */
+// A duration, demand or capacity that is a column is also named in [durationVars], [resourceVars] or [capacityVar].
 @Serializable
 internal class CumulativePayload(
     val starts: IntArray,
@@ -37,7 +34,7 @@ internal class DiffnPayload(
     val nonStrict: Boolean = false,
 )
 
-/** `result = array(index - indexOffset)` over constant [values] or column [vars]; exactly one is present. */
+// `result = array(index - indexOffset)` over constant [values] or column [vars]; exactly one is present.
 @Serializable
 internal class ElementPayload(
     val index: Int,
@@ -47,7 +44,7 @@ internal class ElementPayload(
     val indexOffset: Int = 1,
 )
 
-/** [ElementPayload] with binary64 constants or real column [vars]. */
+// [ElementPayload] with binary64 constants or real column [vars].
 @Serializable
 internal class RealElementPayload(
     val index: Int,
@@ -57,7 +54,7 @@ internal class RealElementPayload(
     val indexOffset: Int = 1,
 )
 
-/** Allowed rows; [upper], when present, turns each cell into the range `tuples..upper`. */
+// Allowed rows; [upper], when present, turns each cell into the range `tuples..upper`.
 @Serializable
 internal class TablePayload(val vars: IntArray, val tuples: List<LongArray>, val upper: List<LongArray>? = null)
 
@@ -83,7 +80,7 @@ internal class MddPayload(
     val cost: Int? = null,
 )
 
-/** One generator: the image of every integer column and of every Boolean column. */
+// One generator: the image of every integer column and of every Boolean column.
 @Serializable
 internal class SymmetryGeneratorPayload(val ints: IntArray, val bools: IntArray)
 

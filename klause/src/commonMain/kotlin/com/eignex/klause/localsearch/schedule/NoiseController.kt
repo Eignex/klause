@@ -7,38 +7,18 @@ import com.eignex.kumulant.stat.decay.EwmaMeanStat
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-/** Adaptive noise/cb schedule the focused-LS move selections consume: [level] in `[0, 1]` scales
- *  diversification (higher = more random). It is an [AdaptivePolicy] over the shared per-round
- *  feedback channel — `observe(RoundLog)` keys off the round's incumbent cost — and additionally
- *  exposes a per-step `observe(cost)` for the focused-LS strategies that retune every flip.
- *  [NoiseController] is the hand-tuned bump-on-stall implementation; [BanditNoiseController] learns
- *  which schedule profile to run. */
+// `level` in `[0, 1]` scales diversification. The per-step `observe(cost)` serves focused-LS strategies
+// that retune every flip.
 internal interface NoiseSchedule : AdaptivePolicy {
     val level: Double
     fun observe(cost: Long)
 }
 
-/**
- * Adaptive parameter controller in the spirit of H. H. Hoos, "An adaptive noise mechanism for WalkSAT",
- * AAAI 2002, https://aaai.org/papers/00655-an-adaptive-noise-mechanism-for-walksat/.
- *
- * Observes the constraint-violation cost over time. When the search stalls (no improvement
- * for [theta] consecutive observations) the controller bumps [level] up toward 1.0 by
- * `(1 - level) * phi`. When the cost improves, the level decays back toward zero by
- * `(2/3) * level * phi`. The level always stays in `[minLevel, maxLevel]`.
- *
- * Two improvement-detection modes:
- *  - **Best-cost** (default, [ewmaAlpha] is null): compares cost against the all-time low
- *    seen by this controller. Strict — only ratchets improvements.
- *  - **EWMA-trend** ([ewmaAlpha] non-null): compares cost against a kumulant
- *    [EwmaMeanStat]-smoothed average. Detects "below local trend" rather than "beats
- *    all-time low" — less reactive to single-step jitter, follows drift in the cost
- *    landscape. `ewmaAlpha` ∈ (0, 1]; smaller = longer effective window.
- *
- * Strategies map [level] to their own knob: WalkSat sets `noise = level`, ProbSat scales
- * its `cb` exponent down. Level 0 = baseline (most greedy);
- * level toward 1 = more diversification.
- */
+// After H. H. Hoos, "An adaptive noise mechanism for WalkSAT", AAAI 2002,
+// https://aaai.org/papers/00655-an-adaptive-noise-mechanism-for-walksat/: `theta` observations without
+// improvement raise the level by `(1 - level)·phi`; an improvement lowers it by `(2/3)·level·phi`.
+// Improvement is against the all-time best, or with `ewmaAlpha` against a smoothed trend, which is less
+// reactive to single-step jitter.
 internal class NoiseController(
     initial: Double,
     val theta: Int = 50,
@@ -63,11 +43,8 @@ internal class NoiseController(
     private var bestCostSeen: Double = Double.POSITIVE_INFINITY
     private var stallCount: Int = 0
 
-    /** Per-step hook for the focused-LS strategies: observe the current cost; mutates [level] if
-     *  the trajectory warrants. */
     override fun observe(cost: Long) = observeCost(cost.toDouble())
 
-    /** Shared-channel hook: retune off the round's incumbent cost. */
     override fun observe(round: RoundLog) = observeCost(round.incumbentCost)
 
     private fun observeCost(cost: Double) {
@@ -91,7 +68,7 @@ internal class NoiseController(
         }
     }
 
-    /** Reset trajectory tracking — call on restart. [level] is preserved. */
+    // The level is preserved across a reset.
     override fun reset() {
         bestCostSeen = Double.POSITIVE_INFINITY
         stallCount = 0
@@ -99,28 +76,9 @@ internal class NoiseController(
     }
 
     companion object {
-        /**
-         * Derive a sensible [ewmaAlpha] from problem size and the per-restart flip budget,
-         * for callers that want EWMA-mode without hand-tuning. The effective window of an
-         * EWMA is roughly `1/α` observations, so the rule trades two pressures:
-         *
-         *  - **Bigger problems want longer windows.** Per-flip cost noise scales with the
-         *    number of violated factors; a longer window rejects more of that jitter. The
-         *    target window grows as `√numVars` (not linear — variance of mean-of-N is
-         *    `σ²/N`, so √N is the natural rate to keep signal-to-noise constant).
-         *  - **Short flip budgets want shorter windows.** A window longer than ~5% of the
-         *    flip budget consumes most of the search in warm-up and never reacts. Cap the
-         *    window at `flipBudget / 20`.
-         *
-         * The result is clipped to `[0.02, 0.5]` — α < 0.02 (window > 50) is more EWMA
-         * than reactive controller; α > 0.5 (window < 2) is effectively the best-cost mode
-         * with extra arithmetic.
-         *
-         * @param numVars total Boolean + integer variable count (`problem.numBoolVars +
-         *                problem.numIntVars`).
-         * @param flipBudget the per-restart flip budget the strategy will run against
-         *                   (typically `LocalSearchParams.maxFlips`).
-         */
+        // The EWMA window is about `1/α` observations. It grows as `√numVars`, which keeps the
+        // signal-to-noise of a mean constant, capped at `flipBudget / 20` so warm-up does not consume the
+        // search. Below α = 0.02 the controller stops reacting; above 0.5 it is the best-cost mode.
         fun autoEwmaAlpha(numVars: Int, flipBudget: Int): Double {
             require(numVars >= 0) { "numVars must be non-negative, got $numVars" }
             require(flipBudget > 0) { "flipBudget must be positive, got $flipBudget" }
@@ -132,13 +90,8 @@ internal class NoiseController(
     }
 }
 
-/**
- * [NoiseSchedule] whose active profile is chosen by a kumulant bandit: instead of one hand-tuned
- * bump-on-stall schedule, it runs one of several [NoiseController] profiles and, every [window]
- * observations, rewards the active profile by whether the cost improved over that window, then lets
- * a [MultiArmedBandit] pick the next. Per-session learning, so the schedule that suits the instance
- * wins out.
- */
+// Every `window` observations the active profile is rewarded by whether the cost improved, and the bandit
+// picks the next.
 internal class BanditNoiseController(
     private val profiles: List<NoiseController>,
     private val bandit: UnivariateBandit,
@@ -166,11 +119,9 @@ internal class BanditNoiseController(
         }
     }
 
-    /** Shared-channel hook: drive the active profile off the round's incumbent cost. */
     override fun observe(round: RoundLog) = observe(round.incumbentCost.toLong())
 
-    /** Reset every profile's trajectory and the active window; the bandit keeps its learned arm
-     *  values, which are session-level rather than per-restart. */
+    // The bandit keeps its arm values: they are session-level, not per-restart.
     override fun reset() {
         profiles.forEach { it.reset() }
         sinceSwitch = 0
@@ -179,10 +130,9 @@ internal class BanditNoiseController(
     }
 
     companion object {
-        /** Three (aggressive / moderate / patient) bump-on-stall profiles under UCB1 (P. Auer,
-         *  N. Cesa-Bianchi, P. Fischer, "Finite-time analysis of the multiarmed bandit problem",
-         *  Machine Learning 47, 2002, https://doi.org/10.1023/A:1013689704352), all anchored to
-         *  [baseline] so the strategy's baseline noise/cb is preserved. */
+        // UCB1 (P. Auer, N. Cesa-Bianchi, P. Fischer, "Finite-time analysis of the multiarmed bandit
+        // problem", Machine Learning 47, 2002, https://doi.org/10.1023/A:1013689704352) over three profiles
+        // anchored to `baseline`.
         fun default(baseline: Double = 0.2, seed: Long = 0L, window: Int = 200): BanditNoiseController {
             val profiles = listOf(
                 NoiseController(initial = baseline, theta = 20, phi = 0.3, minLevel = baseline),

@@ -15,18 +15,9 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.ScanMeter
 import com.eignex.util.collections.IntArrayList
 
-/**
- * Project out a variable that occurs in exactly one linear **inequality** and nowhere else (nor in the
- * objective) — the singleton-column case [AffineSingletons] does not reach (it substitutes only
- * *equality*-defined variables). In `a·x + rest ⟨≤/≥⟩ b`, giving `rest` the most room means driving `x`
- * to the bound that minimizes (for `≤`) or maximizes (for `≥`) `a·x`; the surviving constraint on `rest`
- * is then `rest ⟨≤/≥⟩ b − a·x_best` (exact Fourier-Motzkin elimination of `x` from a single inequality).
- * `x` is dropped and rebuilt at that bound on reconstruct.
- *
- * Solution-set altering (a complete enumerator would branch over `x`'s whole feasible range, which the
- * pinned reconstruct collapses), so it is gated off for solution-set-sensitive queries; gated to
- * `|value| < 2³¹` so `a·x_best` cannot overflow.
- */
+// Fourier-Motzkin elimination of a column that occurs in exactly one inequality and not in the objective:
+// `a·x + rest ⟨≤/≥⟩ b` becomes `rest ⟨≤/≥⟩ b − a·x_best` with `x` pinned at the bound giving `rest` the most room.
+// Pinning collapses the solution set, so solution-set-sensitive queries skip it. Values are gated to `|v| < 2³¹`.
 internal object SingletonInequalityProjection {
 
     private const val PROJECTION_WORK_WEIGHT = 10L
@@ -132,14 +123,9 @@ internal object SingletonInequalityProjection {
         scan.check()
     }
 
-    /**
-     * The source form, over declared ranges, where the side of `x` that relaxes the row can be open.
-     *
-     * A closed best side projects exactly as the finite form does, `x` pinned there. An open one means
-     * `x` can always be chosen to satisfy the row whatever `rest` is, so the row drops outright and `x` is
-     * rebuilt as the extreme integer the row admits — held inside its other side when that one is closed.
-     * A column with an open side declares no value set, so that rebuilt value cannot land in a hole.
-     */
+    // An open best side means `x` can satisfy the row whatever `rest` is, so the row drops and `x` is rebuilt as
+    // the extreme integer the row admits, inside its other side when closed. A column with an open side declares
+    // no value set, so the rebuilt value cannot land in a hole.
     fun projectSource(
         problem: Problem,
         objectiveIntVars: Set<Int>,

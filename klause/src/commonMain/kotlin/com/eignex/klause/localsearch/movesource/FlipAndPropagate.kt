@@ -66,21 +66,14 @@ class FlipAndPropagate(
     }
 }
 
-/**
- * Build the atomic flip compound for [seedVar]: the seed flip to its opposite value plus the
- * value-changing literals it transitively forces through [graph], following edges only from the
- * polarity being set and to a bound of [maxDepth] hops past the seed. Returns the `≥ 2`-part flip
- * list, or null when the walk forces no extra variable (a lone flip is already in the normal pool) or
- * hits a contradiction (a variable forced both ways has no consistent atomic move).
- */
+// Null when the walk forces no extra variable (a lone flip is already in the normal pool) or forces a
+// variable both ways.
 internal fun LocalSearchState.buildImplicationFlip(graph: Array<IntArray>, seedVar: Int, maxDepth: Int): List<Move>? {
     val seedValue = !assignment.boolValue(seedVar)
     val parts = ArrayList<Move>(4)
     parts += Move.BoolFlip(seedVar)
-    // The polarity this move commits each touched variable to (1 = positive), recorded on first
-    // sighting. A later forced literal of the opposite polarity is a contradiction; one of the same
-    // polarity is redundant. Includes variables the move leaves unflipped because they already satisfy
-    // the forced value, so a no-op pin still guards against a contradicting force.
+    // Includes variables left unflipped because they already hold the forced value, so a no-op pin still
+    // detects a contradicting force.
     val setPolarity = MutableIntIntMap()
     setPolarity.put(seedVar, asBit(seedValue))
     var frontier = IntArrayList()

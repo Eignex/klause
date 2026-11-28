@@ -20,7 +20,6 @@ data class SchedulingStats(
     )
 }
 
-/** Mutable [SchedulingStats] accumulator. See [SolveStatsSink]. */
 internal class SchedulingStatsSink {
     val lagrangianPruned: CountStat = CountStat()
     val energeticPruned: CountStat = CountStat()

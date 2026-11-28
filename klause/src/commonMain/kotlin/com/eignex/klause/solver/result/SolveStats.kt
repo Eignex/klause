@@ -7,21 +7,18 @@ import kotlin.time.Duration
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource.Monotonic
 
-/** Zero-count default for [SumResult] stat fields; shared across the stat records in this package. */
 internal val ZERO_COUNT: SumResult = SumResult(sum = 0.0)
 
-/** Empty-max default for [MaxResult] stat fields (no observation yet). */
 internal val NO_MAX: MaxResult = MaxResult(Double.NEGATIVE_INFINITY)
 
-/** Combine two readings under [reduce], treating NaN as "unpopulated" so it defers to a real value. */
+// NaN means unpopulated and defers to the other reading.
 internal inline fun naNDeferring(a: Double, b: Double, reduce: (Double, Double) -> Double): Double = when {
     a.isNaN() -> b
     b.isNaN() -> a
     else -> reduce(a, b)
 }
 
-/** Of two (violation, objective) pairs, return the objective paired with the lower violation (closer to
- *  feasible); NaN violation defers to the other side, ties keep the left objective. */
+// Picks the objective with the lower violation; a NaN violation defers and ties keep the left objective.
 internal fun pickByViolation(violA: Double, objA: Double, violB: Double, objB: Double): Double = when {
     violA.isNaN() -> objB
     violB.isNaN() -> objA
@@ -29,7 +26,6 @@ internal fun pickByViolation(violA: Double, objA: Double, violB: Double, objB: D
     else -> objA
 }
 
-/** Weight-combine two depth means; an empty side (zero weight) defers to the other. */
 internal fun mergeDepthMean(a: WeightedMeanResult, b: WeightedMeanResult): WeightedMeanResult {
     val weights = a.totalWeights + b.totalWeights
     val mean = when {
@@ -45,8 +41,8 @@ internal fun mergeDepthMean(a: WeightedMeanResult, b: WeightedMeanResult): Weigh
  * [com.eignex.klause.solver.SolveResult] and the `MinimizeResult` variants; backends that don't
  * populate it leave the empty defaults.
  *
- * A composition of per-concern records, each owning its own fields and merge, built on kumulant's
- * result types so snapshots from portfolio workers or parallel restarts merge additively.
+ * Each per-concern record owns its fields and merge, so snapshots from portfolio workers or parallel
+ * restarts merge additively.
  */
 data class SolveStats(
     /** Run envelope: backend tag, wall time, timed-out flag. See [RunStats]. */
@@ -69,9 +65,7 @@ data class SolveStats(
     val openTheoryClauses: OpenTheoryClauseStats = OpenTheoryClauseStats(),
     /** Unverified open-model branch-order hint accounting. */
     val openHints: OpenHintStats = OpenHintStats(),
-    /** Presolve outcome, set by whoever ran presolve — the CLI for a lane handed a prepared model, the
-     *  backend itself for one that prepares its own (null when it was not run or finite preparation was a no-op).
-     *  Surfaced under `-s` as a terse summary — see [PresolveStats]. */
+    /** Presolve outcome; null when presolve did not run or finite preparation was a no-op. */
     val presolve: PresolveStats? = null,
     /** What a sequential portfolio scheduled, arm by arm; empty for any other solve. */
     val portfolio: PortfolioStats = PortfolioStats(),
@@ -119,18 +113,13 @@ data class SolveStats(
     }
 }
 
-/** Attach one preparation result at the engine boundary, merging its LP work exactly once. */
+// Merges the preparation's LP work exactly once.
 internal fun SolveStats.withPresolve(presolve: PresolveStats?): SolveStats {
     if (presolve == null || this.presolve == presolve) return this
     return copy(lp = lp.mergedWith(presolve.lpStats), presolve = presolve)
 }
 
-/**
- * Mutable accumulator that backends update during a solve and snapshot into a [SolveStats].
- *
- * Single-threaded with no internal locking: a backend fanning out across threads keeps one sink per
- * worker and merges the snapshots.
- */
+// Single-threaded: a backend fanning out across threads keeps one sink per worker and merges the snapshots.
 internal class SolveStatsSink(var backend: String, lpProbeRoute: LpRoute = LpRoute.NODE) {
     val search: SearchStatsSink = SearchStatsSink()
     val ca: ConflictAnalysisStatsSink = ConflictAnalysisStatsSink()
@@ -142,7 +131,6 @@ internal class SolveStatsSink(var backend: String, lpProbeRoute: LpRoute = LpRou
     var openTheoryClauses: OpenTheoryClauseStats = OpenTheoryClauseStats()
     var openHints: OpenHintStats = OpenHintStats()
 
-    /** What presolve did, for a backend that runs it itself rather than being handed a prepared model. */
     var presolve: PresolveStats? = null
 
     private var startMark: TimeMark? = null
@@ -158,10 +146,8 @@ internal class SolveStatsSink(var backend: String, lpProbeRoute: LpRoute = LpRou
         endElapsedMs = mark.elapsedNow().inWholeMilliseconds
     }
 
-    /** Elapsed ms since [start] — used by the LS loop to stamp time-to-best as incumbents land. */
     fun elapsedMs(): Long = startMark?.elapsedNow()?.inWholeMilliseconds ?: 0L
 
-    /** Wall time uses the most recent [start] / [stop] window, or the current clock before [stop]. */
     fun snapshot(): SolveStats {
         val elapsedMs = endElapsedMs
             ?: startMark?.elapsedNow()?.inWholeMilliseconds
@@ -193,8 +179,7 @@ internal class SolveStatsSink(var backend: String, lpProbeRoute: LpRoute = LpRou
 
 /**
  * What the LP-relaxation harvest contributed during presolve, summed over the presolve↔harvest fixpoint
- * rounds — isolating the LP's effect from the combinatorial passes (whose net effect the surrounding
- * [PresolveStats] counts conflate). [rootInfeasible] flags that the root relaxation was certified
+ * rounds. [rootInfeasible] flags that the root relaxation was certified
  * infeasible (the whole problem is UNSAT); [boundsShaved] counts integer variables whose bounds the LP
  * tightened; [objectiveLbRaised] flags an objective lower-bound harvest; [constraintsRemoved] counts rows
  * the LP proved redundant (max/min over the others); [equalitiesAdded] counts differences the LP proved
@@ -206,7 +191,7 @@ data class LpHarvestReport(
     val objectiveLbRaised: Boolean = false,
     val constraintsRemoved: Int = 0,
     val equalitiesAdded: Int = 0,
-    /** Built root relaxation columns — part of the size the cost gate weighs (0 when none was built). */
+    /** Built root relaxation columns; 0 when none was built. */
     val relaxationCols: Int = 0,
     /** Built root relaxation rows. */
     val relaxationRows: Int = 0,
@@ -215,13 +200,12 @@ data class LpHarvestReport(
     /** The harvest was enabled but the relaxation size exceeded the budget, so it ran no probe work. */
     val skipped: Boolean = false,
 ) {
-    /** True when the harvest neither acted nor was size-skipped — drop the field rather than report it. */
+    /** True when the harvest neither acted nor was size-skipped. */
     val isEmpty: Boolean
         get() = !rootInfeasible && boundsShaved == 0 && !objectiveLbRaised &&
             constraintsRemoved == 0 && equalitiesAdded == 0 && !skipped
 
-    /** Accumulate two rounds' reports: counts add, flags or together, the relaxation size takes the
-     *  larger (the round that paid the most). */
+    /** Accumulate two rounds' reports: counts add, flags or together, the relaxation size takes the larger. */
     operator fun plus(o: LpHarvestReport): LpHarvestReport = LpHarvestReport(
         rootInfeasible || o.rootInfeasible,
         boundsShaved + o.boundsShaved,
@@ -236,9 +220,7 @@ data class LpHarvestReport(
 }
 
 /**
- * Terse presolve outcome for `-s`: just enough to show presolve did something and which techniques —
- * deliberately small so it doesn't dominate the solve counters (the verbose readout is
- * `dry-run-presolve`). [passes] are the ids of the presolve passes that changed the problem;
+ * Terse presolve outcome. [passes] are the ids of the presolve passes that changed the problem;
  * [constraintsRemoved] is the net drop in factor count; [infeasible] flags presolve-proven UNSAT;
  * [lpHarvest] breaks out the LP harvest's own contribution when it fired.
  */

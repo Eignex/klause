@@ -15,8 +15,7 @@ import com.eignex.util.collections.MutableIntObjectMap
  * Each SCC is labelled by its minimum node id, avoiding reversible writes to unchanged components.
  */
 
-/** Incremental matching GAC for [vars] (plain alldifferent). Returns `null` after pruning to the GAC
- *  fixpoint, or the Hall-violator variable ids on infeasibility — same contract as [reginFilter]. */
+// Same contract as reginFilter: null at the GAC fixpoint, else the Hall-violator variable ids.
 internal fun reginIncremental(
     state: PropagationState,
     vars: IntArray,
@@ -28,9 +27,7 @@ internal fun reginIncremental(
     return reginDelta(state, vars, cache, inc, premises)
 }
 
-/** Full rebuild: re-seed the matching (warm-started from the reversible matching), recompute SCC
- *  labels, reachability and prune. Used on the first fire, after a backtrack that invalidated the
- *  state, and whenever a matched edge breaks (the matching must be re-augmented). */
+// On the first fire, after a backtrack that invalidated the state, and whenever a matched edge breaks.
 private fun reginRebuild(
     state: PropagationState,
     vars: IntArray,
@@ -42,7 +39,6 @@ private fun reginRebuild(
     val cap = inc.valueCap
     val valuesPerVar = buildValuesPerVar(state, vars, cache, n)
 
-    // Pigeonhole over distinct current values.
     val present = BooleanArray(cap)
     var distinct = 0
     for (i in 0 until n) {
@@ -76,7 +72,6 @@ private fun rebuildReginMatching(
     n: Int,
     cap: Int,
 ): IntArray? {
-    // Warm-start the matching from the reversible matching, then augment the rest.
     val matchVar = IntArray(n) { -1 }
     val matchVal = IntArray(cap) { -1 }
     for (i in 0 until n) {
@@ -86,10 +81,9 @@ private fun rebuildReginMatching(
             matchVal[j] = i
         }
     }
-    // Complete the seed to a maximum matching in one Hopcroft-Karp pass (O(|E|·√n)) rather than a
-    // per-variable augmenting search — the dominant cost when the matching is built cold at the root
-    // bake with no warm start. On a non-perfect matching, one augmenting search on a still-free variable
-    // recovers the Hall violator in its visited set.
+    // One Hopcroft-Karp pass (O(|E|·√n)) instead of per-variable augmenting searches, which dominate a cold
+    // build at the root bake. On a non-perfect matching, one augmenting search from a free variable recovers
+    // the Hall violator in its visited set.
     if (!reginHopcroftKarp(n, valuesPerVar, matchVar, matchVal, IntArray(n), IntArray(n))) {
         val visited = BooleanArray(cap)
         for (i in 0 until n) {
@@ -106,9 +100,8 @@ private fun rebuildReginMatching(
     return null
 }
 
-/** Delta fire: with the matching intact, patch only the SCC components touched by the values that
- *  left since the last fire, then re-prune. Falls back to [reginRebuild] if a matched edge broke
- *  (re-augmentation needed) or the deletions-only invariant is violated. */
+// With the matching intact, patches only the SCC components touched by values that left since the last
+// fire; rebuilds when a matched edge broke or a domain widened.
 private fun reginDelta(
     state: PropagationState,
     vars: IntArray,
@@ -117,8 +110,7 @@ private fun reginDelta(
     premises: IntArray,
 ): IntArray? {
     val n = inc.n
-    // Dirty SCC labels: an SCC can split only when an *intra-component* edge is deleted. Deleting a
-    // cross-component edge (which carries no cycle) leaves every SCC intact, so it is ignored here.
+    // Only deleting an intra-component edge can split an SCC; cross-component edges carry no cycle.
     val dirtyLabels = IntHashSet()
     for (i in 0 until n) {
         val prev = inc.domRef[i].value ?: return reginRebuild(state, vars, cache, inc, premises)
@@ -126,15 +118,14 @@ private fun reginDelta(
         if (cur === prev) continue
         var widened = false
         cur.values.forEach { v -> if (v !in prev) widened = true }
-        if (widened) return reginRebuild(state, vars, cache, inc, premises) // not deletions-only → rebuild
+        if (widened) return reginRebuild(state, vars, cache, inc, premises)
         val matchedId = inc.matchVar[i]
-        // Values that left var i since the last fire (deletions only — widening ruled out above).
         var brokeMatch = false
         prev.values.forEach { v ->
             if (v !in cur) {
                 val vid = cache.idFor(v)
                 if (vid == matchedId) {
-                    brokeMatch = true // matched edge broke → re-augment
+                    brokeMatch = true
                 } else if (inc.sccId[i] == inc.sccId[n + vid]) {
                     dirtyLabels.add(inc.sccId[i])
                 }
@@ -142,7 +133,6 @@ private fun reginDelta(
         }
         if (brokeMatch) return reginRebuild(state, vars, cache, inc, premises)
     }
-    // Matching still maximum (no matched edge lost): patch the dirty components and re-prune.
     val valuesPerVar = buildValuesPerVar(state, vars, cache, n)
     val conflict = reginSccReachPrune(state, vars, cache, inc, valuesPerVar, dirtyLabels, premises)
     if (conflict != null) return conflict
@@ -151,7 +141,6 @@ private fun reginDelta(
     return null
 }
 
-/** Value-id list per variable over the current domains (stable ids from the universe). */
 private fun buildValuesPerVar(state: PropagationState, vars: IntArray, cache: ReginCache, n: Int): Array<IntArray> =
     Array(n) { i ->
         val list = IntArrayList()
@@ -159,16 +148,9 @@ private fun buildValuesPerVar(state: PropagationState, vars: IntArray, cache: Re
         list.toIntArray()
     }
 
-/** Build the oriented graph (matched value→var, unmatched var→value), recompute free-value
- *  reachability and SCC labels into [ReginIncrementalState.sccId], then prune every unmatched
- *  var→value edge with no support. Returns `null` or the Hall-violator ids on a domain wipeout.
- *  The matching is read from [inc] (already current).
- *
- *  [dirtyLabels] = `null` recomputes every SCC label (the rebuild path). A non-null set recomputes
- *  only the components with those labels (the delta path): deleting an intra-component edge can
- *  only *split* that component, never merge or alter any other, so the partition restricted to a
- *  dirty old component is recovered by re-running the SCC pass on that component's nodes alone (edges kept
- *  only between same-old-label endpoints). Canonical min-node labels make the two paths agree. */
+// Orients the graph (matched value→var, unmatched var→value) and prunes unmatched edges with no support.
+// Null dirtyLabels relabels every SCC; otherwise only the dirty components are re-decomposed, since a
+// deletion can only split its own component. Canonical min-node labels make both paths agree.
 private fun reginSccReachPrune(
     state: PropagationState,
     vars: IntArray,
@@ -237,8 +219,8 @@ private fun reachedFromFreeValues(inc: ReginIncrementalState, radj: Array<IntArr
     return reached
 }
 
-// SCC labels — canonical (min node id per component), written reversibly (no-op for unchanged). [dirtyLabels]
-// non-null and empty means no intra-component deletion, so every SCC label is still valid.
+// Canonical min-node labels are written reversibly, a no-op for unchanged components. An empty dirtyLabels
+// means no intra-component deletion, so every label is still valid.
 private fun relabelScc(adj: Array<IntArrayList>, inc: ReginIncrementalState, dirtyLabels: IntHashSet?) {
     val total = inc.total
     if (dirtyLabels == null) {
@@ -284,11 +266,7 @@ private fun pruneUnsupportedEdges(
     return null
 }
 
-/** Recompute SCC labels only for nodes whose current (old) label is in [dirtyLabels]. Each such
- *  component is re-decomposed on its own nodes, keeping only edges between same-old-label endpoints
- *  (so distinct dirty components are not merged), and the resulting sub-components are canonically
- *  relabelled by their minimum global node id — matching what a full canonical SCC pass would yield,
- *  since deletion only splits components. */
+// Keeps only edges between endpoints with the same previous label, so distinct dirty components never merge.
 private fun reginRecomputeDirtyScc(
     adj: Array<IntArrayList>,
     total: Int,
@@ -310,7 +288,7 @@ private fun reginRecomputeDirtyScc(
         val a = adj[u]
         for (k in 0 until a.size) {
             val w = a[k]
-            if (inc.sccId[w] == inc.sccId[u]) sub[c].add(compact[w]) // same old component only
+            if (inc.sccId[w] == inc.sccId[u]) sub[c].add(compact[w])
         }
     }
     val rawSub = reginTarjanScc(sub, d)

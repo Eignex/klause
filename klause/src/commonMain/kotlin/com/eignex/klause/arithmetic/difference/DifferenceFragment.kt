@@ -23,14 +23,12 @@ internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
 
     fun carriesAPotential(): Boolean = numNodes > 0 && edges.none { it.exceedsPotentialBound() }
 
-    /**
-     * Discard only declared-range edges too wide for the incremental graph's `Long` potentials.
-     *
-     * Those edges express a finite CP domain that remains enforced by its owning propagator. Omitting
-     * them from this redundant graph only weakens its deductions; every retained guarded refutation is
-     * still implied by the source model. A non-domain edge outside the range cannot be dropped because
-     * it is a model row, so no usable fragment exists in that case.
-     */
+    // Discard only declared-range edges too wide for the incremental graph's `Long` potentials.
+    //
+    // Those edges express a finite CP domain that remains enforced by its owning propagator. Omitting
+    // them from this redundant graph only weakens its deductions; every retained guarded refutation is
+    // still implied by the source model. A non-domain edge outside the range cannot be dropped because
+    // it is a model row, so no usable fragment exists in that case.
     fun withoutOverHeavyDomainEdges(): DifferenceFragment? {
         val retained = edges.filterNot { it.domainBound && it.exceedsPotentialBound() }
         if (retained.size == edges.size) return takeIf(DifferenceFragment::carriesAPotential)
@@ -55,7 +53,6 @@ internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
     }
 }
 
-/** One value per integer column witnessing feasibility, or an infeasible/abandoned outcome. */
 internal fun DifferenceFragment.potentialSample(
     numIntVars: Int,
     bools: BooleanArray,

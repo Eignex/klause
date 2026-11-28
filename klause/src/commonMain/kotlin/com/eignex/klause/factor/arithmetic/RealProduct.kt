@@ -11,21 +11,13 @@ import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.propagation.NoPropagator
 
 /**
- * `result = intOperand · realOperand`: a mixed integer·continuous product where
- * [intOperand] is an integer CP search variable and [realOperand] / [result] are LP-only continuous
- * (real) columns — ids in the problem's real-variable namespace, absent from CP search. Its CP
- * projection is [NoPropagator]. Local search uses floating heuristic scores; feasibility authority
- * belongs to the LP search leaf and exact source witness checks.
+ * `result = intOperand · realOperand`, where [intOperand] is an integer search variable and
+ * [realOperand] / [result] are LP-only real columns. Its CP projection is [NoPropagator]; local search
+ * scores it heuristically, and the LP search leaf and exact source witness checks decide feasibility.
  *
- * Its LP projection adapts to how tightly [intOperand] is pinned in the build's domains:
- *  - **Fixed** (`lo == hi == k`, always true at a search leaf, where every integer variable is a
- *    single-point domain) the product is the exact linear equality `result − k·realOperand = 0`. So the
- *    leaf relaxation models the product **exactly**, and the leaf feasibility verdict over it is sound.
- *  - **Free** (a wider domain, e.g. the root/persistent build) the four McCormick envelope inequalities
- *    over `[lo, hi] × [realOperandLo, realOperandHi]` — a valid outer relaxation that tightens the node
- *    bound and can prove infeasibility, but never certifies the product exactly. Emitted only when both
- *    integer bounds are stated by the model and the real operand's bounds are finite; otherwise the
- *    product is absent from the relaxation there, a sound weakening.
+ * Its LP projection is the exact equality `result − k·realOperand = 0` once [intOperand] is fixed to `k`,
+ * as at every search leaf. Otherwise it is the McCormick envelope over `[lo, hi] × [realOperandLo,
+ * realOperandHi]`, emitted only when both integer bounds are stated and the real bounds are finite.
  *
  * McCormick, "Computability of global solutions to factorable nonconvex programs: Part I — Convex
  * underestimating problems", Math. Programming 10, 1976, https://doi.org/10.1007/BF01580665.

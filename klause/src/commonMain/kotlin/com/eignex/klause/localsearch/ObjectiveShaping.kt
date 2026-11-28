@@ -8,20 +8,17 @@ import com.eignex.util.collections.IntArrayList
 import kotlin.random.Random
 
 /**
- * The optimize-phase objective view of an ongoing solve: the injected [objective], the pre-feasibility
- * shaping [shapingLambda], and the cached set of int decision variables the objective depends on. The
- * per-move objective *delta* scoring stays on [LocalSearchState] (it reads the live assignment); this
- * holds only the objective-hot-spot bias that structured sources sample from.
+ * Optimize-phase objective view of a solve: the injected [objective], the shaping [shapingLambda], and the int
+ * variables the objective depends on, which structured sources sample from. Per-move delta scoring stays on
+ * [LocalSearchState].
  */
 class ObjectiveShaping {
 
-    /** Objective injected by the engine during a `minimize` call; `null` otherwise — strategies
-     *  consulting [LocalSearchState.shapedBreakScore] fall back to the unshaped break score. */
+    /** Objective of the running minimization, or null outside one. */
     var objective: Objective? = null
         internal set
 
-    /** Lambda coefficient from `params.costShaping` for pre-feasibility shaping. Set by the engine
-     *  on entering `minimize`; 0.0 (no shaping) otherwise or under
+    /** Pre-feasibility shaping weight on the objective; 0.0 outside minimization and under
      *  [com.eignex.klause.localsearch.CostShaping.FeasibilityFirst]. */
     var shapingLambda: Double = 0.0
         internal set
@@ -40,12 +37,8 @@ class ObjectiveShaping {
     private var objIntVarsFor: Objective? = null
 
     /**
-     * Int decision variables the current [objective] depends on — nonzero-coefficient vars of a
-     * [LinearObjective], leaf vars of a [FunctionalObjective], empty for any other shape or a
-     * satisfiability problem. Recomputed only when [objective] changes. This is the *objective*
-     * hot-spot set: the feasible-phase analogue of the violated-factor bias the infeasibility-phase
-     * sources use, so an objective-descent structural move can concentrate on variables that
-     * actually move the objective rather than swapping objective-irrelevant pairs.
+     * Int decision variables the [objective] depends on: nonzero-coefficient vars of a [LinearObjective], leaf vars
+     * of a [FunctionalObjective], else empty. Objective descent concentrates structural moves on them.
      */
     val objectiveIntVars: IntArray
         get() {
@@ -70,9 +63,7 @@ class ObjectiveShaping {
         else -> emptyIntArray()
     }
 
-    /** Sample an int decision variable biased toward the objective gradient ([objectiveIntVars]),
-     *  consuming one RNG int, or `-1` when the objective exposes no per-var int direction. The shared
-     *  hot-spot variable-selection primitive for feasible-phase structured sources. */
+    /** A uniform member of [objectiveIntVars], consuming one RNG int, or `-1` when it is empty. */
     fun objectiveHotSpotIntVar(rng: Random): Int {
         val vs = objectiveIntVars
         return if (vs.isEmpty()) -1 else vs[rng.nextInt(vs.size)]

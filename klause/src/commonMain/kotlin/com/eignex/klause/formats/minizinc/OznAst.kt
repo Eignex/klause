@@ -1,7 +1,6 @@
 package com.eignex.klause.formats.minizinc
 
-/** AST for the `.ozn` subset used by MiniZinc solution output. The declared type is only consumed for
- *  its tokens (the evaluator drives everything off the initializer), so it is not retained. */
+// A declared type is not retained: the evaluator drives everything off the initializer.
 internal sealed interface OznItem {
     data class VarDecl(val name: String, val initializer: OznExpr?) : OznItem
     data class Output(val items: List<OznExpr>) : OznItem
@@ -19,7 +18,6 @@ internal sealed interface OznExpr {
 
     data class SetLit(val elements: List<OznExpr>) : OznExpr
 
-    /** Array or set comprehension. */
     data class Comprehension(val body: OznExpr, val generators: List<Generator>, val isSet: Boolean) : OznExpr
     data class Generator(val names: List<String>, val source: OznExpr, val where: OznExpr?)
 

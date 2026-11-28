@@ -20,7 +20,7 @@ object Reports {
     internal val json: Json = Json {
         prettyPrint = true
         encodeDefaults = true
-        // Ignore unrecognized fields so persisted records with additional metadata remain readable.
+        // Records with additional metadata remain readable.
         ignoreUnknownKeys = true
     }
 

@@ -1,20 +1,9 @@
 package com.eignex.klause.backtrack
 
-/**
- * Decision-level moving-average restart: restart when a recent window of conflict decision levels runs
- * higher than the long-run average — the search is diving deep before conflicting, a sign the current
- * region is unproductive and it should re-pick. The complement of [GlucoseRestart]'s LBD signal: LBD
- * measures learned-clause quality, decision level measures how deep the search drove to hit the conflict.
- * [com.eignex.klause.solver.search.SearchRun] reports the session's decision level at each conflict.
- *
- *  - [window] — recent-window capacity; the restart check is gated on the window being full, so tiny
- *    searches never restart.
- *  - [ratio] `K` — restart when `globalAvg < K · recentAvg` (recent decision levels running above the
- *    long-run average). Defaults to 1.0.
- *
- * The recent window is a circular buffer, fast-cleared on restart so it must refill before it can
- * trigger again (no restart storms).
- */
+// Restart when a recent window of conflict decision levels runs higher than the long-run average: the search
+// dives deep before conflicting, a sign the region is unproductive. Complements GlucoseRestart's LBD signal.
+// Restart when `globalAvg < ratio · recentAvg`, only once the window is full; the window is cleared on restart,
+// so it must refill before it can trigger again.
 internal class DecisionLevelRestart(private val window: Int = 50, private val ratio: Double = 1.0) {
     init {
         require(window > 0) { "window must be positive, got $window" }
@@ -28,7 +17,6 @@ internal class DecisionLevelRestart(private val window: Int = 50, private val ra
     private var globalSum = 0L
     private var conflicts = 0L
 
-    /** Record one conflict at [decisionLevel] and decide whether to restart. */
     fun recordConflict(decisionLevel: Int): Boolean {
         conflicts++
         globalSum += decisionLevel
@@ -39,7 +27,6 @@ internal class DecisionLevelRestart(private val window: Int = 50, private val ra
         return globalAvg < ratio * recentAvg
     }
 
-    /** Clear the recent window so it must refill before the next restart can fire. */
     fun clearWindow() {
         count = 0
         head = 0

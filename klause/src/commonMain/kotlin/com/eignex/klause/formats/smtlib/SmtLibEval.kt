@@ -18,11 +18,8 @@ import com.eignex.util.numbers.maxOf
 import com.eignex.util.numbers.parseBigInt
 import kotlin.math.abs
 
-/** The sort a term is folded to by [evalTerm]. */
 internal enum class Sort { BOOL, INT, REAL }
 
-/** A folded term result: a boolean literal ([B]), an integer linear combination ([I]), or a real
- *  rational combination ([R]). */
 internal sealed interface Res {
     class B(val lit: Int) : Res
     class I(val term: IntComb) : Res
@@ -34,7 +31,6 @@ private fun Res.asIntComb(): IntComb = (this as Res.I).term
 
 private fun narrowRes(lin: LinComb): Res.I = Res.I(IntComb.Narrow(lin))
 
-/** A folded operand as a real combination: real results directly, int results via the embedding. */
 private fun Res.asReal(): RealComb = when (this) {
     is Res.R -> comb
 
@@ -55,12 +51,8 @@ private sealed interface Frame {
     object PopScope : Frame
 }
 
-/**
- * Fold [root] to a [Res] of the requested [sort], driven by an explicit heap work-stack rather than the
- * call stack: SMT-LIB formulas nest thousands of operators deep, which overflows the stack under
- * recursion. `let` scoping is handled inline via [Frame.MakeScope]/[Frame.PopScope] frames, so deeply
- * nested `let` chains stay off the stack too.
- */
+// A heap work-stack, since formulas nest thousands of operators deep. `let` scoping runs through
+// [Frame.MakeScope]/[Frame.PopScope] frames, so `let` chains stay off the call stack too.
 internal fun Compiler.Builder.evalTerm(root: SExpr, sort: Sort): Res {
     val work = ArrayDeque<Frame>()
     val vals = ArrayDeque<Res>()
@@ -138,8 +130,6 @@ internal fun Compiler.Builder.evalTerm(root: SExpr, sort: Sort): Res {
     return vals.removeLast()
 }
 
-/** Push the frames for `(let (bindings) body)`: evaluate each binding value, build the scope, run the
- *  body, then pop — all in-stack, so nested lets never recurse through [evalTerm]. */
 private fun Compiler.Builder.scheduleLet(node: SExpr.SList, sort: Sort, work: ArrayDeque<Frame>) {
     val bindingList = node.argAt(1, "let bindings") as? SExpr.SList
         ?: smtUnsupported("malformed let bindings")
@@ -161,8 +151,6 @@ private fun Compiler.Builder.scheduleLet(node: SExpr.SList, sort: Sort, work: Ar
     }
 }
 
-/** Inline a `define-fun` call `(f a…)` by binding its parameters to the arguments like a `let` and
- *  evaluating the body — non-recursive, so this expands to a bounded nest handled on the work-stack. */
 private fun Compiler.Builder.scheduleMacro(node: SExpr.SList, head: String, sort: Sort, work: ArrayDeque<Frame>) {
     val m = macros.getValue(head)
     val callArgs = node.items.drop(1)
@@ -186,7 +174,6 @@ private fun Compiler.Builder.scheduleMacro(node: SExpr.SList, head: String, sort
     for (i in callArgs.indices.reversed()) work.addLast(Frame.Eval(callArgs[i], m.parameterSorts[i]))
 }
 
-/** The child sub-terms to fold (with their sorts) for a non-`let` list node. */
 private fun Compiler.Builder.childTasks(node: SExpr.SList, sort: Sort): List<Pair<SExpr, Sort>> {
     val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
         ?: smtUnsupported("malformed operator")
@@ -285,7 +272,6 @@ private fun requireArgCount(head: String, args: List<SExpr>, count: Int) {
     if (args.size != count) smtUnsupported("$head expects $count argument${if (count == 1) "" else "s"}")
 }
 
-/** Combine a list node's already-folded child results [args] into this node's [Res]. */
 private fun Compiler.Builder.combine(node: SExpr.SList, sort: Sort, args: List<Res>): Res {
     val head = node.atomAt(0, "operator")
     return when (sort) {
@@ -295,7 +281,7 @@ private fun Compiler.Builder.combine(node: SExpr.SList, sort: Sort, args: List<R
     }
 }
 
-/** Combine a real-sorted node: exact-rational folding; `*` and `/` need a constant side. */
+// `*` and `/` need a constant side.
 private fun Compiler.Builder.combineReal(head: String, args: List<Res>): Res = when (head) {
     "+" -> Res.R(sumRealCombs(args.map { it.asReal() }))
 
@@ -408,8 +394,7 @@ private fun Compiler.Builder.combineInt(head: String, args: List<Res>): Res = wh
 
     "to_real" -> Res.I(args[0].asIntComb())
 
-    // `to_int` of an integral real term folds back to its integer combination; a genuinely
-    // fractional real gets the floor definition (a fresh integer with `n ≤ r < n + 1`).
+    // A fractional real gets the floor definition: a fresh integer with `n ≤ r < n + 1`.
     "to_int" -> when (val a = args[0]) {
         is Res.I -> a
         is Res.R -> narrowRes(a.comb.toLinCombOrNull() ?: realFloor(a.comb))
@@ -430,16 +415,11 @@ private fun Compiler.Builder.combineInt(head: String, args: List<Res>): Res = wh
     else -> smtUnsupported("unsupported int op '$head'")
 }
 
-/** Integer `div`/`mod` with SMT-LIB's Euclidean semantics. */
 private fun Compiler.Builder.divModRes(a: IntComb, b: IntComb, quotient: Boolean): Res =
     Res.I(wideDivModTerm(a, b, quotient))
 
-/**
- * `v = if cond then a else b`: a fresh quantity pinned to each branch by the condition.
- *
- * On the 64-bit path its domain is the union of the two branch ranges, so an unbounded default never
- * enters the reified equality. Past 64 bits the quantity is digit columns wide enough for either branch.
- */
+// On the 64-bit path the fresh quantity's domain is the union of the branch ranges, so an unbounded default
+// never enters the reified equality. Past 64 bits it is digit columns wide enough for either branch.
 private fun Compiler.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
     if (trueLitCache >= 0) {
         if (cond == trueLitCache) return Res.I(a)
@@ -481,8 +461,7 @@ private fun Compiler.Builder.branchUnder(term: LinComb, knownLiteral: Int): LinC
         ?: term
 }
 
-/** Post a hard linear relation `a ⟨op⟩ b`; a variable-free relation is checked for consistency
- *  (posting the false literal when it cannot hold) rather than an empty [Linear] row. */
+/** A variable-free relation is checked for consistency rather than posted as an empty [Linear] row. */
 internal fun Compiler.Builder.postLinearRel(a: LinComb, b: LinComb, op: LinearOp) {
     val (vars, coeffs, bound) = diff(a, b)
     assertLinearRow(coeffs, vars, op, bound)
@@ -498,7 +477,6 @@ private fun Compiler.Builder.absTerm(x: LinComb): LinComb {
     return LinComb(mapOf(result to 1L), 0L)
 }
 
-/** Upper bound of `|x|` given `x ∈ [lo, hi]` (each null = infinite); null when unbounded either way. */
 private fun absHi(lo: Long?, hi: Long?): Long? {
     if (lo == null || hi == null) return null
     val a = if (lo == Long.MIN_VALUE) null else abs(lo)
@@ -506,8 +484,6 @@ private fun absHi(lo: Long?, hi: Long?): Long? {
     return if (a == null || b == null) null else maxOf(a, b)
 }
 
-/** The value range `[lo, hi]` of [lin] over the current presolve domains; a side is null when
- *  unbounded (an open domain or an arithmetic overflow). */
 internal fun Compiler.Builder.linCombRange(lin: LinComb): Pair<Long?, Long?> {
     var lo: Long? = lin.constant
     var hi: Long? = lin.constant
@@ -539,21 +515,16 @@ internal fun Compiler.Builder.linCombRange(lin: LinComb): Pair<Long?, Long?> {
     return lo to hi
 }
 
-/** Reify an arithmetic relation from its folded operands (wide when a value exceeds 64 bits); an n-ary
- *  chain reifies as the conjunction of its n−1 consecutive pairs. */
 private fun Compiler.Builder.reifyRelArgs(node: SExpr.SList, op: String, args: List<Res>): Int {
     requireChainableRelation(node, op)
     val terms = args.map { it.asIntComb() }
     return chainReified(terms.size) { i -> reifyRelation(op, terms[i], terms[i + 1]) }
 }
 
-/** The literal for a chainable relation over [n] operands: the single pair, or the conjunction of the
- *  n−1 consecutive pairs. The native chain factor is hard-only (no reified form), so a chain under
- *  boolean structure stays a conjunction of reified pairs. */
+// The native chain factor has no reified form, so a chain under Boolean structure is a conjunction of pairs.
 private inline fun Compiler.Builder.chainReified(n: Int, reifyPair: (Int) -> Int): Int =
     if (n == 2) reifyPair(0) else reifyAnd((0 until n - 1).map(reifyPair))
 
-/** Fold an atom to a boolean literal, integer term, or real term. */
 private fun Compiler.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (sort == Sort.REAL) {
     evalRealAtom(node)
 } else if (sort == Sort.BOOL) {
@@ -583,7 +554,6 @@ private fun Compiler.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (s
 
         n != null -> narrowRes(LinComb(emptyMap(), n))
 
-        // An integer literal beyond Long is carried as a wide combination and lowered to a wide factor.
         isIntegerLiteral(node.text) -> Res.I(IntComb.Wide(WideLinComb(emptyMap(), parseBigInt(node.text))))
 
         isRealLiteral(node.text) ->
@@ -596,8 +566,6 @@ private fun Compiler.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (s
     }
 }
 
-/** Fold a real-sorted atom: numeral / decimal literals, real variables, bindings, and (via the
- *  implicit embedding) integer variables reached from a real context through `to_real`. */
 private fun Compiler.Builder.evalRealAtom(node: SExpr.Atom): Res {
     val binding = lookup(node.text)
     if (binding != null) {

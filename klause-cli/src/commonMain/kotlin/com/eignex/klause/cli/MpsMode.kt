@@ -31,13 +31,7 @@ import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.time.TimeSource
 
-/**
- * MPS (Mathematical Programming System) front-end (`.mps`). Captures original numerical declarations,
- * rows and objective once and registers them with the shared source invocation.
- * Emits an `o <cost>` line per improving incumbent, then a final `s SATISFIABLE` / `s OPTIMUM FOUND` /
- * `s UNBOUNDED` / `s UNSATISFIABLE` / `s UNKNOWN` and a `v name=value` line. `-s` statistics are `c`
- * comment lines.
- */
+// Captures numerical declarations, rows and objective once and registers them with the source invocation.
 internal object MpsMode {
     fun newSession(): ModeSession = Session()
 
@@ -141,7 +135,6 @@ private fun checkedIntegralMpsSource(
     return checked.takeIf { it.exact && it.objective == witness.objective }
 }
 
-/** MPS output protocol (PB-competition-style `s`/`o`/`v`). */
 internal class MpsOutput(
     private val exactSourceWitness: () -> Boolean? = { null },
     private val effectiveDeclarations: Boolean = false,
@@ -321,7 +314,7 @@ private fun LinearSourceOutcome.nativeScope(): String = when {
     else -> "workingModel"
 }
 
-/** Print terminating rationals within 64 decimal places as decimals, and others as fractions. */
+// Terminating rationals within 64 decimal places print as decimals, others as fractions.
 private fun exactMpsNumber(value: BigFraction): String {
     val negative = value.signum() < 0
     val magnitude = if (negative) -value.num else value.num
@@ -340,11 +333,9 @@ private fun exactMpsNumber(value: BigFraction): String {
     return value.toString()
 }
 
-/** Format an MPS objective whose continuous columns make it non-integral. A whole value prints as one, so a
- *  model whose reals happen to resolve integrally reads the same as a purely discrete one. */
+// A whole value prints as one, so reals that resolve integrally read the same as a discrete objective.
 private fun wholeOrDecimal(value: Double): String =
     if (value == floor(value) && abs(value) < MAX_EXACT_WHOLE) value.toLong().toString() else value.toString()
 
-/** Largest magnitude a `Double` represents every whole number below; past it the integral shortcut in
- *  [wholeOrDecimal] would print a rounded neighbour as though it were exact. */
+// 2^53: past it the whole-number shortcut would print a rounded neighbour as though it were exact.
 private const val MAX_EXACT_WHOLE = 9.007199254740992E15

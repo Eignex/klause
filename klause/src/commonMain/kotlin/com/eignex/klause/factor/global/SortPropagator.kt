@@ -10,23 +10,11 @@ import com.eignex.klause.propagation.boundLiteral
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
-/**
- * CP propagation logic for `sort` — bound-consistency via K. Mehlhorn and S. Thiel, "Faster Algorithms
- * for Bound-Consistency of the Sortedness and the Alldifferent Constraint", CP 2000,
- * https://doi.org/10.1007/3-540-45349-0_23. The relation is `ys = sorted(xs)`: `ys` is non-decreasing
- * and shares `xs`'s multiset.
- *
- * The filter (a) normalizes `ys` to a non-decreasing bound chain, (b) builds two perfect
- * matchings `f` / `f'` between sorted positions and the `xs` (smallest-upper-bound and
- * largest-lower-bound greedy matchings) to tighten each `ys` bound, then (c) condenses the
- * `xy`-intersection graph into strongly connected components and tightens each `xs` bound to the
- * range its component's `ys` can take. The SCC step (c) is what lets a middle `xs` learn bounds from
- * its sorted position.
- *
- * All per-search working state lives in a [SortWork] held in `state.refPayload[factorId]`, because a
- * [Propagator] instance is cached once per `Problem` and shared across every [PropagationState],
- * including concurrently running portfolio arms; scratch as propagator fields would race across them.
- */
+// Bound consistency after K. Mehlhorn and S. Thiel, "Faster Algorithms for Bound-Consistency of the
+// Sortedness and the Alldifferent Constraint", CP 2000, https://doi.org/10.1007/3-540-45349-0_23: normalize
+// `ys` to a non-decreasing chain, tighten `ys` from two greedy matchings, then tighten each `xs` to the range
+// its SCC's `ys` span. Working state lives in `state.refPayload` because the propagator instance is shared
+// across concurrently running propagation states.
 internal class SortPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,
@@ -57,10 +45,7 @@ internal class SortPropagator(
     }
 }
 
-/**
- * Per-search working state and filtering loop for one [SortPropagator]. The scratch is fully reset at
- * the top of each pass, so nothing survives between fires and no trail participation is needed.
- */
+// Scratch is reset at the top of each pass, so nothing survives between fires and nothing is trailed.
 internal class SortWork(private val xs: IntArray, private val ys: IntArray, private val intVars: IntArray) {
 
     private val n = xs.size
@@ -89,7 +74,6 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
     // The active state, set per propagate() so the bound accessors above stay terse.
     private lateinit var state: PropagationState
 
-    /** The reason of the failure the last [propagate] hit, read by the propagator's conflict reason. */
     var failure: IntArray? = null
         private set
 
@@ -286,7 +270,6 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
         return true
     }
 
-    /** Whether domains of `xs[x]` and `ys[y]` overlap. */
     private fun intersect(y: Int, x: Int): Boolean {
         val xl = xlb(x)
         val xu = xub(x)
@@ -295,7 +278,7 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
         return (xl in yl..yu) || (xu in yl..yu) || (yl in xl..xu) || (yu in xl..xu)
     }
 
-    /** Pop the smallest-UB candidate for `ys[j]`; null (⇒ fail) if none can reach `ys[j].min`. */
+    // Null when no candidate reaches `ys(j).min`.
     private fun popF(j: Int): Int? {
         if (pq.isEmpty()) return null
         val i = pq.pop()
@@ -303,7 +286,7 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
         return i
     }
 
-    /** Pop the largest-LB candidate for `ys[j]`; null (⇒ fail) if none fits below `ys[j].max`. */
+    // Null when no candidate fits below `ys(j).max`.
     private fun popFPrime(j: Int): Int? {
         if (pq.isEmpty()) return null
         val i = pq.pop()
@@ -378,7 +361,6 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
         s2.push(recup[0].toInt(), recup[1].toInt(), recup[2])
     }
 
-    /** Min-key priority queue over element ids; `pop` returns the element with the smallest key. */
     private class MinHeap(capacity: Int) {
         private val elems = IntArray(capacity)
         private val keys = LongArray(capacity)
@@ -449,7 +431,6 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
         fun pop(): Int = data[--size]
     }
 
-    /** Stack of tentative SCCs as `(root, rightMost, maxX)` triples. */
     private class Stack2(capacity: Int) {
         private val roots = IntArray(capacity)
         private val rightMosts = IntArray(capacity)
@@ -473,7 +454,6 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
             if (size > 0) size--
         }
 
-        /** Writes `(root, rightMost, maxX)` into [out]; slots 0/1 are node ids, slot 2 a value. */
         fun peek(out: LongArray): Boolean {
             if (size == 0) return false
             out[0] = roots[size - 1].toLong()

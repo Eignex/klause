@@ -20,8 +20,7 @@ internal class RegularInvariant(
 
     private val acceptingSet: IntHashSet = buildAcceptingSet(accepting)
 
-    /** Positions in [seq] each variable occupies — usually one, so a single-symbol move recombines a
-     *  single DP column. A variable repeated across positions falls back to a full recompute. */
+    // A variable repeated across positions falls back to a full DP recompute.
     private val positionsByVar: MutableIntObjectMap<IntArray> = run {
         val tmp = MutableIntObjectMap<IntArrayList>()
         for (i in seq.indices) tmp.getOrPut(seq[i]) { IntArrayList() }.add(i)
@@ -74,8 +73,6 @@ internal class RegularInvariant(
         return RegularLsState(forward, backward, acceptingDistance(forward))
     }
 
-    /** Accept distance with [intVar] set to [newValue]. A single-position variable recombines its DP
-     *  column in O(Q·Σ); a repeated variable falls back to a full recompute. */
     private fun distanceWith(state: LocalSearchState, st: RegularLsState, intVar: Int, newValue: Long): Int {
         val positions = positionsByVar[intVar]
         if (positions == null || positions.size != 1) {
@@ -139,9 +136,7 @@ internal class RegularInvariant(
 
     override fun proposeExtendedRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (seq.isEmpty() || regularAccepts(state, seq, q0, transitions, numStates, alphabetSize, acceptingSet)) return
-        // DP-optimal repair: a minimum-change in-domain accepting run. Each position where it differs
-        // from the current symbol is a move that strictly reduces the accept distance, so the search
-        // can walk straight to feasibility instead of chasing one dead-state fix at a time.
+        // Each position differing from the minimum-change accepting run strictly reduces the accept distance.
         val target = regularRepairPath(state, seq, numStates, alphabetSize, transitions, q0, acceptingSet) ?: return
         for (i in seq.indices) {
             if (target[i].toLong() != state.assignment.intValue(seq[i])) {
@@ -246,7 +241,6 @@ internal fun buildAcceptingSet(accepting: IntArray): IntHashSet {
     return s
 }
 
-/** Look up `δ(state, symbol)` with 1-based addressing. Returns 0 for the dead state. */
 internal fun regularDelta(transitions: LongArray, numStates: Int, alphabetSize: Int, stateQ: Int, symbol: Long): Int {
     if (stateQ < 1 || stateQ > numStates) return 0
     if (symbol < 1 || symbol > alphabetSize) return 0
@@ -270,7 +264,6 @@ internal fun regularAccepts(
     return q in acceptingSet
 }
 
-/** Symbol [s] is usable at position [i]. */
 internal fun regularSymbolAllowed(state: LocalSearchState, seq: IntArray, i: Int, s: Int): Boolean {
     val v = seq[i]
     return if (state.assumptions.isFrozenInt(v)) {
@@ -280,7 +273,6 @@ internal fun regularSymbolAllowed(state: LocalSearchState, seq: IntArray, i: Int
     }
 }
 
-/** Min symbol changes to reach an accepting run, where [getSym] is position i's current symbol. */
 internal fun regularAcceptDistance(
     seq: IntArray,
     numStates: Int,
@@ -313,12 +305,6 @@ internal fun regularAcceptDistance(
     return best
 }
 
-/**
- * A minimum-change accepting run using only in-domain symbols, returned as the symbol per position,
- * or null when no accepting run is reachable within the domains. The domain-aware,
- * traceback-carrying counterpart of [regularAcceptDistance]: forward DP over allowed symbols with
- * parent pointers, then a backtrack from the cheapest accepting state.
- */
 internal fun regularRepairPath(
     state: LocalSearchState,
     seq: IntArray,
@@ -370,13 +356,10 @@ internal fun regularRepairPath(
     return out
 }
 
-/** Maintained accept-distance DP for a Regular factor: forward and backward layers over the current
- *  assignment plus the resulting accept distance, so a single-symbol move recombines one column in
- *  O(Q·Σ) instead of resweeping the whole DP. */
+// Kept so a single-symbol move recombines one column in O(Q·Σ) instead of resweeping the DP.
 internal class RegularLsState(val forward: Array<IntArray>, val backward: Array<IntArray>, var distance: Int)
 
-/** `forward(i)(q)` = min symbol changes over positions `0 until i` to reach state `q` from `q0`,
- *  where [getSym] is position i's current symbol. */
+// `forward(i)(q)`: min symbol changes over positions `0 until i` to reach `q` from `q0`.
 internal fun regularForwardLayers(
     n: Int,
     numStates: Int,
@@ -404,8 +387,7 @@ internal fun regularForwardLayers(
     return fwd
 }
 
-/** `backward(i)(q)` = min symbol changes over positions `i until n` to drive state `q` to an
- *  accepting state, where [getSym] is position i's current symbol. */
+// `backward(i)(q)`: min symbol changes over positions `i until n` to drive `q` to an accepting state.
 internal fun regularBackwardLayers(
     n: Int,
     numStates: Int,

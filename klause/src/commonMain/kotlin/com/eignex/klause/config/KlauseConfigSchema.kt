@@ -6,12 +6,11 @@ import kotlinx.serialization.Serializable
 import kotlin.properties.PropertyDelegateProvider
 import kotlin.properties.ReadOnlyProperty
 
-/** camelCase word boundaries, where a dotted key inserts a separator. */
 private val CAMEL_BOUNDARY = Regex("([a-z0-9])([A-Z])")
 
 /** The dotted property/env key for a knob [name]: camelCase boundaries become `.` under a `klause.`
  *  prefix, e.g. `bitsetThreshold` → `klause.bitset.threshold`; the env var is this uppercased with
- *  `.` → `_` (`KLAUSE_BITSET_THRESHOLD`). The single transform from a knob's name — never a literal. */
+ *  `.` → `_` (`KLAUSE_BITSET_THRESHOLD`). */
 fun klausePropertyKey(name: String): String = "klause." + name.replace(CAMEL_BOUNDARY, "$1.$2").lowercase()
 
 /**
@@ -94,14 +93,10 @@ class ConfigKey internal constructor(
 }
 
 /**
- * The schema of env/property/file-overridable [KlauseConfig] knobs. Each `by int/long(...)`
- * registers a serialisable [ConfigSpec] under the property's name (via [Schema.register]) and a
- * typed [ConfigKey] in [keys]; the property name is therefore the single source of the knob's name
- * (env var, dotted property and JSON/YAML key all derive from it) and the default comes from
- * [KlauseConfig.DEFAULT] (so it is never restated). Declaring a knob here — and nowhere else — is
- * what makes it env-configurable; [KlauseConfig.fromProps] folds overrides over [keys].
- *
- * Presolve is deliberately absent: it is set programmatically or via the CLI `--presolve` flag.
+ * The schema of env/property/file-overridable [KlauseConfig] knobs. Each knob registers a serialisable
+ * [ConfigSpec] under its property name, from which the env var, dotted property and JSON/YAML key all
+ * derive, and a typed [ConfigKey] in [keys]; defaults come from [KlauseConfig.DEFAULT]. Declaring a
+ * knob here is what makes it env-configurable.
  */
 object KlauseConfigSchema : Schema<ConfigSpec>() {
     private val mutableKeys = mutableListOf<ConfigKey>()

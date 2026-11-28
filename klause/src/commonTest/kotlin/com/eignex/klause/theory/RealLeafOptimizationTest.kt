@@ -171,7 +171,6 @@ class RealLeafOptimizationTest {
             feasibilityTolerance = dyadic).resolve(),
     )
 
-    // The tolerant minimization of [objective] over [source] under [selector], with node bounds and plain value order.
     private fun tolerantMinimum(
         source: Problem,
         policy: SourceTolerance,
@@ -469,7 +468,6 @@ class RealLeafOptimizationTest {
         }
     }
 
-    // A stop that fires at poll [firing], counting every poll.
     private class PollStop(private val firing: Long = Long.MAX_VALUE) : ExecutionControl() {
         var polls = 0L
             private set
@@ -477,7 +475,6 @@ class RealLeafOptimizationTest {
         override fun isCancelled(): Boolean = polls++ >= firing
     }
 
-    // The polls an uninterrupted optimization of [source] makes, and its result.
     private fun polls(source: Problem, costs: List<BigFraction>): Pair<Long, RealOptimizationResult> {
         val counted = PollStop()
         val step = AbsRealCompletion(source).optimize(leaf, costs).advance(counted)

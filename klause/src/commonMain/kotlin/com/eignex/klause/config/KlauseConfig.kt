@@ -6,45 +6,32 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.presolve.PresolvePass
 
-/** Default lower bound assigned to unbounded `var int` declarations (FlatZinc auxiliaries with no
- *  explicit range, SMT-LIB integers with no provable bound): the full `Long` floor, so the finite
- *  model can represent any 64-bit integer value without an artificial clamp clipping a legitimate
- *  one. Callers that do span/coefficient arithmetic on domain bounds must stay overflow-safe (e.g.
- *  [com.eignex.klause.ir.intdomain.ContiguousDomain] saturates its size). */
+/** Default lower bound for an unbounded `var int`: the full `Long` floor, so no artificial clamp clips a
+ *  legitimate value. Span and coefficient arithmetic on domain bounds must stay overflow-safe. */
 const val DEFAULT_UNBOUNDED_INT_LO: Long = Long.MIN_VALUE
 
 /** Default upper bound for unbounded `var int`; counterpart to [DEFAULT_UNBOUNDED_INT_LO]. */
 const val DEFAULT_UNBOUNDED_INT_HI: Long = Long.MAX_VALUE
 
-/** MiniZinc's own default range for an unbounded `var int` (`±10^6`). This is a *semantic* default: a
- *  MiniZinc `var int` with no declared bounds genuinely **is** this range, so the FlatZinc front-end
- *  adopts it and an `unsat` within it is a sound `unsat`. */
+/** MiniZinc's default range for an unbounded `var int` (`±10^6`). This is a semantic default, so an
+ *  `unsat` within it is a sound `unsat`. */
 const val MINIZINC_UNBOUNDED_DEFAULT: Long = 1_000_000
 
-/** Default integer-domain span above which the span-gated LP presolve steps engage. A model whose
- *  widest integer domain spans no more than this stays on the pure (cheap) presolve + bake path; only a
- *  genuinely wide domain — where the root bake's bound propagation would grind O(span) — pays for the LP
- *  feasibility / bound-tightening that runs ahead of the bake. A pure cost gate; the result is unchanged
- *  either way. Widen or lower it via env `KLAUSE_LARGE_SPAN_THRESHOLD`. */
+/** Default integer-domain span above which LP feasibility and bound tightening run ahead of the root
+ *  bake, whose bound propagation would otherwise grind O(span). A pure cost gate. */
 const val DEFAULT_LARGE_SPAN_THRESHOLD: Long = 1_000_000
 
-/** Default **base** relaxation-size cap (`rows × (cols + rows + 1)` cells). The sparse revised simplex
- *  is the only LP engine; this is a pure per-node cost guard (not a memory bound), and the bound
- *  stays sound either way. A model whose *base* relaxation fits this cap budgets its gated hulls against
- *  it; a larger base (still under [DEFAULT_LP_CEILING_TABLEAU_CELLS]) budgets hulls against that
- *  ceiling. Raise it (env below) to spend more per node for hull reach on small models. */
+/** Default **base** relaxation-size cap (`rows × (cols + rows + 1)` cells), a pure per-node cost guard.
+ *  A model whose base relaxation fits this cap budgets its gated hulls against it; a larger base, still
+ *  under [DEFAULT_LP_CEILING_TABLEAU_CELLS], budgets hulls against that ceiling. */
 const val DEFAULT_LP_MAX_TABLEAU_CELLS: Long = 1L shl 20
 
-/** Default **ceiling** relaxation-size cap: the absolute size past which `LpAutoConfig` declines LP
- *  entirely. Larger than [DEFAULT_LP_MAX_TABLEAU_CELLS] (the sparse engine carries bigger relaxations
- *  cheaply); also the hull budget for models whose base relaxation is over the base cap but under this
- *  ceiling. A pure cost guard (the bound is sound). */
+/** Default **ceiling** relaxation-size cap: the size past which automatic LP planning declines LP
+ *  entirely, and the hull budget for models whose base relaxation exceeds the base cap. A pure cost guard. */
 const val DEFAULT_LP_CEILING_TABLEAU_CELLS: Long = 1L shl 26
 
 /** Default span threshold (inclusive) below which a non-contiguous int domain is stored as a bitset
- *  rather than a wide run / survivor rep. 4096 ⇒ ≤ 64 longs (512 bytes), which keeps membership O(1)
- *  across the moderate-span middle ground; only genuinely wide domains fall through to the wide reps.
- *  A pure storage/speed tradeoff — the domain semantics are identical either way. */
+ *  (at most 64 longs) rather than a run or survivor list. A pure storage/speed tradeoff. */
 const val DEFAULT_BITSET_THRESHOLD: Int = 4096
 
 /**
@@ -56,9 +43,7 @@ const val DEFAULT_BITSET_THRESHOLD: Int = 4096
 const val DEFAULT_DOMAIN_WALK_CAP: Long = DEFAULT_BITSET_THRESHOLD.toLong()
 
 /**
- * Immutable invocation configuration for klause's core (compiler + frontends).
- *
- * [KlauseConfig] captures storage policy and preparation effort for one invocation.
+ * Immutable invocation configuration: storage policy and preparation effort for one invocation.
  * Source interpretation belongs to [com.eignex.klause.ir.SemanticOverrides].
  *
  * Two usage modes:
@@ -68,59 +53,46 @@ const val DEFAULT_DOMAIN_WALK_CAP: Long = DEFAULT_BITSET_THRESHOLD.toLong()
  *    `VariableSchema.compile(config)` when you need per-call control (tests, embedding).
  *    Source models retain [problemSettings] through preparation and solving.
  *
- * The core stays pure Kotlin with no platform dependencies — reading env vars / system
- * properties is the responsibility of platform entry points, which feed a property [fromProps]
- * lookup and assign the result to [current].
- *
- * Two things are deliberately *not* env-configurable here:
- *  - **Presolve** — the presolve* fields are set programmatically (embedding) or per-invocation
- *    via the CLI `--presolve` flag; there is no env key for them.
- *  - **Bench-harness tuning** (the `klause.bench.*` system properties) — those configure the
- *    benchmarking harness, not solving semantics, and live in their own namespace.
+ * Reading env vars and system properties is the responsibility of platform entry points, which feed a
+ * [fromProps] lookup. Presolve has no env key: it is set programmatically or via the CLI `--presolve` flag.
  */
 data class KlauseConfig(
-    /** Integer-domain span above which the span-gated LP presolve steps engage (see
-     *  [DEFAULT_LARGE_SPAN_THRESHOLD]). A pure cost gate — below it, presolve/solve behaviour is
-     *  unchanged; coupled columns above it use LP feasibility / bound tightening ahead of the O(span)
-     *  root bake. Wide columns coupled to continuous columns also use that LP preparation. */
+    /** Integer-domain span above which LP preparation runs ahead of the root bake (see
+     *  [DEFAULT_LARGE_SPAN_THRESHOLD]). Wide columns coupled to continuous columns also use it. */
     val largeSpanThreshold: Long = DEFAULT_LARGE_SPAN_THRESHOLD,
 
-    /** Base relaxation-size cap (see [DEFAULT_LP_MAX_TABLEAU_CELLS]): a model whose base relaxation
-     *  fits it budgets its gated hulls against it. A pure cost guard — the bound is always sound. */
+    /** Base relaxation-size cap (see [DEFAULT_LP_MAX_TABLEAU_CELLS]). */
     val lpMaxTableauCells: Long = DEFAULT_LP_MAX_TABLEAU_CELLS,
 
-    /** Ceiling relaxation-size cap (see [DEFAULT_LP_CEILING_TABLEAU_CELLS]): the absolute size past
-     *  which LP is declined, and the hull budget for an over-base-cap but in-ceiling model. */
+    /** Ceiling relaxation-size cap (see [DEFAULT_LP_CEILING_TABLEAU_CELLS]). */
     val lpCeilingTableauCells: Long = DEFAULT_LP_CEILING_TABLEAU_CELLS,
 
-    /** Span threshold (inclusive) below which a non-contiguous int domain is stored as a bitset
-     *  rather than a wide rep (see [DEFAULT_BITSET_THRESHOLD]). A pure storage/speed tradeoff. */
+    /** Bitset storage span threshold (see [DEFAULT_BITSET_THRESHOLD]). */
     val bitsetThreshold: Int = DEFAULT_BITSET_THRESHOLD,
 
-    // Presolve: an emphasis level plus one tri-state override knob per pass (`true` forces the pass
-    // on, `false` off, `null` defers to the emphasis). Assembled into a [PresolveConfig] via
-    // [presolveConfig]; the CLI `--presolve` flag / `klause.presolve` property override these.
+    // Presolve: an emphasis level plus one tri-state override per pass (`true` forces the pass on,
+    // `false` off, `null` defers to the emphasis).
 
     /** Presolve effort level. */
     val presolveEmphasis: PresolveEmphasis = PresolveEmphasis.DEFAULT,
 
-    /** GCD coefficient strengthening. `null` = follow the emphasis. */
+    /** GCD coefficient strengthening. `null` follows the emphasis. */
     val presolveStrengthenCoefficients: Boolean? = null,
 
-    /** Affine singleton elimination. `null` = auto (on). */
+    /** Affine singleton elimination. `null` follows the emphasis. */
     val presolveAffineSingletons: Boolean? = null,
 
-    /** Interchangeable-variable symmetry breaking. `null` = auto (on for decision/optimization,
-     *  off for solution-set-sensitive queries — enumeration / counting / sampling). */
+    /** Interchangeable-variable symmetry breaking. `null` follows the emphasis, and stays off for
+     *  solution-set-sensitive queries. */
     val presolveBreakSymmetries: Boolean? = null,
 
-    /** Construction-time failed-literal SAC. `null` = auto (off — opt-in). */
+    /** Construction-time failed-literal probing. `null` follows the emphasis. */
     val presolveProbeFailedLiterals: Boolean? = null,
 
-    /** Construction-time bound SAC. `null` = auto (off — opt-in). */
+    /** Construction-time bound SAC. `null` follows the emphasis. */
     val presolveProbeIntBounds: Boolean? = null,
 
-    /** Construction-time interior-hole SAC (implies bound SAC). `null` = auto (off — opt-in). */
+    /** Construction-time interior-hole SAC, implying bound SAC. `null` follows the emphasis. */
     val presolveProbeIntHoles: Boolean? = null,
 ) {
     /** Narrow immutable resource settings for source models and their projections. */
@@ -158,15 +130,10 @@ data class KlauseConfig(
         var current: KlauseConfig = DEFAULT
 
         /**
-         * Layer property/env/file overrides onto [base], reading each knob through [lookup] — a
-         * function from a knob's [ConfigKey.propertyKey] (e.g. `klause.bitset.threshold`) to its raw
-         * string value, or `null` when unset. The recognised knobs, their keys and their parsing all
-         * come from [KlauseConfigSchema] (one declaration per knob), so this never re-spells a key.
-         * Unset / unparseable values leave the [base] value untouched.
-         * Source-semantic keys are rejected; pass [com.eignex.klause.ir.SemanticOverrides] to the source entry.
-         *
-         * Platform entry points supply the [lookup]: a CLI maps the dotted key to a system property
-         * and/or the `KLAUSE_BITSET_THRESHOLD`-style env var; a config file maps it to a parsed value.
+         * Layer property/env/file overrides onto [base], reading each knob of [KlauseConfigSchema] through
+         * [lookup], which maps a [ConfigKey.propertyKey] such as `klause.bitset.threshold` to its raw value or
+         * `null`. Unset or unparseable values leave [base] untouched. Source-semantic keys are rejected; pass
+         * [com.eignex.klause.ir.SemanticOverrides] to the source entry.
          */
         fun fromProps(base: KlauseConfig = current, lookup: (String) -> String?): KlauseConfig {
             for (name in retiredSourceKnobs) {

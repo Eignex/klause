@@ -21,9 +21,6 @@ import com.eignex.klause.util.ExecutionControl
  *    in the maintained violated set. Iterates only the small elected set, so it stays cheap while
  *    the search is still closing violations.
  *
- * The CBLS and SA-optimizer recipes reserve the first sampled draw for an elected structural global;
- * an empty elected set uses ordinary sampling.
- *
  * All scopes belong to [Phase.Feasible]: structured moves only matter once the search is at
  * `cost == 0` looking for objective-improving steps.
  */
@@ -100,9 +97,7 @@ class SatisfiedStructured private constructor(
         }
     }
 
-    /** Propose [fid]'s structured moves with the sink's owner attributed to [fid], so its
-     *  feasibility-preserving moves on the variables it owns survive the implicit-solving owner
-     *  filter (a non-owner's moves on those variables are dropped). */
+    // Attributing the proposer keeps [fid]'s moves on variables it owns past the implicit-solving owner filter.
     private fun proposeAsOwner(state: LocalSearchState, fid: Int, sink: MoveSink) {
         sink.proposer = fid
         val f = state.factors[fid]

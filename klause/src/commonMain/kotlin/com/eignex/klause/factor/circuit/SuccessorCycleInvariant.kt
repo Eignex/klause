@@ -6,8 +6,6 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.util.collections.IntIntMap
 
-/** Shared base for [CircuitInvariant] and [SubcircuitInvariant]: violation scoring over a successor
- *  array driven by a caller-supplied cost function. */
 internal open class SuccessorCycleInvariant(
     protected val succ: IntArray,
     protected val n: Int,
@@ -56,17 +54,9 @@ internal open class SuccessorCycleInvariant(
         return newCost - oldCost
     }
 
-    /**
-     * 2-opt segment reversals over a cycle given as [order] (node ids in visiting order, closed
-     * cyclically). Reverses a bounded interior segment — removing two edges and reconnecting their
-     * endpoints with the segment between them flipped — and emits each as one atomic [Move.Compound]
-     * over the affected successor variables. Feasibility-preserving (reversing a segment of a valid
-     * cycle yields a valid cycle), so callers use it for structured moves; [CircuitInvariant] passes
-     * the whole tour and [SubcircuitInvariant] the active sub-tour.
-     *
-     * Croes, "A method for solving traveling-salesman problems", Operations Research 6(6), 1958,
-     * https://doi.org/10.1287/opre.6.6.791
-     */
+    // 2-opt segment reversals over a cycle given in visiting order, each one atomic compound move.
+    // Reversing a segment of a valid cycle yields a valid cycle. Croes, "A method for solving
+    // traveling-salesman problems", Operations Research 6(6), 1958, https://doi.org/10.1287/opre.6.6.791
     protected fun proposeReversals(state: LocalSearchState, order: IntArray, sink: MoveSink, cap: Int, stride: Int) {
         val len = order.size
         if (len < 4) return
@@ -84,9 +74,8 @@ internal open class SuccessorCycleInvariant(
         }
     }
 
-    /** Successor moves reversing cycle segment `(i, j]`: `order(i) -> order(j)`, the reversed interior
-     *  `order(k) -> order(k-1)`, and `order(i+1) -> order(j+1)`. Null if any new edge is frozen or out
-     *  of its successor variable's domain. */
+    // Reverses segment (i, j]: order(i) → order(j), order(k) → order(k-1) inside, order(i+1) → order(j+1).
+    // Null if any new edge is frozen or outside its successor's domain.
     private fun reversalCompound(state: LocalSearchState, order: IntArray, i: Int, j: Int): List<Move>? {
         val len = order.size
         val parts = ArrayList<Move>(j - i + 1)
@@ -108,10 +97,8 @@ internal open class SuccessorCycleInvariant(
         return true
     }
 
-    /** Shared reversal bound. */
     protected companion object {
-        /** Longest cycle segment a single 2-opt reversal flips; bounds the compound's size so the
-         *  reversal stays a cheap local move rather than a near-global rewrite. */
+        // Keeps a reversal a cheap local move rather than a near-global rewrite.
         const val MAX_REVERSAL_SEGMENT: Int = 12
     }
 }

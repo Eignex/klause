@@ -3,49 +3,26 @@ package com.eignex.klause.lowering
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
-/**
- * Multiplier carrying a row of decimal-written values onto whole numbers.
- *
- * A format whose numbers are decimal text can state a fractional coefficient on a row whose variables
- * are integers, and the row's factor holds `Long` coefficients. The multiplier is the least common
- * denominator of the row's values — always a power of ten, because that is the denominator every
- * written decimal has — so an exact multiplier restates the row rather than approximating it.
- */
+// The power of ten carrying a row of decimal-written values onto `Long` coefficients. Every written decimal
+// has a power-of-ten denominator, so an exact multiplier restates the row rather than approximating it.
 internal sealed interface RowScale {
 
-    /** The power of ten every value is multiplied by. */
     val multiplier: Long
 
-    /** Multiply [value] onto the scale. Exact for [Exact]; the nearest whole number for [Rounded]. */
     fun scale(value: Double): Long = (value * multiplier.toDouble()).roundToLong()
 
-    /** Every value of the row is whole at [multiplier]: the scaled row restates the source text. */
     class Exact(override val multiplier: Long) : RowScale
 
-    /**
-     * No power of ten makes the row whole within the exactly-recoverable range, so [multiplier] is the
-     * finest the row's magnitudes admit and every value is rounded onto it.
-     *
-     * This is a field printed at full double precision — `-0.0214054799999994` for `-0.02140548`, or a
-     * rational truncated to its leading digits — where the trailing digits are an artifact of printing
-     * a double and there is no source decimal to recover.
-     */
+    // No power of ten makes the row whole within the recoverable range: a field printed at full double
+    // precision (`-0.0214054799999994` for `-0.02140548`) has no source decimal to recover, so values round.
     class Rounded(override val multiplier: Long) : RowScale
 
-    /**
-     * The row spans a wider dynamic range than any single multiplier covers: the multiplier that keeps
-     * the largest term inside the recoverable range sends the smallest term to zero, which would drop
-     * it from an integer row instead of approximating it.
-     */
+    // The multiplier keeping the largest term recoverable sends the smallest to zero, which would drop it
+    // from an integer row.
     class Unrepresentable(override val multiplier: Long) : RowScale
 }
 
-/**
- * Accumulates one row's values and resolves the power of ten that makes them whole.
- *
- * Values are observed in any order and the scale is resolved once, because the multiplier depends on
- * the whole row: a row is scaled by a single factor to stay equivalent.
- */
+// A row is scaled by a single factor to stay equivalent, so the scale resolves once over the whole row.
 internal class RowScaleBuilder {
 
     private var places = 0
@@ -53,7 +30,6 @@ internal class RowScaleBuilder {
     private var smallestNonZero = Double.MAX_VALUE
     private var recoverable = true
 
-    /** Fold [value] into the row. A non-finite value carries no scale and is skipped. */
     fun observe(value: Double) {
         if (!isFiniteValue(value)) return
         val magnitude = abs(value)
@@ -67,7 +43,6 @@ internal class RowScaleBuilder {
         }
     }
 
-    /** The scale carrying every observed value onto whole numbers. */
     fun resolve(): RowScale {
         if (largest == 0.0) return RowScale.Exact(1L)
         if (recoverable) {
@@ -80,10 +55,7 @@ internal class RowScaleBuilder {
     }
 }
 
-/**
- * Smallest decimal place count reproducing [value] exactly — `units / 10^places` is [value] itself,
- * not merely close to it — or `-1` when no decimal within [MAX_PLACES] places round-trips to it.
- */
+// `-1` when no decimal within MAX_PLACES places round-trips exactly.
 private fun decimalPlacesOf(value: Double): Int {
     if (value == 0.0) return 0
     for (places in 0..MAX_PLACES) {
@@ -95,7 +67,6 @@ private fun decimalPlacesOf(value: Double): Int {
     return -1
 }
 
-/** The largest power of ten keeping [largest] inside the exactly-recoverable range. */
 private fun largestFittingPower(largest: Double): Long {
     var places = 0
     while (places < MAX_PLACES && largest * POWERS_OF_TEN[places + 1].toDouble() <= MAX_UNITS) places++
@@ -104,14 +75,11 @@ private fun largestFittingPower(largest: Double): Long {
 
 private fun isFiniteValue(value: Double): Boolean = value - value == 0.0
 
-/**
- * Magnitude bound for a scaled value. `value * 10^places` is computed in double, so both operands and
- * the product each carry a rounding of at most `2^-53`; below this bound the accumulated error stays
- * under half a unit and [kotlin.math.roundToLong] recovers the whole number the text names.
- */
+// `value * 10^places` is computed in double; below this bound the accumulated rounding stays under half a
+// unit, so `roundToLong` recovers the whole number the text names.
 private const val MAX_UNITS = (1L shl 51).toDouble()
 
-/** Decimal places past which a field carries no recoverable source decimal, only double noise. */
+// Past this a field carries no recoverable source decimal, only double noise.
 private const val MAX_PLACES = 15
 
 private val POWERS_OF_TEN = LongArray(MAX_PLACES + 2).also {

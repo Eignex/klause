@@ -11,28 +11,16 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.MutableIntObjectMap
 
-/**
- * At-most-one clique merging. The scattered
- * pairwise exclusion constraints of a problem — a binary clause `(a ∨ b)` excludes the literal pair
- * `{¬a, ¬b}`, a `Cardinality(max = 1)` excludes every pair of its literals — form a conflict graph;
- * [maximalPersistentAmoCliques] grows the base cliques into maximal ones. This pass
- * *materialises* each maximal clique as one `Cardinality(clique, 0, 1)` and drops the smaller
- * constraints it subsumes, collapsing `O(k²)` binary clauses into a single `O(k)` at-most-one.
- *
- * Solution-set preserving: every pair inside a maximal clique already had an exclusion edge from some
- * source constraint, so the materialised at-most-one is logically equivalent to the conjunction of the
- * pairwise exclusions it replaces — it adds no new exclusion, and no variable is eliminated (no
- * reconstruction needed).
- *
- * Only strictly-subsumed **pure** at-most-ones are dropped: a binary clause, or a `Cardinality(S, 0, 1)`
- * whose set `S` is a proper subset of a clique. A `Cardinality` with a positive lower bound (an
- * exactly/at-least-one) is never dropped — its lower bound is not implied by the at-most-one — though
- * its exclusion edges may still have seeded a clique. A new at-most-one is emitted only when it lets at
- * least two constraints drop, so the factor count never grows.
- */
+// Materialises each maximal at-most-one clique of the conflict graph (binary clauses and
+// `Cardinality(max = 1)` exclusions) as one `Cardinality(clique, 0, 1)` and drops the pure at-most-ones it
+// strictly subsumes, collapsing `O(k²)` binary clauses into one `O(k)` constraint.
+// Solution-set preserving: every pair in a maximal clique already had an exclusion edge, so the new
+// at-most-one adds no exclusion and eliminates no variable. A `Cardinality` with a positive lower bound is
+// never dropped, since the at-most-one does not imply it. A new at-most-one is emitted only when at least
+// two constraints drop, so the factor count never grows.
 internal object AmoCliqueMerge {
 
-    /** A clique of at least this size is worth materialising; size 2 is already a single binary clause. */
+    // Size 2 is already a single binary clause.
     private const val MIN_CLIQUE_SIZE = 3
 
     fun mergeAmoCliques(problem: Problem, cancellation: ExecutionControl = ExecutionControl.Never): PassDelta {
@@ -102,12 +90,8 @@ internal object AmoCliqueMerge {
         return PassDelta(droppedIndices = dropped.toIntArray(), addedFactors = added)
     }
 
-    /**
-     * The literal set [f] excludes pairwise, when [f] is a *pure* at-most-one a larger clique can
-     * subsume — a two-literal clause `(a ∨ b)` → `{¬a, ¬b}`, or a `Cardinality(S, 0, 1)` → `S`. `null`
-     * for anything else (including a `Cardinality` with a positive lower bound, whose lower bound the
-     * at-most-one would not preserve).
-     */
+    // The literal set [f] excludes pairwise when [f] is a pure at-most-one, else null: a `Cardinality` with a
+    // positive lower bound is excluded because the at-most-one would not preserve that bound.
     private fun footprint(f: Factor): Set<Int>? = when {
         f is Clause && f.literals.size == 2 -> hashSetOf(Lit.negate(f.literals[0]), Lit.negate(f.literals[1]))
         f is Cardinality && f.min == 0 && f.max == 1 -> f.literals.toHashSet()

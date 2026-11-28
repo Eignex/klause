@@ -6,25 +6,15 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.PermutationGroup
 import com.eignex.util.collections.IntArrayList
 
-/**
- * Dynamic symmetry handling: one global propagator for the whole automorphism group rather than an
- * enumeration of lex-leader factors. Holds the verified generators (each a kind-preserving
- * permutation of the variables); at every search node it enforces the lex-leader predicate
- * `V ≤lex σ(V)` for each generator, pruning the symmetric completions the prefix already rules
- * out. The lex-minimum of every orbit satisfies `V ≤lex σ(V)` for every group element, so each
- * predicate is a sound symmetry break and at least one representative per orbit always survives.
- *
- * A generator permutes integer and Boolean variables independently (detection is kind-preserving),
- * so each position of the captured lex order compares coordinates of the same kind;
- * each position compares a variable against its image of the same kind. The filtering is the `α`/`β`
- * lex rule (α = first undecided position, β = start of the forced `≥` suffix) of Frisch, Hnich,
- * Kiziltan, Miguel and Walsh, "Propagation algorithms for lexicographic ordering constraints",
- * Artificial Intelligence 170(10), 2006, https://doi.org/10.1016/j.artint.2006.03.002, generalised
- * over typed positions: a Boolean reads
- * as the domain `[0,1]` (`true` ⇒ `[1,1]`, `false` ⇒ `[0,0]`), so a bound tightening at a Boolean
- * position is a pin. Reasons cite the fixed-equal prefix, the deciding pair, and — when the step is
- * forced strict — the scanned suffix, as integer order-atoms plus Boolean literals.
- */
+// At every search node enforces the lex-leader predicate `V ≤lex σ(V)` for each generator. The lex-minimum of
+// every orbit satisfies it for every group element, so each predicate is a sound symmetry break and at least one
+// representative per orbit survives.
+//
+// Generators are kind-preserving, so each lex position compares a variable against its image of the same kind.
+// The filtering is the `α`/`β` lex rule (α = first undecided position, β = start of the forced `≥` suffix) of
+// Frisch, Hnich, Kiziltan, Miguel and Walsh, "Propagation algorithms for lexicographic ordering constraints",
+// Artificial Intelligence 170(10), 2006, https://doi.org/10.1016/j.artint.2006.03.002, generalised over typed
+// positions: a Boolean reads as the domain `[0,1]`, so a bound tightening at a Boolean position is a pin.
 internal class SymmetryPropagator(
     private val generators: List<Generator>,
     private val unified: List<IntArray>,
@@ -36,11 +26,10 @@ internal class SymmetryPropagator(
         const val MAX_CACHED_ORBIT_WORDS = 65_536
     }
 
-    /** A generator's lex sequence: position `k` compares [leftVar]`[k]` against its image
-     *  [rightVar]`[k]`, both Boolean when [isBool]`[k]` (else both integer). */
+    // Position k compares leftVar(k) against its image rightVar(k), both Boolean when isBool(k).
     class Generator(val leftVar: IntArray, val rightVar: IntArray, val isBool: BooleanArray)
 
-    /** Permutation degree (`nInt + nBool`). */
+    // Permutation degree, `nInt + nBool`.
     private val n: Int = if (unified.isEmpty()) nInt else unified.first().size
 
     private class OrbitCache(size: Int) {
@@ -53,17 +42,11 @@ internal class SymmetryPropagator(
         return orbitalFix(state, factorId)
     }
 
-    /**
-     * Orbital fixing: the lex-leader implies `x_k ≤ x_j` for every `j` in the orbit of `k` under the
-     * pointwise stabiliser of the positions preceding `k` in the order — a group element that fixes
-     * those positions auto-equalises the prefix, so position `k` decides `V ≤lex σ(V)`. Applied at the
-     * order's first unfixed position (the frontier; later positions follow as search fixes this one),
-     * this prunes using the whole group's stabiliser structure, not just the propagated generators —
-     * the strength that survives beyond the bounded generator expansion on large groups. Sound by
-     * construction (every orbit element comes from a genuine group element fixing the prefix). After
-     * Margot, "Exploiting orbits in symmetric ILP", Math. Program. 98, 2003,
-     * https://doi.org/10.1007/s10107-003-0394-6.
-     */
+    // Orbital fixing: the lex-leader implies `x_k ≤ x_j` for every `j` in the orbit of `k` under the pointwise
+    // stabiliser of the positions preceding `k`, since an element fixing those positions equalises the prefix.
+    // Applied at the first unfixed position, it prunes with the whole group's stabiliser structure rather than
+    // only the propagated generators. After Margot, "Exploiting orbits in symmetric ILP", Math. Program. 98,
+    // 2003, https://doi.org/10.1007/s10107-003-0394-6.
     @Suppress("ReturnCount")
     private fun orbitalFix(state: PropagationState, factorId: Int): Boolean {
         if (unified.isEmpty()) return true
@@ -121,8 +104,7 @@ internal class SymmetryPropagator(
         return orbit
     }
 
-    /** The premise of an `x ≤ y` bound transfer: the cited variable's current bound (an integer
-     *  order-atom, or the Boolean's current literal). A superset is sound. */
+    // A superset of the cited variable's current bound is a sound premise.
     private fun boundReason(state: PropagationState, v: Int, isBool: Boolean): IntArray? = if (isBool) {
         val value = state.boolValues[v] ?: return null
         intArrayOf(Lit.make(v, !value))
@@ -130,14 +112,9 @@ internal class SymmetryPropagator(
         state.composeIntVarAtomAntecedents(intArrayOf(v))
     }
 
-    /**
-     * The clause-form reason for a lex-leader conflict (`propagate` returned `false` on the
-     * direct-conflict path): re-scan the generators, find the one whose fixed-equal prefix forces
-     * `V >lex σ(V)` with no equal-tail rescue, and cite the prefix and the scanned suffix that
-     * established it. Every solution surviving the symmetry break has `V ≤lex σ(V)`, so the clause is
-     * entailed. `null` (chronological backtrack) when no generator is in that direct-conflict state —
-     * a conflict reached only through a failed tightening already carries that pin's antecedents.
-     */
+    // Finds the generator whose fixed-equal prefix forces `V >lex σ(V)` with no equal-tail rescue and cites the
+    // prefix and scanned suffix; every surviving solution has `V ≤lex σ(V)`, so the clause is entailed. Null when
+    // no generator is in that state: a conflict from a failed tightening already carries that pin's antecedents.
     @Suppress("ReturnCount", "NestedBlockDepth")
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         for (g in generators) {
@@ -172,7 +149,6 @@ internal class SymmetryPropagator(
         return null
     }
 
-    /** `V ≤lex σ(V)` filtering for one generator. Returns `false` on contradiction. */
     @Suppress("ReturnCount", "CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
     private fun propagateLexLeader(state: PropagationState, g: Generator): Boolean {
         val len = g.leftVar.size
@@ -244,9 +220,7 @@ internal class SymmetryPropagator(
     private fun tightenLo(state: PropagationState, v: Int, isBool: Boolean, newLo: Long, ant: IntArray?): Boolean =
         if (isBool) (newLo <= 0 || state.pinBool(v, true, ant)) else state.tightenIntMin(v, newLo, ant)
 
-    /** The premise of a tightening at α: the fixed-equal prefix, the α pair, and (when strict) the
-     *  scanned suffix. Integer premises become order-atom antecedents; Boolean premises that are
-     *  pinned become the negation of their current literal. A superset is sound. */
+    // The fixed-equal prefix, the α pair and, when strict, the scanned suffix. A superset is sound.
     private fun reason(state: PropagationState, g: Generator, a: Int, scanStop: Int, strictHere: Boolean): IntArray? {
         val intVars = IntArrayList()
         val boolVars = IntArrayList()

@@ -2,7 +2,6 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.util.collections.IntArrayList
 
-/** Build [FlatZincSearchHints] from the search annotations on the `solve` item. */
 internal fun FlatZincCompiler.compileSearchAnnotation(context: FlatZincProgram? = null): FlatZincSearchHints? {
     val blocks = model.solve.annotations.filter(::isSearchAnnotation).flatMap(::searchBlocksOf)
     val tiers = blocks.mapNotNull { compileSearchBlock(it, context) }
@@ -27,7 +26,6 @@ internal fun FlatZincCompiler.compileSearchAnnotation(context: FlatZincProgram? 
 internal fun isSearchAnnotation(a: FznAnnotation): Boolean =
     a.name == "int_search" || a.name == "bool_search" || a.name == "set_search" || a.name == "seq_search"
 
-/** Flatten one search annotation to concrete tiers. */
 internal fun FlatZincCompiler.searchBlocksOf(a: FznAnnotation): List<FznAnnotation> = when (a.name) {
     "int_search", "bool_search", "set_search" -> listOf(a)
 
@@ -56,7 +54,6 @@ private fun FlatZincCompiler.compileSearchBlock(a: FznAnnotation, context: FlatZ
     )
 }
 
-// Resolve a search variable expression to bool/int ids in the listed order.
 private fun FlatZincCompiler.collectSearchVars(
     e: FznExpr,
     bools: IntArrayList,

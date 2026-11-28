@@ -132,9 +132,8 @@ internal class AllDifferentInvariant(
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean =
         seedGreedy(state) || seedByMatching(state)
 
-    /** Fast path: first-fit assignment, each present non-frozen var taking the first in-domain value
-     *  that is either an excepted value or not yet used. Mutates as it goes; a `false` result is
-     *  retried by [seedByMatching], which recomputes from the frozen vars and overwrites the rest. */
+    // First-fit; mutates as it goes, and a `false` result is retried by seedByMatching, which
+    // overwrites every non-frozen var.
     private fun seedGreedy(state: LocalSearchState): Boolean {
         val used = LongHashSet(vars.size)
         for (i in vars.indices) {

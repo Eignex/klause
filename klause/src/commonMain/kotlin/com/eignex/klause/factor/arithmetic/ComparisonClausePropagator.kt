@@ -9,15 +9,7 @@ import com.eignex.klause.propagation.tightenIntMaxImpl
 import com.eignex.klause.propagation.tightenIntMinImpl
 import com.eignex.util.collections.IntArrayList
 
-/**
- * CP propagator for [ComparisonClause]: the disjunction `⋁ᵢ (vars(i) ⟨ops(i)⟩ consts(i))`. Each
- * literal's truth is read straight from the live domain — no reifying Boolean, order atom, or
- * channeling clause. Unit propagation: with every literal but one falsified, the survivor is
- * enforced; with all falsified, the clause conflicts.
- *
- * Wakeup uses the default occurrence-list path (fire on any change to a member variable), which is
- * always correct for literal statuses that can flip on an interior value removal (`=`/`≠`).
- */
+// Literal truth is read from live domains. Wakes on any change, since `=`/`≠` literals flip on interior removals.
 internal class ComparisonClausePropagator(
     private val vars: IntArray,
     private val ops: Array<LinearOp>,
@@ -33,20 +25,14 @@ internal class ComparisonClausePropagator(
                 FALSIFIED -> {}
 
                 else -> {
-                    // A second undecided literal means the clause can still be satisfied two ways, so
-                    // no bound is forced; the falsified prefix scanned so far is irrelevant.
                     if (undecided >= 0) return true
                     undecided = i
                 }
             }
         }
-        // No literal is entailed. All falsified → conflict (the engine seeds this factor and reads
-        // the atom-level nogood from [conflictReason]); exactly one undecided → enforce it.
         return if (undecided < 0) false else enforce(state, undecided)
     }
 
-    /** Enforce literal [k] (all others falsified) with the falsifiers of the other literals as the
-     *  antecedent, so the recorded bound reason traces back through them. */
     private fun enforce(state: PropagationState, k: Int): Boolean {
         val ant = otherFalsifiers(state, k)
         val v = vars[k]
@@ -71,19 +57,13 @@ internal class ComparisonClausePropagator(
         return out.toIntArray()
     }
 
-    /** Falsifiers of every literal except [k], explaining why literal [k] must hold. */
     private fun otherFalsifiers(state: PropagationState, k: Int): IntArray {
         val out = IntArrayList()
         for (i in vars.indices) if (i != k) out.add(falsifier(state, i))
         return out.toIntArray()
     }
 
-    /**
-     * The reason literal for falsified literal [i] — the negation of the domain fact that falsifies
-     * it, hence currently false. `x ≤ c` false ⟺ `[x ≥ c+1]` holds (cite `¬[x ≥ c+1]`); `x ≥ c` false
-     * ⟺ `[x ≤ c−1]` holds; `x = c` false ⟺ `[x = c]` is false (cite `[x = c]`); `x ≠ c` false ⟺
-     * `[x = c]` holds (cite `¬[x = c]`).
-     */
+    // The negation of the domain fact that falsifies literal [i], hence currently false.
     private fun falsifier(state: PropagationState, i: Int): Int {
         val v = vars[i]
         val c = consts[i]

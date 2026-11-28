@@ -7,14 +7,11 @@ import com.eignex.klause.propagation.inDomainAt
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
-/**
- * Reasons for [com.eignex.klause.factor.table.Regular] deductions as cuts of the layered automaton graph over the
- * domains at a past undo-log position. Layer `i` holds the states after `i` symbols; an edge `q -s-> q'` from
- * layer `i` is live while `s` is in `seq(i)`'s domain. A symbol leaves `seq(i)` when each of its edges starts at
- * a state the start cannot reach or ends at one that cannot reach acceptance. Unreachability is explained by the
- * state's edges on that side: an edge whose symbol had left its domain cites that one literal, else the state at
- * its far end is unreachable in turn. Each state is explained once per reason.
- */
+// Reasons for Regular deductions as cuts of the layered automaton graph over the domains at a past undo-log
+// position. An edge `q -s-> q'` from layer `i` is live while `s` is in `seq(i)`'s domain. A symbol leaves `seq(i)`
+// when each of its edges starts at a state the start cannot reach or ends at one that cannot reach acceptance.
+// Unreachability is explained by the state's edges on that side: a cut edge cites its one literal, else the state
+// at its far end is unreachable in turn. Each state is explained once per reason.
 internal class RegularExplainer(
     private val seq: IntArray,
     private val numStates: Int,
@@ -42,7 +39,6 @@ internal class RegularExplainer(
         return if (t in 1..numStates) t else 0
     }
 
-    /** Reason for the symbols position [pos] lost as of [atTrail]. */
     fun prune(state: PropagationState, pos: Int, atTrail: Int): IntArray {
         val cut = Cut(state, atTrail)
         val v = seq[pos]
@@ -66,7 +62,6 @@ internal class RegularExplainer(
         return cut.literals()
     }
 
-    /** Reason for no accepted word remaining as of [atTrail]: no accepting state is reachable. */
     fun conflict(state: PropagationState, atTrail: Int): IntArray {
         val cut = Cut(state, atTrail)
         for (q in accepting) if (q in 1..numStates) cut.unreachable(n, q)
@@ -113,7 +108,6 @@ internal class RegularExplainer(
             }
         }
 
-        /** Explain why [q] at [layer] is unreachable from the start: each incoming edge is cut. */
         fun unreachable(layer: Int, q: Int) {
             val stack = IntArrayList()
             push(stack, explainedFwd, layer, q)
@@ -135,7 +129,6 @@ internal class RegularExplainer(
             }
         }
 
-        /** Explain why [q] at [layer] cannot reach acceptance: each outgoing edge is cut. */
         fun dead(layer: Int, q: Int) {
             val stack = IntArrayList()
             push(stack, explainedBwd, layer, q)

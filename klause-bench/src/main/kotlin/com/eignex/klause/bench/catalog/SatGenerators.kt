@@ -5,17 +5,12 @@ import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.ir.Problem
 import kotlin.random.Random
 
-/**
- * Parametric SAT generators returning a [Problem] through the DIMACS parser.
- * [php] generates unsatisfiable pigeonhole instances; [random3Sat] samples uniform
- * 3-SAT at the requested clause/variable ratio.
- */
 internal object SatGenerators {
     fun php(n: Int): Problem = Dimacs.parse(phpCnf(n)).toProblem()
     fun random3Sat(n: Int, ratio: Double = 4.26, seed: Long = 1L): Problem =
         Dimacs.parse(random3SatCnf(n, ratio, seed)).toProblem()
 
-    /** PHPₙ as DIMACS CNF. Var `p*n+h+1` = "pigeon p sits in hole h". */
+    // Variable `p*n+h+1` means pigeon p sits in hole h.
     private fun phpCnf(n: Int): String {
         val pigeons = n + 1
         fun v(p: Int, h: Int) = p * n + h + 1
@@ -37,7 +32,6 @@ internal object SatGenerators {
         return "p cnf ${pigeons * n} $count\n$clauses"
     }
 
-    /** Uniform random 3-SAT: [n] vars, `ratio*n` clauses of 3 distinct vars with random signs. */
     private fun random3SatCnf(n: Int, ratio: Double, seed: Long): String {
         val rng = Random(seed + n)
         val m = (ratio * n).toInt()

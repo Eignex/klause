@@ -11,7 +11,6 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.util.arrays.argsortBy
 import com.eignex.util.numbers.saturatedAdd
 
-/** LS invariant for [Diffn]: maintains the overlapping-pair count, with affected-pair deltas. */
 internal class DiffnInvariant(
     private val xs: IntArray,
     private val ys: IntArray,
@@ -58,7 +57,7 @@ internal class DiffnInvariant(
         return xOverlap && yOverlap
     }
 
-    /** Overlapping-pair count with an optional single-variable override (`ov < 0` = none). */
+    // `ov < 0` means no override.
     private fun countOverlaps(state: LocalSearchState, ov: Int, nv: Long): Int {
         var bad = 0
         for (i in 0 until n) {
@@ -85,8 +84,6 @@ internal class DiffnInvariant(
         return bad
     }
 
-    /** Number of overlapping pairs that include rectangle [r], under an optional single-var
-     *  override (`ov < 0` = none). */
     private fun pairsInvolvingRect(state: LocalSearchState, r: Int, ov: Int, nv: Long): Int {
         val xr = rx(state, r, ov, nv)
         val yr = ry(state, r, ov, nv)
@@ -119,17 +116,14 @@ internal class DiffnInvariant(
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         (state.refPayload[factorId] as DiffnLsState).overlappingPairs > 0
 
-    /** Graded violation: the number of overlapping rectangle pairs, compressed — a move that
-     *  separates some (but not all) overlaps scores a real improvement instead of 0. */
+    // Graded so a move that separates some but not all overlaps scores a real improvement.
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int = compressViolation(
         (state.refPayload[factorId] as DiffnLsState).overlappingPairs.toLong(),
         state.violationSoftCap,
     )
 
-    /** Affected-pair delta: a single-var move (position or size) only changes the overlap
-     *  status of pairs that include the moved rectangle, so the new total is
-     *  `overlappingPairs − oldPairsInvolving(r) + newPairsInvolving(r)` in O(n). Falls back to the
-     *  O(n²) recount when the moved var is shared across rectangles (`varToRectOf == -1`). */
+    // A single-var move only changes pairs that include the moved rectangle, so the delta is O(n). A var
+    // shared across rectangles falls back to the O(n²) recount.
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val s = state.refPayload[factorId] as DiffnLsState
         val r = varToRectOf(intVar)
@@ -162,8 +156,6 @@ internal class DiffnInvariant(
             compressViolation(before.toLong(), state.violationSoftCap)
     }
 
-    /** Repair: for each overlapping pair, propose single-axis shifts of either rectangle out
-     *  of the overlap, diagonal compound shifts, and a position swap. */
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
         for (i in 0 until n) {
@@ -229,7 +221,6 @@ internal class DiffnInvariant(
 
     override val providesImplicitNeighbourhood: Boolean get() = true
 
-    /** Bounded feasible relocations and equal-footprint position swaps. */
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (n < 2 || isViolated(state, factorId)) return
         DiffnRelocations(
@@ -285,10 +276,8 @@ internal class DiffnInvariant(
         }
     }
 
-    /** Feasible init: lay the rectangles out left-to-right so they are pairwise disjoint on the
-     *  x-axis (hence non-overlapping for any y). Each `xs[i]` takes the first in-domain value at or
-     *  after the previous rectangle's right edge; `ys[i]` takes its domain minimum. Returns false —
-     *  leaving the random assignment — when a rectangle can't be placed in domain. */
+    // Lays the rectangles out left-to-right, pairwise disjoint on the x-axis and so non-overlapping for
+    // any y.
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
         if (n == 0) return false
         var prevRight = Long.MIN_VALUE

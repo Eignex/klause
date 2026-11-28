@@ -1,6 +1,6 @@
 package com.eignex.klause.backtrack
 
-/** Deterministic 1:1 duty cycle for repeated root LP work. */
+// Deterministic 1:1 duty cycle for repeated root LP work.
 internal class RootLpDutyCycle {
     private var lastRootCost = 0L
     private var lastRootEnd = 0L

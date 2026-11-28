@@ -104,10 +104,10 @@ class BacktrackSolver internal constructor(
     /** Optimise against [objective] under the hard constraints. */
     fun minimize(objective: LinearObjective): MinimizeResult = minimize(objective, BacktrackParams())
 
-    /** Open an explicit-state, pausable branch-and-bound over [objective]. See [ResumableSearch].
-     *  The handle reuses this solver's search primitives; [params] should carry the
-     *  [BacktrackParams.objectiveBoundSupplier] for external bound sharing (its [BacktrackParams.cancellation]
-     *  bounds construction, while a separately bound lifetime token persists). */
+    /**
+     * Open an explicit-state, pausable branch-and-bound over [objective]. See [ResumableSearch].
+     * [BacktrackParams.cancellation] bounds construction, while a separately bound lifetime token persists.
+     */
     override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch =
         if ((params.nativeSat ?: true) && PropagationProblem(problem).isNativeSatEligible &&
             params.componentFactory == null
@@ -117,14 +117,8 @@ class BacktrackSolver internal constructor(
             PreparingMinimize(this, objective, params)
         }
 
-    /**
-     * Open a reusable [RepairSearch] for the LNS destroy/repair loop: one persistent
-     * [ResumableMinimize] whose session (learned-clause DB) and LP relaxation are re-seeded per fragment
-     * via [ResumableMinimize.rebind] instead of rebuilt. The per-fragment objective cutoff is threaded
-     * through the [BacktrackParams.objectiveBoundSupplier] so it prunes against best-known; the caller
-     * keeps that cutoff monotone (see [RepairSearch.repair]). [params] is the base repair config (its own
-     * `objectiveBoundSupplier` is overridden here).
-     */
+    // One persistent ResumableMinimize, re-seeded per LNS fragment by rebind, so its learned clauses and LP
+    // relaxation survive across fragments. The fragment cutoff replaces params' objectiveBoundSupplier.
     @Suppress("TooGenericExceptionCaught") // the repair owner must preserve arbitrary primary and cleanup failures
     internal fun openRepair(objective: LinearObjective, params: BacktrackParams): RepairSearch {
         var activeCutoff = Double.POSITIVE_INFINITY
@@ -281,9 +275,6 @@ class BacktrackSolver internal constructor(
         if (PrivateRebuildSatisfaction.eligible(problem, params)) PrivateRebuildSatisfaction(this, params)
         else ResumableSatisfaction(this, params)
 
-    /**
-     * The verdict a satisfaction [outcome] stands for, stopping [sink] for its counters.
-     */
     internal fun verdictOf(
         outcome: SearchOutcome,
         assumptions: Assumptions,
@@ -298,8 +289,7 @@ class BacktrackSolver internal constructor(
 
             is SearchOutcome.Exhausted ->
                 if (outcome.indeterminate) {
-                    // A leaf's continuous LP could not be certified either way, so the tree is not
-                    // provably all-infeasible — report `unknown` rather than an unsound UNSAT.
+                    // An uncertified continuous leaf leaves the tree not provably infeasible.
                     SolveResult.Unknown(outcome.stopCause.terminationReason(), stats)
                 } else {
                     SolveResult.Unsat(
@@ -319,28 +309,12 @@ class BacktrackSolver internal constructor(
     }
 
     /**
-     * Independent random samples ("with replacement", per the [com.eignex.klause.solver.Solver.samples]
-     * contract). Each yield kicks off a fresh DFS from root on a new [PropagationSession]
-     * with a per-call RNG seed; no engine state carries between yields, so subsequent
-     * yields are statistically independent given the random heuristic defaults.
+     * Independent random samples, with replacement: each yield is a fresh search from the root on a new
+     * [PropagationSession] with its own seed. A fixed [BacktrackParams.randomSeed] makes the sequence
+     * reproducible. Duplicates are not filtered; use [enumerate] for distinct models.
      *
-     * **Reproducibility.** With a fixed [BacktrackParams.randomSeed] the per-call seeds
-     * are derived by a deterministic LCG advance, so the same parent seed produces the
-     * same sequence of samples across runs. This is reproducibility, not correlation —
-     * the per-call seeds are independent random draws as far as the search is concerned.
-     *
-     * **Duplicates.** The sequence does **not** filter duplicates. For a problem with N
-     * feasible models, the same model may be yielded multiple times; the distribution
-     * across yields is determined by the heuristics. For distinct samples use [enumerate]
-     * (complete + DFS-ordered) or `samples(p).distinct().take(n)` (random + distinct,
-     * uses memory linear in yielded count).
-     *
-     * **Termination.** The sequence is **infinite for any feasible problem** — callers
-     * must bound it with `.take(n)` or `.takeWhile(...)`. It terminates early only when:
-     *  - a run returns [SolveResult.Unsat] — the entire search tree exhausts without a
-     *    SAT (the problem is infeasible); or
-     *  - a run returns [SolveResult.Unknown] — [BacktrackParams.maxDecisions] elapsed
-     *    before any SAT was found on that run.
+     * The sequence is infinite for a feasible problem; it ends early only when a run returns
+     * [SolveResult.Unsat] or [SolveResult.Unknown].
      */
     override fun samples(params: BacktrackParams): Sequence<Sample> = sequence {
         var seed = params.randomSeed ?: Random.Default.nextLong()
@@ -351,9 +325,7 @@ class BacktrackSolver internal constructor(
                 is SolveResult.Unsat -> return@sequence
                 is SolveResult.Unknown -> return@sequence
             }
-            // LCG advance for reproducibility: same parent seed → same per-call seed
-            // sequence → same sample sequence. The per-call seeds drive the heuristics'
-            // random choices; from the search's perspective they're independent draws.
+            // Deterministic LCG advance: the same parent seed reproduces the same sample sequence.
             seed = seed * 6364136223846793005L + 1442695040888963407L
         }
     }
@@ -376,13 +348,8 @@ class BacktrackSolver internal constructor(
         }.withSourceSemantics(problem.semantics)
 
     /**
-     * Distinct SAT assignments via single-DFS traversal of the search tree. Complete:
-     * given enough budget, every distinct feasible assignment is yielded exactly once.
-     * The optional rolling Hamming-distance window adds extra spacing between yields.
-     *
-     * For *diverse* distinct samples — useful when a small test/verification budget
-     * shouldn't be spent on one subtree — call [samples] (which uses random restarts
-     * with-replacement) and de-duplicate client-side, e.g. `samples(p).distinct().take(n)`.
+     * Distinct models from one depth-first traversal. Given enough budget, every feasible assignment is yielded
+     * exactly once; the optional rolling Hamming-distance window adds spacing between yields.
      */
     override fun enumerate(params: BacktrackParams): Sequence<Sample> = sequence {
         for (outcome in enumerationOutcomes(params)) {
@@ -449,7 +416,7 @@ class BacktrackSolver internal constructor(
         )
     }
 
-    /** Enumerate accepted samples while preserving the terminal search outcome for finite orchestration. */
+    // Keeps the terminal search outcome for finite orchestration.
     internal fun enumerationOutcomes(params: BacktrackParams): SearchStream<SearchOutcome> {
         var traversal: CpSatisfactionTraversal? = null
         val window = ArrayDeque<Sample>()
@@ -479,46 +446,22 @@ class BacktrackSolver internal constructor(
         )
     }
 
-    /**
-     * Branch-and-bound minimisation. Walks the DFS yielding feasible leaves; each leaf
-     * improves the incumbent `bestObj` and tightens a partial-assignment lower bound
-     * that the search engine consults on every successful pin to prune the subtree when
-     * it provably can't beat the incumbent. The pruning predicate closes over the
-     * mutable `bestObj`, so the tightening propagates lazily without explicit
-     * communication into the engine.
-     *
-     * For [LinearObjective] the bound is `Σ_b lb_b(bool) + Σ_i lb_i(int) + constant`,
-     * where:
-     *  - `lb_b = boolWeights[b]` if `b` is pinned-true, `0` if pinned-false,
-     *    `min(0, boolWeights[b])` if unpinned;
-     *  - `lb_i = coeff[i] · (coeff ≥ 0 ? dom.min : dom.max)`.
-     *
-     * Sound: every completion can only *raise* the contribution of unpinned vars from
-     * the minimum, so an LB that already equals or exceeds the incumbent guarantees no
-     * descendant leaf beats it.
-     */
+    /** Branch-and-bound minimization; the last result of [improvements]. */
     override fun minimize(objective: LinearObjective, params: BacktrackParams): MinimizeResult =
         improvements(objective, params).last()
 
     /**
-     * Anytime variant of [minimize]: yields one [MinimizeResult.BestFound] per new
-     * incumbent discovered, followed by exactly one terminal verdict
-     * ([MinimizeResult.Optimal] / [MinimizeResult.Infeasible] / final
-     * [MinimizeResult.BestFound] / [MinimizeResult.Unknown]). Same B&B engine as
-     * [minimize]; just exposes the search's intermediate bests as they land instead of
-     * collapsing them into a single return value.
+     * Anytime variant of [minimize]: yields one [MinimizeResult.BestFound] per new incumbent, followed by exactly
+     * one terminal verdict ([MinimizeResult.Optimal] / [MinimizeResult.Infeasible] / final
+     * [MinimizeResult.BestFound] / [MinimizeResult.Unknown]).
      *
-     * With [BacktrackParams.lpConfig] the LP-relaxation family is enabled here, structurally:
-     * [LpAutoConfig.resolve] ORs on the techniques the emphasis permits whose target structure the
-     * problem contains. The objective is statically linear, so no objective-shape check is involved —
-     * LP enablement is purely a params decision.
+     * With [BacktrackParams.lpConfig], [LpAutoConfig.resolve] enables the LP techniques its emphasis permits whose
+     * target structure the problem contains.
      */
     @Suppress("TooGenericExceptionCaught") // a lazy callback failure remains primary if cleanup also fails
     override fun improvements(objective: LinearObjective, params: BacktrackParams): Sequence<MinimizeResult> =
         sequence {
-            // The single B&B orchestration ([ResumableMinimize]), driven lazily: one incumbent surfaced
-            // per step, then the terminal verdict. lpConfig is resolved inside the search. `pausable = false`
-            // makes a fired cancellation a hard terminal stop (no resume) — a one-shot stream's contract.
+            // `pausable = false` makes a fired cancellation terminal, as a one-shot stream requires.
             val search = ResumableMinimize(this@BacktrackSolver, objective, params, pausable = false)
             try {
                 while (true) {
@@ -547,21 +490,16 @@ class BacktrackSolver internal constructor(
         }
 }
 
-/** Ceiling on the adaptive cancellation cadence (nodes between deadline polls). Fast instances
- *  settle here — a few microseconds per check at worst; slow ones adapt below it. See
- *  [com.eignex.klause.solver.search.SearchCancellationPoller]. */
+// Ceiling on the adaptive cancellation cadence (nodes between deadline polls); slow instances adapt below it.
 internal const val CANCEL_CHECK_INTERVAL: Int = 256
 
-/** Target wall-clock gap (ms) between deadline polls; the adaptive cadence steers toward it so `-t`
- *  overshoot stays ~this small regardless of per-node cost. */
+// Target wall-clock gap (ms) between deadline polls, so deadline overshoot stays about this small whatever the
+// per-node cost.
 internal const val CANCEL_CHECK_TARGET_MS: Long = 5
 
-/** Cap on cascading CDB backjumps within a single search step. Defensive; under
- *  a well-formed analyzer the loop terminates well before this. */
+// Defensive cap on cascading backjumps within one search step; a well-formed analyzer terminates well before it.
 internal const val MAX_CASCADING_BACKJUMPS: Int = 64
 
-/** After this many identical re-derivations of one clause, its conflicts are
- *  handled chronologically instead of by backjump — a repeat-learning streak this
- *  long means the backjump + assert cycle is not progressing. Generous enough that
- *  healthy re-learning (after forgetting or restarts) never trips it. */
+// After this many identical re-derivations of one clause, its conflicts are handled chronologically: the
+// backjump-and-assert cycle is not progressing. Healthy re-learning after forgetting or restarts never trips it.
 internal const val RELEARN_FALLBACK_THRESHOLD: Int = 8

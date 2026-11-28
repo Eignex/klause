@@ -4,72 +4,54 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.PresolveInvocationStats
 import com.eignex.klause.util.ExecutionControl
 
-/**
- * Share of the model, in [PresolveRoundEngine.RoundHost.modelSize] units, that other passes must change
- * before a pass above [PresolveTiming.FAST] runs again, in addition to its observed cost/yield threshold.
- */
+// Share of the model that other passes must change before a pass above [PresolveTiming.FAST] runs again,
+// in addition to its observed cost/yield threshold.
 private const val RERUN_CHANGE_FRACTION = 0.01
 
-/** What running one pass did to the host's model. */
 internal enum class PassOutcome {
-    /** The pass found nothing to do. */
     UNCHANGED,
 
-    /** A sound cheap applicability check excluded the pass. */
+    // A sound cheap applicability check excluded the pass.
     SKIPPED,
 
-    /** Analysis stopped without a completed reduction. */
+    // Analysis stopped without a completed reduction.
     INTERRUPTED,
 
-    /** The pass rewrote the model. */
     CHANGED,
 
-    /** The pass refuted the model. */
     INFEASIBLE,
 }
 
-/** Shared bounded-fixpoint scheduler for the source and finite presolve lanes. */
+// Bounded-fixpoint scheduler shared by the source and finite presolve lanes.
 internal object PresolveRoundEngine {
 
-    /**
-     * The per-lane operations the scheduler drives.
-     *
-     * A host owns the model type its passes read, the change type they return, and where a firing pass's
-     * change lands; the scheduler needs only to know what a pass did, so neither type appears here. That
-     * is what lets the source lane run over declarations while the finite lane runs over root domains
-     * under one schedule.
-     */
+    // A host owns its lane's model and change types, so the source lane runs over declarations and the
+    // finite lane over root domains under one schedule.
     interface RoundHost {
-        /** Run [pass] over the current model and fold its change in. [slice] caps this pass's own share
-         *  of the phase budget; `null` leaves the host's own cancellation in place. */
+        // [slice] caps this pass's share of the phase budget; null leaves the host's cancellation in place.
         fun runPass(pass: PresolvePass, slice: ExecutionControl?): PassOutcome
 
-        /** Post-pass hook, invoked whether or not the pass fired. */
+        // Invoked whether or not the pass fired.
         fun afterPass(pass: PresolvePass) {}
 
-        /** Current problem complexity, read at round boundaries for the abort check. */
+        // Read at round boundaries for the abort check.
         fun complexity(): Long
 
-        /** Factors plus columns of the current model, the scale [changedUnits] is weighed against. */
+        // Factors plus columns, the scale [changedUnits] is weighed against.
         fun modelSize(): Long
 
-        /** Factors dropped or added plus columns narrowed, summed over every change folded in so far. */
+        // Factors dropped or added plus columns narrowed, cumulative.
         fun changedUnits(): Long
 
-        /** Relevant input revision for a parked pass, or null for permanent parking. */
+        // Null parks the pass permanently.
         fun inputRevision(pass: PresolvePass): Long? = null
     }
 
-    /** The changes made by one bounded pass schedule. */
     class Result(val fired: List<PresolvePass>, val infeasible: Boolean)
 
-    /**
-     * Drive [passes] to their bounded fixpoint through [host].
-     *
-     * Any change re-enables every [PresolveTiming.FAST] pass. A costlier pass runs again only once the
-     * other passes have changed at least `RERUN_CHANGE_FRACTION` of the model it last ran over and met
-     * its observed work per useful reduction. These are spending heuristics, not search-cost bounds.
-     */
+    // Any change re-enables every [PresolveTiming.FAST] pass. A costlier pass runs again only once the
+    // other passes have changed at least `RERUN_CHANGE_FRACTION` of the model it last ran over and met its
+    // observed work per useful reduction. These are spending heuristics, not search-cost bounds.
     fun run(
         passes: List<PresolvePass>,
         maxRounds: Int,
@@ -152,7 +134,7 @@ internal object PresolveRoundEngine {
         return Result(fired.toList(), infeasible)
     }
 
-    /** Compose pass reconstruction functions in reverse application order. */
+    // Reverse application order.
     fun compose(reconstructs: List<(Sample) -> Sample>): (Sample) -> Sample = if (reconstructs.isEmpty()) {
         { it }
     } else {

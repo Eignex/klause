@@ -2,7 +2,6 @@ package com.eignex.klause.formats.minizinc
 
 import com.eignex.klause.formats.FormatException
 
-/** Recursive-descent parser for the `.ozn` subset of MiniZinc. */
 internal class OznParser(private val tokens: List<OznToken>) {
     private var pos: Int = 0
 
@@ -75,8 +74,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
         return OznItem.VarDecl(name, init)
     }
 
-    /** Consume a type's tokens. The declared type carries no semantic weight in `.ozn` evaluation
-     *  (values come from initializers), so nothing is retained. */
+    // Values come from initializers, so the declared type is consumed and discarded.
     private fun parseType() {
         if (peekKeyword("array")) {
             advance()
@@ -484,8 +482,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
     }
 }
 
-/** Raised when parsing or evaluating MiniZinc `.ozn` output fails — the single catchable exception for
- *  this front-end, matching the one-class convention of the other formats. */
+/** Raised when parsing or evaluating MiniZinc `.ozn` output fails. */
 class OznParseException : FormatException {
     constructor(message: String) : super("MiniZinc output", message)
 

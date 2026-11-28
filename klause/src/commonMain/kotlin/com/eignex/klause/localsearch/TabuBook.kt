@@ -3,21 +3,15 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.ir.Problem
 
 /**
- * Tabu / activity bookkeeping for an ongoing solve: the accepted-move [step] clock, the per-variable
- * last-touched stamps ([lastTouched]) driving the tabu window, and the cross-epoch [touchCount]
- * activity histogram. [LocalSearchState]'s apply path advances all three; strategies read them for
- * tabu decisions.
+ * Tabu and activity bookkeeping that [LocalSearchState]'s apply path advances: the accepted-move [step] clock, the
+ * per-variable [lastTouched] stamps and the cross-epoch [touchCount] histogram.
  */
 class TabuBook private constructor(
     problem: Problem,
-    /** Step at which each variable was last flipped or set. Bool var ids in `[0, numBoolVars)`; int
-     *  var ids offset by `numBoolVars`; real var ids offset by `numBoolVars + numIntVars`. Reset to
-     *  zero on [reset] — used only for tabu decisions within a single restart epoch. For cross-epoch
-     *  activity, see [touchCount]. */
+    /** Step at which each variable last moved, reset with the tabu window. Bool ids come first, then int ids offset
+     *  by `numBoolVars`, then real ids offset by `numBoolVars + numIntVars`. */
     val lastTouched: LongArray,
-    /** Cumulative count of moves applied to each variable, same indexing as [lastTouched]. Survives
-     *  [reset] so it measures activity across the whole search run. Captured by
-     *  [com.eignex.klause.localsearch.WarmState] for ALNS's `activityBiased` destroy operator. */
+    /** Moves applied to each variable across the whole run, indexed like [lastTouched]; survives [reset]. */
     val touchCount: IntArray,
 ) {
     constructor(problem: Problem) : this(
@@ -38,20 +32,16 @@ class TabuBook private constructor(
     private val numBoolVars: Int = problem.numBoolVars
     private val numDiscreteVars: Int = problem.numBoolVars + problem.numIntVars
 
-    /** Step counter incremented on every accepted move. Together with [lastTouched] it enforces a
-     *  tabu list. */
+    /** Accepted-move counter, the clock [lastTouched] is stamped with. */
     var step: Long = 0L
         internal set
 
-    /** Clear the tabu window: zero [lastTouched] and [step]. [touchCount] is deliberately preserved
-     *  so cross-epoch activity survives a restart. */
     internal fun reset() {
         for (i in lastTouched.indices) lastTouched[i] = 0L
         step = 0L
     }
 
-    /** True iff [move]'s var was touched within the last [tenure] accepted moves. For a
-     *  [Move.Compound], conservative: true if *any* part is tabu. */
+    /** True iff [move]'s var moved within the last [tenure] accepted moves; a compound is tabu when any part is. */
     fun isTaboo(move: Move, tenure: Int): Boolean {
         if (tenure <= 0) return false
         return when (move) {

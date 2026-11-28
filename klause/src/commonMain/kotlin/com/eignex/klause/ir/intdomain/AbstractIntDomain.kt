@@ -19,19 +19,16 @@ internal abstract class AbstractIntDomain(val storage: DomainStorageSettings) : 
 
     override fun excludeValues(values: LongArray): IntDomain? {
         if (values.isEmpty()) return this
-        // A non-enumerable (wide-span) domain must never be walked value-by-value: a survivor pass over a
-        // > 2^31-value domain would overflow its Int-indexed list. Fold the excluded values in one at a time
-        // instead, each a span-independent run split, so the cost scales with the exclusion count. A finite
-        // exclusion set cannot empty such a domain, so the result is never null; identity is preserved when
-        // nothing was actually present to exclude.
+        // A non-enumerable (wide-span) domain must never be walked value by value: its survivor list would overflow
+        // Int indexing. Each excluded value is a span-independent run split instead, and a finite exclusion set
+        // cannot empty such a domain.
         val span = spanOrNull()
         if (span == null) {
             var d: IntDomain = this
             for (v in values) d = d.excludeValue(v)
             return if (d === this) this else d
         }
-        // Grow from a small default rather than preallocating the value count: a wide domain carved to a
-        // sparse survivor set yields a tiny result, and a count-capacity array would waste memory.
+        // A wide domain carved to a sparse survivor set yields a tiny result, so no count-sized preallocation.
         val out = LongArrayList()
         var j = 0
         span.forEach { p ->
@@ -67,8 +64,8 @@ internal abstract class AbstractIntDomain(val storage: DomainStorageSettings) : 
         var h = min.hashCode() * 31 + max.hashCode()
         val span = spanOrNull()
         if (span == null) {
-            // Hash the holes instead of the (un-walkable) values. Consistent with [equals]: a
-            // non-enumerable domain never set-equals an enumerable one — their exact counts differ.
+            // Hash the holes instead of the unwalkable values. Consistent with equals: a non-enumerable domain
+            // never set-equals an enumerable one, since their exact counts differ.
             forEachHole { v -> h = h * 31 + v.hashCode() }
             return h
         }

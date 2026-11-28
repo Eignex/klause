@@ -24,11 +24,8 @@ internal object LabInputs {
     fun resolve(ref: ProblemRef, inputOnly: Boolean = false): List<BenchInput> =
         indexed(ref) ?: materialized(ref, inputOnly)
 
-    /**
-     * [ref]'s inputs from its collections' indexes, without their bytes, when the lab accepts declared hashes. The
-     * lab fetches each by content hash for the case that needs it, and [verify] checks it before the solve. MiniZinc
-     * models stay [materialized]: their include directories and dependency scan need real trees and content.
-     */
+    // The lab fetches each input by content hash for the case that needs it, and verify checks it before the solve.
+    // MiniZinc models stay materialized: their include directories and dependency scan need real trees and content.
     private fun indexed(ref: ProblemRef): List<BenchInput>? {
         if (!CorpusFetcher.declaredInputs || ref.format == Format.MINIZINC) return null
         return (listOf(ref.source to "model") + listOfNotNull(ref.data?.let { it to "data" })).map { (source, role) ->

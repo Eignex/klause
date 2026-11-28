@@ -30,7 +30,7 @@ internal class AllDifferentPayload(
 @Serializable
 internal class AllDifferentTuplesPayload(val tuples: List<IntArray>)
 
-/** Exact affine operand over `Term` codes. */
+// Exact affine operand over `Term` codes.
 @Serializable
 internal class DistinctOperandPayload(
     val terms: IntArray,
@@ -44,7 +44,7 @@ internal class DistinctOperandPayload(
 @Serializable
 internal class DistinctPayload(val operands: List<DistinctOperandPayload>, val activator: Int? = null)
 
-/** Counts are either [countVars] columns or fixed [countLow]..[countHigh] ranges. */
+// Counts are either [countVars] columns or fixed [countLow]..[countHigh] ranges.
 @Serializable
 internal class GlobalCardinalityPayload(
     val xs: IntArray,

@@ -33,15 +33,13 @@ internal enum class PrimalPhaseResult {
 }
 
 internal enum class PivotFold {
-    /** The update went in and the factors are fit to carry on. */
     UPDATED,
 
-    /** The refactor policy rebuilt the same basis; the factors are fresh. */
+    // The refactor policy rebuilt the same basis.
     REBUILT,
 
-    /** Numerical repair installed a different ordered basis; iteration-local state must be abandoned. */
+    // Numerical repair installed a different ordered basis; iteration-local state must be abandoned.
     BASIS_CHANGED,
 
-    /** Neither the update nor the rebuild behind it left a usable basis. */
     FAILED,
 }

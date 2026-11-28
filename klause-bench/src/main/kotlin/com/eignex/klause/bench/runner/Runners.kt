@@ -2,11 +2,7 @@ package com.eignex.klause.bench.runner
 
 import com.eignex.klause.bench.catalog.ProblemRef
 
-/**
- * Picks the right [Runner] for a [ProblemRef]: [MiniZincRunner] for MiniZinc models (which
- * need the `minizinc` compile step), [InProcessRunner] for everything else. Solving the
- * resolved [ResolvedProblem] is uniform afterwards, so callers depend only on this dispatch.
- */
+/** Picks the runner for a catalog problem: MiniZinc models compile through `minizinc`, the rest run in-process. */
 object Runners {
     private val miniZinc = MiniZincRunner()
     private val exactMiniZinc = MiniZincRunner(exactFloats = true)

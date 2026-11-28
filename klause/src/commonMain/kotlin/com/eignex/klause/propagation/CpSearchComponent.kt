@@ -80,7 +80,6 @@ class CpSearchComponent(
         sourceChecks = SelectedProjectionChecks(selection, factorIds)
     }
 
-    /** Where conflicts this component cannot learn from are counted; null counts nothing. */
     internal var conflictStats: ConflictAnalysisStatsSink? = null
 
     override val resolvesAfterModelBlock: Boolean
@@ -355,11 +354,9 @@ class CpSearchComponent(
             }
         }
         recordNativeLevel(context.decisionLevel)
-        // A cut fixpoint reports no conflict, so this node stands on factors that never fired: hand it
-        // back as undecided and let the traversal retract it, rather than descend toward a leaf those
-        // factors would have refuted. A refutation the fixpoint did reach needs no such retreat — an
-        // under-propagated state only ever under-tightens, so the conflict holds and keeps its
-        // explanation. See [check] for the leaf that a fixpoint cut elsewhere reaches.
+        // A cut fixpoint reports no conflict, so this node stands on factors that never fired: hand it back as
+        // undecided for the traversal to retract. A refutation the fixpoint did reach holds, since an
+        // under-propagated state only under-tightens.
         return if (result is ComponentResult.Consistent && session.fixpointCancelled) {
             ComponentResult.Indeterminate
         } else {
@@ -529,10 +526,8 @@ class CpSearchComponent(
         branching.alternatives(session, ::sourceIntId)
 
     /**
-     * Refuse a leaf standing on a fixpoint the deadline cut short. A cut fixpoint reports no conflict
-     * (see [PropagationSession.fixpointCancelled]), so the factors it never fired have not had their
-     * say: the traversal would otherwise read the under-propagated state as a model and publish an
-     * assignment that violates them.
+     * Refuses a leaf standing on a fixpoint the deadline cut short: the factors it never fired could be violated
+     * by the under-propagated state.
      */
     override fun check(context: com.eignex.klause.solver.search.SearchContext): ComponentCheck =
         if (session.fixpointCancelled) ComponentCheck.Indeterminate else session.checkSelectedProjection(sourceChecks)

@@ -1,100 +1,63 @@
 package com.eignex.klause.ir
 
-/**
- * A single declaration of a factor's structural key, consumed twice: [MaterializingKeySink] builds the
- * canonical [StructuralKey]; [HashingKeySink] folds the hash of the key the same
- * factor would have *after* a variable remap, without allocating either the remapped factor or the key
- * (`remapStructuralHash`). The two sinks emit the identical word sequence for the same remap, so a
- * factor gets both behaviours from one `buildKey` description via [materializeKey] and [hashRemappedKey].
- *
- * Methods split arguments into constants (carried verbatim) and variable references (remapped by
- * [HashingKeySink]): [intVar]/[intVars]/[sortedIntVars] are integer-variable ids, [boolVar] a Boolean
- * variable id, [boolLit]/[boolLits]/[sortedBoolLits] Boolean literals (variable remapped, polarity kept),
- * and [pairsByVarKey]/[pairsByLitKey] `(varKey, constValue)` pairs ordered by the *remapped* key. The
- * `const*` methods and the scalar [int]/[long]/[bool]/[enum] carry values no remap touches.
- */
+// One declaration of a factor's structural key, consumed twice: MaterializingKeySink builds the key and
+// HashingKeySink folds the hash the key would have after a variable remap, allocating neither. Both emit
+// the identical word sequence for the same remap. Variable and literal methods are remapped by the
+// hashing sink; `const*` and scalar methods carry values verbatim.
 internal interface KeySink {
     fun int(value: Int)
     fun long(value: Long)
     fun bool(value: Boolean)
     fun enum(value: Enum<*>)
 
-    /** A positional constant int array (order significant), not remapped. */
     fun constInts(xs: IntArray)
 
-    /** A positional constant long array (order significant), not remapped. */
     fun constLongs(xs: LongArray)
 
-    /** A pre-built constant fragment (no variable ids inside) spliced verbatim. */
+    // A pre-built fragment with no variable ids inside, spliced verbatim.
     fun constWords(fragment: LongArray)
 
-    /** One integer-variable id. */
     fun intVar(id: Int)
 
-    /** One integer-variable id, or a negative sentinel carried verbatim (e.g. an absent count var). */
+    // A negative sentinel, such as an absent count variable, is carried verbatim.
     fun intVarOrSelf(id: Int)
 
-    /** Positional integer-variable ids (order significant). */
     fun intVars(ids: IntArray)
 
-    /** Set-semantics integer-variable ids (order insignificant): remapped, then sorted ascending. */
     fun sortedIntVars(ids: IntArray)
 
-    /** One real-variable id. */
     fun realVar(id: Int)
 
-    /** One Boolean-variable id. */
     fun boolVar(id: Int)
 
-    /** Set-semantics Boolean-variable ids: remapped, then sorted ascending. */
     fun sortedBoolVars(ids: IntArray)
 
-    /** One Boolean literal (variable remapped, polarity kept). */
     fun boolLit(lit: Int)
 
-    /** Positional Boolean literals (order significant). */
     fun boolLits(lits: IntArray)
 
-    /** Set-semantics Boolean literals: remapped, then sorted ascending. */
     fun sortedBoolLits(lits: IntArray)
 
-    /** `(varKey, value)` pairs ordered by the remapped key ascending; the value for original index `i` is
-     *  `valueOf(i)`, a constant. Non-coalescing: keys sharing an image stay as separate pairs. */
+    // Ordered by remapped key; keys sharing an image stay separate pairs.
     fun pairsByVarKey(varKeys: IntArray, valueOf: (Int) -> Long)
 
-    /** `(litKey, value)` pairs ordered by the remapped literal ascending; value at original index `i` is
-     *  `valueOf(i)`, a constant. Non-coalescing. */
     fun pairsByLitKey(litKeys: IntArray, valueOf: (Int) -> Long)
 
-    /** `(varKey, value)` pairs ordered by the remapped variable ascending, **coalescing** keys that share
-     *  an image by summing their `valueOf(i)` values — mirroring a factor (e.g. Linear) whose `remap`
-     *  merges same-variable terms via its constructor, so the port hash matches `remap().structuralKey()`
-     *  even when the map collapses two variables. Under an injective map it is equivalent to
-     *  [pairsByVarKey]. */
+    // Sums the values of keys sharing an image, mirroring a factor whose `remap` merges same-variable
+    // terms, so the hash matches `remap().structuralKey()` even when the map collapses two variables.
     fun pairsByVarKeyCoalescing(varKeys: IntArray, valueOf: (Int) -> Long)
 }
 
-/**
- * The canonical [StructuralKey] of [kind] whose payload is emitted by [build] — the materialising half
- * of a factor's single key declaration. A factor's `structuralKey` is `materializeKey(KIND, ::buildKey)`.
- */
 internal fun materializeKey(kind: FactorKind, build: (KeySink) -> Unit): StructuralKey =
     MaterializingKeySink(kind).also(build).toKey()
 
-/** [materializeKey] with a factor-provided payload-size estimate. */
 internal fun materializeKey(kind: FactorKind, expectedWords: Int, build: (KeySink) -> Unit): StructuralKey =
     MaterializingKeySink(kind, expectedWords).also(build).toKey()
 
-/**
- * The `hashCode` of the key `build` describes *after* renumbering variables through [mapping] — the
- * hashing half, allocation-free (no `remap()` copy, no key object). Equals
- * `remap(mapping).structuralKey().hashCode()`. A factor's `remapStructuralHash` is
- * `hashRemappedKey(KIND, mapping, ::buildKey)`, sharing the same `buildKey` as [materializeKey].
- */
+// Equals `remap(mapping).structuralKey().hashCode()` without allocating the remapped factor or key.
 internal fun hashRemappedKey(kind: FactorKind, mapping: VarRemap, build: (KeySink) -> Unit): Int =
     HashingKeySink(kind, mapping).also(build).hash()
 
-/** Builds the canonical [StructuralKey] with the identity remap. */
 internal class MaterializingKeySink(private val kind: FactorKind, expectedWords: Int = 0) : KeySink {
     private val b = StructuralKeyBuilder(expectedWords)
 
@@ -123,12 +86,8 @@ internal class MaterializingKeySink(private val kind: FactorKind, expectedWords:
     fun toKey(): StructuralKey = b.build(kind)
 }
 
-/**
- * Folds the hash of the key the factor would have after renumbering variables through [mapping],
- * mirroring [StructuralKeyBuilder]'s word layout without allocating. The fold matches
- * `remap(mapping).structuralKey().hashCode()`: `contentHashCode` over the payload words
- * (seed 1, `h = 31*h + longWordHash(w)`), then `31*kind.ordinal + h`.
- */
+// Mirrors StructuralKeyBuilder's word layout: `contentHashCode` over the payload words, then
+// `31*kind.ordinal + h`, so the fold matches `remap(mapping).structuralKey().hashCode()`.
 internal class HashingKeySink(private val kind: FactorKind, private val mapping: VarRemap) : KeySink {
     private var h = 1
 
@@ -187,8 +146,7 @@ internal class HashingKeySink(private val kind: FactorKind, private val mapping:
 
     override fun pairsByLitKey(litKeys: IntArray, valueOf: (Int) -> Long) = pairs(litKeys, { mapLit(it) }, valueOf)
 
-    /** Emit `length` then the images of [ids] under [image], ascending — mirrors `sortedInts` on the
-     *  remapped array. */
+    // Mirrors `sortedInts` on the remapped array.
     private inline fun sortedImages(ids: IntArray, image: (Int) -> Int) {
         word(ids.size.toLong())
         val images = IntArray(ids.size) { image(ids[it]) }
@@ -196,8 +154,7 @@ internal class HashingKeySink(private val kind: FactorKind, private val mapping:
         for (x in images) word(x.toLong())
     }
 
-    /** Emit `length` then `(image, value)` pairs ordered by image ascending (ties by original index),
-     *  mirroring `pairsByKey` on the remapped keys — non-coalescing. */
+    // Mirrors `pairsByKey` on the remapped keys; ties break by original index.
     private inline fun pairs(keys: IntArray, image: (Int) -> Int, valueOf: (Int) -> Long) {
         word(keys.size.toLong())
         val n = keys.size

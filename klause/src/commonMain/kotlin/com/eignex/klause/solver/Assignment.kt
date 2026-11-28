@@ -83,7 +83,7 @@ class Assignment private constructor(
 
     /** Randomize every Boolean and integer variable within its domain; real values are left unchanged. */
     fun randomize(rng: Random, intDomains: Array<IntDomain>) {
-        // Direct word fill — much faster than a per-var coin flip via bits.set / clear.
+        // A word fill is much faster than a per-var coin flip.
         randomizeBoolWords(rng, 0, boolWordCount)
         for (i in 0 until numIntVars) {
             val d = intDomains[i]
@@ -226,10 +226,8 @@ class Sample private constructor(
     fun approximateRealValue(id: Int): Double = approximateReals[id]
 
     /**
-     * Algebraic coordinates whose isolating interval still spans more than one binary64 rounding cell, so that
-     * [approximateRealValue] approximates the root in [algebraicReals] rather than giving its nearest binary64 value.
-     * A published solve or optimum narrows each interval within a bounded allowance; a coordinate listed here is one
-     * that allowance left unsettled.
+     * Indices of algebraic coordinates whose isolating interval still spans more than one binary64 rounding cell,
+     * so [approximateRealValue] is not the nearest binary64 value of the root in [algebraicReals].
      */
     fun undeterminedReals(): List<Int> {
         val algebraic = algebraicReals ?: return emptyList()

@@ -16,14 +16,8 @@ class SearchCancellationPoller(private val timeSource: TimeSource.WithComparable
     private var lastMark: ComparableTimeMark? = null
 
     /**
-     * Poll on a fixed cadence instead of a time-adaptive one.
-     *
-     * A search can only stop where it polls. While the cadence is tuned by elapsed time, *where* a
-     * counted budget stops the search is a function of machine speed — so two identical invocations
-     * pause at different nodes and every counter downstream of the search inherits that. A caller
-     * running the search against a counted budget sets this so the stopping point is a property of the
-     * search alone. Off by default: the adaptive cadence is what keeps cheap search from calling its
-     * token every step, and that is worth more than reproducibility when nothing is counting.
+     * Poll on a fixed cadence instead of a time-adaptive one, so a counted budget stops the search at the
+     * same node regardless of machine speed. Off by default because the adaptive cadence polls less often.
      */
     var fixedCadence: Boolean = false
 
@@ -58,8 +52,6 @@ class SearchCancellationPoller(private val timeSource: TimeSource.WithComparable
     private companion object {
         const val MAX_INTERVAL = 256
 
-        /** Poll cadence under [fixedCadence]: frequent enough to stop near a counted budget, coarse
-         *  enough not to call the token every step. */
         const val FIXED_INTERVAL = 16
         const val TARGET_MILLIS = 5L
     }

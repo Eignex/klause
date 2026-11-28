@@ -18,7 +18,6 @@ import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.LongHashSet
 import com.eignex.util.collections.MutableLongIntMap
 
-/** CP propagation logic for `nvalue`. */
 internal class NValuePropagator(
     val boolVars: IntArray,
     val intVars: IntArray,
@@ -82,15 +81,11 @@ internal class NValuePropagator(
 
         if (state.cpGateShouldSkip(factorId)) return true
 
-        // atLeast / eq: the distinct count cannot exceed the size of a maximum bipartite var↦value matching
-        // (Bessière, Hebrard, Hnich, Kiziltan, Walsh, "Filtering Algorithms for the NValue Constraint",
-        // Constraints 11(4), 2006, https://doi.org/10.1007/s10601-006-9001-9). Tighter than |union of
-        // domains|. When the count is pinned to that maximum, a maximum matching is mandatory, so
-        // matching-support pruning applies.
+        // atLeast / eq: the distinct count is at most a maximum var↦value matching (Bessière, Hebrard, Hnich,
+        // Kiziltan, Walsh, "Filtering Algorithms for the NValue Constraint", Constraints 11(4), 2006,
+        // https://doi.org/10.1007/s10601-006-9001-9). A count pinned to that maximum makes the matching mandatory.
         if (mode != NValue.Mode.AtMost) {
-            // The matching build enumerates each variable's domain. On a domain too large to walk fall
-            // back to the trivial sound upper bound (distinct values ≤ number of variables) and skip the
-            // GAC value pruning, which needs the matching.
+            // The matching enumerates domains; a domain too large to walk falls back to `n ≤ |xs|`.
             if (xs.all { state.intDomains[it].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null }) {
                 val matching = buildMatching(state)
                 // No matching is larger: the variables alternating paths reach from unmatched ones are
@@ -112,9 +107,7 @@ internal class NValuePropagator(
                 return failOn(state, IntArray(0), n)
             }
         }
-        // atMost / eq: bound-consistency — the count is at least the size of a
-        // maximal set of pairwise-disjoint value windows, and when that lower bound meets `n`'s upper
-        // bound every variable is forced into the window of its kernel representative.
+        // atMost / eq: bound consistency over kernels of disjoint value windows.
         if (mode != NValue.Mode.AtLeast) {
             if (!kernelBoundConsistency(state)) return false
         }
@@ -153,9 +146,8 @@ internal class NValuePropagator(
     }
 
     private fun propagateGreedy(state: PropagationState): Boolean {
-        // The union / disjoint-window scans below enumerate each variable's domain. On a domain too large
-        // to walk use a bounds-only bound instead: the distinct count is at most the number of possibly-
-        // present variables. Definitely-present fixed non-excepted values supply a lower bound.
+        // The scans below enumerate domains. A domain too large to walk falls back to counting possibly-present
+        // variables (upper) and definitely-present fixed non-excepted values (lower).
         val nonAbsent = xs.indices.filter { !definitelyAbsentNvFn(it, state) }
         if (nonAbsent.any { state.intDomains[xs[it]].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null }) {
             val boundsAnt = OptionalPresence.withPresencePremises(
@@ -211,8 +203,6 @@ internal class NValuePropagator(
         return true
     }
 
-    /** A maximum bipartite matching between `xs` and their domain values, grown one augmenting path
-     *  per variable. */
     private class Matching(
         val varToVal: IntArray,
         val valToVar: IntArray,
@@ -250,13 +240,9 @@ internal class NValuePropagator(
         return Matching(varToVal, valToVar, values.toLongArray(), adj, matched)
     }
 
-    /**
-     * Matching-support value pruning for atLeast/eq once the count is pinned to the maximum matching size: a
-     * maximum matching is then mandatory, so any var-value pair that lies in no maximum matching has
-     * no support and is removed, while a matched pair that crosses a strong component (in every
-     * maximum matching) is forced. Orientation: matched edges value→var, the rest var→value, with a
-     * source/sink wiring free vars/values so alternating paths from exposed vertices join one SCC.
-     */
+    // With a mandatory maximum matching, a pair in no maximum matching is removed and a matched pair crossing
+    // strong components is forced. Matched edges run value→var, the rest var→value, and a source/sink joins
+    // alternating paths from exposed vertices into one SCC.
     @Suppress("ReturnCount", "NestedBlockDepth")
     private fun atLeastGacPrune(state: PropagationState, m: Matching, ant: IntArray?): Boolean {
         val nv = xs.size
@@ -336,16 +322,10 @@ internal class NValuePropagator(
         return false
     }
 
-    /**
-     * Bound-consistency for atMost (N. Beldiceanu, "Pruning for the minimum constraint family and for the
-     * number of distinct values constraint family", CP 2001, https://doi.org/10.1007/3-540-45578-7_15)
-     * over kernels of disjoint bound windows: a kernel is a maximal set
-     * of pairwise-disjoint `[lb, ub]` windows; its size lower-bounds the distinct count, and when it
-     * equals `n`'s upper bound each variable is squeezed into the window of its kernel representative.
-     * Bounds-only, so interior holes are ignored (sound — the interval over-approximates the domain).
-     * Each `while` iteration takes one snapshot of the bounds and runs both a lower-bound pass and an
-     * upper-bound pass off it, looping until neither pass narrows anything.
-     */
+    // N. Beldiceanu, "Pruning for the minimum constraint family and for the number of distinct values
+    // constraint family", CP 2001, https://doi.org/10.1007/3-540-45578-7_15. A kernel is a maximal set of
+    // pairwise-disjoint `[lb, ub]` windows; its size lower-bounds the count, and when it equals `n.max` each
+    // variable is squeezed into its group's window. Bounds-only, so interior holes are ignored.
     private fun kernelBoundConsistency(state: PropagationState): Boolean {
         val nv = xs.size
         val minVal = LongArray(nv)
@@ -368,7 +348,7 @@ internal class NValuePropagator(
         return true
     }
 
-    /** One kernel pass. Returns -1 on conflict, 1 if it narrowed a domain, 0 otherwise. */
+    // Returns -1 on conflict, 1 if it narrowed a domain, 0 otherwise.
     @Suppress("LongParameterList", "ReturnCount")
     private fun kernelPass(
         state: PropagationState,
@@ -378,10 +358,8 @@ internal class NValuePropagator(
         order: IntArray,
         lowerPass: Boolean,
     ): Int {
-        // Scan variables in value order (lower bound ascending, or upper bound descending), ties by
-        // index descending, so the kernel grouping is deterministic across fires. A window closes
-        // whenever the next variable cannot overlap the running one.
-        // Compare full bounds directly: negating Long.MIN_VALUE cannot reverse its order.
+        // Index tie-break keeps the grouping deterministic across fires. Bounds are compared directly
+        // because negating Long.MIN_VALUE cannot reverse its order.
         val comparator = if (lowerPass) compareBy<Int> { minVal[it] } else compareByDescending<Int> { maxVal[it] }
         val sorted = (0 until nv).sortedWith(comparator.thenByDescending { it })
         for (idx in 0 until nv) order[idx] = sorted[idx]
@@ -434,10 +412,8 @@ internal class NValuePropagator(
             if (!state.tightenIntMin(n, nbKer.toLong(), ant)) return if (failOn(state, ant, n)) 0 else -1
             status = 1
         }
-        // When the kernel count is forced to equal n's max, no variable may stray outside its
-        // window's value range, so squeeze each group.
+        // As many groups as values allowed: no variable may leave its group's window.
         if (state.intDomains[n].max == nbKer.toLong()) {
-            // As many groups as values allowed: each variable takes its group's closing member's value.
             val base = Lits().apply {
                 addAll(kernelLits)
                 add(bound(state, n, false, nbKer.toLong()))
@@ -467,11 +443,8 @@ internal class NValuePropagator(
     private fun overlaps(lowerPass: Boolean, nodeMin: Long, nodeMax: Long, min: Long, max: Long): Boolean =
         if (lowerPass) nodeMin <= max else nodeMax >= min
 
-    /**
-     * The variables in [stamp] form one kernel group; any member that cannot reach the next group's
-     * [frontier] value is clamped to the group's tightest shared bound. Returns -1 on conflict, 1 if
-     * it narrowed a domain, 0 otherwise.
-     */
+    // A group member that cannot reach the next group's frontier is clamped to the group's tightest shared
+    // bound. Returns -1 on conflict, 1 if it narrowed a domain, 0 otherwise.
     @Suppress("LongParameterList")
     private fun squeeze(
         state: PropagationState,

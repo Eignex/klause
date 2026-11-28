@@ -13,35 +13,14 @@ import com.eignex.util.numbers.signum
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.unaryMinus
 
-/**
- * R. Kannan and A. Bachem, *Polynomial Algorithms for Computing the Smith and Hermite Normal Forms of an Integer
- * Matrix*, SIAM J. Comput. 8(4) (1979), https://doi.org/10.1137/0208040: the column Hermite form with its unimodular
- * transform, so the change of variables is a bijection of the integer lattice rather than merely of the rationals.
- *
- * A matrix in column Hermite normal form together with the column operations that produced it:
- * `H = A · V`, where [v] is unimodular (integer, determinant ±1) and therefore a bijection of the
- * integer lattice — so `Ax ⋛ b` and `Hy ⋛ b` have the same integer solutions, related by `x = Vy`.
- */
+// Column Hermite form `H = A · V` (R. Kannan and A. Bachem, *Polynomial Algorithms for Computing the Smith and
+// Hermite Normal Forms of an Integer Matrix*, SIAM J. Comput. 8(4) (1979), https://doi.org/10.1137/0208040). [v] is
+// unimodular, so `Ax ⋛ b` and `Hy ⋛ b` have the same integer solutions, related by `x = Vy`.
 internal class HermiteForm(val h: List<SparseIntRow>, val v: UnimodularTransform)
 
-/**
- * Column Hermite normal form of [a] over [cols] columns, with the unimodular column transform that
- * produces it, or null when [cancellation] fired before the reduction finished.
- *
- * The form is lower triangular: reading rows top to bottom, each pivot sits strictly to the right of
- * nothing — every entry to the right of a row's pivot is zero — which is what makes a variable's bound
- * derivable from the row its column pivots in. That is the property the reduction is after: on a
- * double-bounded system with this shape every variable is either bounded by propagation along its pivot
- * row or has an all-zero column and drops out entirely.
- *
- * Computed by integer column operations only — swap, negate, and add an integer multiple of one column to
- * another — each of which is unimodular, so their product [HermiteForm.v] is too. Entries are
- * [BigInt] because the intermediate coefficients of an integer elimination grow well past `Long` even
- * when the input and the result both fit comfortably.
- *
- * A partial reduction is not usable: its `H` is not yet triangular, so forward substitution over it would
- * bound the wrong column. ExecutionControl therefore reports nothing rather than a prefix.
- */
+// Lower triangular: every entry right of a row's pivot is zero, so each variable is bounded along its pivot row or
+// has an all-zero column. Swaps, negations and integer column additions are unimodular, so [HermiteForm.v] is too.
+// A partial `H` is not triangular and would bound the wrong column, so cancellation returns null.
 @Suppress("NestedBlockDepth", "ReturnCount")
 internal fun hermiteNormalForm(
     a: List<SparseIntRow>,
@@ -55,18 +34,14 @@ internal fun hermiteNormalForm(
     var pivot = 0
     for (row in 0 until rows) {
         if (pivot >= cols) break
-        // Clear the row to the right of the pivot column by repeated gcd steps: pick the column with the
-        // smallest non-zero entry and subtract multiples of it from the others, which is the Euclidean
-        // algorithm run across columns and terminates for the same reason.
+        // The Euclidean algorithm across columns clears the row right of the pivot.
         while (true) {
             if (cancellation()) return null
             cancellation.charge(LATTICE_WORK_WEIGHT * (1L + h.rowSupport[row].size))
             var minCol = -1
             var minAbs = BIG_ZERO
             var nonZero = 0
-            // The row view holds exactly the columns this row is non-zero in, so the search costs the
-            // row's own support rather than the column count. Ties go to the lower column so that the
-            // reduction does not depend on the hash order of the view.
+            // Ties go to the lower column so the reduction does not depend on the view's hash order.
             for (j in h.rowSupport[row]) {
                 if (j < pivot) continue
                 nonZero++
@@ -90,14 +65,14 @@ internal fun hermiteNormalForm(
                 if (!q.isZero()) addMultipleOfColumn(h, v, target = j, source = pivot, factor = -q)
             }
         }
-        if (h[row, pivot].isZero()) continue // the whole row is zero from `pivot` right; no pivot here
+        if (h[row, pivot].isZero()) continue
         if (h[row, pivot].signum() < 0) negateColumn(h, v, pivot)
-        // Reduce the entries left of the pivot into `[0, d)`, the canonical form's uniqueness rule.
+        // Entries left of the pivot reduce into `[0, d)`, which makes the form unique.
         val d = h[row, pivot]
         for (j in ascendingSupport(h, row)) {
             if (j >= pivot) continue
             var q = h[row, j] / d
-            if (h[row, j] - q * d < BIG_ZERO) q -= BIG_ONE // floor, so the residue is >= 0
+            if (h[row, j] - q * d < BIG_ZERO) q -= BIG_ONE
             if (!q.isZero()) addMultipleOfColumn(h, v, target = j, source = pivot, factor = -q)
         }
         pivot++
@@ -105,7 +80,7 @@ internal fun hermiteNormalForm(
     return HermiteForm(h.toRows(), v)
 }
 
-/** The row's non-zero columns in ascending order, snapshotted so the column operations may mutate it. */
+// Snapshotted so the column operations may mutate the row.
 private fun ascendingSupport(h: SparseIntColumns, row: Int): IntArray {
     val cs = h.rowSupport[row].toIntArray()
     cs.sort()
@@ -122,7 +97,6 @@ private fun negateColumn(h: SparseIntColumns, v: UnimodularTransform, col: Int) 
     v.negate(col)
 }
 
-/** `column[target] += factor · column[source]`, applied to the matrix and to the transform alike. */
 private fun addMultipleOfColumn(
     h: SparseIntColumns,
     v: UnimodularTransform,

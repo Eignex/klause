@@ -17,36 +17,19 @@ import com.eignex.util.collections.MutableIntIntMap
 import com.eignex.util.collections.MutableIntLongMap
 import kotlin.math.max
 
-/**
- * Single-node flow-cover cuts (Padberg, Van Roy and Wolsey, "Valid linear inequalities for fixed charge
- * problems", Oper. Res. 1985, https://doi.org/10.1287/opre.33.4.842). Two structural forms are read
- * directly from the integer model, both reducing to the same cover separation over LP columns:
- *
- *  - **Explicit flow**: a capacity row `Σⱼ yⱼ ≤ b` whose flow variables each carry a variable-upper-bound
- *    `yⱼ ≤ uⱼ·xⱼ` (a 2-term [Linear] `yⱼ − uⱼ·xⱼ ≤ 0`, `xⱼ ∈ {0,1}`).
- *  - **Implicit / bin-packing**: a 0/1 knapsack `Σⱼ wⱼ·xⱼ ≤ C` (`xⱼ ∈ {0,1}`, `wⱼ > 0`) viewed as a
- *    single-node flow with `yⱼ = wⱼ·xⱼ` — the flow and its indicator share the column, capacity `wⱼ`.
- *    This exposes the flow-cover family to bin-packing / network-flow models, which carry the
- *    structure as plain weighted knapsacks rather than explicit flow variables.
- *
- * For a cover `C` whose capacity exceeds the demand by `λ = Σ_C capⱼ − b > 0`, every feasible point
- * satisfies `Σ_C flowⱼ + Σ_C max(0, capⱼ − λ)·(1 − xⱼ) ≤ b`. The cover is chosen greedily from the arcs
- * the LP opens most (largest `xⱼ*`), and the inequality is emitted only when the LP point violates it.
- * Sound: it holds at every integer-feasible point, so it only tightens
- * the relaxation. Cuts from globally valid rows are [Cut.global].
- */
+// Single-node flow-cover cuts (Padberg, Van Roy and Wolsey, "Valid linear inequalities for fixed charge
+// problems", Oper. Res. 1985, https://doi.org/10.1287/opre.33.4.842) over an explicit capacity row with
+// variable upper bounds `yⱼ ≤ uⱼ·xⱼ`, or a 0/1 knapsack read as flows `yⱼ = wⱼ·xⱼ`. For a cover `C` with
+// `λ = Σ_C capⱼ − b > 0`, `Σ_C flowⱼ + Σ_C max(0, capⱼ − λ)·(1 − xⱼ) ≤ b` holds at every feasible point.
 internal class FlowCoverSeparator : CutSeparator {
     override val family: CutFamily = CutFamily.FLOW_COVER
 
-    /** One flow arc over LP columns: the flow contributes `flowCoeff · primal(flowCol)` (so the cut term
-     *  is `flowCoeff·flowCol`), gated by the `{0,1}` indicator column, with effective capacity [cap]. For
-     *  an implicit knapsack arc the flow and indicator are the same column (`flowCoeff = cap = wⱼ`). */
+    // For an implicit knapsack arc the flow and indicator share a column (`flowCoeff = cap = wⱼ`).
     private class Arc(val flowCol: Int, val flowCoeff: Long, val indicatorCol: Int, val cap: Long)
 
     override fun separate(ctx: CutContext): List<Cut> {
         val problem = ctx.problem
         val intColOf = ctx.relaxation.intColOf
-        // Explicit VUB per flow variable: yⱼ ≤ uⱼ·xⱼ ⇔ a 2-term Linear `yⱼ − uⱼ·xⱼ ≤ 0`, xⱼ ∈ {0,1}.
         val indicator = MutableIntIntMap()
         val vubCap = MutableIntLongMap()
         for (f in problem.factors) {
@@ -55,15 +38,12 @@ internal class FlowCoverSeparator : CutSeparator {
             if (row.bound != 0L) continue
             val (y, x, u) = matchVub(f.vars, row) ?: continue
             if (!problem.statesBinary(x)) continue
-            // The cover inequality reads capⱼ as a ceiling on the flow, and it is emitted globally. Over a
-            // flow the model leaves open above the root box supplies that ceiling, which bounds the search
-            // and not the model — so the arc is declined rather than capped there.
+            // A root-box ceiling on a flow the model leaves open above bounds the search, not the model.
             if (!problem.statesUpperBound(y)) continue
-            // `yⱼ ≥ 0` is what makes the cover inequality hold: a flow free to run negative lets the
-            // untaken arcs absorb the capacity row's slack, so Σ_C y can exceed b while the row is
-            // satisfied, and the cut then cuts off a feasible point.
+            // A flow free to run negative lets untaken arcs absorb the capacity row's slack, so the cover
+            // inequality would cut off a feasible point.
             if (!problem.statesLowerBoundAtLeast(y, 0L)) continue
-            val cap = minOf(u, problem.rootDomainOf(y).max) // effective flow when xⱼ = 1
+            val cap = minOf(u, problem.rootDomainOf(y).max)
             if (cap <= 0L) continue
             indicator.put(y, x)
             vubCap.put(y, cap)
@@ -81,8 +61,7 @@ internal class FlowCoverSeparator : CutSeparator {
         return cuts
     }
 
-    /** Match `a₀·v₀ + a₁·v₁ ≤ 0` to `y − u·x ≤ 0`: the `+1` term is the flow `y`, the negative term the
-     *  indicator `x` with capacity `u = −coeff`. Returns `(y, x, u)` or null when it is not that shape. */
+    // `y − u·x ≤ 0` as `(y, x, u)`.
     private fun matchVub(vars: IntArray, row: IntegerConstants): Triple<Int, Int, Long>? {
         val (c0, c1) = row.coeff(0) to row.coeff(1)
         return when {
@@ -92,8 +71,6 @@ internal class FlowCoverSeparator : CutSeparator {
         }
     }
 
-    /** Arcs for an explicit capacity row `Σ yⱼ ≤ b` (unit coefficients) whose every flow variable carries
-     *  a registered VUB, or null when the row is not that shape. */
     private fun explicitArcs(
         vars: IntArray,
         row: IntegerConstants,
@@ -109,8 +86,6 @@ internal class FlowCoverSeparator : CutSeparator {
         }
     }
 
-    /** Arcs for an implicit bin-packing knapsack `Σ wⱼ·xⱼ ≤ C` (`xⱼ ∈ {0,1}`, `wⱼ > 0`), each term a flow
-     *  `yⱼ = wⱼ·xⱼ` over the indicator's own column, or null when the row is not that shape. */
     private fun implicitArcs(vars: IntArray, row: IntegerConstants, problem: Problem, intColOf: IntArray): List<Arc>? {
         for (i in vars.indices) {
             if (row.coeff(i) <= 0) return null
@@ -135,12 +110,10 @@ internal class FlowCoverSeparator : CutSeparator {
             if (capSum > b) break
         }
         val lambda = capSum - b
-        if (lambda <= 0L) return null // not a cover
+        if (lambda <= 0L) return null
 
-        // Σ_C flowⱼ + Σ_C mⱼ·(1 − xⱼ) ≤ b, mⱼ = max(0, capⱼ − λ). Rewrite over columns, coalescing the
-        // flow and indicator coefficients that share a column (the implicit knapsack arc).
+        // Coalesce flow and indicator coefficients that share a column.
         val coeffByCol = MutableIntLongMap()
-        // Columns in first-seen order, so the emitted cut keeps the cover's arc order.
         val order = IntArrayList()
         var rhs = b
         for (arc in cover) {
@@ -155,16 +128,14 @@ internal class FlowCoverSeparator : CutSeparator {
         }
         var activity = 0.0
         order.forEach { col -> activity += coeffByCol.getOrDefault(col, 0L) * ctx.primalOf(col) }
-        if (activity <= rhs + VIOLATION_TOL) return null // not violated
+        if (activity <= rhs + VIOLATION_TOL) return null
 
         val cols = order.toIntArray()
         val coeffs = LongArray(cols.size) { coeffByCol.getOrDefault(cols[it], 0L) }
-        // Globally valid iff the source rows are global (every detected row is a declared constraint).
         return Cut(cols, coeffs, Relation.LE, rhs, global = true)
     }
 
     private companion object {
-        /** LP activity must exceed the cut rhs by at least this for the cut to be worth emitting. */
         const val VIOLATION_TOL = 1e-6
     }
 }

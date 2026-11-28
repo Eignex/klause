@@ -6,13 +6,9 @@ import com.eignex.util.numbers.saturatedSub
 import kotlin.random.Random
 
 /**
- * Largest regret first (MiniZinc's `max_regret`): the free variable with the greatest gap between
- * the two smallest values still in its domain — the cost of *not* taking its best value. Free bools
- * have the fixed regret `1` (domain `{0, 1}`), so an int var with a wider low-end gap outranks them.
- * Ties keep the earliest variable (bools precede ints).
- *
- * Domain-only (no objective), unlike the objective-weighted [MaxRegret] — this is the one the
- * `max_regret` search annotation maps to, since the annotation applies to satisfaction too.
+ * Largest regret first (MiniZinc's `max_regret`): the free variable with the greatest gap between the two
+ * smallest values in its domain. Free bools have regret `1`. Ties keep the earliest variable (bools
+ * precede ints). Domain-only, unlike the objective-weighted [MaxRegret], so it applies to satisfaction too.
  */
 object DomainMaxRegret : VariableSelector {
     override fun fresh() = this

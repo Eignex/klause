@@ -23,8 +23,7 @@ import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.util.ExecutionControl
 import kotlin.time.TimeSource
 
-/** Round cap for the presolve↔LP-harvest fixpoint: a spin guard, never the real stop. The loop
- *  exits as soon as a harvest tightens nothing, which is the common case after the first round. */
+// A spin guard: the loop normally exits as soon as a harvest tightens nothing.
 private const val MAX_PRESOLVE_HARVEST_ROUNDS = 4
 
 /**
@@ -48,25 +47,15 @@ class PresolveOutcome(
 }
 
 /**
- * The presolve driver: the full-model transform pipeline, independent of any front-end representation.
- * Presolve and the LP-relaxation harvest are iterated to a fixpoint: the harvest's proven domain
- * tightenings can unlock further reductions (coefficient strengthening, affine elimination, structural
- * reductions), which can in turn expose more for the next harvest. The loop is self-gating — it runs a
- * second [Presolver.run] only when a harvest actually tightened the problem — and bounded by
- * [MAX_PRESOLVE_HARVEST_ROUNDS]. Lives in the presolve layer (not a front-end) and drives the LP steps
- * directly through [lp.bounding][com.eignex.klause.lp.bounding], so every caller shares the same pipeline.
+ * The presolve driver, independent of any front-end representation. Presolve and the LP-relaxation harvest
+ * iterate to a fixpoint, since a harvest's proven tightenings can unlock further reductions; a round runs
+ * only when the previous harvest tightened the problem, up to [MAX_PRESOLVE_HARVEST_ROUNDS].
  */
 object PresolvePipeline {
 
-    /**
-     * Apply source-safe presolve before either finite materialization or open-theory preparation.
-     *
-     * This is the single phase every route is planned from, so it runs exactly once per solve: the
-     * bounded lane hands its result straight to [run], and the open lane routes from it. It is
-     * intentionally limited to [PresolvePass.Capability.SOURCE]. Passes that inspect finite domains or
-     * root deductions stay on the finite side of the deferred bake boundary. [finiteLane] marks a phase
-     * that [run] continues, so it applies the finite lane's pass policy.
-     */
+    // Source-safe presolve, the single phase every route is planned from, so it runs once per solve. Limited
+    // to [PresolvePass.Capability.SOURCE]: passes that read finite domains or root deductions stay behind
+    // the bake. [finiteLane] marks a phase that [run] continues, so it applies the finite lane's policy.
     internal fun prepareSource(
         problem: Problem,
         config: PresolveConfig = PresolveConfig.DEFAULT,
@@ -133,14 +122,8 @@ object PresolvePipeline {
         sourcePreparation = sourcePreparation,
     )
 
-    /**
-     * [run] over a source model [prepared] by an earlier call to [prepareSource].
-     *
-     * The finite lane selects its component plan from the prepared model, which means it has already run
-     * the source phase by the time it gets here. Taking the result rather than the raw model is what
-     * keeps that phase from running a second time, and it carries the allowance the phase ran under, so
-     * the rounds below spend what is left of it rather than a fresh one.
-     */
+    // Takes the prepared result so the source phase never runs twice, and spends the rest of the allowance
+    // it ran under.
     internal fun run(
         prepared: PreparedSource,
         linearObjective: LinearObjective?,
@@ -157,8 +140,7 @@ object PresolvePipeline {
         val sourceProblem = prepared.problem
         val presolveBudget = prepared.budget
         val cancellation = phaseCancellation(callerCancellation, presolveBudget)
-        // Root-bake probing (failed-literal / SAC) runs in the presolve lane via [RootBaker]: resolve it
-        // from the config once and thread it through the context so every rebuild re-derives it.
+        // Resolved once and threaded through the context so every rebuild re-derives the probing.
         val bakeConfig = BakeConfig.from(config)
         var currentObjective = prepared.objective ?: linearObjective
         var context = PresolveContext.of(
@@ -170,9 +152,6 @@ object PresolvePipeline {
             .withBakeConfig(bakeConfig)
             .withPresolveBudget(presolveBudget)
             .withKeepBinaryComparisons(config.keepsBinaryComparisons(finiteLane = true))
-        // LP-relaxation harvest: fold the LP's proven domain tightenings, redundant-row removals and
-        // implied equalities into the problem permanently so every backend sees them. Gated by the
-        // `lp-harvest` pass; the harvest's own LP relaxation+shaving is enabled here directly.
         val harvestPlan = if (config.resolved(PresolvePass.LP_HARVEST, context)) {
             LpPlan(bounding = true, variableShaving = true, objectiveShaving = true)
         } else {
@@ -182,18 +161,10 @@ object PresolvePipeline {
             config.overrides[PresolvePass.LP_HARVEST] != true && linearObjective == null && problem.isClausal()
         val objective = currentObjective ?: LinearObjective()
 
-        // Coefficient strengthening runs in the source phase, before [RootBaker.reseed] forces the
-        // root bake: a gcd-indivisible equality is infeasible regardless of the (possibly very wide)
-        // variable bounds, so it is caught in O(factors). The bake would otherwise narrow it toward the
-        // empty domain one step per round — O(span) on a wide clamped domain — before any pass runs.
-        //
-        // On a genuinely wide integer domain, the LP relaxation proves global infeasibility (e.g. a
-        // difference cycle `x < y ∧ y < x`) in O(one LP solve) — before [RootBaker.reseed]'s bound
-        // propagation would grind it out one step per round (O(span)). [lpRootInfeasible] builds the root
-        // relaxation straight from the declared domains (no bake fixpoint) and certifies infeasibility via
-        // an exact Farkas ray; the relaxation contains every integer solution, so it is the same verdict the
-        // bake would reach. Coupled wide columns can feed repeated bound narrowing; an isolated
-        // wide output with bounded integer inputs uses the ordinary bake instead.
+        // On coupled wide integer domains the bake would narrow toward a refutation one step per round, O(span).
+        // [lpRootInfeasible] certifies infeasibility from the declared domains in one LP solve via an exact
+        // Farkas ray; the relaxation contains every integer solution, so the verdict is the bake's. An
+        // isolated wide output with bounded integer inputs uses the ordinary bake.
         val sourceProjections = projections?.forEngineView(sourceProblem)
         val (wideCoupling, rootInfeasible) = presolveBudget.observePreparation(
             PresolvePreparationStage.PRE_BAKE_LP_FEASIBILITY, PresolveLane.SOURCE, sourceProblem,
@@ -212,9 +183,7 @@ object PresolvePipeline {
             }
             wide to result
         }
-        // A refutation reached before the bake is the verdict, and the source model is what carries it: the
-        // bake and every round below would only re-derive it at O(span), so the phase stops here and reports
-        // what the source phase left.
+        // A refutation before the bake is the verdict; the bake and rounds would only re-derive it at O(span).
         if (prepared.infeasible || rootInfeasible.infeasible) {
             return PresolveOutcome(
                 sourceProblem,
@@ -228,11 +197,8 @@ object PresolvePipeline {
             ).also { it.mapping = prepared.mapping }
         }
 
-        // On a wide but feasible domain the LP's optimization-based bound tightening (OBBT, [lpRootBounds])
-        // collapses each variable's clamped domain in one solve per bound — so the root bake starts from the
-        // tightened domains instead of narrowing them one step per round (O(span)). Solution-set-preserving,
-        // so it is sound before the bake. Gated on coupled wide columns so bounded inputs of an isolated
-        // output use ordinary propagation.
+        // On coupled wide domains, OBBT ([lpRootBounds]) collapses each domain in one solve per bound so the
+        // bake does not narrow it one step per round. Solution-set preserving, so sound before the bake.
         val rootBounds = if (wideCoupling) {
             presolveBudget.observePreparation(
                 PresolvePreparationStage.PRE_BAKE_LP_BOUNDS, PresolveLane.SOURCE, sourceProblem,
@@ -250,9 +216,8 @@ object PresolvePipeline {
         }
         val prebaked = rootBounds.problem
 
-        // Step 0: run the deferred base bake — fold the root propagation into the domains. A no-op for a
-        // directly-constructed (already-baked) problem, so this is where a front-end's deferred base bake
-        // actually happens, after the O(one-LP) pre-bake infeasibility/OBBT that must precede it.
+        // Step 0: the deferred base bake, after the pre-bake LP steps that must precede it. A no-op for an
+        // already-baked problem.
         val bakeStart = TimeSource.Monotonic.markNow()
         val (baked, seeded) = presolveBudget.observePreparation(
             PresolvePreparationStage.ROOT_BAKE, PresolveLane.FINITE, prebaked, cancellation,
@@ -294,14 +259,9 @@ object PresolvePipeline {
         }
         currentObjective = refit(currentObjective, packed)
         context = context.withObjective(currentObjective)
-        // Pseudo-Boolean lane substitution: a `{0, 1}` integer column becomes a Boolean literal and the rows
-        // over such columns become clause / cardinality / pseudo-Boolean factors. It runs ahead of the round
-        // engine, on the bake's committed domains — that is what makes the `{0, 1}` columns visible — so
-        // every round pass then reads the model in the lane it will be solved in: the literal-aware
-        // reductions (at-most-one clique merging, coefficient strengthening over literals, bounded variable
-        // elimination, clause subsumption) apply where only the integer-column ones could before. It also
-        // has to precede symmetry breaking, whose added handling factor reads the columns value-wise and
-        // would hold every one of them in the integer lane.
+        // Runs on the bake's committed domains, which expose the `{0, 1}` columns, and ahead of the round
+        // engine so every round pass reads the model in the lane it will be solved in. It must also precede
+        // symmetry breaking, whose handling factor reads columns value-wise and would pin them as integers.
         val substitution = if (packed.baked is PropagationResult.Unsat ||
             !config.resolved(PresolvePass.SUBSTITUTE_BINARY_COLUMNS, context)
         ) {
@@ -380,7 +340,6 @@ object PresolvePipeline {
             if (harvested !== pre.problem) {
                 mappings.add(SourceMapping(pre.problem, harvested, TransformationGuarantees.IDENTITY))
             }
-            // Neither presolve nor the harvest changed anything this round → fixpoint.
             if (pre.problem === current && harvested === pre.problem) break
             pre.passesFired.forEach { firedPasses.add(it.id) }
             harvestResult?.let { harvest += it.report }
@@ -388,11 +347,8 @@ object PresolvePipeline {
             // A no-op harvest means the next round's presolve would re-derive the same fixpoint, so stop.
             if (harvested === pre.problem) break
         }
-        // The base bake (declared → root-propagated domains) is not a presolve reduction: the solve boundary
-        // re-runs it. So when no pass fired ([current] === [seeded]) and neither the OBBT pre-bake ([prebaked]
-        // === [sourceProblem]) nor the probing reseed ([seeded] === [baked]) tightened anything beyond that base
-        // fold, report no change and let the caller keep its raw problem — preserving object identity for a
-        // genuine no-op presolve.
+        // The base bake is not a presolve reduction (the solve boundary re-runs it), so when nothing beyond it
+        // changed, report no change and let the caller keep its raw problem.
         val onlyBaseBake = current === seeded && prebaked === sourceProblem && seeded === baked
         // The joint difference system is appended here rather than by a round pass: it mentions every
         // variable its edges touch, so between rounds it would hold those variables against affine
@@ -421,8 +377,6 @@ object PresolvePipeline {
             ).also { it.mapping = SourceMapping(problem, problem, TransformationGuarantees.IDENTITY) }
         }
 
-        // Terse presolve summary for `-s`: which passes fired (+ `lp-harvest` when the LP tightened anything)
-        // and the net constraint drop / proven infeasibility, with the LP harvest's own breakdown attached.
         val passes = firedPasses.toList() +
             (if (!harvest.isEmpty) listOf("lp-harvest") else emptyList()) +
             (if (posted !== reduced) listOf(PresolvePass.POST_DIFFERENCE_SYSTEM.id) else emptyList())
@@ -448,16 +402,12 @@ object PresolvePipeline {
     }
 }
 
-/** [objective] zero-extended to cover [problem]'s Boolean namespace. */
 private fun refit(objective: LinearObjective?, problem: Problem): LinearObjective? {
     if (objective == null || objective.boolWeightValues.size >= problem.numBoolVars) return objective
     return objective.copy(boolWeights = objective.boolWeightValues.copyOf(problem.numBoolVars))
 }
 
-/**
- * [cancellation], stopping as well once [budget] is spent, and carrying [budget] as the meter every pass
- * and LP solve below charges. Whatever token the caller built, the phase's work lands in its own budget.
- */
+// Whatever token the caller built, the phase's work lands in its own budget.
 private fun phaseCancellation(cancellation: ExecutionControl, budget: PresolveBudget?): ExecutionControl =
     budget?.orSpent(cancellation) ?: cancellation
 
@@ -481,14 +431,8 @@ private fun needsWideDomainLp(problem: Problem): Boolean {
     return false
 }
 
-/**
- * A slice of [budget] for one pre-bake root LP, falling back to [cancellation] when the phase carries no
- * budget. These run before any pass, so a relaxation the LP cannot close within the allowance would
- * otherwise spend all of it and leave the round engine none — and, cancelled mid-solve, it yields nothing
- * at all for the work it did. Half of what remains, matching the round engine's own per-pass policy, so
- * each stage costs a bounded share of the phase rather than the phase itself. The simplex charges its
- * work through the slice, which is what stops it at the same pivot on every run.
- */
+// Half of what remains, like the round engine's per-pass policy: these LPs run before any pass, and one the
+// LP cannot close would otherwise spend the whole allowance and yield nothing when cancelled mid-solve.
 private fun preBakeSlice(cancellation: ExecutionControl, budget: PresolveBudget?): ExecutionControl = budget?.let {
     it.slice(it.remaining() / 2) or cancellation
 } ?: cancellation

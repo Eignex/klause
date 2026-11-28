@@ -2,12 +2,9 @@ package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.util.numbers.BigFraction
 
-/**
- * Exact arithmetic on real algebraic numbers held as a defining polynomial plus an isolating interval.
- * Sums, products and polynomial images take their defining polynomial from a resultant and pick the
- * right root by refining enclosures (R. Loos, "Computing in algebraic extensions", Computer Algebra,
- * Computing Supplementum 4, 1982, https://doi.org/10.1007/978-3-7091-3406-1_12).
- */
+// Sums, products and polynomial images take their defining polynomial from a resultant and pick the right
+// root by refining enclosures (R. Loos, "Computing in algebraic extensions", Computer Algebra, Computing
+// Supplementum 4, 1982, https://doi.org/10.1007/978-3-7091-3406-1_12).
 internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = PolynomialArithmetic()) {
     private val univariate = RationalPolynomialArithmetic(arithmetic)
     private data class RootCount(val polynomial: RationalPolynomial, val count: Int)
@@ -72,8 +69,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         value.image,
     )
 
-    // [value] narrowed to the side of [split] that holds its root, or to [split] itself when that is the root. A split
-    // outside the open interval leaves [value] unchanged.
+    // A split outside the open interval leaves value unchanged.
     fun splitAt(value: AlgebraicReal, split: BigFraction): AlgebraicReal = arithmetic.execution.operation {
         arithmetic.step()
         if (split <= value.interval.lower || value.interval.upper <= split) return@operation value

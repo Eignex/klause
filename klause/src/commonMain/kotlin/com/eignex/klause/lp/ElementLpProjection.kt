@@ -7,19 +7,10 @@ import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 
-/**
- * Element's LP relaxation. A constant array gives the exact convex hull: a one-hot selector `y_p ∈ [0,1]` per
- * position whose index value is in `idx`'s root box (pinned to 0 when that value left the live
- * domain), with rows `Σ_p y_p = 1`, the index channel `Σ_p (p + off)·y_p = idx`, and the result channel
- * `Σ_p arr[p]·y_p = result`. A variable array keeps the selectors and index channel but relaxes the
- * bilinear result channel with two big-M rows per position forcing `result = arr[p]` when `y_p = 1`.
- * Admission counts retained root choices, with a bounded enumeration allowance.
- *
- * The selectors enumerate `idx`'s root box and the one-hot row then confines the column to what was
- * enumerated, so over a side the model leaves open the hull would drop positions the model admits —
- * declined outright there. The big-M result channel leans on both boxes it spans and is emitted per
- * position, only where the model states them.
- */
+// A constant array gives the exact convex hull: one-hot selectors `y(p)` over `idx`'s root box (pinned to 0
+// off the live domain), `Σ y(p) = 1`, the index channel and the result channel. A variable array relaxes the
+// bilinear result channel to two big-M rows per position. The one-hot row confines `idx` to the enumerated
+// box, so an open-sided `idx` is declined: the hull would drop positions the model admits.
 internal fun Element.emitLpRelaxation(builder: RelaxationBuilder) {
     if (!builder.hullEnabled()) return
     if (!builder.statesBothBounds(idx)) return
@@ -51,9 +42,7 @@ internal suspend fun SequenceScope<Unit>.prepareLpHull(
 
     if (!boxes.statesBothBounds(idx)) return null
     val choices = factor.retainedChoices(boxes.domain(idx)) ?: return null
-    // The big-M result channel spans the result's box and the entry's, so it arrives only for the
-    // positions whose two boxes are both the model's own — sizing it over the rest would budget rows
-    // the build declines.
+    // Size big-M rows only where the build emits them: both boxes stated by the model.
     val linkable = arrIsVars && boxes.statesBothBounds(result)
     var linked = 0L
     var added = 0L
@@ -63,8 +52,6 @@ internal suspend fun SequenceScope<Unit>.prepareLpHull(
         if (shared.columns.add(idx to value)) added++
         if (linkable && boxes.statesBothBounds(arr[p].toInt())) linked++
     }
-    // Constant array: Σ y = 1 + index channel + result channel (3 rows). Variable array:
-    // Σ y = 1 + index channel + two big-M rows per linked selector.
     // Retained source regions can each carry the same channel rows while sharing their columns.
     return LpSizeEstimate(cols = added, rows = 2L + if (arrIsVars) 2L * linked else 1L)
 }
@@ -95,7 +82,7 @@ private fun Element.retainedChoices(domain: IntDomain): LongArray? {
     return retained.toLongArray().takeIf { it.isNotEmpty() }
 }
 
-/** The shared one-hot selectors `Σ_p y_p = 1` and index channel `Σ_p (p + off)·y_p = idx`. */
+// `Σ y(p) = 1` and the index channel `Σ (p + off)·y(p) = idx`.
 private fun Element.emitSelectorsAndIndexChannel(
     builder: RelaxationBuilder,
     choices: LongArray,
@@ -132,7 +119,6 @@ private fun Element.emitSelectorsAndIndexChannel(
     builder.row(idxCols, idxVals, LinearOp.EQ, 0L, Contribution.HULL)
 }
 
-/** Constant array: `Σ_p arr[p]·y_p − result = 0` — the exact convex hull of the table. */
 private fun Element.emitResultChannel(builder: RelaxationBuilder, selCols: IntArrayList, positions: IntArrayList) {
     val k = selCols.size
     val resCols = IntArray(k + 1)
@@ -146,25 +132,21 @@ private fun Element.emitResultChannel(builder: RelaxationBuilder, selCols: IntAr
     builder.row(resCols, resVals, LinearOp.EQ, 0L, Contribution.HULL)
 }
 
-/** Variable array: two big-M rows per position tying `result` to `arr[p]` when its selector is on. */
 private fun Element.emitResultBigM(builder: RelaxationBuilder, selCols: IntArrayList, positions: IntArrayList) {
-    // `M` spans the result's box and the entry's, so it bounds their gap only while both are the
-    // model's own; a position over an invented endpoint stays unlinked (sound — the selector is still
-    // free and the one-hot row still holds).
+    // `M` bounds the gap only while both boxes are the model's own; a position over an invented
+    // endpoint stays unlinked, which is sound because its selector stays free.
     if (!builder.statesBothBounds(result)) return
     val resCol = builder.intColumn(result)
     val rDom = builder.rootDomain(result)
     for (t in 0 until selCols.size) {
-        val arrVar = arr[positions[t]].toInt() // entry is a var id when arrIsVars
+        val arrVar = arr[positions[t]].toInt()
         if (!builder.statesBothBounds(arrVar)) continue
         val aDom = builder.rootDomain(arrVar)
         val m = maxOf(rDom.max, aDom.max) - minOf(rDom.min, aDom.min)
-        if (m < 0L) continue // empty domain — leave that position unconstrained (sound)
+        if (m < 0L) continue
         val arrCol = builder.intColumn(arrVar)
         val y = selCols[t]
-        // result − arr[p] + M·y_p ≤ M  ⇒  result ≤ arr[p] when y_p = 1, slack otherwise.
         builder.row(intArrayOf(resCol, arrCol, y), longArrayOf(1L, -1L, m), LinearOp.LE, m, Contribution.HULL)
-        // arr[p] − result + M·y_p ≤ M  ⇒  arr[p] ≤ result when y_p = 1, slack otherwise.
         builder.row(intArrayOf(arrCol, resCol, y), longArrayOf(1L, -1L, m), LinearOp.LE, m, Contribution.HULL)
     }
 }

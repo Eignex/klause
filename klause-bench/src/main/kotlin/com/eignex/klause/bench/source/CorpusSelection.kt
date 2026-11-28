@@ -9,44 +9,27 @@ import com.eignex.klause.bench.catalog.ProblemSource
 import java.io.File
 import kotlin.random.Random
 
-/**
- * Corpus selection. It discovers `(model, optional data)` instances
- * from a corpus root under a known [Layout], then applies family-aware selection so a capped
- * run yields a spread across problem families rather than all of the first family:
- *
- *  - **interleave** — round-robin merge across families, so `take(N)` spans families;
- *  - **per-family cap** — at most K instances per family (head, or deterministic seeded sample);
- *  - **overall cap** — total instance limit applied after interleave;
- *  - **[pickPrimaryMzn]** — choose the canonical `.mzn` when a family ships several;
- *  - **`.dzn` pairing** — pair each data file with its model across nested layouts.
- *
- * Selection is independent of *how* the corpus arrived (vendored or fetched), so any metric
- * or target can reuse it; for external collections the cache is fetched on demand first.
- */
+// Family-aware selection: a capped run spreads across problem families instead of taking all of the first one.
 internal object CorpusSelection {
 
-    /** A discovered instance: paths are relative to the corpus root. */
+    // Paths are relative to the corpus root.
     data class Discovered(
         val name: String,
         val mznRelPath: String,
         val dznRelPath: String? = null,
-        /** Explicit family key; when null, falls back to the leading path component of [name]. Set
-         *  for flat corpora (e.g. XCSP3) whose family lives in the name rather than a directory. */
+        // Set for flat corpora (e.g. XCSP3) whose family lives in the name rather than a directory.
         val familyKey: String? = null,
     ) {
-        /** Family key: [familyKey] when set, else the leading path component of [name]. */
         val family: String get() = familyKey ?: name.substringBefore('/')
     }
 
-    /** Knobs controlling how many instances a selection yields. */
     data class Selection(
         val perFamily: Int? = null,
         val maxInstances: Int? = null,
-        /** When non-null, sample [perFamily] per family with this seed instead of taking the head. */
+        // When non-null, sample perFamily per family with this seed instead of taking the head.
         val sampleSeed: Long? = null,
     ) {
         companion object {
-            /** Read selection knobs from `-Dklause.bench.select.*` (perFamily / max / seed). */
             fun fromProps(defaultPerFamily: Int? = null): Selection = Selection(
                 perFamily = System.getProperty("klause.bench.select.perFamily")?.toIntOrNull() ?: defaultPerFamily,
                 maxInstances = System.getProperty("klause.bench.select.max")?.toIntOrNull(),
@@ -55,13 +38,11 @@ internal object CorpusSelection {
         }
     }
 
-    /** How instances are laid out under a corpus root. */
     sealed interface Layout {
         fun discover(root: File): List<Discovered>
 
-        /** MiniZinc-Challenge layout: one dir per problem family under [subDir], each with one
-         *  or more `.mzn` (pick the primary) plus `.dzn` data files in nested dirs. Data-free
-         *  instances retain the primary model's basename in their key. */
+        // One dir per family under subDir, each with one or more `.mzn` plus `.dzn` data in nested dirs.
+        // Data-free instances keep the primary model's basename in their key.
         data class MznChallenge(val subDir: String = "") : Layout {
             override fun discover(root: File): List<Discovered> {
                 val base = if (subDir.isEmpty()) root else File(root, subDir)
@@ -70,10 +51,8 @@ internal object CorpusSelection {
             }
         }
 
-        /** The whole `mzn-challenge` archive: every year directory (`2008`, `2009`, …) is itself a
-         *  [MznChallenge] layout. Names and family keys are year-prefixed (`2013/cargo`) since the
-         *  same problem name recurs across years (`black-hole` in both 2013 and 2025) and a bare
-         *  name would silently merge two different problems into one family. */
+        // Every year directory is a MznChallenge layout. Names and family keys are year-prefixed (`2013/cargo`)
+        // because problem names recur across years and a bare name would merge different problems.
         data class MznChallengeAllYears(val legacyExclusions: Boolean = true) : Layout {
             override fun discover(root: File): List<Discovered> {
                 val years = root.listFiles { f -> f.isDirectory && f.name.toIntOrNull() != null }
@@ -84,9 +63,7 @@ internal object CorpusSelection {
             }
         }
 
-        /** Flat layout: walk [subDir] for `.mzn` files; family = first path component under
-         *  [subDir]. A parameterized model is paired with a same-named `.dzn` sibling when one
-         *  exists (a self-contained model has none). Used for libminizinc tests and hakank. */
+        // Each `.mzn` pairs with a same-named `.dzn` sibling when one exists.
         data class FlatMzn(val subDir: String) : Layout {
             override fun discover(root: File): List<Discovered> {
                 val base = File(root, subDir)
@@ -107,13 +84,9 @@ internal object CorpusSelection {
             }
         }
 
-        /** Flat layout for single-file instances of one [ext] (no data-file pairing): walk
-         *  [subDir] for `*.ext`. Family defaults to the first path component (SMT-LIB `.smt2`,
-         *  DIMACS `.cnf`), but a flat corpus whose family lives in the filename passes [familyOf] —
-         *  e.g. XCSP3, where `AircraftAssemblyLine-1-178-00-0_c23` groups under `AircraftAssemblyLine`
-         *  via the series prefix, so `per-family` samples across series instead of near-identical
-         *  parameterizations. A `*.ext.zst` file is the same instance stored compressed, named without the
-         *  suffix; when both forms are present the instance is listed once, as its stored compressed form. */
+        // Single-file instances without data pairing. A corpus whose family lives in the filename passes familyOf
+        // (XCSP3 series prefixes), so per-family sampling spans series instead of near-identical parameterizations.
+        // A `*.ext.zst` file is the same instance compressed; when both exist it is listed once, compressed.
         data class Flat(
             val subDir: String,
             val ext: String,
@@ -139,7 +112,7 @@ internal object CorpusSelection {
                 }
             }
 
-            /** A fixed set already knows its paths; do not enumerate unrelated corpus members. */
+            // A fixed set already knows its paths; do not enumerate unrelated corpus members.
             fun named(root: File, names: List<String>): List<Discovered> {
                 val base = if (subDir.isEmpty()) root else File(root, subDir)
                 return names.distinct().mapNotNull { name ->
@@ -173,16 +146,13 @@ internal object CorpusSelection {
         }
     }
 
-    /** Discover + select instances from a fetched [collection], returning catalog [ProblemRef]s.
-     *  [format] is the instances' format (defaults to MiniZinc; SMT-LIB/DIMACS corpora set it). */
     fun select(
         collection: ExternalCollection,
         layout: Layout,
         selection: Selection,
         category: Category,
         format: Format = Format.MINIZINC,
-        /** Resolve an instance's oracle from its resolved instance [File] (e.g. parse directives). Reading content
-         *  needs the collection's bytes; without it discovery may run on the collection's index listing alone. */
+        // Reading content needs the collection's bytes; without it discovery may run on the index listing alone.
         expected: ((File) -> Expected)? = null,
     ): List<ProblemRef> {
         val paths = if (expected == null && layout is Layout.Flat) {
@@ -205,8 +175,7 @@ internal object CorpusSelection {
         return references(collection, root, chosen, category, format, expected)
     }
 
-    /** Resolve exact flat-corpus names with the same provenance as full discovery. Missing members
-     * remain absent so the caller's existing missing-set-member check can report them. */
+    // Missing members stay absent so the caller's missing-set-member check reports them.
     fun named(
         collection: ExternalCollection,
         layout: Layout.Flat,
@@ -245,12 +214,10 @@ internal object CorpusSelection {
             )
         }
 
-    /** Apply per-family cap (head or seeded sample), interleave, then overall cap. */
+    // Per-family cap (head or seeded sample), interleave, then overall cap.
     fun applySelection(all: List<Discovered>, sel: Selection): List<Discovered> =
         applySelectionBy(all, sel) { it.family }
 
-    /** Generic family-aware selection over any item type, keyed by [family]. Reused for
-     *  catalog [com.eignex.klause.bench.catalog.ProblemRef] selection in the ad-hoc CLI. */
     fun <T> applySelectionBy(all: List<T>, sel: Selection, family: (T) -> String): List<T> =
         applyAdmittedSelectionBy(all, sel, family) { true }
 
@@ -275,14 +242,8 @@ internal object CorpusSelection {
         return sel.maxInstances?.let { interleaved.take(it) } ?: interleaved
     }
 
-    /** Format-balanced (or any-[group]-balanced) selection: partition [all] by [group], apply the
-     *  family-aware cap/sample/interleave within each group, then spread [Selection.maxInstances]
-     *  *evenly across the groups present* rather than across families globally — so a corpus with
-     *  many families in one format can't crowd the other formats out of a capped run. The split
-     *  water-fills: a group with fewer instances than its even share yields the surplus to groups
-     *  that can still absorb it, keeping the total at the cap when the corpus can supply it. Groups
-     *  are round-robin [interleave]d so a further downstream `take` still spans every group. With no
-     *  [Selection.maxInstances] every group is kept in full. */
+    // Spreads maxInstances evenly across groups rather than families, so a format with many families cannot crowd
+    // the others out of a capped run. Groups are interleaved so a downstream `take` still spans every group.
     fun <T> applyBalancedBy(all: List<T>, sel: Selection, family: (T) -> String, group: (T) -> Any): List<T> {
         val groups = LinkedHashMap<Any, MutableList<T>>()
         for (d in all) groups.getOrPut(group(d)) { mutableListOf() }.add(d)
@@ -292,9 +253,7 @@ internal object CorpusSelection {
         return interleave(perGroup.mapIndexed { i, g -> g.take(quota[i]) })
     }
 
-    /** Spread [total] across bins of the given [sizes] as evenly as possible, never exceeding a
-     *  bin's size: hand every not-yet-full bin an equal share of what remains, repeating until the
-     *  budget is spent or every bin is full, so surplus from small bins flows to bins with room. */
+    // Surplus from bins smaller than their even share flows to bins with room.
     private fun waterFill(sizes: List<Int>, total: Int): IntArray {
         val quota = IntArray(sizes.size)
         var remaining = total.coerceAtMost(sizes.sum())
@@ -312,11 +271,8 @@ internal object CorpusSelection {
         return quota
     }
 
-    /** One family per immediate subdirectory of [base]: each is a `.mzn` (pick the primary) plus
-     *  `.dzn` data files in nested dirs, relative to [root]. [prefix] (a challenge year, for
-     *  [Layout.MznChallengeAllYears]) is prepended to the name/family key so same-named problems
-     *  from different years don't collide. Shared by [Layout.MznChallenge] (one year, no prefix)
-     *  and [Layout.MznChallengeAllYears] (every year, prefixed). */
+    // One family per immediate subdirectory of base. prefix (a challenge year) keeps same-named problems from
+    // different years apart.
     private fun discoverFamilyDirs(
         root: File,
         base: File,
@@ -343,9 +299,7 @@ internal object CorpusSelection {
             // The 2026 archive publishes parameterized models without their instance data.
             if (dzns.isEmpty() && mznRel.startsWith("2026/")) continue
             if (dzns.isEmpty()) {
-                // familyKey is set explicitly (not left to the name.substringBefore('/') fallback)
-                // because a year-prefixed name already contains a '/' (`2013/black-hole`), which
-                // would otherwise collapse every problem in a year into one family.
+                // A year-prefixed name already contains '/', so the default family fallback would collapse a year.
                 val modelName = primary.relativeTo(pd).path.removeSuffix(".mzn")
                 out += Discovered("$familyName/$modelName", mznRel, familyKey = familyName)
             } else {
@@ -364,9 +318,7 @@ internal object CorpusSelection {
 
     private val DATA_EXTENSIONS = setOf("dzn", "json")
 
-    /** Pick the canonical `.mzn` for [familyName] from [candidates]: exact basename, then
-     *  `<family>_model` / `model` / `main`, then a family-prefixed non-`mznc` name, else
-     *  sorted-first. Equal-priority candidates use path order independently of filesystem enumeration. */
+    // Path order breaks ties independently of filesystem enumeration.
     fun pickPrimaryMzn(familyName: String, candidates: List<File>): File {
         val lower = familyName.lowercase()
         val priorities = listOf<(File) -> Boolean>(
@@ -385,8 +337,6 @@ internal object CorpusSelection {
         return ordered.first()
     }
 
-    /** Round-robin merge: iteration k takes element k from each list that still has one.
-     *  Stable; preserves within-list order. */
     fun <T> interleave(lists: List<List<T>>): List<T> {
         if (lists.isEmpty()) return emptyList()
         val maxLen = lists.maxOf { it.size }

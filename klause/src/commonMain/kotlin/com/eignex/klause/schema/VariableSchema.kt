@@ -16,13 +16,10 @@ import com.eignex.skema.Schema
 import kotlin.properties.PropertyDelegateProvider
 import kotlin.properties.ReadOnlyProperty
 
-/** Suffix used to name the synthetic presence Boolean backing every opt variable. */
 internal const val PRESENCE_SUFFIX: String = "__present"
 
-/** Builds the canonical presence-variable name for an opt var named [varName]. */
 internal fun presenceName(varName: String): String = "$varName$PRESENCE_SUFFIX"
 
-/** The declaration of an integer taking exactly [values], as ascending runs over their hull. */
 internal fun valueSetSpec(values: Collection<Long>): IntDomainSpec {
     val sorted: List<Long> = values.distinct().sorted()
     require(sorted.isNotEmpty()) { "intVar: values must not be empty" }
@@ -76,11 +73,6 @@ open class VariableSchema : Schema<SchemaEntry>() {
         max: Double = Double.POSITIVE_INFINITY,
     ) = register(FloatSpec(min, max)) { FloatHandle(it, min, max) }
 
-    /**
-     * Shared delegate for the opt-variable builders: declares the synthetic presence Boolean
-     * `<prop>__present` plus the value variable's [valueSpec], then wires both into the typed
-     * handle built by [makeHandle] (given the value var's name and its presence handle).
-     */
     private fun <H> optVar(valueSpec: SchemaEntry, makeHandle: (name: String, present: BoolHandle) -> H) =
         PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, H>> { thisRef, prop ->
             val pName = presenceName(prop.name)

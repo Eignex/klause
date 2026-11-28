@@ -96,9 +96,8 @@ class TieredVariableSelector(
             TierVarSelect.MaxRegret -> maxRegretFree(tier, session)
         }
 
-    /** Free variable with the largest gap between its two smallest domain values (`max_regret`);
-     *  free bools have the fixed regret `1`. Ties keep the earliest listed variable. The regret
-     *  needs the second-smallest *value*, which [bestFree]'s `(size, min, max)` score can't see. */
+    // Free bools have regret 1; ties keep the earliest listed variable. The regret needs the second-smallest
+    // value, which bestFree's (size, min, max) score cannot see.
     private fun maxRegretFree(tier: SearchTier, session: PropagationSession): VarRef? {
         var best: VarRef? = null
         var bestRegret = Long.MIN_VALUE
@@ -133,8 +132,7 @@ class TieredVariableSelector(
         return if (candidates.isEmpty()) null else candidates[rng.nextInt(candidates.size)]
     }
 
-    /** Argmax of [score]`(size, min, max)` over the tier's free variables; bools score
-     *  as the domain `{0, 1}`. Ties keep the earliest listed variable. */
+    // Bools score as the domain {0, 1}; ties keep the earliest listed variable.
     private inline fun bestFree(
         tier: SearchTier,
         session: PropagationSession,
@@ -188,8 +186,7 @@ class TieredValueSelector(
     // Built per problem (its ownership arrays are sized to the model) and used for one search; not reused.
     override fun fresh() = this
 
-    // var id → owning tier index + 1; 0 = unowned (fallback). First-listed tier wins
-    // when arrays overlap.
+    // Owning tier index + 1, 0 for unowned; the first-listed tier wins when arrays overlap.
     private val boolOwner = IntArray(numBoolVars)
     private val intOwner = IntArray(numIntVars)
 

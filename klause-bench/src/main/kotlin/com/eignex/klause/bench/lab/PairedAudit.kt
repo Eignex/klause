@@ -20,9 +20,9 @@ import kotlin.system.exitProcess
 private const val PARTIAL = 3
 
 /**
- * Audits a retained paired lab comparison without changing it; see `klause-bench/scripts/paired-audit.sh`.
- * Exits 0 when every row is accepted and the declared experiment is fully verified, 1 when a row is invalid or
- * missing, and 3 when rows are accepted but the declared treatments, revisions or cohort are only partly verifiable.
+ * Audits a retained paired lab comparison; see `klause-bench/scripts/paired-audit.sh`. Exits 0 when every row is
+ * accepted and the declared experiment is fully verified, 1 when a row is invalid or missing, and 3 when rows are
+ * accepted but the declared treatments, revisions or cohort are only partly verifiable.
  */
 fun main(args: Array<String>) {
     val report = runCatching { PairedAudit.run(args.toList()) }.getOrElse { failure ->
@@ -39,10 +39,7 @@ fun main(args: Array<String>) {
     )
 }
 
-/**
- * One retained case row, reduced to the identities, controls, outcomes and costs the audit compares.
- * Statistics, witnesses and runtime file maps are dropped, so a large retained job stays small in memory.
- */
+// Statistics, witnesses and runtime file maps are dropped, so a large retained job stays small in memory.
 internal data class AuditedCase(
     val index: Int,
     val status: String,
@@ -67,12 +64,8 @@ internal data class AuditedCase(
 )
 
 internal object PairedAudit {
-    /**
-     * What a comparison may differ in: its [arms], benchCase parameter keys set per arm ([treatments]),
-     * identity facets allowed to differ between arms ([allowed]) and pinned comparison control values ([controls]).
-     * A request adds each arm's [expected] revision and values and the [cohort]; [gaps] name what it leaves
-     * unverifiable.
-     */
+    // treatments are benchCase parameter keys set per arm; allowed are identity facets that may differ; controls are
+    // pinned comparison values. A request adds expected and cohort; gaps name what it leaves unverifiable.
     internal data class Declaration(
         val arms: List<String>,
         val treatments: Set<String> = emptySet(),
@@ -246,7 +239,7 @@ internal object PairedAudit {
         },
     )
 
-    /** Solver and CLI implementation jars, whose hashes identify the revision rather than the runtime. */
+    // Their hashes identify the revision rather than the runtime.
     internal fun solverJar(path: String): Boolean = path.substringAfterLast('/').let {
         (it.startsWith("klause-jvm-") || it.startsWith("klause-cli-jvm-")) && it.endsWith(".jar")
     }

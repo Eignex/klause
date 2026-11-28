@@ -146,11 +146,8 @@ class FiniteSolveRequest(
         ) { "enumeration needs its captured source operation" }
     }
 
-    /**
-     * Finite LP dependencies. A source that accepts points within a positive feasibility tolerance accepts
-     * LP deductions within tolerances too; every other source, and `--exact`, which zeroes the tolerance,
-     * certifies them exactly.
-     */
+    // A source that accepts points within a positive feasibility tolerance accepts LP deductions within
+    // tolerances too; every other source, and `--exact`, which zeroes the tolerance, certifies them exactly.
     internal val lpSolveContext: LpSolveContext get() = LpSolveContext.finite(
         numerical = shape.sourceInvocation?.source?.semantics?.effective?.feasibilityTolerance?.isExact == false &&
             shape.sourceInvocation?.linearSource?.acceptedModelExact != true,
@@ -351,7 +348,6 @@ internal fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: Finite
     numericalCompanions: TheoryParams): FiniteSolveResult =
     solve(request, callbacks, request.lpSolveContext, numericalCompanions)
 
-/** Execute the fixed finite route with per-invocation LP dependencies. */
 internal fun FinitePipeline.solve(
     request: FiniteSolveRequest,
     callbacks: FiniteSolveCallbacks,
@@ -704,11 +700,9 @@ private fun FiniteSolveOutcome.withPresolve(presolve: PresolveStats?): FiniteSol
     else -> this
 }
 
-/**
- * This result over the source [problem]. An unbounded verdict stands only if its witness and ray, lifted through
- * [reconstruct], still prove [objective] unbounded over [problem], exactly or within its declared tolerance; otherwise
- * the witness remains a feasible assignment with no optimality proof.
- */
+// This result over the source [problem]. An unbounded verdict stands only if its witness and ray, lifted through
+// [reconstruct], still prove [objective] unbounded over [problem], exactly or within its declared tolerance; otherwise
+// the witness remains a feasible assignment with no optimality proof.
 private fun FiniteExecutionResult.reconstructed(
     reconstruct: (Sample) -> Sample,
     problem: Problem,
@@ -745,11 +739,8 @@ private fun FiniteExecutionResult.reconstructed(
     }
 }
 
-/**
- * The ray through the lifted [point] that [reconstruct] maps the prepared ray onto, as the difference of the two
- * lifted assignments one step apart. The source check, not this lift, is what proves it a ray; a lift that moves
- * a discrete value or loses the exact reals yields none.
- */
+// The difference of the two lifted assignments one step apart. The source check, not this lift, proves it a
+// ray; a lift that moves a discrete value or loses the exact reals yields none.
 private fun FiniteExecutionResult.Completed.liftedDirection(
     reconstruct: (Sample) -> Sample,
     point: Sample,

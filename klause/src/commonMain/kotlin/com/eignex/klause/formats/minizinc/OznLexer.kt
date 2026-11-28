@@ -1,12 +1,10 @@
 package com.eignex.klause.formats.minizinc
 
-/** Tokenizer for the MiniZinc syntax subset used in `.ozn` files. */
 internal class OznLexer(private val source: String) {
     private var pos: Int = 0
 
-    // Line tracking. `pos` only advances, so counting newlines forward from the last scanned offset
-    // makes [lineAt] O(1) amortized; recounting from offset 0 per token would be O(n²) over a large
-    // `.ozn`.
+    // `pos` only advances, so counting newlines forward from the last scanned offset keeps line tracking
+    // O(1) amortized.
     private var lineNo: Int = 1
     private var lineScanned: Int = 0
     private fun lineAt(): Int {
@@ -160,8 +158,7 @@ internal class OznLexer(private val source: String) {
     }
 }
 
-/** Single punctuation characters valid in the `.ozn` subset (two-character operators are matched
- *  before this fallthrough). Anything else is rejected rather than emitted as a stray token. */
+// Two-character operators are matched before this fallthrough; anything else is rejected.
 private val SINGLE_PUNCT: Set<Char> = "()[]{},:;=+-*/<>!.|".toSet()
 
 internal enum class OznTokenKind {

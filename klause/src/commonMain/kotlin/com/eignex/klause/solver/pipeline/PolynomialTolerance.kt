@@ -51,7 +51,6 @@ internal class PolynomialTolerance private constructor(
     private val scope: RealToleranceScope,
     private val slack: BigFraction,
 ) {
-    // Whether this encoding widens [factor] rather than stating it exactly.
     fun widens(factor: Factor): Boolean {
         val reals = factor.variables.reals
         return reals.isNotEmpty() && factor !is Distinct && !scope.isExact(reals[0])

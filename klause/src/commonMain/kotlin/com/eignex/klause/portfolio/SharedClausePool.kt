@@ -17,40 +17,26 @@ import com.eignex.util.collections.storage.primitiveCapacityBytes
 import com.eignex.util.concurrent.Mutex
 import com.eignex.util.hash.fibonacciHash
 
-/**
- * An append-only, de-duplicated pool of session-portable learned nogoods ([SharedClause]) shared
- * across the backtrack arms of one `Problem`. Arms publish their glue
- * clauses and pull others' via a per-arm cursor ([PoolClauseExchange]); every arm benefits from
- * every arm's learning.
- *
- * Used by the [Portfolio] on any number of lanes: several lanes publish concurrently and need a real lock,
- * and across segments the pool is also the *persistent memory* that survives a backtrack arm's handle being
- * rebuilt. The [lock] is a [Mutex] sized to the executor: a no-op on a single core (which pays
- * nothing), a platform mutex under the parallel executor's concurrent writers.
- *
- * De-dup is by [SharedClause.key]. A bounded [cap] stops growth: a publish that would overflow first
- * compacts the pool to half, keeping globally-published nogoods (soundness-motivated shares that
- * bypassed the glue filter) ahead of the best glue by (LBD, length), so publishing keeps working for
- * the whole solve instead of silently stopping at the cap. Compaction bumps a generation stamp that
- * rides in the high bits of every cursor: a cursor from an older generation re-drains the whole pool,
- * and the arm-side `seen` key-set makes that re-drain duplicate-free — so eviction costs a stale arm
- * one full (deduped) import, never a missed or double-registered clause. Evicted keys leave the
- * de-dup set, so a re-derived clause can re-enter.
- *
- * Glue clauses and the literal block distance (LBD) follow G. Audemard, L. Simon, "Predicting learnt clauses quality
- * in modern SAT solvers", IJCAI 2009, https://www.ijcai.org/Proceedings/09/Papers/074.pdf.
- */
+// Append-only, de-duplicated pool of learned nogoods shared across the backtrack arms of one problem. Across
+// segments it is also the memory that survives a backtrack arm's handle being rebuilt, so even a single lane
+// uses it, with a no-op lock.
+//
+// A publish that would overflow cap first compacts the pool to half, keeping globally published nogoods ahead of
+// the best glue by (LBD, length), so publishing keeps working for the whole solve. Compaction bumps a generation
+// stamp in the high bits of every cursor: an older cursor re-drains the whole pool, and the arm-side `seen` set
+// makes that re-drain duplicate-free, so eviction never loses or double-registers a clause. Evicted keys leave the
+// de-dup set, so a re-derived clause can re-enter.
+//
+// Glue clauses and the literal block distance (LBD) follow G. Audemard, L. Simon, "Predicting learnt clauses quality
+// in modern SAT solvers", IJCAI 2009, https://www.ijcai.org/Proceedings/09/Papers/074.pdf.
 internal class SharedClausePool(
     private val lock: Mutex = Mutex(concurrent = false),
     private val cap: Int = DEFAULT_CAP,
     internal val measureMemory: Boolean = false,
     internal val memorySampleWork: Long = SharingMemoryObservation.DEFAULT_WORK,
     internal val memorySampleScratchEntries: Int = SharingMemoryObservation.DEFAULT_SCRATCH_ENTRIES,
-    /** Default LBD bound for the arms' glue export ([PoolClauseExchange]); the pool carries it so
-     *  every arm of one portfolio shares a single tunable filter (`--param clause-share-lbd`). */
+    // The pool carries the glue export filter so every arm of one portfolio shares it.
     val shareMaxLbd: Int = PoolClauseExchange.DEFAULT_MAX_LBD,
-    /** Default length bound for the arms' glue export, the length half of the shared filter
-     *  (`--param clause-share-len`). */
     val shareMaxLen: Int = PoolClauseExchange.DEFAULT_MAX_LEN,
     internal val softLimitBytes: Long? = null,
     internal val reclamationWork: Long = DEFAULT_RECLAMATION_WORK,
@@ -88,10 +74,8 @@ internal class SharedClausePool(
         )
     }
 
-    /** Append the unseen clauses of [batch] (by key) as published by arm [origin], compacting on overflow.
-     *  [isGlobal] marks a globally-published nogood for retention priority over filtered glue. A clause
-     *  already pooled keeps the arm that published it first. With [stableGenerationOnly], a batch that
-     *  could require compaction returns -1 before publication. */
+    // isGlobal gives a nogood retention priority over filtered glue. A clause already pooled keeps the arm that
+    // published it first. With stableGenerationOnly, a batch that could require compaction returns -1 unpublished.
     fun publish(
         batch: List<SharedClause>,
         origin: Int = NO_ORIGIN,
@@ -152,8 +136,7 @@ internal class SharedClausePool(
         Reclamation(status, before, store.ownedBytes, budget.work, budget.scratchEntries)
     }
 
-    /** The clauses appended at index ≥ [cursor] of the cursor's generation, paired with the advanced
-     *  cursor. A cursor from an older generation restarts at index 0 (see the class doc). */
+    // A cursor from an older generation restarts at index 0.
     fun drainSince(cursor: Long): Drained = lock.withLock {
         val from = if (generationOf(cursor) == generation) indexOf(cursor) else 0
         val size = store.size
@@ -439,7 +422,6 @@ internal class SharedClausePool(
         val scratchEntries: Int,
     )
 
-    /** A drained batch, the arm that published each of its clauses, and the advanced cursor. */
     internal class Drained(val clauses: List<SharedClause>, val origins: IntArray, val cursor: Long)
 
     internal companion object {
@@ -447,7 +429,6 @@ internal class SharedClausePool(
         private const val DEFAULT_RECLAMATION_WORK = 4_000_000L
         private const val DEFAULT_RECLAMATION_SCRATCH = 2_000_000
 
-        /** The origin of a clause whose publisher named no arm. */
         const val NO_ORIGIN = -1
 
         private fun cursorOf(generation: Int, index: Int): Long = (generation.toLong() shl 32) or index.toLong()
@@ -457,28 +438,19 @@ internal class SharedClausePool(
     }
 }
 
-/**
- * A per-arm [ClauseExchange] over a [SharedClausePool]: at each restart it imports the nogoods
- * published since this arm last looked and exports the arm's new glue clauses (LBD ≤ [maxLbd],
- * length ≤ [maxLen]). A `seen` key-set holds every key this arm has already imported or exported, so
- * it never re-imports its own clauses nor re-exports a clause twice; the pool de-dups globally on top.
- */
+// The `seen` key-set holds every key this arm has imported or exported, so it never re-imports its own clauses
+// nor re-exports one twice; the pool de-dups globally on top.
 internal class PoolClauseExchange(
     private val pool: SharedClausePool,
-    /** The arm this exchange publishes for; see [SharedClausePool.publish]. */
     private val origin: Int = SharedClausePool.NO_ORIGIN,
-    /** Where uses of imported clauses are counted for the arms that published them; null counts nothing. */
     private val tally: ContributionTally? = null,
     private val maxLbd: Int = pool.shareMaxLbd,
     private val maxLen: Int = pool.shareMaxLen,
-    /** Skip permanent (search-conditioned) clauses on export — the incumbent objective bound and
-     *  blocking nogoods. Required for an arm learning under assumptions/an incumbent (LNS repair): those
-     *  clauses hold only under its pins, so sharing them globally is unsound. */
+    // Permanent clauses (incumbent objective bound, blocking nogoods) learned under assumptions or an
+    // incumbent hold only under those pins, so sharing them globally is unsound.
     private val skipPermanent: Boolean = false,
-    /** Publish globally-valid nogoods (LP Farkas) via [publishGlobal]. An LNS-repair arm derives Farkas
-     *  certificates under its pins, so they are not globally valid there — it disables this. */
+    // An arm learning under pins derives Farkas nogoods that are not globally valid.
     private val shareGlobalNogoods: Boolean = true,
-    /** Where this arm's clause traffic is recorded; null records nothing. */
     private val meter: SharingMeter? = null,
 ) : ClauseExchange {
     private var cursor = 0L
@@ -622,8 +594,7 @@ internal class PoolClauseExchange(
         }
     }
 
-    /** Publish a globally-valid nogood straight to the pool (no LBD/length filter), deduped by the
-     *  `seen` set so this arm neither double-publishes it nor re-imports its own. */
+    // Bypasses the LBD/length filter.
     override fun publishGlobal(clause: SharedClause) {
         if (!shareGlobalNogoods) return
         metered {
@@ -634,8 +605,7 @@ internal class PoolClauseExchange(
         }
     }
 
-    /** Publish this arm's not-yet-seen glue clauses; safe at any decision level (read-only on the
-     *  trail). The `seen` set guards against re-export within a session; the pool de-dups globally. */
+    // Safe at any decision level: read-only on the trail.
     private fun export(session: PropagationSession, retiring: Boolean) {
         val candidates = exportCandidates(session) ?: return
         if (retiring && candidates.isNotEmpty() && pool.softLimitBytes == null &&

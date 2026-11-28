@@ -17,9 +17,8 @@ internal class InverseInvariant(
     private val gOffset: Int,
 ) : Invariant {
 
-    /** True when f and g are the same variables in the same order (XCSP3 `channel` over one list):
-     *  the constraint is then `f(f(x)) = x`, a self-inverse / involution, and the generic channel swap
-     *  would write the shared variables twice. */
+    // f and g are the same list, so the constraint is the involution `f(f(x)) = x` and the generic
+    // channel swap would write the shared variables twice.
     private val selfInverse: Boolean = fOffset == gOffset && f.contentEquals(g)
 
     private fun fValueToGIndex(j: Long): Long = j - gOffset
@@ -132,13 +131,8 @@ internal class InverseInvariant(
         }
     }
 
-    /**
-     * Involution-preserving structured moves for the self-inverse case. Each move recombines the
-     * current pairing into another involution: transpose two fixed points, split a transposition into
-     * two fixed points, or recombine two transpositions `(a,a'), (b,b') -> (a,b), (a',b')`. All keep
-     * `f(f(x)) = x`, so they preserve feasibility; the identity seed (every point fixed) is already a
-     * valid involution.
-     */
+    // Each move recombines the pairing into another involution: transpose two fixed points, split a
+    // transposition, or recombine two transpositions `(a,a'), (b,b') -> (a,b), (a',b')`.
     private fun proposeInvolutionMoves(state: LocalSearchState, sink: MoveSink) {
         val n = f.size
         if (n < 2) return
@@ -167,8 +161,6 @@ internal class InverseInvariant(
         }
     }
 
-    /** Emit the compound setting `f(indices(k)) = targets(k) + gOffset`, or skip (return false) if any
-     *  target is out of its variable's domain. Indices are distinct by construction. */
     private fun emitInvolution(state: LocalSearchState, sink: MoveSink, indices: IntArray, targets: IntArray): Boolean {
         val parts = ArrayList<Move>(indices.size)
         for (k in indices.indices) {
@@ -184,8 +176,7 @@ internal class InverseInvariant(
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean =
         seedIdentity(state) || seedByMatching(state)
 
-    /** The fast path: the identity permutation `f(i) = i`, `g(i) = i`. Atomic — checks every variable
-     *  before writing any, so a failure leaves the assignment untouched for the matching fallback. */
+    // Checks every variable before writing any, so a failure leaves the assignment for the matching fallback.
     private fun seedIdentity(state: LocalSearchState): Boolean {
         val n = f.size
         val values = MutableIntLongMap(n)
@@ -207,18 +198,9 @@ internal class InverseInvariant(
         return true
     }
 
-    /**
-     * Matching-based seed for restricted domains where the identity permutation is infeasible (a
-     * derangement-shaped channel, say). The bipartite graph puts f-index `i` on the left and the
-     * g-index (= the value `f(i)` selects, offset-normalized) on the right, with an edge only when
-     * both sides accept it: `i`'s f value lies in `dom(f[i])` and the back-reference `i` lies in
-     * `dom(g[that index])`. A perfect matching is exactly a feasible inverse pair, found by reusing
-     * the all-different augmenting-path matcher [reginTryAugment].
-     *
-     * Restricted to disjoint, equal-length, unfrozen `f`/`g`: a self-inverse (overlapping `f`/`g`)
-     * needs a symmetric matching the plain matcher does not guarantee, and frozen variables keep the
-     * identity-only path, so both fall through to the caller's `false`.
-     */
+    // A perfect matching of f-indices to g-indices, with an edge only where both channel directions are
+    // in domain, is a feasible inverse pair. A self-inverse needs a symmetric matching the plain matcher
+    // does not guarantee, so overlapping or frozen f/g fall back to `false`.
     private fun seedByMatching(state: LocalSearchState): Boolean {
         val n = f.size
         if (g.size != n) return false

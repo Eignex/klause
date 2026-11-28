@@ -12,12 +12,9 @@ import com.eignex.util.collections.storage.borrowBackingArray
 import com.eignex.util.collections.toSortedIntArray
 
 /**
- * Per-move one-way invariant index over a model's definitional nodes: given the
- * vars a move touched, [affectedNodes] returns the cone of definitions to re-evaluate in
- * topological order. The local-search state drives the actual writes through its incremental
- * apply path so factor payloads and break/make counts stay maintained — this class is a passive
- * index. [isDefinedInt] / [isDefinedBool] let move generation exclude defined vars from the
- * search space entirely (they are determined, not searched).
+ * Passive index over definitional nodes: [affectedNodes] returns the cone to re-evaluate after a move, in topological
+ * order, and defined vars are excluded from search. The state performs the writes through its incremental apply path
+ * so payloads and break/make counts stay maintained.
  */
 class InvariantNetwork private constructor(data: DefinitionIndex) {
     internal constructor(nodes: List<DefinitionalSweep.SweepNode>, numIntVars: Int, numBoolVars: Int) :
@@ -189,14 +186,9 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
 
     private val members: Set<DefinitionalSweep.SweepNode> by lazy { nodeArr.toHashSet() }
 
-    /** True iff [node] is one of this network's own nodes. */
     internal fun maintains(node: DefinitionalSweep.SweepNode): Boolean = node in members
 
-    /**
-     * Topologically-ordered node indexes affected by writes to the seed vars: the transitive
-     * read-cone, computed by a marked worklist walk. Negative var ids are ignored so callers
-     * can reuse fixed-size scratch arrays.
-     */
+    /** Topologically ordered indexes of the read-cone of the seed vars; negative ids are ignored for scratch reuse. */
     fun affectedNodes(seedInts: IntArray, seedBools: IntArray): IntArray = findAffectedNodes(seedInts, seedBools, null)
 
     internal fun affectedNodes(seedInts: IntArray, seedBools: IntArray, assignment: Assignment): IntArray =

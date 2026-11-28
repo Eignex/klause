@@ -1,9 +1,8 @@
 package com.eignex.klause.presolve
 
 /**
- * Which root-bake probing tiers [RootBaker.bake] runs, and their budgets. Threaded through the
- * presolve / backtrack lanes so the kernel carries no probing policy. [NONE] disables all probing
- * (the common case — a plain [RootBaker.bake] is then a no-op returning the base bake).
+ * Which root-bake probing tiers [RootBaker.bake] runs, and their budgets, so the kernel carries no probing
+ * policy. [NONE] disables probing, and [RootBaker.bake] then returns the base bake.
  */
 class BakeConfig(
     /**
@@ -39,12 +38,12 @@ class BakeConfig(
      */
     val probeSeed: Long = 0L,
 ) {
-    /** True iff any probing tier is enabled — when false, [RootBaker.bake] returns the base bake as-is. */
+    /** True iff any probing tier is enabled. */
     val anyEnabled: Boolean get() = probeFailedLiterals || probeIntBounds || probeIntHoles
 
     /** Shared config and the [PresolveConfig]-derived factory. */
     companion object {
-        /** No probing — the kernel base bake stands alone. */
+        /** No probing. */
         val NONE: BakeConfig = BakeConfig()
 
         /**

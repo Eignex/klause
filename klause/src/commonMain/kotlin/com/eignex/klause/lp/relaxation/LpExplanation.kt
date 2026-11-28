@@ -28,52 +28,32 @@ import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.toLongExact
 import com.eignex.util.numbers.unaryMinus
 
-/**
- * Turns LP certificates into learned-clause material over absolute variable-bound atoms, read off the
- * integer-multiplier [LpDeductionCertificate], which carries the reduced-cost signs and dual-weight rows
- * the reasons lean on. The artifacts share one shape: a set of *premises* — column bounds the
- * certificate leans on — whose negations form clause literals, with the constraint rows kept implicit.
- * Keeping the rows implicit is what makes the clauses small, and it is sound exactly when every row the
- * certificate leans on holds at every solution of the problem ([LpModel.rowGlobal]). A non-global row
- * with recorded validity premises ([LpModel.rowPremises] — the live-big-M reified rows) is kept implicit
- * by citing those bounds as extra literals instead; a non-global row without premises (a locally
- * separated or Gomory/MIR cut) makes the certificate inexpressible and it is withheld rather than
- * under-cited.
- *
- * A premise is cited from the column's **live LP bound**:
- *  - an integer column contributes `¬(x ≥ lo)` (lower side) or `¬(x ≤ ub)` (upper side) — a
- *    declared (unbranched) bound's negation is simply a constant-false literal, harmless;
- *  - a Boolean column carries information only when its column is collapsed: pinned **true**
- *    (`lo = 1`) contributes `¬b` on the lower side, pinned **false** (`ub = 0`) contributes `b` on
- *    the upper side; an unpinned column's `b ≥ 0` / `b ≤ 1` premise is vacuous and cited as
- *    nothing — its variable literal would be *unassigned* at the node, breaking the all-false
- *    contract. The side is what matters — *not* the seat name: a pinned column sits at a single
- *    point, so its recorded seat side is arbitrary, and mapping seat→polarity would emit the
- *    premise itself instead of its negation.
- *
- * Every emitted literal is false at the node that produced the certificate, which is the contract
- * both consumers require: `analyzeConflictClause` seeds 1UIP from an all-false clause, and
- * `implyInt*WithReason` records reasons whose literals are currently false.
- */
+// Turns LP certificates into learned-clause material over absolute variable-bound atoms. Each artifact is
+// a set of premises, the column bounds the certificate leans on, whose negations form the clause; rows stay
+// implicit. That keeps clauses small and is sound only when every row the certificate leans on holds at
+// every solution. A non-global row with recorded validity premises (the live-big-M reified rows) cites
+// them as extra literals; a non-global row without premises (a locally separated or Gomory/MIR cut) makes
+// the certificate inexpressible, and it is withheld rather than under-cited.
+//
+// Premises come from the column's live LP bound. A Boolean column carries information only when collapsed:
+// pinned true cites ¬b on the lower side, pinned false cites b on the upper side, and an unpinned column
+// cites nothing because its literal would be unassigned. The side decides polarity, never the recorded
+// seat, which is arbitrary for a collapsed column.
+//
+// Every emitted literal is false at the node that produced the certificate: 1UIP analysis seeds from an
+// all-false clause, and reasons require currently false literals.
 internal object LpExplanation {
     private val minimumLong = bigIntOf(Long.MIN_VALUE)
     private val maximumLong = bigIntOf(Long.MAX_VALUE)
 
-    /** [premiseLit] result: the premise holds over the whole declared box — cite nothing. */
+    // The premise holds over the whole declared box: cite nothing.
     const val PREMISE_NONE: Int = -1
 
-    /** [premiseLit] result: the premise has no expressible CP atom (e.g. an auxiliary column) — abandon. */
+    // The premise has no expressible CP atom, such as an auxiliary column: abandon.
     const val PREMISE_AUX: Int = -2
 
-    /**
-     * The negated premise literal for structural column [col], cited on its lower side
-     * ([lowerSide], premise `x ≥ lo`) or upper side (premise `x ≤ ub`), where `lo`/`ub` are the
-     * LP's live column bounds. Returns [PREMISE_NONE] for a vacuous premise and [PREMISE_AUX] when
-     * the column has no backing CP variable. For an *optimal* certificate the side must follow the
-     * reduced cost's sign (`d > 0` uses the lower bound, `d < 0` the upper — the seat name is
-     * meaningless for a collapsed column); for a Farkas ray it follows the sign of `ρ·A_j` (see
-     * [infeasibilityClause]).
-     */
+    // For an optimal certificate the side follows the reduced cost's sign (d > 0 lower, d < 0 upper); for a
+    // Farkas ray it follows the sign of ρ·A_j.
     fun premiseLit(relaxation: LpRelaxation, session: PropagationSession, col: Int, lowerSide: Boolean): Int {
         if (col < relaxation.colRealId.size && relaxation.colRealId[col] >= 0) {
             val bounds = relaxation.model.exactBounds(col)
@@ -136,7 +116,7 @@ internal object LpExplanation {
         return PREMISE_AUX
     }
 
-    /** The sides of column [col] whose bounds [cert]'s bound rests on, `true` for the lower side. */
+    // true is the lower side.
     fun citedSides(cert: LpDeductionCertificate, col: Int): List<Boolean> {
         val minimizing = when (cert.reducedCostSign(col)) {
             0 -> 0
@@ -146,17 +126,9 @@ internal object LpExplanation {
         return CITED_SIDES[minimizing or cert.extraCitedSides(col)]
     }
 
-    /**
-     * Reason atoms certifying the LP's objective lower bound for an OPTIMAL [cert] (the exact
-     * basis-certificate), or null when the certificate touches an auxiliary column or a non-global
-     * row without recorded premises carries dual weight. By LP duality `c·x = y·b + Σ_j d_j·x_j` holds
-     * row-wise, so for any point satisfying the rows, `objective ≥ L` follows from `x_j ≥ lo_j` on the
-     * columns with `d_j > 0` and `x_j ≤ ub_j` on those with `d_j < 0` — exactly the premises cited here.
-     * A certificate may name further sides it reads ([LpDeductionCertificate.extraCitedSides]), and those are cited
-     * too; other columns with a zero reduced cost stay uncited. Rows stay implicit, which is why every row with
-     * `y_i ≠ 0`, or that a certificate cites, must be globally valid or carry recorded validity premises
-     * ([LpModel.rowPremises]) cited alongside.
-     */
+    // By LP duality c·x = y·b + Σ_j d_j·x_j, so objective ≥ L follows from x_j ≥ lo_j where d_j > 0 and
+    // x_j ≤ ub_j where d_j < 0, plus any extra sides the certificate names. Every row with y_i ≠ 0 must be
+    // global or have its validity premises cited alongside.
     fun objectiveBoundReason(
         relaxation: LpRelaxation,
         cert: LpDeductionCertificate,
@@ -210,14 +182,9 @@ internal object LpExplanation {
     }
 
     /**
-     * Nogood literals for an infeasibility [ray] (an exact integer Farkas certificate, [integerFarkasRay]),
-     * or null when the certificate touches an auxiliary column, leans on a non-global row with no
-     * recorded premises, or is constraint-only (no column premise — nothing to learn). The ray makes
-     * `ρ·rhs > Σ_j max(0, ρ·A_j)·u_j`: each structural column with `ρ·A_j > 0` is seated at its upper
-     * bound, each with `ρ·A_j < 0` at its lower bound, and those seated bounds — plus the recorded
-     * premises of any ray-weighted non-global row — are jointly inconsistent with the (globally valid)
-     * rows, so the clause `⋁ ¬(premise)` is implied by the problem alone. Every literal is false at the
-     * dead node; the engine registers the clause where one can become unassigned (1UIP backjump / restart).
+     * Nogood for an exact integer Farkas [ray] ([integerFarkasRay]): columns with `ρ·A_j > 0` cite their
+     * upper bound, those with `ρ·A_j < 0` their lower bound, plus the recorded premises of ray-weighted
+     * non-global rows. Together they contradict the rows, so `⋁ ¬(premise)` follows from the problem alone.
      */
     fun infeasibilityClause(relaxation: LpRelaxation, ray: LongArray, session: PropagationSession): IntArray? {
         val model = relaxation.model
@@ -236,7 +203,6 @@ internal object LpExplanation {
         for (col in relaxation.colVarId.indices) {
             val sign = rayColumnSign(model, ray, col) ?: return null
             if (sign == 0) continue
-            // ρ·A_j > 0 ⇒ the column's upper bound is load-bearing (upper side); < 0 ⇒ lower side.
             val premises = boundPremiseLits(relaxation, session, col, lowerSide = sign < 0) ?: return null
             for (lit in premises) if (seen.add(lit)) lits.add(lit)
         }
@@ -257,12 +223,8 @@ internal object LpExplanation {
         return if (dot.hi == 0L && dot.lo == 0L) 0 else if (dot.isNonNegative()) 1 else -1
     }
 
-    /**
-     * A theory lemma from an exact rational infeasibility over the load-bearing [rows]: the rows'
-     * validity premises plus the current bound atoms of every integer-backed column those rows touch —
-     * each a live assumption the refutation leans on, so their conjunction is provably real-infeasible
-     * and the negated clause is globally valid. Null when some cited row's premise is inexpressible.
-     */
+    // Theory lemma for an exact rational infeasibility over rows: their validity premises plus both bound
+    // atoms of every column they touch are jointly real-infeasible, so the negated clause is globally valid.
     fun premiseClauseForRows(relaxation: LpRelaxation, rows: IntArray, session: PropagationSession): IntArray? {
         val lits = IntArrayList()
         val seen = IntHashSet()
@@ -282,12 +244,8 @@ internal object LpExplanation {
         return lits.toIntArray()
     }
 
-    /**
-     * Append the negated validity premises of every non-global row in [rows]; false when some
-     * non-global row has none recorded (the certificate is then inexpressible). The premise
-     * thresholds were the live bounds at the relaxation's build, so each atom is true (and its
-     * negation false) at the node — tightenings since the build only strengthen the atom.
-     */
+    // False when a non-global row has no recorded premises. The thresholds were live bounds at build, so
+    // each atom is true at the node; later tightenings only strengthen it.
     fun addRowPremiseLits(
         lits: IntArrayList,
         seen: IntHashSet,
@@ -341,7 +299,7 @@ internal object LpExplanation {
         return true
     }
 
-    /** [addRowPremiseLits] over dual support and the equality proving an integral objective. */
+    // Rows with dual support plus the rows proving an integral objective.
     fun addDualRowPremiseLits(
         lits: IntArrayList,
         seen: IntHashSet,

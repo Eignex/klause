@@ -10,30 +10,18 @@ import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongArrayList
 
 /**
- * Per-call constraint on the solver: pin specific variables to specific values for the
- * duration of the call. Compatible with all the entry points on [Solver] and
- * [com.eignex.klause.solver.Optimizer]; operations that cannot enforce non-empty assumptions
- * reject them explicitly. Session counting uses an isolated conditioned model.
+ * Call-scoped pins of variables to values, accepted by the entry points on [Solver] and
+ * [com.eignex.klause.solver.Optimizer]. The `Problem` is untouched; operations that cannot enforce non-empty
+ * assumptions reject them, and session counting uses an isolated conditioned model.
  *
- * Implementations are expected to:
- *  - initialise (or re-initialise on restart) the assignment with the assumed values,
- *  - skip any move proposal that would change an assumed variable,
- *  - leave the underlying `Problem` untouched — assumptions are call-scoped, not
- *    permanent constraints.
+ * Jointly infeasible assumptions may yield `null` / `Unknown` instead of `Unsat` when the engine cannot prove
+ * unsatisfiability.
  *
- * If the assumed values are jointly infeasible against the problem's constraints the
- * solver may return `null` / `Unknown` rather than reporting `Unsat` (local-search
- * cannot prove UNSAT).
+ * Exact pins come from [withBool] / [withInt] / [mergedWith]. Presolve-derived bound tightenings, holes and
+ * set restrictions ride alongside in [deductions] and are applied together with the pins at seed time.
  *
- * The exact pins are the user/search-facing contract ([withBool] / [withInt] / [mergedWith]). The
- * presolve-derived bound tightenings, holes, and set-restrictions produced by SAC-at-root and
- * bake-time probing ride alongside in [deductions] — they are applied together at seed time but never
- * originate from the pin API.
- *
- * Storage is parallel primitive arrays sorted ascending by key, with binary-search lookup for
- * [boolValueOrNull] / [intValueOrNull]. The [bools] / [ints] map views allocate on every access; hot
- * paths should use the primitive accessors ([forEachBool], [forEachInt], [boolValueOrNull],
- * [intValueOrNull]).
+ * Storage is parallel arrays sorted by key. The [bools] / [ints] map views allocate on every access; hot
+ * paths use [forEachBool], [forEachInt], [boolValueOrNull] and [intValueOrNull].
  */
 class Assumptions internal constructor(
     /** Bool var ids, ascending. Public for primitive iteration in [forEachBool]. */
@@ -98,9 +86,6 @@ class Assumptions internal constructor(
     /**
      * Merge `this` with [other]; on key overlap, [other]'s value wins (last-write
      * semantics, which sessions rely on). Returns a fresh [Assumptions]; the inputs are untouched.
-     *
-     * Sorted merge in O(n + m). The [deductions] merge is delegated to [DeducedRestrictions.mergedWith]
-     * under the merged exact-pin set.
      */
     fun mergedWith(other: Assumptions): Assumptions {
         if (other.isEmpty && other.deductions.isEmpty) return this
@@ -138,8 +123,6 @@ class Assumptions internal constructor(
         )
     }
 
-    /** Rebuild with a subset of fields replaced; every unspecified field (including [deductions]) is
-     *  carried over unchanged. */
     private fun copy(
         boolKeys: IntArray = this.boolKeys,
         boolValues: BooleanArray = this.boolValues,
@@ -268,8 +251,7 @@ class Assumptions internal constructor(
         val None: Assumptions =
             Assumptions(emptyIntArray(), emptyBooleanArray(), emptyIntArray(), emptyLongArray())
 
-        /** Map-based factory. Call sites use `Assumptions(bools = mapOf(0 to true))`;
-         *  internally normalises to the primitive sorted-array form. */
+        /** Map-based factory, e.g. `Assumptions(bools = mapOf(0 to true))`. */
         operator fun invoke(bools: Map<Int, Boolean> = emptyMap(), ints: Map<Int, Long> = emptyMap()): Assumptions {
             if (bools.isEmpty() && ints.isEmpty()) return None
             val bKeys = bools.keys.toIntArray().also { it.sort() }

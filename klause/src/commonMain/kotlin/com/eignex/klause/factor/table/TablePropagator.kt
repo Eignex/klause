@@ -33,12 +33,8 @@ internal class TablePropagator(
     private val tuples: LongArray,
     private val arity: Int,
     private val numTuples: Int,
-    /** Per-cell upper bound for a short-support table (see [com.eignex.klause.factor.table.Table.hi]);
-     *  null when every cell is a point (a ground table). */
     private val hi: LongArray?,
-    /** Shared across a `<group>`'s rows over one relation: caches the "sweep prunes
-     *  nothing" verdict so later rows with the same column bounds skip re-sweeping the shared table.
-     *  Null for a lone table — then every fire sweeps. */
+    // Shared by a group's rows over one relation, so later rows with the same column bounds skip re-sweeping.
     private val groupCache: TableGroupCache? = null,
 ) : InterruptiblePropagator, ExtensionalSupportProvider {
 
@@ -87,7 +83,6 @@ internal class TablePropagator(
         return ExtensionalSupportCounts(counts, support.numValid)
     }
 
-    /** Lower/upper bound the cell at (row, col) accepts; equal for a point, `[MIN, MAX]` for a `*`. */
     private fun cellLo(row: Int, col: Int): Long = tuples[row * arity + col]
     private fun cellHi(row: Int, col: Int): Long = hi?.get(row * arity + col) ?: tuples[row * arity + col]
 
@@ -115,9 +110,7 @@ internal class TablePropagator(
         return values.copyOf(kept)
     }
 
-    /** Advisor subscription: STR2 is hole-aware GAC (tuple feasibility tests membership, the
-     *  prune drops interior values), so subscribe to every kind on every column variable and consume
-     *  the dirty-variable delta, so a fire re-sweeps only when a column actually changed. */
+    // STR2 is hole-aware GAC, so it watches every event kind.
     override val initialIntEventWatches: IntArray = allEventWatches(xs)
 
     override val consumesIntEventDelta: Boolean = true
@@ -234,14 +227,9 @@ internal class TablePropagator(
         return out.toArray()
     }
 
-    /**
-     * Reason for column [col]'s prune as of undo-log position [atTrail], or with [col] = -1 for the table running
-     * out of tuples: the column's own domain then, which every bound it moves rests on, and for each ruled-out
-     * tuple that held a value the prune removed one column that had ruled it out. A tuple every cell of which met
-     * its domain stood; the values its cell in [col] covers kept their support, so a ruled-out tuple covering
-     * only such values took no part. Among the columns ruling a tuple out, one whose literals are already cited
-     * is taken, else the one needing fewest.
-     */
+    // Reason for [col]'s prune at [atTrail], or for running out of tuples when [col] = -1: the column's own domain,
+    // and for each ruled-out tuple that held a removed value one column that ruled it out, preferring one already
+    // cited, else the one needing fewest literals.
     private fun supportLoss(state: PropagationState, col: Int, atTrail: Int): IntArray {
         val snapshot = ExplanationSnapshot(state, xs, atTrail)
         val out = LitSet()
@@ -310,12 +298,8 @@ internal class TablePropagator(
 
     private enum class Cell { LIVE, KILLED }
 
-    /**
-     * Whether the cell at (row, c) met column c's historical domain, adding to [into], when it did not, the
-     * literals false then that say so: the bound it fell past, and each hole it fell in that was carved on the
-     * path. Root holes and survivor restrictions are unconditional and need none. Walks only the cell's holes,
-     * and only once every value in it is known to be one.
-     */
+    // When the cell missed column c's historical domain, adds the literals saying so: the bound it fell past and
+    // each hole carved on the path. Root holes and survivor restrictions are unconditional and need none.
     private fun cellAt(
         state: PropagationState,
         row: Int,
@@ -448,18 +432,10 @@ internal class TablePropagator(
         fun toArray(): IntArray = lits.toIntArray()
     }
 
-    /**
-     * Simple tabular reduction, STR2 (Lecoutre, "STR2: optimized simple tabular reduction for table
-     * constraints", Constraints 16(4), 2011, https://doi.org/10.1007/s10601-011-9107-6). The propagator
-     * maintains a sparse set of currently-feasible tuple indices in [TableStr2State] across propagator
-     * calls; on each fire it sweeps only the live prefix to drop newly-infeasible tuples and gather column supports.
-     * Backtrack correctness comes from [TableStr2State.numValid] being a reversible cell on the engine's
-     * undo trail: a pop restores the live-set size (hence the live set) in O(1).
-     *
-     * Short-support cells (`[Table.hi]`) generalize a column entry from a single value to an interval
-     * `[lo, hi]`: a point is `lo == hi`, a `*` wildcard is `[MIN, MAX]`. A cell is feasible when the
-     * interval intersects the live domain (hole-aware), and supports every live domain value it covers.
-     */
+    // STR2 (Lecoutre, "STR2: optimized simple tabular reduction for table constraints", Constraints 16(4), 2011,
+    // https://doi.org/10.1007/s10601-011-9107-6) over a sparse set of live tuples whose size
+    // [TableStr2State.numValid] is trailed, so a pop restores it in O(1). A short-support cell is feasible when its
+    // interval meets the live domain, and supports every live value it covers.
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         state.finiteWork.begin()
         val payload = state.refPayload[factorId]
@@ -474,20 +450,14 @@ internal class TablePropagator(
             if (ok) state.refPayload[factorId] = NoopStarted
             return ok
         }
-        // The bitset support map is indexed by (value − lo) and sized to the column span, which only
-        // works when every column's domain is within Int range and its span is modest. A wider column
-        // (a float-scaled table) takes the value-keyed path, which carries no span dependency.
+        // The bitset support map is sized to the column span; wider columns take the value-keyed path.
         val bitsetEligible = (0 until arity).all { col ->
             val d = state.intDomains[xs[col]]
             d.min >= Int.MIN_VALUE.toLong() && d.max <= Int.MAX_VALUE.toLong() && d.max - d.min < MAX_BITSET_SPAN
         }
-        // Group reuse: when every column still holds its full contiguous domain, whether the sweep prunes
-        // a domain value is a pure function of (relation, column bounds). A dense relation shared across a
-        // group's rows supports every value under full domains, so almost every root fire prunes nothing —
-        // and re-establishing that costs a full-table scan per row. Once one row records the no-prune
-        // verdict for these bounds, siblings with the same full bounds skip their own sweep: they prune
-        // nothing either, and leaving their (still-full) tuple set unfiltered only defers cleanup a real
-        // later fire redoes. Sound only for contiguous domains — a hole could remove a value's only support.
+        // Under full contiguous domains, whether the sweep prunes is a function of (relation, column bounds), so
+        // once one row of a group records a no-prune verdict, siblings with the same bounds skip their sweep. A
+        // hole could remove a value's only support, so contiguity is required.
         val gc = groupCache
         if (gc != null && bitsetEligible) {
             var contiguous = true
@@ -501,9 +471,8 @@ internal class TablePropagator(
                 if (d.holeCount != 0L) contiguous = false
             }
             if (contiguous && gc.isNoop(mins, maxs)) {
-                // This row sweeps nothing, so it has nothing to filter and needs no live set. A group's
-                // rows share one relation but each would otherwise allocate its own O(numTuples) tuple
-                // index — the dominant term in the build's peak memory on the largest table instances.
+                // No live set: each row would otherwise allocate its own O(numTuples) index, which dominates peak
+                // memory on the largest tables.
                 if (existing == null) state.refPayload[factorId] = NoopStarted
                 return true
             }
@@ -511,8 +480,7 @@ internal class TablePropagator(
             val ok = propagateBitset(state, s)
             if (ok) {
                 s.commit()
-                // Record the verdict once: under full contiguous bounds the sweep pruned no domain value
-                // iff every column still spans its bounds (any tuple removal doesn't change a domain).
+                // Under full contiguous bounds the sweep pruned nothing iff every column still spans its bounds.
                 if (contiguous && gc.noopMins == null) {
                     var noPrune = true
                     for (col in 0 until arity) {
@@ -533,8 +501,7 @@ internal class TablePropagator(
         return ok
     }
 
-    /** The STR2 live set for this factor, installed on first genuine use. Every tuple starts live, which
-     *  is exactly the state a sweep would have left: a row reaching here has filtered nothing yet. */
+    // Every tuple starts live: a row reaching here has filtered nothing yet.
     private fun newLiveSet(state: PropagationState, factorId: Int): TableStr2State {
         val index = if (hi == null && numTuples >= 128) supportCache.supports { state.checkFiniteWork() } else null
         val fresh = TableStr2State(
@@ -547,15 +514,12 @@ internal class TablePropagator(
         return fresh
     }
 
-    /** Whether the cell at (row, col) — the interval `[cellLo, cellHi]` — has support in domain [d]. */
     private fun cellFeasible(state: PropagationState, row: Int, col: Int, d: IntDomain): Boolean {
         val lo = cellLo(row, col)
         val hiC = cellHi(row, col)
         return if (lo == hiC) lo in d else domainOverlapsRange(state, d, lo, hiC)
     }
 
-    /** STR2 sweep + support filtering with a per-column span-sized bitset — the fast path for columns
-     *  whose domain is within Int range and narrow ([MAX_BITSET_SPAN]). */
     private fun propagateBitset(state: PropagationState, s: TableStr2State): Boolean {
         val delta = s.beginSweep()
         val domLo = LongArray(arity)
@@ -605,8 +569,7 @@ internal class TablePropagator(
                         fullySupported[col] = true
                         continue
                     }
-                    // Every domain value the interval covers is supported; setting bits over the
-                    // (in-range) offsets is safe — the prune only ever consults in-domain positions.
+                    // Bits over non-domain offsets are harmless: the prune consults only in-domain positions.
                     val bits = requireNotNull(supportBits[col])
                     val first = (maxOf(lo, domLo[col]) - domLo[col]).toInt()
                     val last = (minOf(hiC, domHi[col]) - domLo[col]).toInt()
@@ -685,11 +648,7 @@ internal class TablePropagator(
         return true
     }
 
-    /** STR2 sweep + support filtering with a value-keyed support set per column — the path for columns
-     *  whose domain is outside Int range or too wide for a span-sized bitset. Support membership is by
-     *  value, so a tuple value beyond Int range prunes soundly; the bound tightening uses the min/max
-     *  supported value directly. (A column over a *contiguous* wide domain still enumerates it in the
-     *  removal sweep below; the realistic wide case is a small-cardinality set domain — a bucket table.) */
+    // Value-keyed supports for columns outside Int range or too wide for a bitset.
     private fun propagateWide(state: PropagationState, s: TableStr2State): Boolean {
         val delta = s.beginSweep()
         val supported = Array(arity) { LongHashSet(numTuples) }
@@ -750,8 +709,7 @@ internal class TablePropagator(
             state.checkFiniteWork()
             if (fullySupported[col]) continue
             val ant = if (hi == null) null else columnReason(state, col) { coarse }
-            // Every surviving tuple contributed to every column, so numValid > 0 leaves each column with
-            // at least one supported value (minSup/maxSup are set).
+            // numValid > 0 leaves every column at least one supported value.
             if (minSup[col] > state.intDomains[xs[col]].min &&
                 !state.tightenIntMin(
                     xs[col],
@@ -771,9 +729,7 @@ internal class TablePropagator(
                 return false
             }
             val sup = supported[col]
-            // A column too large to walk keeps its bounds tightening above; skip the per-value support
-            // removal rather than walking the span. Sound: such a domain is never a full assignment, and
-            // the removal runs once the column narrows below the cap (every leaf is singleton domains).
+            // Skipping a column too large to walk is sound: removal runs once it narrows, and leaves are singletons.
             if (state.intDomains[xs[col]].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null) {
                 val toRemove = LongArrayList()
                 state.intDomains[xs[col]].values.forEach { value ->
@@ -817,9 +773,7 @@ internal class TablePropagator(
         }
     }
 
-    // The reason [col]'s prune records: built only if conflict analysis reads it ([supportLoss]), which needs the
-    // undo log to see the domains as they stood. Without it nothing reads reasons, and every column's current
-    // domain stands in.
+    // Without the undo log nothing reads reasons, so every column's current domain stands in.
     private inline fun columnReason(state: PropagationState, col: Int, coarse: () -> IntArray?): IntArray? =
         if (state.currentLevel == 0) {
             null
@@ -848,7 +802,6 @@ internal class TablePropagator(
         const val UPPER = 1
         const val VALUE = 2
 
-        /** [ranges] sorted and merged where they touch or overlap. */
         private fun mergeRanges(ranges: List<LongRange>): List<LongRange> {
             val merged = ArrayList<LongRange>()
             for (r in ranges.sortedBy { it.first }) {
@@ -862,12 +815,9 @@ internal class TablePropagator(
             return merged
         }
 
-        /** Whether [range] lies inside one of the merged [ranges]. */
         private fun covers(ranges: List<LongRange>, range: LongRange): Boolean =
             ranges.any { range.first >= it.first && range.last <= it.last }
 
-        /** Columns whose domain is within Int range and narrower than this take the span-sized bitset
-         *  support path; wider columns take the value-keyed set path (sound for any magnitude). */
         const val MAX_BITSET_SPAN: Long = 1L shl 24
 
         private fun setSupportRange(state: PropagationState, bits: LongArray, first: Int, last: Int) {
@@ -887,8 +837,6 @@ internal class TablePropagator(
             }
         }
 
-        /** Whether domain [d] holds a value in `[lo, hi]` (hole-aware): the clamped range is non-empty
-         *  and, when the domain has holes, not entirely holes. */
         private fun domainOverlapsRange(state: PropagationState, d: IntDomain, lo: Long, hi: Long): Boolean {
             val a = maxOf(lo, d.min)
             val b = minOf(hi, d.max)
@@ -904,6 +852,5 @@ internal class TablePropagator(
     }
 }
 
-/** A table whose root restriction or shared group no-op needed no STR2 live set. Carries "started"
- *  alone; the first fire that must sweep replaces it with a real [TableStr2State]. */
+// Marks a started table with no STR2 live set yet; the first fire that must sweep replaces it.
 private object NoopStarted

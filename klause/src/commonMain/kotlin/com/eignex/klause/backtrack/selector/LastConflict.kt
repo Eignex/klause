@@ -10,18 +10,8 @@ import kotlin.random.Random
 /**
  * Last-conflict prioritisation (Lecoutre, Saïs, Tabary and Vidal, "Reasoning from last conflict(s) in
  * constraint programming", Artificial Intelligence 173, 2009, https://doi.org/10.1016/j.artint.2009.09.002).
- * Wraps any base
- * [VariableSelector]: on every pick, returns the variable that triggered the most
- * recent conflict (if it's still unpinned), otherwise delegates to the base. Cleared
- * when the prioritised variable successfully commits (the next pick falls through to
- * the base) or on restart.
- *
- * Tends to fix unstable subtrees fast — when the search backtracks past a conflict
- * and the responsible variable is back in scope, branching on it again before
- * exploring other vars lets the engine confirm or rule out the cause of the prior
- * failure without wandering. Composes cleanly with [Vsids] / [DomWdeg]: use
- * `LastConflict(Vsids())` to get last-conflict priority on top of activity-driven
- * picking.
+ * Picks the variable of the most recent conflict while it is unpinned, otherwise delegates to [base]. The
+ * priority clears when that variable commits or on restart.
  */
 class LastConflict(private val base: VariableSelector) : VariableSelector {
 

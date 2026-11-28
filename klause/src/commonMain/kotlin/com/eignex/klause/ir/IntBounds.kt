@@ -60,31 +60,18 @@ class IntBounds internal constructor(
 
     internal val openUpperBits: Bits? get() = openHi
 
-    /** A [Tightening] over a copy of these ranges, for a pass that proves bounds on some of the columns. */
     internal fun tightening(): Tightening =
         Tightening(lowerBounds.copyOf(), upperBounds.copyOf(), openLo?.copy(), openHi?.copy())
 
-    /**
-     * The first column whose proved range admits nothing, or -1.
-     *
-     * A crossed range is a refutation, and it has to be read here rather than left to whoever
-     * materializes a domain from it: two bounds proved from different rows can cross without either one
-     * being wrong, so the caller reports `unsat` where a domain would only throw.
-     */
+    // A crossed range is a refutation and is read here rather than left to whoever materializes a domain:
+    // two bounds proved from different rows can cross, so the caller reports `unsat` where a domain throws.
     internal fun crossedColumn(): Int {
         for (v in 0 until size) if (hasLower(v) && hasUpper(v) && lowerBounds[v] > upperBounds[v]) return v
         return -1
     }
 
-    /**
-     * Bounds under construction, narrowed column by column before being stated as one [IntBounds].
-     *
-     * The ranges are copied once and mutated in place, so proving a bound on a handful of columns of a
-     * wide model costs one copy rather than one per column. Only narrowing is possible: [atLeast] and
-     * [atMost] keep whichever of the proved and the current bound is tighter, and closing an open side
-     * counts as narrowing however wide the proved bound is. A pass that ends with [changed] false proved
-     * nothing its input did not already state.
-     */
+    // Copied once and mutated in place, so proving bounds on a few columns of a wide model costs one copy.
+    // Only narrowing is possible; closing an open side counts as narrowing however wide the proved bound.
     internal class Tightening internal constructor(
         private val lowerBounds: LongArray,
         private val upperBounds: LongArray,
@@ -93,11 +80,9 @@ class IntBounds internal constructor(
     ) {
         private var built = false
 
-        /** Whether any call actually narrowed a range. */
         var changed: Boolean = false
             private set
 
-        /** Raise column [v]'s lower bound to [value], or close its open lower side at [value]. */
         fun atLeast(v: Int, value: Long) {
             check(!built) { "cannot tighten bounds after build" }
             if (openLo?.get(v) == true) {
@@ -109,7 +94,6 @@ class IntBounds internal constructor(
             changed = true
         }
 
-        /** Lower column [v]'s upper bound to [value], or close its open upper side at [value]. */
         fun atMost(v: Int, value: Long) {
             check(!built) { "cannot tighten bounds after build" }
             if (openHi?.get(v) == true) {
@@ -121,7 +105,6 @@ class IntBounds internal constructor(
             changed = true
         }
 
-        /** Finish this tightening and return its ranges, or null when nothing was narrowed. */
         fun build(): IntBounds? {
             check(!built) { "bounds already built" }
             built = true
@@ -129,7 +112,7 @@ class IntBounds internal constructor(
         }
     }
 
-    /** Internal constructor for source-model storage. */
+    /** Holds the internal factories for source-model storage. */
     companion object {
         internal fun fromFiniteBounds(
             lowerBounds: LongArray,

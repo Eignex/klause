@@ -3,8 +3,7 @@ package com.eignex.klause.factor
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.localsearch.LocalSearchState
 
-/** Reification contract `auxBoolVar ↔ (body predicate)` for `ReifiedLinear`, `ReifiedCardinality`,
- *  `ReifiedPseudoBoolean` — an interface so a factor can also extend a body abstraction. */
+/** Reification contract `auxBoolVar ↔ (body predicate)`. */
 interface ReifiedFactor : Factor {
 
     /** The reifying Boolean variable, true iff the body predicate holds. */

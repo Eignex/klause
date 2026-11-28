@@ -1,19 +1,14 @@
 #!/usr/bin/env bash
 # MiniZinc-facing wrapper for klause-cli.
 #
-# MiniZinc invokes:
-#   ${executable from klause.msc} [flags] /path/to/model.fzn
-#
-# We delegate to the gradle-built distribution. Configure via:
-#   - KLAUSE_HOME: path to the klause repo (default: dirname of this script's parent)
-#   - KLAUSE_JAR : direct path to the klause-cli distribution jar (overrides KLAUSE_HOME)
+# Usage: klause-fzn [flags] model.fzn
+# KLAUSE_HOME: the klause checkout (default: two levels above this script).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KLAUSE_HOME="${KLAUSE_HOME:-$(cd "$HERE/../.." && pwd)}"
 
-# Use the gradle-installed app bundle. Run `./gradlew :klause-cli:installJvmDist` once
-# to build it; produces klause-cli/build/install/klause-cli-jvm/bin/klause-cli.
+# Built by `./gradlew :klause-cli:installJvmDist`.
 DIST_LAUNCHER="$KLAUSE_HOME/klause-cli/build/install/klause-cli-jvm/bin/klause-cli"
 
 if [[ ! -x "$DIST_LAUNCHER" ]]; then

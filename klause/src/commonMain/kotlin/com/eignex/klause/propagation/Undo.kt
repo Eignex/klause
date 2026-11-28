@@ -21,7 +21,7 @@ internal fun PropagationState.logBoolPin(v: Int) {
     undo.holeHistLen.add(0)
 }
 
-/** Capture int var `v`'s full prior state. Must be called *before* the mutation. */
+// Must be called before the mutation.
 internal fun PropagationState.logIntChange(v: Int) {
     (boundMoves[v] ?: IntArrayList(initialCapacity = 4).also { boundMoves[v] = it }).add(undo.size)
     val prior = intDomains[v]
@@ -41,11 +41,9 @@ internal fun PropagationState.logIntChange(v: Int) {
     undo.holeHistLen.add(holeHistVal[v]?.size ?: 0)
 }
 
-/** Journal an interior carve as just the carved value (tag 2): replay re-inserts it instead
- *  of restoring a retained domain snapshot, which would cost O(holes) per carve and make deep
- *  searches on wide hole-list domains quadratic in retained heap. Columns:
- *  [UndoLog.carved] = carved value, [UndoLog.level] = prior intLevel,
- *  [UndoLog.maxReason] = prior holeHist length. */
+// Replay re-inserts the carved value: restoring a retained domain snapshot would cost O(holes) per carve and make
+// deep searches on wide hole-list domains quadratic in retained heap. [UndoLog.maxReason] carries the prior
+// hole-history length.
 internal fun PropagationState.logIntCarve(v: Int, value: Long) {
     undo.tag.add(2)
     undo.varId.add(v)
@@ -61,16 +59,11 @@ internal fun PropagationState.logIntCarve(v: Int, value: Long) {
     undo.holeHistLen.add(0)
 }
 
-/** Variable id recorded by undo record `i`. */
 internal fun PropagationState.undoVarAt(i: Int): Int = undo.varId[i]
 
-/** True iff undo record `i` is a bool pin (vs. an int-domain change). */
 internal fun PropagationState.undoIsBoolAt(i: Int): Boolean = undo.tag[i] == 0
 
-/** Capture a [PropagationState.LevelMark] at the current state. Cheap: five ints plus a snapshotCopy of
- *  each [PropagationState.SnapshottablePayload]. The map is allocated only when at least one payload is
- *  present (Table / Mdd factors); the common no-payload case shares [PropagationState.emptyPayloads] and
- *  never allocates per push. */
+// The payload map is allocated only when a snapshottable payload exists, so the common case never allocates.
 internal fun PropagationState.mark(): PropagationState.LevelMark {
     @Suppress("DoubleMutabilityForCollection") // lazily allocated when a snapshot is taken
     var payloads: MutableIntObjectMap<PropagationState.SnapshottablePayload>? = null
@@ -120,14 +113,8 @@ internal fun PropagationState.prepareMark(): Iterator<PropagationState.LevelMark
     ))
 }.iterator()
 
-/**
- * Rewind the state to [mark] by replaying the undo log from the top down to
- * [PropagationState.LevelMark.undoSize], then truncating the append-only stacks (decision vars, pin
- * order) and restoring reversible cells, snapshottable payloads and atom truths. Replays in reverse so a var
- * narrowed several times since the mark lands on its mark-time value. Transient
- * bookkeeping (dirty queues, conflict seeds, current level/factor) is cleared — the
- * caller only ever marks / undoes between propagation cycles, when those are idle.
- */
+// Replays in reverse so a var narrowed several times since the mark lands on its mark-time value. Transient
+// bookkeeping is cleared: callers mark and undo only between propagation cycles, when it is idle.
 internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
     pendingFiniteMutation = null
     replayVarUndo(mark.undoSize)
@@ -144,8 +131,7 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
         it.bcpHead = boolPinOrder.size
         nativeConflictReason = null
     }
-    // Restore snapshottable per-factor payloads. Defensive snapshotCopy so a later
-    // undo to the same mark returns to the same logical state.
+    // Copied again so a later undo to the same mark returns to the same logical state.
     mark.snapshottablePayloads.forEach { fid, payload ->
         refPayloadStore[fid] = payload.snapshotCopy()
     }
@@ -164,10 +150,8 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
 // The replay passes of [undoTo] are separate functions: each is a loop over its own log, and one body holding
 // them all is compiled again on-stack for each loop a long backjump enters.
 private fun PropagationState.replayVarUndo(undoSize: Int) {
-    // Optional sink for variables made (potentially) free again by this revert. Used by
-    // VSIDS-style pickers that remove a variable from their order heap when it's assigned
-    // and need it re-inserted on backtrack (combined-index encoding: bool id `v`, int id
-    // `numBoolVars + v`). Captured once so the no-listener case stays a single null check.
+    // Pickers re-insert unassigned variables into their order heap (bool id `v`, int id `numBoolVars + v`).
+    // Captured once so the no-listener case stays a single null check.
     val unassigned = unassignListener
     val retracting = retractingListener
     val numBool = problem.numBoolVars
@@ -240,10 +224,7 @@ private fun PropagationState.replayIntVarUndo(
 }
 
 private fun PropagationState.restoreReversibleCells(revSize: Int) {
-    // Roll back reversible cells (incremental factor state) top-down to the mark, so a cell
-    // mutated several times since the mark lands on its mark-time value (LIFO via each cell's
-    // own prior-value stack). Independent of the bool/int cells above (disjoint state), so the
-    // replay order between the two groups is immaterial.
+    // Disjoint from the bool/int cells, so the replay order between the groups is immaterial.
     val revTrail = undo.revTrail
     var r = revTrail.size - 1
     while (r >= revSize) {
@@ -254,12 +235,8 @@ private fun PropagationState.restoreReversibleCells(revSize: Int) {
 }
 
 private fun PropagationState.restoreAtomTruths(atomUndoSize: Int) {
-    // Restore atom truths recorded since the mark (the reversible atom trail): replay top-down so
-    // an atom whose truth changed several times since the mark lands on its mark-time value. This
-    // is the atoms' own assignment trail — an atom-lit forced directly by a channeling / learned
-    // clause (pinAtomLit) is undone here even when its bound never moved, which a domain-driven
-    // reconcile could not do. Independent of the int/bool cells above (disjoint
-    // state), so the replay order between the two groups is immaterial.
+    // The atoms' own assignment trail: an atom literal forced directly by a clause is undone here even when its
+    // bound never moved.
     var a = atoms.undoAtomId.size - 1
     while (a >= atomUndoSize) {
         val id = atoms.undoAtomId[a]

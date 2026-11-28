@@ -207,17 +207,11 @@ internal inline fun observeNodeFixing(sink: SolveStatsSink, phase: LpSolvePhase,
     }
 }
 
-/**
- * Reduced-cost fixing from one [LpDeductionCertificate] in minimized source objective units. Moving
- * an integral column Δ steps from its minimizing endpoint raises the Lagrangian by `|reducedCost|·Δ`.
- * A verified integral objective uses `ceil(bound) - 1`; other objectives retain an enclosing rational
- * cutoff. A finite single-coordinate objective ceiling supplies a closed feasibility cutoff,
- * including before an incumbent exists. The allowed movement uses the unrounded gap divided by `|reducedCost|`.
- * With [learn] each integer fixing carries the LP dual-decomposition reason (the other
- * support columns' seated bounds + the incumbent bound + any dual-weighted non-global row's premises);
- * when the reason is inexpressible the fixing falls back to a reason-less level-local tightening (a
- * conflict-analysis leaf). Returns true if a reduction empties a domain (the node is then pruned).
- */
+// Moving an integral column Δ steps from its minimizing endpoint raises the Lagrangian by
+// `|reducedCost|·Δ`. A verified integral objective uses `ceil(bound) - 1`; other objectives keep an enclosing
+// rational cutoff, and a finite single-coordinate objective ceiling supplies one before an incumbent exists.
+// An inexpressible reason falls back to a reason-less level-local tightening. Returns true when a domain
+// empties.
 @Suppress("LongParameterList", "CyclomaticComplexMethod")
 internal fun LpEngine.applySparseReducedCostFixing(
     relaxation: LpRelaxation,
@@ -402,13 +396,12 @@ internal fun LpEngine.singleObjectiveCeiling(
     return ceiling.takeIf { exactBits(listOf(it)) <= 128 }
 }
 
-/** One certificate's reusable support for local reduced-cost deductions under a named cutoff. */
 internal class ReducedCostFixingReasons(
     private val supportCols: IntArray,
     private val supportLits: IntArray,
     private val incumbentLit: Int,
 ) {
-    /** Reason for [col], excluding its own minimizing endpoint because that is the value being bounded. */
+    // Excludes col's own minimizing endpoint, the value being bounded.
     fun reasonFor(col: Int): IntArray {
         val out = IntArrayList(supportCols.size + 1)
         for (k in supportCols.indices) if (supportCols[k] != col) out.add(supportLits[k])
@@ -417,14 +410,10 @@ internal class ReducedCostFixingReasons(
     }
 }
 
-/**
- * Build the complete reusable premise set for one certificate: all dual-weighted row premises, every
- * structural column's minimizing endpoint with nonzero reduced cost (including basic columns), every further side
- * the certificate reads ([LpDeductionCertificate.extraCitedSides], kept in each fixing's reason, the fixed column's
- * own included), and the source-objective cutoff. For a single affine source objective `a·x + c`, the cutoff is
- * converted to the exact variable atom `x ≤ ⌊(improvingMax − c) / a⌋`; that atom must already hold. Null means some
- * premise cannot be named; the deduction may still be applied locally without a reusable reason.
- */
+// Premises: dual-weighted row premises, each nonzero-reduced-cost column's minimizing endpoint, every
+// further side the certificate cites, and the objective cutoff. For a single affine objective `a·x + c` the
+// cutoff becomes the atom `x ≤ ⌊(improvingMax − c) / a⌋`, which must already hold. Null when some premise
+// cannot be named; the deduction may still apply locally.
 internal fun reducedCostFixingReasons(
     relaxation: LpRelaxation,
     cert: LpDeductionCertificate,

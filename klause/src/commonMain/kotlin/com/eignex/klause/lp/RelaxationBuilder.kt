@@ -24,16 +24,11 @@ class LpAuxiliaryColumn(
 }
 
 /**
- * The sink an LP factor projection emits its relaxation into. A factor states linear constraints over the
- * problem's integer variables by raw id; the driver behind this interface maps each variable to its LP
- * column, caps the model, and tracks row provenance — a factor never touches the underlying tableau.
+ * The sink an LP factor projection emits its relaxation into. The driver maps variables to LP columns, caps
+ * the model and tracks row provenance.
  */
 interface RelaxationBuilder {
-    /**
-     * Emit `Σ coeffs(k) · intVars(k) ⟨op⟩ bound` over integer variables (raw ids), tagged
-     * [Contribution.CORE] or [Contribution.HULL] by [contribution] (default [Contribution.CORE]).
-     * [LinearOp.NE] is not linear-relaxable and is ignored.
-     */
+    /** Emit `Σ coeffs(k) · intVars(k) ⟨op⟩ bound` over raw integer ids. [LinearOp.NE] is ignored. */
     fun linearRow(
         op: LinearOp,
         intVars: IntArray,
@@ -43,10 +38,8 @@ interface RelaxationBuilder {
     )
 
     /**
-     * Emit `Σ weights(k) · literal(k) ⟨op⟩ bound` over Boolean literals (a literal is a variable id
-     * or its negation). A positive literal counts `+w · x`, a negative literal `+w · (1 − x)`; the
-     * constants are folded into the right-hand side. [weights] of `null` means unit weights
-     * (cardinality). Tagged by [contribution] (default [Contribution.CORE]). [LinearOp.NE] is ignored.
+     * Emit `Σ weights(k) · literal(k) ⟨op⟩ bound`; a negative literal counts `w · (1 − x)`. Null [weights]
+     * means unit weights. [LinearOp.NE] is ignored.
      */
     fun boolRow(
         literals: IntArray,
@@ -63,12 +56,8 @@ interface RelaxationBuilder {
     fun boolColumn(boolVar: Int): Int
 
     /**
-     * The LP column handle for LP-only continuous (real) variable [realVar] (raw id in the problem's
-     * real-variable namespace), created on first reference with the variable's declared real bounds and
-     * objective coefficient. A real column is present in this relaxation but absent from CP search — it
-     * has no domain, trail, or branching; the simplex resolves it at nodes and leaves. The default
-     * declines (`-1`) for builders with no real-variable backing (e.g. presolve test fakes); the search
-     * relaxation driver overrides it. See [realRow].
+     * The LP column handle for LP-only continuous variable [realVar], created on first reference with its
+     * declared bounds and objective coefficient, or `-1` for a builder with no real-variable backing.
      */
     fun realColumn(realVar: Int): Int = -1
 
@@ -88,12 +77,8 @@ interface RelaxationBuilder {
     }
 
     /**
-     * Emit a real-coefficient row `Σ coeffs(k) · columns(k) ⟨op⟩ rhs` over column handles obtained from
-     * [intColumn], [boolColumn], or [realColumn] — the LP-only linear form of a constraint that touches a
-     * continuous variable. Repeated columns are summed and absent columns count as zero. [LinearOp.NE] is
-     * ignored. The row forces the model onto the double-precision view, so the exact integer certification
-     * declines while it is present (its infeasibility is still certified via the rationalized 128-bit
-     * Farkas). The default is a no-op; the search relaxation driver overrides it.
+     * Emit a real-coefficient row `Σ coeffs(k) · columns(k) ⟨op⟩ rhs` over column handles. Repeated columns
+     * are summed. [LinearOp.NE] is ignored. The row forces the model onto the double-precision view.
      */
     fun realRow(
         columns: IntArray,
@@ -130,26 +115,23 @@ interface RelaxationBuilder {
         realRowForIntValue(intVar, value, columns, coeffs, op, rhs)
     }
 
-    /** The live pin of Boolean variable [boolVar] in this build's domains, or null when unpinned (or
-     *  the builder has no Boolean backing). Lets a conditionally-active factor emit only the rows its
-     *  activation literal currently justifies. */
+    /**
+     * The live pin of Boolean variable [boolVar], or null when unpinned or the builder has no Boolean
+     * backing.
+     */
     fun liveBool(boolVar: Int): Boolean? = null
 
     /**
-     * An auxiliary LP column in `[lo, hi]` with no backing CP variable (e.g. a one-hot selector or a
-     * product column). [presence], when given, is a flat list of `(intVar, value)` pairs that must all
-     * hold for the column to be present; it lets the persistent relaxation re-bind the column across
-     * nodes (its upper bound drops to 0 when any required value leaves the live domain). `null` keeps
-     * the column off the persistent path. Values are `Long` so a column keyed on a domain value beyond
-     * Int range (a float-scaled bucket) re-binds against the true value rather than a truncated one.
+     * An auxiliary LP column in `[lo, hi]` with no backing CP variable. [presence] is a flat list of
+     * `(intVar, value)` pairs that must all hold for the column to be present, letting the persistent
+     * relaxation re-bind it across nodes (its upper bound drops to 0 otherwise); `null` keeps the column off
+     * the persistent path.
      */
     fun auxColumn(lo: Long, hi: Long, presence: LongArray? = null, definition: LpAuxiliaryColumn? = null): Int
 
     /**
-     * Whether this factor's HULL contribution is enabled this build — its convex-hull family flag is
-     * on and we are not building the minimal objective-cone relaxation. A factor guards its hull
-     * section (the selector/arc columns it allocates and the rows over them) with this, so a disabled
-     * family adds neither columns nor rows; only its CORE rows remain.
+     * Whether this factor's HULL contribution is enabled this build. A disabled family must add neither
+     * columns nor rows.
      */
     fun hullEnabled(): Boolean
 
@@ -157,44 +139,31 @@ interface RelaxationBuilder {
     fun liveDomain(intVar: Int): IntDomain
 
     /**
-     * The root box integer variable [intVar] takes — the root-propagation fold, or the model's own
-     * declaration before it has run.
-     *
-     * A box, not a statement of the model: a side the source left open was closed by an invented
-     * endpoint so the finite lane has something to branch on. A projection that enumerates this box, or
-     * bakes one of its endpoints into a coefficient, must first ask [statesLowerBound] /
-     * [statesUpperBound] whether that side is the model's own.
+     * The root box of integer variable [intVar]. A side the source left open was closed by an invented
+     * endpoint, so a projection that enumerates the box or bakes an endpoint must first ask
+     * [statesLowerBound] / [statesUpperBound].
      */
     fun rootDomain(intVar: Int): IntDomain
 
     /**
-     * Whether the model itself bounds integer variable [intVar] below.
-     *
-     * A side closed by an invented box bounds the search and not the model, so a row whose constants
-     * lean on that endpoint holds inside the box only, and a hull that enumerates the box restricts a
-     * range the model never excluded — at the root the column enters the LP genuinely open, and such a
-     * row would cut off feasible points outright.
-     *
-     * The question is whether the side is stated at all, not whether [rootDomain] sits exactly on it:
-     * the root fold and presolve narrow the box below the stated bound by proof, and a bound proved over
-     * the model is as much the model's as one it declared.
+     * Whether the model itself bounds integer variable [intVar] below, by declaration or proof. A row
+     * leaning on an invented endpoint would cut off feasible points, since the column enters the root LP
+     * genuinely open.
      */
     fun statesLowerBound(intVar: Int): Boolean
 
     /** Whether the model itself bounds integer variable [intVar] above; see [statesLowerBound]. */
     fun statesUpperBound(intVar: Int): Boolean
 
-    /** Whether both of [intVar]'s root endpoints are the model's own — the reading a projection that
-     *  enumerates the box, or leans on either endpoint, has to make; see [statesLowerBound]. */
+    /** Whether both of [intVar]'s root endpoints are the model's own; see [statesLowerBound]. */
     fun statesBothBounds(intVar: Int): Boolean = statesLowerBound(intVar) && statesUpperBound(intVar)
 
     /** Whether every member of [intVars] states both of its endpoints; see [statesBothBounds]. */
     fun statesBothBounds(intVars: IntArray): Boolean = intVars.all { statesBothBounds(it) }
 
     /**
-     * Emit `Σ coeffs(k) · columns(k) ⟨op⟩ rhs` over column handles obtained from [intColumn],
-     * [boolColumn], or [auxColumn]. Repeated columns are summed and absent columns count as zero.
-     * Tagged by [contribution] (default [Contribution.CORE]). [LinearOp.NE] is ignored.
+     * Emit `Σ coeffs(k) · columns(k) ⟨op⟩ rhs` over column handles. Repeated columns are summed.
+     * [LinearOp.NE] is ignored.
      */
     fun row(
         columns: IntArray,
@@ -212,14 +181,10 @@ interface RelaxationBuilder {
     fun conditionedRow(columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, integer: Int, value: Long) {}
 
     /**
-     * Emit a big-M row `Σ coeffs(k) · columns(k) ⟨op⟩ rhs` whose constants bake in the live
-     * (node-current) bounds. [global] must be true exactly when the same big-M follows from the
-     * declared bounds — then the row holds at every solution and is cacheable. Otherwise it holds only
-     * inside the node's box, and the engine records the live bounds the big-M leaned on as the row's
-     * conflict-certificate premises: for each linearized integer column, its live upper bound when
-     * [maxSide] matches the coefficient's sign (positive on the `lMax` side), else its live lower bound
-     * — auxiliary indicator columns are ignored. A feasibility-defining CORE row. [LinearOp.NE] is
-     * ignored.
+     * Emit a CORE big-M row whose constants bake in the live bounds. [global] must be true exactly when the
+     * same big-M follows from the declared bounds, which makes the row cacheable. Otherwise the live bounds
+     * the big-M leaned on become certificate premises: the upper bound of each integer column whose
+     * coefficient sign matches [maxSide], else the lower bound. [LinearOp.NE] is ignored.
      */
     fun bigMRow(columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, global: Boolean, maxSide: Boolean)
 }

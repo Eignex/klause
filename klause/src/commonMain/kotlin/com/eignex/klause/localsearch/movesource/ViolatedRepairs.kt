@@ -6,8 +6,7 @@ import com.eignex.klause.localsearch.MoveSink
 /**
  * Repair moves drawn from sampled violated factors. Draws `min(sampleCount, violated.size)`
  * uniformly-random violated factors and asks each for its repair-move suggestions via
- * [com.eignex.klause.localsearch.Invariant.proposeRepairMoves]. The null "no candidate" contract is policy
- * the caller enforces — this source only fills the sink.
+ * [com.eignex.klause.localsearch.Invariant.proposeRepairMoves].
  */
 class ViolatedRepairs(
     /** Number of violated factors to sample per [generate] (capped at the violated count). */

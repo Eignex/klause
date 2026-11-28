@@ -20,12 +20,8 @@ internal class LinearPropagator(
     val bound: Long,
 ) : Propagator {
 
-    /**
-     * Advisor subscription: `propagateLinearBounds` derives everything from the interval
-     * `[c·min, c·max]` of each term — it reads only `min`/`max` and never inspects interior holes.
-     * So the propagator subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] on each variable
-     * and is not woken by interior `VALUE_REMOVED`. Terms are coalesced, so [vars] is duplicate-free.
-     */
+    // Propagation reads only bounds, so interior VALUE_REMOVED wakes are skipped. Terms are coalesced,
+    // so each variable is watched once.
     override val initialIntEventWatches: IntArray = IntArray(vars.size * 2).also { out ->
         var w = 0
         for (v in vars) {
@@ -40,25 +36,19 @@ internal class LinearPropagator(
     override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
         explainLinearBound(state, coeffs, vars, payload, atTrail, atLevel)
 
-    /** Reason set when [propagate] returns false. The conflict comes from exactly one sum
-     *  extreme breaching `bound`: `LE` / `EQ`-with-`sumLo>bound` from the lo side (`Σ rLo`),
-     *  `GE` / `EQ`-with-`sumHi<bound` from the hi side (`Σ rHi`). Cite only that side's
-     *  driving bounds, weakened by the excess over `bound` (see [collectLinearLiftedAntecedents]) —
-     *  those alone prove infeasibility, so the nogood is sharper and more reusable than citing both
-     *  bounds of every var. `NE` (sum pinned to `bound`) needs both bounds, so it keeps the dense reason. */
+    // Exactly one sum extreme breaches `bound`, so citing only that side's bounds, weakened by the excess,
+    // gives a sharper nogood. NE needs both bounds of every variable.
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         if (op == LinearOp.NE) return collectLinearTightenAntecedents(state, vars, excludeIdx = -1, extraLit = 0)
         val range = linearSumRange(state, coeffs, vars) // [sumLo, sumHi]
         if (range[0] == Long.MIN_VALUE && range[1] == Long.MAX_VALUE) {
-            // Overflow-weakened range: the breaching side is unknowable in 64-bit, so a one-sided
-            // reason could omit the bounds that actually prove the conflict. Cite both sides of
-            // every variable — dense but always sufficient.
+            // Overflow hides the breaching side, so cite both sides of every variable.
             return collectLinearTightenAntecedents(state, vars, excludeIdx = -1, extraLit = 0)
         }
         val useLo = when (op) {
             LinearOp.LE -> true
             LinearOp.GE -> false
-            else -> range[0] > bound // EQ: lo side (mins too big) vs hi side
+            else -> range[0] > bound
         }
         val slack = if (useLo) range[0] - bound - 1 else bound - range[1] - 1
         return if (slack < 0) {

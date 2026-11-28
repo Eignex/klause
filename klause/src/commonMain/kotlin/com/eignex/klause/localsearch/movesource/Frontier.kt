@@ -53,8 +53,6 @@ class Frontier(
         }
     }
 
-    /** Emit adjacent-value int steps and bool flips for every variable of factor [nf], spending from and
-     *  returning the remaining [budget]. */
     private fun addNeighbourMoves(state: LocalSearchState, sink: MoveSink, nf: Int, budget: Int): Int {
         var b = budget
         val nfac = state.problem.factors[nf]

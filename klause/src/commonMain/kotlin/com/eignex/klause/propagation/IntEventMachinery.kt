@@ -5,13 +5,8 @@ import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
-/**
- * Typed int-event wakeup machinery for [PropagationState]: the per-`(intVar, kind)` advisor index,
- * the per-var pending-kind masks, and the per-factor dirty-variable delta accumulators.
- * All four structures are empty when no factor opts in, so the common case allocates nothing;
- * [incremental] mode forces them live so a mid-life factor subscribing to typed events (or
- * consuming the delta) wakes correctly even when the initial problem had none.
- */
+// Every structure is empty when no factor opts in, so the common case allocates nothing. Incremental mode forces
+// them live so a mid-life factor that subscribes or consumes the delta wakes correctly.
 internal class IntEventMachinery private constructor(
     projection: PropagationProblem,
     incremental: Boolean,
@@ -26,30 +21,16 @@ internal class IntEventMachinery private constructor(
     ) : this(projection, incremental, null, null, null, null)
     private val problem: Problem = projection.problem
 
-    /** Whether the typed int-event machinery ([dirtyKinds] / [baseFlat]) is live. */
     val on: Boolean = projection.usesIntEventWatchers || incremental
 
-    /** Whether the per-factor dirty-variable delta accumulators are live. */
     val deltaOn: Boolean = projection.usesIntEventDeltaConsumers || incremental
 
-    /**
-     * Per-`(intVar, kind)` advisor index, the int-side analog of [BoolWatcherIndex.byLit]: slot
-     * `[IntEvent.pack(v, kind)]` lists the factor ids that subscribed to that event via
-     * [Propagator.initialIntEventWatches], read by `enqueueForIntChange` to wake only the factors that
-     * care about the kind of change that just happened. The base factors' subscriptions are held as a
-     * CSR ([baseOffsets] / [baseFlat]) built once at construction rather than one [IntArrayList] per
-     * `numIntVars * IntEvent.COUNT` slot, since on a large model most slots have no subscriber and
-     * allocating a list per slot would dominate [PropagationState] construction. The CSR is one prefix-sum pass plus
-     * one fill pass over the base propagators, both O(subscriptions); reads are a contiguous slice with
-     * ascending base factor ids. Mid-life factors ([PropagationState.addMidlifeFactor]) subscribe into
-     * [overflow].
-     */
+    // Base subscriptions as a CSR built once: one list per `numIntVars * IntEvent.COUNT` slot would dominate
+    // construction on a large model where most slots have no subscriber.
     internal val baseOffsets: IntArray
     internal val baseFlat: IntArray
 
-    /** Mid-life subscriptions (packed slot → factor ids), allocated lazily — the common case
-     *  adds no int-event-watching factor mid-run (presolve appends Linear rows, which watch nothing), so
-     *  this stays `null` and the read pays only a null check past the CSR. */
+    // Lazy: mid-life factors rarely subscribe (presolve appends Linear rows, which watch nothing).
     @Suppress("DoubleMutabilityForCollection") // null until the first mid-life subscription; assigned once, lazily
     internal var overflow: IntEventOverflow? = null
 
@@ -82,8 +63,7 @@ internal class IntEventMachinery private constructor(
         }
     }
 
-    /** Subscribe a mid-life factor [fid] to the event [packed] ([IntEvent.pack]); the base CSR is frozen,
-     *  so post-construction subscriptions go to the sparse [overflow]. */
+    // The base CSR is frozen, so later subscriptions go to the sparse [overflow].
     fun subscribeMidlife(packed: Int, fid: Int): Long {
         var work = 0L
         val index = overflow ?: IntEventOverflow().also {
@@ -100,8 +80,6 @@ internal class IntEventMachinery private constructor(
         return work
     }
 
-    /** Visit every factor subscribed to event [packed]: base subscribers (CSR, ascending factor id) then
-     *  mid-life subscribers (overflow). */
     inline fun forEachWatcher(packed: Int, charge: (Long) -> Unit, action: (Int) -> Unit) {
         for (k in baseOffsets[packed] until baseOffsets[packed + 1]) action(baseFlat[k])
         val index = overflow
@@ -110,36 +88,15 @@ internal class IntEventMachinery private constructor(
         if (list != null) for (i in 0 until list.size) action(list[i])
     }
 
-    /**
-     * Per-int-var bitmask of the [IntEvent] kinds that occurred since the variable was last
-     * drained — recorded by `markIntDirty` alongside the dirty-int queue and consumed (then
-     * cleared) by `enqueueForIntChange` to wake exactly the subscribed advisors. Empty (aliasing
-     * the shared [emptyIntArray]) when no factor subscribes, so the common case allocates nothing
-     * and skips the bookkeeping entirely.
-     *
-     * Sound to over-set (extra bit ⇒ harmless extra wake) but never under-set (a missing bit drops
-     * a wake a subscriber relied on). Mark and drain are paired through the dirty-int queue; since
-     * the driver only marks/undoes between propagation cycles — when the queue is empty and thus
-     * every mask already cleared — no stale bits survive a backtrack.
-     */
+    // Kinds that occurred since the variable was last drained. Over-setting only over-wakes; under-setting drops
+    // a wake. The driver marks and undoes only between propagation cycles, when every mask is clear, so no
+    // stale bits survive a backtrack.
     val dirtyKinds: IntArray = if (on) IntArray(problem.numIntVars) else emptyIntArray()
 
-    /**
-     * Per-factor dirty-variable delta accumulator: for each factor with
-     * [Propagator.consumesIntEventDelta], the subscribed variables that fired since the consumer
-     * last drained. `enqueueForIntChange` appends a variable when it wakes the consumer via the
-     * advisor index ([dirtyMark] deduplicates), and `drainIntEventDirtyVars` returns and clears
-     * the set on a fire.
-     *
-     * **Drift-tolerant superset.** It is never cleared on backtrack, so after a pop it may list a
-     * variable whose change was undone — harmless, because the consumer diffs its own reversible
-     * baseline and finds no change for a stale variable. It is therefore always a *superset* of
-     * "changed since this consumer last fired": no real change is ever missed (every change to a
-     * subscribed variable wakes the consumer and appends), which is the soundness-critical
-     * direction. `null` per non-consuming factor; both lists are empty when the problem has no
-     * consumer, and grow-only (parallel to the factor store) — `addMidlifeFactor` appends a slot
-     * per new factor so a mid-life delta consumer's accumulator stays in bounds.
-     */
+    // Per delta-consuming factor, the subscribed variables that fired since it last drained. Never cleared on
+    // backtrack, so it is a superset of the real changes: a stale entry is harmless because the consumer diffs
+    // its own reversible baseline, and no real change is missed. Grows with the factor store so a mid-life
+    // consumer stays in bounds.
     val dirtyVars: ArrayList<IntArrayList?> =
         preparedDirtyVars ?: if (deltaOn) {
             ArrayList<IntArrayList?>(problem.numFactors).apply { repeat(problem.numFactors) { add(null) } }
@@ -147,7 +104,6 @@ internal class IntEventMachinery private constructor(
             ArrayList()
         }
 
-    /** Dedup companion to [dirtyVars]; see its doc. */
     val dirtyMark: ArrayList<IntHashSet?> =
         preparedDirtyMark ?: if (deltaOn) {
             ArrayList<IntHashSet?>(problem.numFactors).apply { repeat(problem.numFactors) { add(null) } }

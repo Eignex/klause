@@ -30,10 +30,6 @@ import com.eignex.util.numbers.unaryMinus
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.TimeSource
 
-/**
- * SMT-LIB command sessions (`.smt2` / `.smt`). Models require an explicit query
- * solver statistics and objective observations use SMT-LIB comments.
- */
 internal object SmtLibMode {
     fun newSession(): ModeSession = Session()
 
@@ -136,8 +132,7 @@ internal object SmtLibMode {
     }
 }
 
-/** Render an SMT-LIB `(get-model)`-style model: one `(define-fun name () Sort value)` per
- *  declared variable. Real values are the sample's certified exact reals. */
+// Real values are the sample's certified exact reals.
 internal fun renderModel(ints: Map<String, Int>, bools: Map<String, Int>, reals: Map<String, Int>, s: Sample): String =
     buildString {
         append("(\n")
@@ -149,7 +144,6 @@ internal fun renderModel(ints: Map<String, Int>, bools: Map<String, Int>, reals:
         append(")")
     }
 
-/** Render an exact open-theory model through the pipeline's mode-neutral witness surface. */
 internal fun renderOpenTheoryModel(
     ints: Map<String, Int>,
     bools: Map<String, Int>,
@@ -170,7 +164,6 @@ internal fun smtInteger(value: String): String = if (value.startsWith('-')) "(- 
 
 internal fun smtReal(value: String): String = smtRealTerm(value)
 
-/** SMT-LIB output protocol: `sat`/`unsat`/`unknown` + the buffered model on sat. */
 internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { null }) : BufferedBestOutput() {
     override fun formatObjective(objective: Long): String =
         sourceObjective()?.toString() ?: super.formatObjective(objective)
@@ -264,7 +257,7 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
         Verdict.UNKNOWN -> "unknown"
     }
 
-    // Deliberately lean block: SMT-LIB comments carry headline search and exact-theory counters.
+    // SMT-LIB comments carry only headline search and exact-theory counters.
     override fun keepStat(key: String): Boolean = key in SMT_SEARCH_KEYS || key.startsWith("smt")
 
     private companion object {

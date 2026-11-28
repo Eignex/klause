@@ -1,6 +1,4 @@
 plugins {
-    // kbuild CLI conventions: KMP + lint + kover, JVM dist + native executables,
-    // and the `releaseAssets` packaging task.
     id("com.eignex.cli")
 }
 
@@ -65,17 +63,15 @@ kotlin {
         commonMain.dependencies {
             implementation("com.eignex:util:0.0.1-ci.43969094073.1-20261116.222329-1")
             implementation(project(":klause"))
-            // KMP logger for `-v` progress output (custom stderr writer).
             implementation("co.touchlab:kermit:2.1.0")
-            // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to
-            // render them as %%%mzn-stat lines.
+            // SolveStats exposes kumulant summary types, rendered as %%%mzn-stat lines.
             implementation("com.eignex:kumulant:0.3.4-20261116.231003-146")
         }
     }
 }
 
-// A solve of seconds never repays the optimizing compiler, which otherwise takes about two fifths of one
-// processor throughout. JAVA_OPTS or KLAUSE_CLI_OPTS can raise the tier again for long runs.
+// A solve of seconds never repays the optimizing compiler; JAVA_OPTS or KLAUSE_CLI_OPTS can raise the tier for
+// long runs.
 tasks.withType<CreateStartScripts>().configureEach {
     doFirst { defaultJvmOpts = (defaultJvmOpts ?: emptyList()) + "-XX:TieredStopAtLevel=1" }
 }

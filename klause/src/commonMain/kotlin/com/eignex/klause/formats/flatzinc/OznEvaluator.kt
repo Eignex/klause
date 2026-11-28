@@ -7,7 +7,6 @@ import com.eignex.util.numbers.mulExact
 import com.eignex.util.numbers.subExact
 import kotlin.math.abs
 
-/** Evaluates `.ozn` expressions against solver bindings and renders output text. */
 internal class OznEvaluator(items: List<OznItem>) {
     private val decls: Map<String, OznItem.VarDecl> = items
         .filterIsInstance<OznItem.VarDecl>()
@@ -460,7 +459,6 @@ internal class OznEvaluator(items: List<OznItem>) {
     }
 }
 
-/** Result of evaluating an .ozn expression. */
 internal sealed interface OznValue {
     data class IntV(val value: Long) : OznValue
     data class FloatV(val value: Double) : OznValue

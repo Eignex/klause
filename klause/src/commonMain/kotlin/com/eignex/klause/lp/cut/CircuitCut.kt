@@ -7,49 +7,20 @@ import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongHashSet
 
-/**
- * Arc-indicator model for one [com.eignex.klause.factor.circuit.Circuit]: the LP columns of the
- * binary arc variables `y_ij` (1 iff `succ(i) = j`) that the base relaxation creates under the
- * circuit-arc flag, plus the node count. The degree and channelling rows tying these to the integer
- * `succ` columns live in the relaxation; this record is what a [CircuitSeparator] needs to read the
- * fractional arc values back and separate subtour-elimination cuts.
- *
- * Arcs are stored **sparsely** — parallel per-arc arrays, one entry per candidate arc — so the model
- * is O(arcs), not O(n²), and scales to large but sparse routing graphs (small per-node successor
- * domains).
- */
+// LP columns of a circuit's arc indicators `y_ij` (1 iff `succ(i) = j`), stored per candidate arc so the
+// model is O(arcs) rather than O(n²).
 internal class CircuitArcModel(
-    /** Number of nodes. */
     val n: Int,
-    /** Tail node of arc `k`. Parallel to [heads] / [cols]. */
     val tails: IntArray,
-    /** Head node of arc `k`. */
     val heads: IntArray,
-    /** LP column of arc `k` (`tails(k) → heads(k)`). */
     val cols: IntArray,
 )
 
-/**
- * Genuine subtour-elimination cuts for [com.eignex.klause.factor.circuit.Circuit]. The base
- * relaxation's degree rows (each node has exactly one out- and one in-arc) make every *integer*
- * arc solution a permutation — a disjoint union of cycles. A Hamiltonian circuit is the single-cycle
- * case, so the gap to feasibility is exactly the subtours, removed by the directed cutset inequality
- *
- *   `Σ_{i∈S, j∉S} y_ij ≥ 1`   for every proper node subset `S` (the cycle must leave `S`)
- *
- * (Dantzig, Fulkerson and Johnson, "Solution of a large-scale traveling-salesman problem", Oper. Res.
- * 1954, https://doi.org/10.1287/opre.2.4.393).
- *
- * There are exponentially many such `S`; they are separated exactly by max-flow. With the fractional
- * `y` as directed arc capacities, the minimum `root → t` cut equals the max flow; a value below 1
- * means the source side of that cut is a violated subtour-elimination constraint. Separating over
- * every sink `t ≠ root` finds a violated cut whenever one exists. Every emitted cut is a valid
- * inequality of the Hamiltonian-circuit polytope, so the bound stays sound.
- *
- * Max-flow runs over the **sparse** fractional support (paired-adjacency residual graph; the reverse
- * of edge `e` is `e xor 1`), so separation cost scales with the number of fractional arcs rather than
- * n².
- */
+// The degree rows make every integer arc solution a union of cycles, so the gap to a Hamiltonian circuit is
+// the subtours, removed by `Σ_{i∈S, j∉S} y_ij ≥ 1` for every proper node subset `S` (Dantzig, Fulkerson and
+// Johnson, "Solution of a large-scale traveling-salesman problem", Oper. Res. 1954,
+// https://doi.org/10.1287/opre.2.4.393). A `root → t` max flow below 1 over the fractional support exposes a
+// violated `S` as the min cut's source side; trying every sink finds one whenever one exists.
 internal class CircuitSeparator : CutSeparator {
     override val family: CutFamily = CutFamily.CIRCUIT
 
@@ -66,9 +37,8 @@ internal class CircuitSeparator : CutSeparator {
 
     private fun separateModel(model: CircuitArcModel, ctx: CutContext, cuts: MutableList<Cut>) {
         val n = model.n
-        if (n < 3) return // no proper subtour possible
-        // Residual graph over the fractional support: a forward edge (capacity y) and a zero-capacity
-        // reverse per arc with y > TOL, in paired adjacency (the reverse of edge e is e xor 1).
+        if (n < 3) return
+        // Paired adjacency over the fractional support: the reverse of edge e is e xor 1.
         var support = 0
         for (k in model.cols.indices) if (ctx.primalOf(model.cols[k]) > TOL) support++
         if (support == 0) return
@@ -100,8 +70,7 @@ internal class CircuitSeparator : CutSeparator {
         for (t in 1 until n) {
             val flow = maxFlowMinCut(eHead, eTo, eNext, capOrig, root, t, scratch)
             if (flow >= 1.0 - TOL) continue
-            // Dedup the source side S by a content hash — n may exceed 64, so a Long set-bitmask
-            // would collide. A hash collision only ever drops a distinct cut (sound, never unsound).
+            // A hash collision only drops a distinct cut, never admits a wrong one.
             var key = HASH_SEED
             for (i in 0 until n) key = key * HASH_MULT + if (reach[i]) 1L else 0L
             if (!seen.add(key)) continue
@@ -110,20 +79,13 @@ internal class CircuitSeparator : CutSeparator {
                 if (reach[model.tails[k]] && !reach[model.heads[k]]) cols.add(model.cols[k])
             }
             if (cols.isEmpty()) continue
-            // A cutset inequality of the Hamiltonian-circuit polytope holds for every circuit — global.
             cuts.add(Cut(cols.toIntArray(), LongArray(cols.size) { 1L }, Relation.GE, 1L, global = true))
             if (cuts.size >= MAX_CUTS) return
         }
     }
 
-    /**
-     * Edmonds–Karp max flow (Edmonds and Karp, J. ACM 1972, https://doi.org/10.1145/321694.321699)
-     * from [s] to [t] over the paired-adjacency residual graph
-     * ([eHead] / [eTo] / [eNext] / [capOrig]; the reverse of edge `e` is `e xor 1`, and `eTo(e xor 1)`
-     * is therefore the tail of `e`). Returns the flow value and writes the source-reachable set of the
-     * residual graph into [scratch] — the minimum cut's source side. The capacities are copied per call,
-     * so the separator can reuse the same graph across every sink.
-     */
+    // Edmonds–Karp (Edmonds and Karp, J. ACM 1972, https://doi.org/10.1145/321694.321699). Leaves the min cut's
+    // source side in scratch.reach; capacities are copied per call so the graph is reused across sinks.
     @Suppress("LongParameterList")
     private fun maxFlowMinCut(
         eHead: IntArray,
@@ -141,7 +103,7 @@ internal class CircuitSeparator : CutSeparator {
         var flow = 0.0
         while (true) {
             parentEdge.fill(-1)
-            parentEdge[s] = -2 // source visited; no parent edge
+            parentEdge[s] = -2
             queue.clear()
             queue.addLast(s)
             while (queue.isNotEmpty()) {

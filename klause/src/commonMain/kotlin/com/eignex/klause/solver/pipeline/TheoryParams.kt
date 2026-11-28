@@ -44,24 +44,15 @@ data class TheoryParams(
     /**
      * Local-search allowance for the request's one unverified Boolean hint draw, or null to draw none.
      *
-     * Null by default. A hint buys only branch order and costs work before the first decision. Zero is not that
-     * switch: it runs the producer under an allowance it cannot reach a proposal within, which is what
-     * separates the producer's own cost from the proposal's effect.
+     * A hint buys only branch order and costs work before the first decision. Zero runs the producer under an
+     * allowance it cannot reach a proposal within, which separates the producer's cost from the proposal's
+     * effect. The setting also gates point and source-clause preferences: null permits direct primitive point
+     * preferences for one linear completion owner, zero permits construction observations without publishing a
+     * component preference, and a positive value permits indexed preferences after caller or deferred hints
+     * decline.
      *
-     * A null allowance permits direct primitive point preferences for one linear completion owner
-     * with source integer or real coordinates, without a source-clause index
-     * or Boolean draw. A Boolean-complete mixed worker can also order the current source
-     * disjunction's rows or a disequality's sides from an existing exact point or optimal float guess;
-     * both alternatives remain searched.
-     * Other built-in linear point guidance and compound source-clause preferences use
-     * this opt-in. Zero permits bounded construction observations
-     * but publishes no component preference; a positive value permits indexed preferences after caller
-     * or deferred hints decline. Construction and arithmetic comparisons keep their own owners and
-     * limits; this flip ceiling supplies no separate allowance for them.
-     *
-     * This is a ceiling on the draw, not an allowance beside [openWorkLimit]: the draw may spend only
-     * what that budget has left and what it spends is charged there, so the traversal of a hinted run
-     * gets the budget minus the draw.
+     * A ceiling on the draw, not an allowance beside [openWorkLimit]: the draw spends what that budget has
+     * left and is charged there.
      */
     val openHintFlips: Long? = null,
     /**
@@ -74,12 +65,8 @@ data class TheoryParams(
      */
     val openBranching: OpenBranching = OpenBranching.Automatic,
     /**
-     * Splits that must consult the hint before its allowance is spent drawing one.
-     *
-     * A model whose Boolean columns propagation settles reaches almost no split, so a hint drawn up
-     * front there costs its whole allowance where no branch order could have paid for it. Waiting makes
-     * the search show it is branching-bound first. One means draw at the first split; a threshold past
-     * any split the search reaches means never draw at all.
+     * Splits that must consult the hint before its allowance is spent drawing one, so the search shows it is
+     * branching-bound first. One draws at the first split.
      */
     val openHintMinSplits: Long = DEFAULT_HINT_MIN_SPLITS,
     /** Wall-clock timeout token, kept separate from external cancellation for result reporting. */

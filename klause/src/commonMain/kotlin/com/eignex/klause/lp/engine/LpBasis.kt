@@ -1,32 +1,23 @@
 package com.eignex.klause.lp.engine
 
-/** Where a variable sits. Nonbasic variables are pinned to a finite bound, or to zero when free. */
+// Nonbasic variables are pinned to a finite bound, or to zero when free.
 internal enum class VarStatus {
-    /** The value is read off the basis. */
     BASIC,
 
-    /** Nonbasic, pinned to its lower bound. */
     AT_LOWER,
 
-    /** Nonbasic, pinned to its upper bound. */
     AT_UPPER,
 
-    /** Nonbasic with equal bounds. */
     FIXED,
 
-    /** Nonbasic with no bound, held at zero. */
     FREE,
 }
 
-/**
- * A basis: the `m` basic variable columns plus the bound each nonbasic variable is pinned to. Branch-and-bound
- * only tightens bounds, so a parent basis stays dual-feasible and a child re-optimizes with a few pivots instead
- * of a cold solve.
- */
+// Branch-and-bound only tightens bounds, so a parent basis stays dual-feasible and a child re-optimizes with a few
+// pivots instead of a cold solve.
 internal class Basis(
-    /** The ordered `m` variable columns that are basic; position identifies the basis coordinate. */
+    // Position identifies the basis coordinate.
     val basicVars: IntArray,
-    /** Per-variable status, length `numVars`. */
     val status: Array<VarStatus>,
     // A solver projection can be valid while its original status declaration has no capture-v1 wire code.
     val captureEligible: Boolean = true,

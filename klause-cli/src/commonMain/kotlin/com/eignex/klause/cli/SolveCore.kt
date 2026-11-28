@@ -40,12 +40,8 @@ import com.eignex.util.process.processProperty
 import com.eignex.util.runtime.diagnostics.sampleHeap
 import kotlin.time.Duration
 
-/**
- * The unified, mode-agnostic solve driver. Every CLI mode (MiniZinc, XCSP3, SMT-LIB) feeds a
- * [Solvable] + [CommonOptions] in, and all terminal reporting goes out through the mode's
- * [OutputProtocol]. It translates frontend flags, deadlines, and source annotations into pipeline
- * requests, then renders their streamed models and terminal results.
- */
+// Mode-agnostic solve driver: translates frontend flags, deadlines and source annotations into pipeline
+// requests and renders their results through the mode's OutputProtocol.
 internal object SolveCore {
 
     fun solve(rawSolvable: Solvable, common: CommonOptions, protocol: OutputProtocol) {
@@ -59,23 +55,16 @@ internal object SolveCore {
             }
         }
         val publication = ArithmeticPublication(output)
-        // Engine resolution: explicit `-e` wins, then `-f` (free) ≡ `-e cp`, else the configured
-        // default ([defaultEngine] — the built-in [FiniteEngine.DEFAULT] or a packaged image's env override).
         val engine = common.resolvedEngine()
-        // Presolve once, before any worker is built, so every engine and portfolio worker shares
-        // the one transformed problem. The pipeline drops solution-set-altering passes (symmetry
-        // breaking, value precedence) for a pure-LS engine unless `--presolve` is explicit;
-        // solutions are reconstructed at render time.
+        // Presolve runs once, before any worker is built, so every worker shares the transformed problem.
+        // The pipeline drops solution-set-altering passes for a pure-LS engine unless `--presolve` is explicit.
         val policy = executionPolicy(common, common.presolve != null)
         val config = common.presolve?.let { PresolveConfig.parse(it) } ?: common.config.presolveConfig()
-        // Symmetry breaking collapses symmetric solutions, so disable it (via auto resolution) when
-        // the run wants the full solution set: enumeration (`-a`) or a multi-solution cap (`-n N`),
-        // unless we're optimizing (a single optimum, where symmetry breaking is sound).
+        // Symmetry breaking collapses symmetric solutions, so it is unsound when a satisfaction run
+        // enumerates (`-a`) or caps several solutions (`-n N`).
         val solutionSetSensitive = !rawSolvable.optimize && (common.allSolutions || (common.solutionCap ?: 1L) > 1L)
-        // One invocation deadline covers presolve, LP preparation and search.
-        // Taken before the token is built, because the allowance has to stop the driver and not only the
-        // engine: an engine-local check leaves the driver re-entering arms that cancel at their first
-        // poll, which burns the whole deadline and overshoots the cap several times over.
+        // One invocation deadline covers presolve, LP preparation and search. It must stop the driver, not
+        // only the engine, or the driver keeps re-entering arms that cancel at their first poll.
         val (deadline, deadlineCancel) = deadlineCancellation(common)
         val (presolveCancel, presolveBudget) = presolveAllowance(common, deadlineCancel)
         // `-p N` gives the open portfolio a lane per core, as it does the finite one.
@@ -128,14 +117,12 @@ internal object SolveCore {
         }
         val nodeBudget = takeNodeBudget(common).also { common.nodeBudget = it }
         val cancel = nodeBudget?.let { deadlineCancel or ExecutionControl { it.exhausted() } } ?: deadlineCancel
-        // `-p N` is MiniZinc-standard parallelism = the **core** count. The portfolio engines
-        // (cp/mixed/ls) run sequentially at `-p1` and as a parallel pool at `-pN`. The one naked
-        // engine (fixed) is inherently single-core.
+        // `-p N` is the core count. Portfolio engines run sequentially at `-p1` and as a parallel pool
+        // otherwise; `fixed` is single-core.
         val cores = common.parallel ?: 1
         when (engine) {
-            // Naked single backtrack (FD track). A source search annotation, when present, decides
-            // the heuristic and per-solver selector --params are rejected; an unannotated model has
-            // no heuristic to preserve, so its one run accepts them (see runBacktrack).
+            // A source search annotation decides the heuristic and selector params are rejected; an
+            // unannotated model has no heuristic to preserve, so its run accepts them.
             FiniteEngine.FIXED -> {
                 runBacktrack(
                     rawSolvable, common, output, config, solutionSetSensitive, presolveCancel, presolveBudget,
@@ -143,10 +130,7 @@ internal object SolveCore {
                 )
             }
 
-            // The parallel-capable portfolio engines: their mix is carried on the enum. `ls` resolves
-            // a four-axis arm pool from its --params (a `strategy=` base plus per-axis edits); `cp`
-            // resolves a per-solver override pool from its --params (var-/val-selector, luby, …). A
-            // single resolved arm runs as a one-arm pool.
+            // A single resolved arm runs as a one-arm pool.
             FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS ->
                 runPortfolio(
                     rawSolvable, common, output, cores, engine, config, solutionSetSensitive, presolveCancel,
@@ -155,21 +139,13 @@ internal object SolveCore {
         }
     }
 
-    /**
-     * Whether the invocation deadline has expired when rendering an undecided verdict.
-     * Some backends leave [backendTimedOut] false, so the shared deadline also identifies
-     * timeouts. Decided verdicts are unaffected.
-     */
+    // Some backends leave backendTimedOut false, so the shared deadline also identifies timeouts.
     private fun budgetSpent(common: CommonOptions, backendTimedOut: Boolean): Boolean =
         backendTimedOut || common.deadlineAtMs?.let { nowMillis() >= it } == true
 
-    /**
-     * Consumes `node-limit` as a shared [NodeBudget] and removes it from [CommonOptions.engineParams].
-     * Every arm spends the same invocation allowance; engines must not consume the key again.
-     */
+    // Every arm spends the same invocation allowance; engines must not consume `node-limit` again.
     internal fun takeNodeBudget(common: CommonOptions): NodeBudget? = takeOpenNodeLimit(common)?.let(::NodeBudget)
 
-    /** Consume the route-local fixed-work limit for an open-theory solve. */
     private fun takeOpenNodeLimit(common: CommonOptions): Long? =
         when (val setting = takeAllowanceSetting(common.engineParams, NODE_LIMIT_KEY)) {
             AllowanceSetting.Automatic, AllowanceSetting.Unlimited -> null
@@ -177,23 +153,15 @@ internal object SolveCore {
         }
 
     private fun deadlineCancellation(common: CommonOptions): Pair<Long?, ExecutionControl> {
-        // Anchored once at process start (see CommonOptions.deadlineAtMs) so the bake and the
-        // solve share one budget; fall back to a fresh anchor if it was never set.
+        // Anchored once at process start so the bake and the solve share one budget.
         val deadline = common.deadlineAtMs ?: common.timeLimitMs?.let { nowMillis() + it }
-        // Deadline-backed (Monotonic) rather than a bare `nowMillis()` predicate, so budget-relative tokens
-        // like [ExecutionControl.shorten] can be computed from it downstream (the ALNS bootstrap). Fires at the
-        // same absolute instant as the epoch deadline.
         if (common.deadlineAtMs == null) common.deadlineAtMs = deadline
         val cancel = common.invocationCancellation()
         return deadline to cancel
     }
 
-    /**
-     * Presolve's slice of a [timeLimitMs] run at [fraction], bounded below by
-     * [CliKnobs.MIN_PRESOLVE_BUDGET_MS] so a short run still buys a pass worth entering, and above by
-     * [CliKnobs.MAX_PRESOLVE_BUDGET_SHARE] so that floor can never take the whole run. A run with no
-     * `-t` has no total to take a share of, so it falls back to the flat backstop.
-     */
+    // The floor lets a short run still buy a pass worth entering; the ceiling keeps that floor from taking
+    // the whole run.
     internal fun derivedPresolveBudgetMs(timeLimitMs: Long?, fraction: Double): Long {
         if (timeLimitMs == null) return CliKnobs.DEFAULT_PRESOLVE_BUDGET_MS
         val share = (timeLimitMs * fraction).toLong()
@@ -201,12 +169,7 @@ internal object SolveCore {
         return minOf(share.coerceAtLeast(CliKnobs.MIN_PRESOLVE_BUDGET_MS), ceiling)
     }
 
-    /**
-     * The presolve phase's allowance, as a [ExecutionControl] for the phase and a [PresolveBudget] the round
-     * engine slices per pass. Derived by [derivedPresolveBudgetMs] as a share of the run's own `-t`
-     * budget rather than a flat figure, and counted in work. An explicit `klause.presolve.budget.ms` takes
-     * precedence. A shared elapsed ceiling also reserves time for search when work underprices preparation.
-     */
+    // The elapsed ceiling reserves time for search when work underprices preparation.
     internal fun presolveAllowance(
         common: CommonOptions,
         solveCancel: ExecutionControl,
@@ -216,8 +179,6 @@ internal object SolveCore {
         return (budget?.orSpent(phaseStop) ?: phaseStop) to budget
     }
 
-    /** Naked single backtrack solve for the `fixed`/FD engine. A model annotation selects its heuristic;
-     *  without one, the standard conflict-driven heuristic is used and selector overrides are accepted. */
     private fun runBacktrack(
         solvable: Solvable,
         common: CommonOptions,
@@ -243,18 +204,10 @@ internal object SolveCore {
         )
     }
 
-    /**
-     * The work [budget] was charged since [before], beside the [elapsed] it took and the whole allowance's
-     * standing, relating the work unit to time. Empty when presolve ran without a budget.
-     */
     private fun presolveWorkText(budget: PresolveBudget?, before: Long, elapsed: Duration): String = budget?.let {
         ", work ${it.spent() - before} in ${elapsed.inWholeMilliseconds}ms (${it.spent()} of ${it.allowance})"
     }.orEmpty()
 
-    /**
-     * Print presolve timing, size and factor-count changes, LP harvest statistics and proven
-     * infeasibility for `dry-run-presolve`. Timing excludes JVM startup and parsing.
-     */
     internal fun printPresolved(
         original: Problem,
         presolved: Problem,
@@ -267,9 +220,7 @@ internal object SolveCore {
         val passes = stats?.passes.orEmpty()
         emit("presolve dry-run:")
         printPresolveDiagnostics(stats, emit)
-        // Heap after ingest, which is the quantity an OOM at `-Xmx` is about. Retained is what
-        // the built problem holds; peak includes the transients the build passed through, so a large gap
-        // points at a structure that is materialized and dropped rather than one that is kept.
+        // A large gap between peak and retained heap points at a structure materialized and dropped.
         sampleHeap()?.let { heap ->
             val peak = heap.peakBytes?.let { "peak: ${it / MIB}MiB, " }.orEmpty()
             emit(
@@ -278,18 +229,15 @@ internal object SolveCore {
                     "committed: ${heap.committedBytes / MIB}MiB",
             )
         }
-        // Split the load into parse, the root bake (step 0), and the presolve passes. The base bake is
-        // deferred to the pipeline (stats.bakeElapsed) for a front-end problem, or ran while constructing
-        // the source problem otherwise — only one is non-zero. `elapsed` is the whole presolve phase,
-        // which for a deferred problem includes the step-0 bake, so the passes get the remainder.
+        // The bake ran either in the pipeline (stats.bakeElapsed) or while constructing the source problem;
+        // only one is non-zero.
         val stepZeroBake = stats?.bakeElapsed ?: Duration.ZERO
         val bake = constructionBakeElapsed + stepZeroBake
         loadElapsedMs?.let { load ->
             emit("  parse: ${(load - constructionBakeElapsed.inWholeMilliseconds).coerceAtLeast(0)}ms")
             emit("  bake (step 0): $bake")
         }
-        // Presolve passes alone (the step-0 bake is broken out above; for a deferred problem it is part
-        // of the pipeline's wall time, so subtract it to leave the passes' own cost).
+        // A deferred bake is part of the presolve phase's elapsed time.
         emit("  elapsed: ${elapsed - stepZeroBake}")
         emit("  passes fired: ${if (passes.isEmpty()) "(none)" else passes.joinToString(", ")}")
         emit("  bool vars: ${presolved.numBoolVars}, int vars: ${presolved.numIntVars}")
@@ -304,8 +252,6 @@ internal object SolveCore {
             val a = after[kind] ?: 0
             emit("  $kind: $b -> $a")
         }
-        // The LP harvest's own contribution, isolated from the combinatorial passes whose net effect the
-        // counts above conflate — the point of inspecting the LP presolve specifically.
         stats?.lpHarvest?.let { lp ->
             val dims = "relaxation ${lp.relaxationCols} cols / ${lp.relaxationRows} rows / ${lp.relaxationNnz} nnz"
             if (lp.skipped) {
@@ -321,25 +267,19 @@ internal object SolveCore {
                 emit("  lp-harvest: ${parts.joinToString(", ")} ($dims)")
             }
         }
-        // Read the verdict presolve already reached. Asking the problem for its own `baked` instead forces
-        // a lazy that a rebuilt (already-folded) problem has never run, paying a fresh root fixpoint over
-        // every factor after the summary has printed.
+        // Asking the problem for its own `baked` would force a fresh root fixpoint on a rebuilt problem.
         if (stats?.infeasible == true) {
             emit("  INFEASIBLE: presolve proved the problem unsatisfiable")
         }
     }
 
-    /**
-     * Saturating total integer-domain span `sum(max - min)`. Widths and the sum are checked
-     * for overflow. Any open side saturates the total; [openText] reports the open-column count.
-     */
+    // Saturates at Long.MAX_VALUE on overflow or any open side.
     private fun domainSpan(problem: Problem): Long {
         val bounds = problem.intBounds
         var span = 0L
         for (v in 0 until problem.numIntVars) {
             if (bounds.isOpen(v)) return Long.MAX_VALUE
-            // The value set a closed column declares is what the search enumerates, and the fold narrows
-            // it; the bounds are the hull it sits in. A column stating bounds alone has only the hull.
+            // The declared value set is what the search enumerates; a column stating bounds alone has only the hull.
             val declared = problem.intDomainOrNull(v)
             val width = if (declared != null) {
                 declared.max - declared.min
@@ -353,10 +293,7 @@ internal object SolveCore {
         return span
     }
 
-    /**
-     * Open integer columns as `<open> of <total>`. A column is open when either source bound
-     * is absent, regardless of any finite search box. Complements the saturated [spanText].
-     */
+    // A column is open when either source bound is absent, regardless of any finite search box.
     private fun openText(problem: Problem): String {
         val bounds = problem.intBounds
         var open = 0
@@ -366,16 +303,10 @@ internal object SolveCore {
         return "$open of ${problem.numIntVars}"
     }
 
-    /** Whether the model declares no bound on one of integer column [v]'s sides. */
     private fun IntBounds.isOpen(v: Int): Boolean = isOpenLower(v) || isOpenUpper(v)
 
-    /**
-     * Integer columns no factor needs a finite domain for, so nothing about them has to be enumerated.
-     *
-     * Eligible is not the same as decidable: an MPS model is entirely `Linear` rows and reads as fully
-     * eligible, yet its integers still have to be searched until something decides them. The actionable
-     * figure is the second one — a theory-eligible column with an open source side.
-     */
+    // Eligible is not decidable: an all-`Linear` model reads as fully eligible yet its integers still need
+    // search. The actionable figure is the eligible columns with an open source side.
     private fun theoryText(problem: Problem): String {
         val partition = problem.variablePartition()
         var openAndEligible = 0
@@ -387,8 +318,6 @@ internal object SolveCore {
         return "${partition.theoryEligibleCount} of ${partition.size}, $openAndEligible of them open"
     }
 
-    /** [domainSpan] for the dry-run readout, naming the saturated case instead of printing a number
-     *  that would read as an exact total. */
     private fun spanText(problem: Problem): String =
         domainSpan(problem).let { if (it == Long.MAX_VALUE) "unbounded" else it.toString() }
 
@@ -582,8 +511,7 @@ internal object SolveCore {
         FiniteSolveVerdict.UNBOUNDED -> Verdict.UNBOUNDED
     }
 
-    /** Renders [sample] and returns its (objective, continuousObjective) pair so a caller that also
-     *  needs those values (e.g. arm attribution) doesn't re-walk the objective's coefficient arrays. */
+    // Returns the objective pair so callers such as arm attribution need not re-evaluate it.
     private fun emit(output: OutputProtocol, solvable: Solvable, sample: Sample): Pair<Long?, Double?> {
         val objective = solvable.objectiveValue?.invoke(sample)
         val continuousObjective = solvable.continuousObjectiveValue?.invoke(sample)
@@ -595,11 +523,8 @@ internal object SolveCore {
         if (common.statistics) output.onStatistics(s, ms, solutions)
     }
 
-    /** Re-express the LS incumbent objective in the model's orientation, reusing the same sign-corrected
-     *  [Solvable.objectiveValue] that renders solutions. The engine records the incumbent in its internal
-     *  "lower is better" frame (maximisation via a negated coefficient); the objective lambda reads the
-     *  canonical objective variable in original units. Only the routing LP stats are merged for runs
-     *  without an incumbent or without an objective lambda. */
+    // The engine records the LS incumbent in its minimizing frame; the sign-corrected objectiveValue
+    // re-expresses it in the model's orientation.
     private fun withModelObjective(s: SolveStats, solvable: Solvable, sample: Sample?): SolveStats {
         val routed = s.copy(lp = s.lp.mergedWith(solvable.routingLpStats))
         if (sample == null || s.ls.incumbentObjective.isNaN()) return routed
@@ -613,7 +538,6 @@ internal object SolveCore {
     }
 }
 
-/** Render one [SearchEvent] as a `-v` line; [worker] tags portfolio workers. */
 internal fun describeEvent(e: SearchEvent, t: Long, worker: String? = null): String {
     val who = worker?.let { " $it" }.orEmpty()
     return when (e) {
@@ -634,7 +558,7 @@ internal fun describeEvent(e: SearchEvent, t: Long, worker: String? = null): Str
     }
 }
 
-/** Live-event listener for `-v`; null when not verbose so the engines skip observation. */
+// Null when not verbose so the engines skip observation.
 internal fun verboseListener(verbose: Boolean, emit: (String) -> Unit = ::printErrorLine): ((SearchEvent) -> Unit)? {
     if (!verbose) return null
     val log = cliLogger(verbose = true, emit = emit)
@@ -642,16 +566,13 @@ internal fun verboseListener(verbose: Boolean, emit: (String) -> Unit = ::printE
     return { e -> log.v { describeEvent(e, nowMillis() - start) } }
 }
 
-/**
- * Print a quarantined portfolio arm to stderr whatever the verbosity: an arm claiming a result the model refutes is a
- * bug in that arm's configuration, which the run survives but nobody should miss.
- */
+// Printed whatever the verbosity: an arm claiming a result the model refutes is a configuration bug the
+// run survives but nobody should miss.
 internal fun warnPortfolioFault(fault: ArmFault, emit: (String) -> Unit = ::printErrorLine) {
     emit("% WARNING: portfolio arm ${fault.workerLabel} quarantined: ${fault.reason}")
 }
 
-/** Per-worker `-v` listener for the portfolio paths. Workers run concurrently; the logger
- *  writes whole lines, which is the only shared state. */
+// Workers run concurrently; the logger writes whole lines, which is the only shared state.
 internal fun portfolioVerboseListener(
     verbose: Boolean, emit: (String) -> Unit = ::printErrorLine,
 ): ((String, SearchEvent) -> Unit)? {
@@ -661,7 +582,7 @@ internal fun portfolioVerboseListener(
     return { worker, e -> log.v { describeEvent(e, nowMillis() - start, worker) } }
 }
 
-/** Bytes per mebibyte — heap figures are reported in MiB, the unit `-Xmx` is set in. */
+// Heap figures are reported in MiB, the unit `-Xmx` is set in.
 private const val MIB = 1024L * 1024L
 
 internal fun reportOpenTheoryOptimum(

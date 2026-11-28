@@ -8,21 +8,13 @@ import kotlin.math.ln
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
-/**
- * Near-uniform XOR-hashed sampling (UniGen2) over the sampling set resolved by [CellContext]. An
- * *accuracy-validation* tool: it produces (almost) uniform draws to measure how biased the cheap
- * sampling path is. Far more expensive than the cheap path.
- *
- * S. Chakraborty, D. J. Fremont, K. S. Meel, S. A. Seshia, M. Y. Vardi, "On Parallel Scalable
- * Uniform SAT Witness Generation", TACAS 2015, https://doi.org/10.1007/978-3-662-46681-0_25
- *
- * XOR hashes range over the projection's bits (see [cellCount]). Strategy: estimate the projected model
- * count `C` once (via [ApproxMC]); if `C` already fits a target cell band, enumerate all models and
- * pick uniformly (exactly uniform). Otherwise draw `m ≈ log2(C / pivot)` hashes, enumerate the
- * resulting cell, and — when its size lands in the `[loThresh, hiThresh]` band — pick a member
- * uniformly at random. Out-of-band cells are rejected and retried with a fresh hash family; after
- * [MAX_CONSECUTIVE_REJECTS] failures it falls back to `cheapFallback` rather than spin forever.
- */
+// Near-uniform XOR-hashed sampling (UniGen2), an accuracy-validation tool for measuring how biased the cheap
+// sampling path is: S. Chakraborty, D. J. Fremont, K. S. Meel, S. A. Seshia, M. Y. Vardi, "On Parallel Scalable
+// Uniform SAT Witness Generation", TACAS 2015, https://doi.org/10.1007/978-3-662-46681-0_25
+//
+// Estimates the projected count C once with ApproxMC. A small enough C is enumerated and sampled exactly. Otherwise
+// it draws `m ≈ log2(C / pivot)` hashes and picks uniformly from a cell whose size lands in [loThresh, hiThresh],
+// retrying out-of-band cells with a fresh family and falling back to cheapFallback after MAX_CONSECUTIVE_REJECTS.
 internal object UniGen {
 
     fun samples(
@@ -55,9 +47,8 @@ internal object UniGen {
 
         var seedCounter = config.seed ?: Random.Default.nextLong()
 
-        // Small enough to sample exactly-uniformly with no hashing — but gate on the real
-        // bounded enumeration, not the lossy ε=0.8 estimate: a capped set is a search-order-biased
-        // truncation, so fall through to hashing rather than sample it.
+        // Gate on the bounded enumeration, not the lossy estimate: a capped set is a search-order-biased
+        // truncation, so it falls through to hashing.
         if (count <= hiThresh) {
             val all = cellCount(ctx, hashes = emptyList(), cap = hiThresh)
             if (all.complete) {
@@ -86,7 +77,6 @@ internal object UniGen {
         }
     }
 
-    /** Give up on rejection sampling after this many consecutive out-of-band draws. */
     private const val MAX_CONSECUTIVE_REJECTS = 64
 
     private class CellSampler(

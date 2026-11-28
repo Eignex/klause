@@ -22,9 +22,9 @@ import java.io.File
 import kotlin.system.exitProcess
 
 /**
- * Offline pre-submission checks for frozen-source descriptors: `check DESCRIPTOR [--manifest FILE] [--workspace DIR]`
- * reports descriptor violations and each case's held-out eligibility; `exposures --use USE --label LABEL CASES...`
- * turns retained `lab-cases.jsonl` rows into exposure entries. Neither reads corpus bytes or runs a solver.
+ * Offline checks for frozen-source descriptors: `check DESCRIPTOR [--manifest FILE] [--workspace DIR]` reports
+ * violations and held-out eligibility; `exposures --use USE --label LABEL CASES...` turns retained `lab-cases.jsonl`
+ * rows into exposure entries. Neither reads corpus bytes or runs a solver.
  */
 fun main(args: Array<String>) {
     val output = when (args.firstOrNull()) {
@@ -54,14 +54,10 @@ fun main(args: Array<String>) {
     println(SourceEligibility.json.encodeToString(SourceEligibility.Manifest.serializer(), output))
 }
 
-/**
- * Held-out eligibility of frozen-source cases under an explicit exposure manifest kept outside the source tree.
- *
- * Two inputs are the same source only when they share exact bytes: equal stored hashes, or stored and decoded hashes
- * joined by verified records. Names, paths and families never establish equivalence; related sources count only through
- * the manifest's recorded relations. A case is eligible only when its decoded identity is verified, nothing exposes
- * it, and the manifest declares complete coverage for every collection its identities touch.
- */
+// Two inputs are the same source only when they share exact bytes: equal stored hashes, or stored and decoded hashes
+// joined by verified records. Names, paths and families never establish equivalence. A case is eligible only when its
+// decoded identity is verified, nothing exposes it, and the manifest declares complete coverage for every collection
+// its identities touch.
 internal object SourceEligibility {
     const val SCHEMA = "source-exposure-v1"
     const val REPORT_SCHEMA = "source-eligibility-v1"
@@ -75,7 +71,6 @@ internal object SourceEligibility {
         ignoreUnknownKeys = true
     }
 
-    /** One input file: its corpus-relative [path] (collection first), stored and decoded hashes when known. */
     @Serializable
     data class Identity(
         val path: String,
@@ -86,27 +81,26 @@ internal object SourceEligibility {
         val collection: String get() = path.substringBefore('/')
         val compressed: Boolean get() = CorpusFiles.isCompressed(File(path))
 
-        /** Decoded hashes this record asserts; an uncompressed corpus member decodes to its stored bytes. */
+        // An uncompressed corpus member decodes to its stored bytes.
         val decoded: Set<String> get() = setOfNotNull(plainSha256, packedSha256?.takeUnless { compressed })
     }
 
-    /** A source some solver run, selection or applicability screen used, with that use's [outcome]. */
     @Serializable
     data class Exposure(val inputs: List<Identity>, val use: String, val outcome: String, val evidence: String)
 
-    /** A verified decoded identity, such as a source-identity receipt, that exposes nothing by itself. */
+    // Exposes nothing by itself.
     @Serializable
     data class Verified(val inputs: List<Identity>, val evidence: String)
 
-    /** Sources recorded as one family or as encodings of one source; exposing a member exposes the others. */
+    // Exposing a member exposes the others.
     @Serializable
     data class Relation(val members: List<Identity>, val kind: String, val reason: String)
 
-    /** The manifest's claim that [collection]'s exposures are completely recorded, on [basis]. */
+    // The claim that the collection's exposures are completely recorded.
     @Serializable
     data class Coverage(val collection: String, val basis: String)
 
-    /** Exposure the manifest knows it could not record; a null [collection] could be any collection. */
+    // Exposure the manifest could not record; a null collection could be any collection.
     @Serializable
     data class Gap(val collection: String? = null, val reason: String)
 
@@ -138,7 +132,6 @@ internal object SourceEligibility {
         val status: Status,
         val reasons: List<String>,
         val exposures: List<Match> = emptyList(),
-        /** Other recorded or committed paths holding the same stored or decoded bytes. */
         val aliases: List<String> = emptyList(),
     )
 
@@ -197,7 +190,7 @@ internal object SourceEligibility {
         if (oneSource && inputs.map { it.role }.distinct().size != inputs.size) add("$where repeats an input role")
     }
 
-    /** The frozen `cases` templates in [element]: a template array, a bench request, an experiment or a stored job. */
+    // Accepts a template array, a bench request, an experiment or a stored job.
     fun descriptor(element: JsonElement): List<BenchCase> = when {
         element is JsonArray ->
             BenchProtocol.json.decodeFromJsonElement(ListSerializer(BenchCase.serializer()), element)
@@ -266,7 +259,7 @@ internal object SourceEligibility {
         }
     }
 
-    /** Committed index entries as identities; a plain-named entry records decoded bytes as stored bytes. */
+    // A plain-named entry records decoded bytes as stored bytes.
     private fun committedIdentities(workspace: File): List<Identity> =
         File(workspace, CommittedCorpusIndexes.DIRECTORY).listFiles { file -> file.name.endsWith(".tsv.gz") }
             .orEmpty().sortedBy { it.name }.flatMap { file ->
@@ -386,7 +379,6 @@ internal object SourceEligibility {
 
     private fun Exposure.match(via: String) = Match(via, inputs, use, outcome, evidence)
 
-    /** Hashes joined by records that bind one file's stored bytes to its decoded bytes. */
     private class Identities(private val records: List<Identity>) {
         private val parent = mutableMapOf<String, String>()
 
@@ -409,7 +401,6 @@ internal object SourceEligibility {
             if (ra != rb) parent[ra] = rb
         }
 
-        /** Whether [other] holds the same bytes as the input of [inputs] with its role. */
         fun same(inputs: List<Identity>, other: Identity): Boolean = inputs.any { input ->
             input.role == other.role && component(input)?.let { it == component(other) } == true
         }
@@ -435,7 +426,7 @@ internal object SourceEligibility {
         }
     }
 
-    /** Exposure entries for every retained row, including failed, unsuitable and no-witness outcomes. */
+    // Includes failed, unsuitable and no-witness outcomes.
     fun exposures(files: List<File>, use: String, label: String): Manifest {
         val rows = linkedMapOf<Pair<List<Identity>, String>, MutableList<String>>()
         val verified = linkedMapOf<Identity, MutableList<String>>()

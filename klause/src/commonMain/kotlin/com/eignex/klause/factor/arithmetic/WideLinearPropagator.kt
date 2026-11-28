@@ -11,15 +11,8 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.compareTo
 
-/**
- * CP propagator for a [Linear] row whose coefficients or bound exceed the 64-bit range (the wide form).
- * All arithmetic is exact arbitrary precision ([BigInt]) — see
- * [com.eignex.klause.factor.arithmetic.internals.wideEnforceRow] — so there is no overflow to guard against
- * and no `unknown` degrade: the row is enforced exactly, including at a fully pinned leaf.
- *
- * The integer variables keep their ordinary `Long` domains and are branched normally; this propagator is
- * the only CP reader of the wide coefficients, and the wide values never reach the domains or the trail.
- */
+// Exact BigInt arithmetic enforces the row with no overflow degrade. This is the only CP reader of the wide
+// coefficients; they never reach the domains or the trail.
 internal class WideLinearPropagator(
     val intVars: IntArray,
     val vars: IntArray,
@@ -28,7 +21,7 @@ internal class WideLinearPropagator(
     val bound: BigInt,
 ) : Propagator {
 
-    /** Interval reasoning reads only `min`/`max` (see [LinearPropagator]); subscribe to bound moves. */
+    // Interval reasoning reads only bounds.
     override val initialIntEventWatches: IntArray = IntArray(vars.size * 2).also { out ->
         var w = 0
         for (v in vars) {

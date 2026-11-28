@@ -34,43 +34,35 @@ import kotlin.math.floor
 import kotlin.math.round
 import kotlin.math.sign
 
-/**
- * LS invariant for a [Linear] or [ReifiedLinear] row whose running sum a `Long` might not hold: over-64-bit
- * constants, or terms whose coefficients and domains can carry `Σ coeff·value` past the 64-bit range.
- *
- * That range is a worst case over the whole domain, and the sums search actually visits are usually far smaller.
- * So a row whose constants fit a `Long` keeps its sum in the narrowest exact form that holds it: a `Long` updated
- * with overflow-checked arithmetic, an [Int128] once a step leaves 64 bits, and a [BigInt] only once a step
- * leaves 128. Each step back inside a narrower range returns the sum to it. A row with over-64-bit constants
- * always sums in [BigInt]. Whatever the form, the violation and move deltas are the row's own, exactly.
- */
+// For rows whose running sum may leave 64 bits. The domain-wide worst case is rarely visited, so a row with
+// `Long` constants keeps its sum in the narrowest exact form that holds it (`Long`, Int128, then BigInt) and
+// returns to a narrower form when the sum does. A row with over-64-bit constants always sums in BigInt.
 internal class ExactLinearInvariant(
     constants: IntegralConstants,
     private val vars: IntArray,
     private val op: LinearOp,
-    /** The reifying Boolean, or -1 for a plain row. */
+    // -1 for a plain row.
     private val auxBoolVar: Int = -1,
 ) : Invariant {
     private val coeffs: Array<BigInt> = Array(vars.size) { constants.exactCoeff(it) }
     private val bound: BigInt = constants.exactBound
 
-    // The constants as `Long`s when they fit, which is what lets the sum live in a `Long` or an [Int128].
+    // Null when a constant exceeds `Long`, which forces the BigInt form.
     private val longCoeffs: LongArray? =
         (constants as? IntegerConstants)?.let { c -> LongArray(vars.size) { c.coeff(it) } }
     private val longBound: Long = (constants as? IntegerConstants)?.bound ?: 0L
 
-    // [longBound] in 128 bits, read only, so the residual of a wide sum is one subtraction.
+    // Read only.
     private val wideBound: Int128 = Int128().apply { addLong(longBound) }
     private val index = IntIntMap.build(vars, IntArray(vars.size) { it }, absent = -1)
 
-    /** One row's sum in the narrowest exact form, with scratch space so scoring a move allocates nothing. */
+    // Carries scratch space so scoring a move allocates nothing.
     private class Sum {
         var form: Int = LONG
         var long: Long = 0L
         val wide = Int128()
         var big: BigInt = BIG_ZERO
 
-        // Scratch: a candidate sum, and one term of a step.
         val candidate = Int128()
         val term = Int128()
     }
@@ -89,14 +81,12 @@ internal class ExactLinearInvariant(
         return if (i < 0) 0L else checkNotNull(longCoeffs)[i]
     }
 
-    // The row's sum as a [BigInt], whatever form holds it.
     private fun exact(sum: Sum): BigInt = when (sum.form) {
         LONG -> bigIntOf(sum.long)
         WIDE -> toBigInt(sum.wide)
         else -> sum.big
     }
 
-    // Store [value], in the narrowest form the constants and the value allow.
     private fun store(sum: Sum, value: BigInt) {
         if (longCoeffs != null && value.magnitudeBitLength() < Long.SIZE_BITS) {
             sum.form = LONG
@@ -107,7 +97,7 @@ internal class ExactLinearInvariant(
         }
     }
 
-    // Whether the body holds when `sum - bound` has sign [sign].
+    // [sign] is the sign of `sum - bound`.
     private fun holdsSign(sign: Int): Boolean = when (op) {
         LinearOp.LE -> sign <= 0
         LinearOp.GE -> sign >= 0
@@ -115,7 +105,6 @@ internal class ExactLinearInvariant(
         LinearOp.NE -> sign != 0
     }
 
-    // The body's degree when `sum - bound` has sign [sign] and magnitude [magnitude], saturated to a `Long`.
     private fun bodyDegree(sign: Int, magnitude: Long, softCap: Int): Int = when (op) {
         LinearOp.NE -> if (sign != 0) 0 else 1
         else -> if (holdsSign(sign)) 0 else compressViolation(magnitude, softCap)
@@ -132,7 +121,7 @@ internal class ExactLinearInvariant(
         return degreeOf(residual.signum(), saturatedMagnitude(residual), aux, softCap)
     }
 
-    // The degree of the 128-bit value in [value], which this consumes as scratch: it is turned into the residual.
+    // Consumes [value] as scratch: it is turned into the residual.
     private fun degreeOfWide(value: Int128, aux: Boolean, softCap: Int): Int {
         value.subtract(wideBound)
         val sign = when {
@@ -144,7 +133,6 @@ internal class ExactLinearInvariant(
         return degreeOf(sign, magnitude, aux, softCap)
     }
 
-    // The degree of [sum] as it stands.
     private fun currentDegree(sum: Sum, aux: Boolean, softCap: Int): Int {
         when (sum.form) {
             LONG -> {
@@ -267,7 +255,6 @@ internal class ExactLinearInvariant(
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val sum = sumOf(state, factorId)
         val aux = aux(state)
-        // The body must hold for a plain row or a true reifier, and fail for a false one.
         val want = auxBoolVar < 0 || aux
         if (holdsSign(residualSign(sum)) == want) return
         if (auxBoolVar >= 0) sink.addBoolFlip(auxBoolVar)
@@ -298,7 +285,6 @@ internal class ExactLinearInvariant(
         }
     }
 
-    // The sign of `sum - bound`, whatever form holds the sum.
     private fun residualSign(sum: Sum): Int = when (sum.form) {
         LONG -> {
             val residual = sum.long - longBound
@@ -326,8 +312,7 @@ internal class ExactLinearInvariant(
         else -> (sum.big - bound).signum()
     }
 
-    // Target for `c·x` at [cur] and body truth [want]: exact if `bound − (sum − c·cur)` fits `Long`,
-    // otherwise estimated in `Double`. Null when an equality has no integer target.
+    // Exact if `bound − (sum − c·cur)` fits `Long`, otherwise estimated in `Double`.
     private fun proposedTarget(sum: Sum, c: Long, cur: Long, want: Boolean): Long? {
         if (sum.form == LONG) {
             val term = c * cur
@@ -347,7 +332,6 @@ internal class ExactLinearInvariant(
         else -> sum.big.toDouble()
     }
 
-    // [target] in `Long` arithmetic, for a [remaining] that fits.
     private fun longTarget(c: Long, remaining: Long, want: Boolean): Long? {
         val positive = c > 0L
         val floor = remaining.floorDiv(c)
@@ -371,7 +355,6 @@ internal class ExactLinearInvariant(
         }
     }
 
-    // [longTarget] from a quotient estimated in `Double`, saturated to the `Long` range.
     private fun doubleTarget(c: Long, quotient: Double, want: Boolean): Long? {
         if (quotient.isNaN()) return null
         val positive = c > 0L
@@ -396,8 +379,7 @@ internal class ExactLinearInvariant(
         }
     }
 
-    // The value of a term with coefficient [c] that brings the body to [want], given [remaining] = bound minus the
-    // rest of the row; null when no integer value of the term satisfies an equality. Mirrors snapLinearTarget.
+    // [remaining] is bound minus the rest of the row. Mirrors snapLinearTarget.
     private fun target(c: BigInt, remaining: BigInt, want: Boolean): BigInt? {
         val positive = c > BIG_ZERO
         return when (op) {
@@ -420,7 +402,6 @@ internal class ExactLinearInvariant(
     }
 
     private companion object {
-        // Repair candidates drawn per pick on a wide row, as [LinearInvariant] does.
         const val REPAIR_SAMPLE_CAP: Int = 256
 
         fun saturated(value: BigInt): Long = when {
@@ -429,13 +410,11 @@ internal class ExactLinearInvariant(
             else -> Long.MIN_VALUE
         }
 
-        // |value|, saturated to `Long.MAX_VALUE` exactly as [magnitude] saturates a `Long`.
         fun saturatedMagnitude(value: BigInt): Long =
             if (value.magnitudeBitLength() < Long.SIZE_BITS) magnitude(value.toLong()) else Long.MAX_VALUE
 
         fun clampExact(d: IntDomain, target: BigInt): Long = d.clamp(saturated(target))
 
-        // The forms a row's sum takes, narrowest first.
         const val LONG: Int = 0
         const val WIDE: Int = 1
         const val BIG: Int = 2
@@ -449,7 +428,6 @@ internal class ExactLinearInvariant(
             else -> value.toLong()
         }
 
-        // Whether `sum + c·(new − old)` stays inside 64 bits at every step.
         fun longStep(sum: Long, c: Long, old: Long, new: Long): Boolean {
             val step = new - old
             if (subOverflows(new, old, step)) return false
@@ -472,17 +450,12 @@ internal class ExactLinearInvariant(
 
         const val HALF_RANGE: Long = 1L shl 31
 
-        // |value|, with `Long.MIN_VALUE`'s magnitude saturated to `Long.MAX_VALUE`.
         fun magnitude(value: Long): Long = if (value == Long.MIN_VALUE) Long.MAX_VALUE else abs(value)
     }
 }
 
-/**
- * Whether a row's running sum can leave the 64-bit range over [domains]: `|bound| + Σ |coeff|·max(|min|, |max|)`
- * reaches 2^61. Below that, every partial sum and every move delta `coeff·(new − old)` fits a `Long`, so the `Long`
- * invariant is exact and the row pays nothing for being exact. Estimated in `Double`, whose rounding is far inside
- * the factor of two between this limit and the `Long` range.
- */
+// True when `|bound| + Σ |coeff|·max(|min|, |max|)` reaches 2^61. Below that every partial sum and move delta
+// fits a `Long`. The `Double` estimate's rounding is far inside the factor of two below the `Long` range.
 internal fun needsExactSum(constants: IntegralConstants, vars: IntArray, domains: Array<IntDomain>): Boolean {
     if (constants !is IntegerConstants) return true
     var total = abs(constants.bound.toDouble())

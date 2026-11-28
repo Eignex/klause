@@ -10,12 +10,7 @@ import com.eignex.klause.solver.result.SmtStats
 import com.eignex.klause.solver.result.SolveStats
 import kotlin.math.round
 
-/**
- * Ordered LP `-s` metrics, empty when no LP-family technique ran. The counters cover solve
- * cost, prune rates, root bounds and standalone Lagrangian/energetic deductions.
- * Cuts and hull columns contribute to shared bounds; `lpCuts` reports their volume.
- * Every key has an `lp` prefix.
- */
+// Empty when no LP-family technique ran.
 internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val solves = stats.lp.solves.sum
     val lagrangian = stats.scheduling.lagrangianPruned.sum
@@ -70,8 +65,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     if (stats.lp.luMaxDim.max.isFinite() && stats.lp.luMaxDim.max > 0.0) {
         out += "lpLuMaxDim" to "${stats.lp.luMaxDim.max.toLong()}"
     }
-    // Printed only when nonzero: a solve that meets neither says nothing, so a line appearing at all
-    // is the whole signal.
+    // Printed only when nonzero: a line appearing at all is the whole signal.
     if (stats.lp.singularRefactorizations.sum > 0.0) {
         out += "lpSingularRefactorizations" to "${stats.lp.singularRefactorizations.sum.toLong()}"
     }
@@ -90,8 +84,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
             primalRefactorizations = stats.lp.primalRefactorizations,
         ))
     }
-    // The decline rate: certified against the two causes it can fail for. Printed whenever any
-    // certification happened, since a zero decline count is as informative as a nonzero one here.
+    // Printed whenever any certification happened: a zero decline count is as informative as a nonzero one.
     val certifyAttempts = stats.lp.certified.sum + stats.lp.certifyDeclinedContinuous.sum +
         stats.lp.certifyDeclinedNumeric.sum
     if (certifyAttempts > 0.0) {
@@ -167,8 +160,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
         out += "lpRootReducedCostFixes" to "${stats.lp.rootReducedCostFixes.sum.toLong()}"
     }
     if (stats.lp.rootMatrixMinValue.isFinite()) {
-        // Full precision, not [round4]: a coefficient below 1e-4 is exactly the one worth seeing, and
-        // rounding it reports the badly scaled matrix as a zero.
+        // Full precision: rounding would report a badly scaled matrix's tiny coefficient as zero.
         out += "lpRootMatrixMin" to "${stats.lp.rootMatrixMinValue}"
         out += "lpRootMatrixMax" to "${stats.lp.rootMatrixMaxValue}"
         out += "lpRootRowRatio" to "${stats.lp.rootRowRatio}"
@@ -253,11 +245,6 @@ private fun appendRouteCertifierStats(
     }
 }
 
-/**
- * Ordered local-search `-s` telemetry, emitted for LS backends or portfolio arms with moves.
- * Reports throughput, incumbent timings, stalls, restarts and best residual violation
- * (zero when feasible). Every key has an `ls` prefix.
- */
 internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> {
     val moves = stats.ls.moves.sum
     if (stats.run.backend != "ls" && moves == 0.0 && stats.ls.bestResidual == null &&
@@ -319,11 +306,7 @@ internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     return out
 }
 
-/**
- * Systematic-search counters for `-s`, as ordered `key`/`value` pairs — the backtrack/CDCL block
- * every complete solve reports. Modes that deliberately emit a subset (SMT-LIB, XCSP) filter by
- * key at the call site, so the full group order lives in one place.
- */
+// Modes that emit a subset filter by key at the call site, so the group order lives in one place.
 internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val out = ArrayList<Pair<String, String>>()
     out += "nodes" to "${stats.search.nodes.sum.toLong()}"
@@ -377,11 +360,7 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
     return out
 }
 
-/**
- * A sequential portfolio's schedule for `-s`: the model's classification as one `profile` pair, then one
- * `arm.<label>` pair per arm with segments run, work and time spent, mean reward, failures, the credit earned by each
- * kind of contribution, and what each sharing channel cost and moved. Empty outside a sequential portfolio.
- */
+// Empty outside a sequential portfolio.
 internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val profile = stats.portfolio.profile?.let {
         "profile" to "${it.problemClass} optimizing=${it.optimizing} wide=${it.wide} scheduling=${it.scheduling}"
@@ -493,7 +472,6 @@ private fun diagnosticString(value: String): String = buildString {
 
 private const val NANOS_PER_MICRO = 1_000L
 
-/** Open-theory work and cost accounting pairs for `-s`. */
 internal fun openTheoryStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> =
     with(stats.openTheory) {
         listOf(
@@ -531,7 +509,6 @@ internal fun openTheoryStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pai
         } + openHintUsageStatPairs(stats) + smtStatPairs(stats, solveTimeMs)
     }
 
-/** Exact SMT-theory lane counters, with rates only when their denominator is meaningful. */
 private fun smtStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> = with(stats.smt) {
     if (this == SmtStats()) return emptyList()
     val out = ArrayList<Pair<String, String>>()
@@ -602,19 +579,15 @@ private fun smtStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     return out
 }
 
-/** Native CP conflict-analysis diagnostic counters for `-s`, separate from shared theory analysis. */
 internal fun caStatPairs(stats: SolveStats): List<Pair<String, String>> = listOf(
     "caNotApplicable" to "${stats.ca.notApplicable.sum.toLong()}",
     "caNonAsserting" to "${stats.ca.nonAsserting.sum.toLong()}",
 )
 
-/** Print [pairs] one per line as `<prefix> key=value` — the shared stat-emission loop each mode
- *  runs with its own comment prefix (`%%%mzn-stat:`, `;`, `c`). */
 internal fun printStatPairs(prefix: String, pairs: List<Pair<String, String>>) {
     for ((k, v) in pairs) println("$prefix $k=$v")
 }
 
-/** Round to four decimals for the rate and ratio lines; integral values render without a fraction. */
 private fun round4(x: Double): String {
     val r = round(x * 10000.0) / 10000.0
     return if (r == r.toLong().toDouble()) "${r.toLong()}" else "$r"

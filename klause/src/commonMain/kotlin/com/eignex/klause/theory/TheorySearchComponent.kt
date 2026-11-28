@@ -12,12 +12,10 @@ import com.eignex.klause.solver.search.TypedSearchValueKey
 /**
  * Bridges a batch fragment-checking [Theory] into the incremental shared search lifecycle.
  *
- * The underlying arithmetic procedures retain their specialised exact search, while this adapter owns
- * their shared-trail boundary: Boolean assignments are trailed, semantic bound changes invalidate the
- * cached theory result, and a complete Boolean skeleton is checked during component propagation rather
- * than by a separate frontend loop. A service's completeness is independent of this bridge, and undecided
- * checks remain indeterminate. Directly incremental components implement
- * [com.eignex.klause.solver.search.SearchComponent] without implementing [Theory].
+ * The underlying procedures keep their own exact search, while this adapter owns the shared-trail
+ * boundary: Boolean assignments are trailed, semantic bound changes invalidate the cached theory result,
+ * and a complete Boolean skeleton is checked during component propagation. Undecided checks remain
+ * indeterminate.
  */
 class TheorySearchComponent<A : Any>(
     private val theory: Theory<A>,
@@ -31,7 +29,6 @@ class TheorySearchComponent<A : Any>(
     private var assignment: A? = null
     private var outcome: ComponentCheck? = null
 
-    /** Attach solve-scoped exact-theory telemetry before this component is traversed. */
     internal fun observeWith(stats: SmtStatsSink) {
         smtStats = stats
     }

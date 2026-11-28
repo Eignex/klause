@@ -10,16 +10,10 @@ import com.eignex.klause.model.PbOp
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.MutableIntObjectMap
 
-/**
- * At-most-one conflict structure read off a problem's factors: [adjacency] maps a Boolean variable to
- * the variables mutually exclusive with it — an edge per binary clause `¬a ∨ ¬b`, all pairs of an
- * at-most-one factor (`Cardinality(max = 1)`, unit-weight `Σ x ≤ 1` PseudoBoolean) over positive
- * literals — and [baseCliques] lists those at-most-one factors' member variables (pairwise adjacent by
- * construction). Global by construction: every edge is implied by a factor of the original problem.
- */
+// Edges come from binary clauses `¬a ∨ ¬b` and at-most-one factors over positive literals; baseCliques lists
+// those factors' members. Every edge is implied by an original factor, so the graph is global.
 internal class ConflictGraph(val adjacency: MutableIntObjectMap<IntHashSet>, val baseCliques: List<IntArray>)
 
-/** Builds the [ConflictGraph] the knapsack-lifting and clique separators share. */
 internal fun conflictGraph(problem: Problem): ConflictGraph {
     val adj = MutableIntObjectMap<IntHashSet>()
     fun edge(a: Int, b: Int) {

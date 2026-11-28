@@ -5,32 +5,22 @@ import com.eignex.klause.propagation.RevIntArray
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
 
-/**
- * Integer max-flow (level graph + blocking flow) over a graph stored as parallel arrays. Edges come
- * in forward/reverse pairs; even indices are forward edges (original capacity), odd indices are
- * residual reverses (initially zero). Flow pushed on edge `e` is `originalCap - cap(e)` for forward edges.
- *
- * Two lifetimes:
- *  - **Rebuild** ([reset] + [addEdge]): the structure and residual capacities live in plain
- *    `IntArrayList`s, refilled per fire — used for the count-var / optional / first-fire paths.
- *  - **Persistent** ([freeze]): after a build the residual capacities are copied onto the engine undo
- *    trail ([RevIntArray]), so the flow *survives across fires and restores on backtrack* — the
- *    variable→value edge set is invariant (built for the root, widest domains), and a fire only blocks
- *    the edges whose value left ([blockEdge]), rerouting any unit they carried ([recoverEdge]), with
- *    no per-fire network rebuild or warm-start replay.
- */
+// Edges come in forward/reverse pairs: even indices are forward edges, odd ones their residual reverses.
+//
+// Two lifetimes. Rebuild (reset + addEdge) refills plain lists per fire, for the count-var, optional and
+// first-fire paths. Persistent (freeze) copies the residual capacities onto the undo trail, so the flow
+// survives across fires and restores on backtrack: the edge set spans the root domains, and a fire only
+// blocks edges whose value left, rerouting any unit they carried.
 internal class GccFlowBuilder {
     private var adj: Array<IntArrayList> = emptyArray()
     private val edgeTo = IntArrayList()
     private val cap = IntArrayList()
     private val originalCap = IntArrayList()
 
-    /** Non-null once [freeze]d: the reversible residual capacities. Reads/writes route through
-     *  [capGet]/[capSet] so the flow rolls back with the engine trail on backtrack. */
+    // Non-null once frozen; capGet and capSet route through it so the flow rolls back with the trail.
     private var revCap: RevIntArray? = null
 
-    /** Non-null once [freeze]d: per-edge reversible removed flag (1 = the value left the domain).
-     *  A removed edge reads as capacity 0 and flow 0 everywhere, and restores on backtrack. */
+    // 1 when the edge's value left the domain; a removed edge reads as capacity 0 and flow 0.
     private var removed: RevIntArray? = null
 
     var numNodes: Int = 0
@@ -65,17 +55,13 @@ internal class GccFlowBuilder {
         edgeTo.clear()
         cap.clear()
         originalCap.clear()
-        revCap = null // back to build mode
+        revCap = null
         removed = null
         numNodes = nodes
     }
 
-    /** Number of directed edges (forward+reverse pairs count as two). */
     val edgeCount: Int get() = edgeTo.size
 
-    /** Copy the just-built residual capacities onto the engine undo trail so the flow persists across
-     *  fires and restores on backtrack. Called once after a [reset]+[addEdge] build establishes the
-     *  initial feasible max flow; subsequent fires mutate the flow reversibly via [blockEdge]/[maxFlow]. */
     fun freeze(state: PropagationState) {
         val r = RevIntArray(state, cap.size)
         for (e in 0 until cap.size) r[e] = cap[e]
@@ -83,21 +69,16 @@ internal class GccFlowBuilder {
         removed = RevIntArray(state, cap.size)
     }
 
-    /** Whether the flow is persistent (frozen onto the trail). */
     val frozen: Boolean get() = revCap != null
 
-    /** Mark forward edge [eIdx] (and its reverse) removed — its value left the domain. Reversible: it
-     *  reads as capacity/flow 0 until a backtrack restores it. Sound only for an edge carrying no flow
-     *  ([flowOf] `== 0`); the caller first reroutes a flow-carrying edge's unit with [recoverEdge], or
-     *  re-solves when no alternate path exists. */
+    // Sound only for an edge carrying no flow: the caller first reroutes a carried unit with recoverEdge, or
+    // re-solves when no alternate path exists.
     fun blockEdge(eIdx: Int) {
         val r = removed ?: return
         r[eIdx] = 1
         r[eIdx xor 1] = 1
     }
 
-    /** Restore every edge to its original capacity with zero flow, keeping the built structure (the
-     *  non-persistent per-fire counterpart to [reset]+re-`addEdge`). */
     fun resetFlow() {
         for (e in 0 until edgeTo.size step 2) {
             capSet(e, originalCap[e])
@@ -105,24 +86,17 @@ internal class GccFlowBuilder {
         }
     }
 
-    /**
-     * Recover the flow after the saturated forward edge [e] = [tail]→[head] (a variable's assignment) is
-     * removed: cancel its one unit and reroute [tail]→[head] along an alternate residual path (excluding
-     * [e]), preserving the flow value. Returns true if rerouted — then the caller blocks [e]; false if no
-     * alternate exists (the unit cannot be re-placed locally), leaving [e]'s flow restored so the caller
-     * falls back to a full re-solve. Keeps the persistent flow maximum without the O(n) warm-start replay.
-     */
+    // Cancels the saturated edge tail→head's unit and reroutes it along another residual path, keeping the
+    // flow maximum. On false the unit is restored and the caller falls back to a full re-solve.
     fun recoverEdge(e: Int, tail: Int, head: Int): Boolean {
-        capSet(e, capGet(e) + 1) // e: flow 1 → 0
+        capSet(e, capGet(e) + 1)
         capSet(e xor 1, capGet(e xor 1) - 1)
         if (bfsReroute(tail, head, e)) return true
-        capSet(e, capGet(e) - 1) // restore e's unit
+        capSet(e, capGet(e) - 1)
         capSet(e xor 1, capGet(e xor 1) + 1)
         return false
     }
 
-    /** BFS a single unit of residual flow from [s] to [t] excluding edge [ex] (and its reverse); push it
-     *  if a path is found. Reuses the [parentEdge]/[bfsQueue] scratch. */
     private fun bfsReroute(s: Int, t: Int, ex: Int): Boolean {
         val parent = parentEdge
         parent.fill(-1, 0, numNodes)
@@ -159,63 +133,26 @@ internal class GccFlowBuilder {
         return true
     }
 
-    fun augmentThroughEdge(source: Int, sink: Int, viaU: Int, viaV: Int): Boolean {
-        var viaEdge = -1
-        val nu = adj[viaU]
-        for (k in 0 until nu.size) {
-            val e = nu[k]
-            if (edgeTo[e] == viaV && capGet(e) > 0) {
-                viaEdge = e
-                break
-            }
+    fun seedAssignment(replay: GccAssignmentReplay, variable: Int, value: Int, choice: Int) {
+        val supply = replay.supply[variable]
+        if (capGet(supply) == 0 || capGet(choice) == 0) return
+        val minimum = replay.minimum[value]
+        if (minimum >= 0 && capGet(minimum) > 0) {
+            pushUnit(minimum)
+        } else {
+            val aboveMinimum = replay.aboveMinimum[value]
+            val remainingTotal = replay.remainingTotal
+            if (remainingTotal < 0 || capGet(aboveMinimum) == 0 || capGet(remainingTotal) == 0) return
+            pushUnit(aboveMinimum)
+            pushUnit(remainingTotal)
         }
-        if (viaEdge < 0) return false
-        val parent = parentEdge
-        parent.fill(-1, 0, numNodes)
-        parent[source] = -2
-        val q = bfsQueue
-        var h = 0
-        var t = 0
-        q[t++] = source
-        var found = false
-        while (h < t && !found) {
-            val u = q[h++]
-            if (u == viaU) {
-                if (parent[viaV] == -1) {
-                    parent[viaV] = viaEdge
-                    if (viaV == sink) found = true else q[t++] = viaV
-                }
-            } else {
-                val neigh = adj[u]
-                for (k in 0 until neigh.size) {
-                    val e = neigh[k]
-                    val v = edgeTo[e]
-                    if (parent[v] != -1 || capGet(e) <= 0) continue
-                    parent[v] = e
-                    if (v == sink) {
-                        found = true
-                        break
-                    }
-                    q[t++] = v
-                }
-            }
-        }
-        if (!found) return false
-        var bottleneck = Int.MAX_VALUE
-        var cur = sink
-        while (cur != source) {
-            val e = parent[cur]
-            if (capGet(e) < bottleneck) bottleneck = capGet(e)
-            cur = edgeTo[e xor 1]
-        }
-        cur = sink
-        while (cur != source) {
-            val e = parent[cur]
-            capSet(e, capGet(e) - bottleneck)
-            capSet(e xor 1, capGet(e xor 1) + bottleneck)
-            cur = edgeTo[e xor 1]
-        }
-        return true
+        pushUnit(supply)
+        pushUnit(choice)
+    }
+
+    private fun pushUnit(edge: Int) {
+        capSet(edge, capGet(edge) - 1)
+        capSet(edge xor 1, capGet(edge xor 1) + 1)
     }
 
     fun addEdge(u: Int, v: Int, c: Int): Int {
@@ -256,16 +193,10 @@ internal class GccFlowBuilder {
         return seen
     }
 
-    /**
-     * Blocking-flow max-flow: repeatedly build a BFS level graph over the residual edges, then saturate it with
-     * a blocking flow (a DFS that advances a per-node edge cursor so each edge is examined once per phase).
-     * `O(V²E)` in general and near `O(E√V)` on the unit-capacity variable→value matching graphs the GCC
-     * propagator builds. Any maximum flow is equally valid for the residual-SCC GAC filtering that reads the final
-     * residual graph.
-     *
-     * Dinitz, "Algorithm for solution of a problem of maximum flow in networks with power estimation",
-     * Soviet Math. Doklady 11, 1970.
-     */
+    // O(V²E) in general and near O(E√V) on unit-capacity matching graphs. Any maximum flow serves the
+    // residual-SCC filtering that reads the result.
+    // Dinitz, "Algorithm for solution of a problem of maximum flow in networks with power estimation",
+    // Soviet Math. Doklady 11, 1970.
     fun maxFlow(source: Int, sink: Int): Int {
         var total = 0
         val srcAdj = adj[source]
@@ -303,9 +234,8 @@ internal class GccFlowBuilder {
         return total
     }
 
-    /** Push flow along one level-respecting residual path from [u] to [sink], bounded by [limit]. The
-     *  per-node cursor [iter] skips edges already exhausted this phase, so the blocking flow stays linear
-     *  in the edges. Recursion depth is the level-graph height — a handful for the GCC matching graph. */
+    // The per-node cursor skips edges exhausted this phase, keeping the blocking flow linear in the edges.
+    // Recursion depth is the level-graph height, a handful for the matching graph.
     private fun blockingDfs(u: Int, sink: Int, limit: Int, level: IntArray, iter: IntArray): Int {
         if (u == sink) return limit
         val neigh = adj[u]
@@ -333,16 +263,10 @@ internal class GccFlowBuilder {
     private var sccCall = emptyIntArray()
     private var sccIter = emptyIntArray()
 
-    /**
-     * Residual-SCC labels over nodes `0 until limit`, written into [sccId]. An iterative index/lowlink
-     * pass run directly over the residual edges (`adj(v)` filtered by `capGet(e) > 0` and
-     * `edgeTo(e) < limit`) with no materialized adjacency, which would be a top cost on cardinality-heavy
-     * propagation. The prune only reads the SCC partition, not label values. Scratch buffers are reused
-     * across fires.
-     *
-     * Tarjan, "Depth-first search and linear graph algorithms", SIAM J. Comput. 1(2), 1972,
-     * https://doi.org/10.1137/0201010
-     */
+    // Iterative index/lowlink pass straight over the residual edges: materializing an adjacency would be a top
+    // cost on cardinality-heavy propagation. Callers read the partition only, not label values.
+    // Tarjan, "Depth-first search and linear graph algorithms", SIAM J. Comput. 1(2), 1972,
+    // https://doi.org/10.1137/0201010
     fun computeSccResidual(limit: Int, sccId: IntArray) {
         if (sccIndex.size < limit) {
             sccIndex = IntArray(limit)

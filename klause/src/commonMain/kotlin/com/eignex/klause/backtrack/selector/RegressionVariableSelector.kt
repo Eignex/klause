@@ -16,28 +16,13 @@ import kotlin.math.min
 import kotlin.random.Random
 
 /**
- * Contextual-bandit variable heuristic: a kumulant [RegressionContextualBandit]
- * (LinUCB over a Bayesian linear-regression posterior; Li, Chu, Langford and Schapire, "A
- * contextual-bandit approach to personalized news article recommendation", WWW 2010,
- * https://doi.org/10.1145/1772690.1772758) learns, **per session**, a value function
- * over per-variable branching features and picks the unassigned variable with the highest LinUCB
- * score. It is a learned generalisation of the hand-tuned heuristics: where [Vsids] attributes
- * activity to variables and [DomWdeg] weight to constraints, this fits a linear model to features
- * that include both signals and lets the posterior weight them for the instance at hand.
+ * Contextual-bandit variable heuristic: a [RegressionContextualBandit] (LinUCB over a Bayesian
+ * linear-regression posterior; Li, Chu, Langford and Schapire, "A contextual-bandit approach to personalized
+ * news article recommendation", WWW 2010, https://doi.org/10.1145/1772690.1772758) learns, per session, a
+ * value function over per-variable branching features and picks the highest-scoring unassigned variable.
  *
- * **Soundness:** the bandit only chooses *which* unassigned variable to branch on next; every such
- * choice is sound, so search stays complete and correct regardless of what the model learns. Only
- * efficiency depends on the model.
- *
- * **Cost guard:** scoring every candidate each decision is O(candidates · featureWork), far heavier
- * than VSIDS's O(log n) heap pick. On wide instances that would dominate the search, so at most
- * [scoreCap] candidates are scored — when more are unassigned, the smallest-domain ones (the
- * fail-first prior) are taken first and the rest ignored this decision.
- *
- * **Reward** is attributed at the *next* decision (the outcome of the previous branch is known by
- * then): a branch that led straight to a conflict scores 1.0 (informative fail-first pruning),
- * otherwise the reward is the propagation it triggered, squashed into [0,1]. A single arm (index 0)
- * carries the shared regression; the per-candidate feature vector is the context.
+ * At most [scoreCap] candidates are scored per decision, smallest domains first. A branch is rewarded at
+ * the next decision: 1.0 if it led straight to a conflict, else its propagation squashed into `[0, 1)`.
  */
 class RegressionVariableSelector private constructor(
     private val newBandit: () -> RegressionContextualBandit<*>,
@@ -46,21 +31,17 @@ class RegressionVariableSelector private constructor(
 
     private val bandit: RegressionContextualBandit<*> = newBandit()
 
-    /** A fresh selector with the same config and a new, unlearned bandit — so reuse across solves
-     *  starts each search from the documented per-session state, never a prior problem's model. */
+    /** A fresh selector with the same config and an unlearned bandit. */
     override fun fresh() = RegressionVariableSelector(newBandit, scoreCap)
 
-    // Pending attribution for the previous decision (rewarded at the next pick, once its outcome
-    // is observable). Null between runs / before the first decision.
+    // The previous decision, rewarded at the next pick once its outcome is observable.
     private var pendingFeatures: DoubleArray? = null
     private var pendingPropCount: Long = 0L
     private var conflictSincePick: Boolean = false
 
-    // Self-maintained VSIDS-style activity + last-conflict step (the engine exposes neither to a
-    // heuristic). Slot-indexed: bool var v → v, int var v → numBoolVars + v. Allocated lazily on
-    // the first pick (problem size isn't known at construction). With these as features the linear
-    // model can express VSIDS (weight on activity) and LastConflict (weight on recency) as well as
-    // fail-first, so it can learn the right family per instance.
+    // Self-maintained activity and last-conflict step, since the engine exposes neither to a heuristic.
+    // As features they let the linear model express VSIDS and last-conflict as well as fail-first.
+    // Slots: bools first, then ints offset by numBoolVars.
     private var activity: DoubleArray? = null
     private var lastConflict: LongArray? = null
     private var numBoolVars: Int = 0
@@ -68,9 +49,7 @@ class RegressionVariableSelector private constructor(
     private var bumpInc: Double = 1.0
     private var maxActivity: Double = 1.0
 
-    // Instance-relative feature scales, computed once from the problem in ensureState (so the
-    // unbounded structural features land in ~[0,1] off the instance's own maxima, not magic
-    // constants). degree ÷ max degree, ln(domSize) ÷ ln(max domain), depth ÷ variable count.
+    // Instance-relative scales so the unbounded structural features land in ~[0, 1].
     private var degreeScale: Double = 1.0
     private var lnDomScale: Double = 1.0
     private var depthScale: Double = 1.0
@@ -108,14 +87,12 @@ class RegressionVariableSelector private constructor(
             1.0
         } else {
             val delta = (session.propagationCount - pendingPropCount).coerceAtLeast(0L).toDouble()
-            // Squash propagation yield into [0,1): 0 → 0, large → ~1.
             (delta / (delta + PROP_SQUASH)).coerceIn(0.0, 1.0)
         }
         bandit.update(0, DenseVector.wrap(f), reward, 1.0)
         pendingFeatures = null
     }
 
-    /** A scored candidate: its [ref] and current domain size (the cheap fail-first key). */
     private class Candidate(val ref: VarRef, val domSize: Int)
 
     private fun collectCandidates(session: PropagationSession): List<Candidate> {
@@ -130,7 +107,6 @@ class RegressionVariableSelector private constructor(
             all.add(Candidate(VarRef.IntVar(v), d.valueCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()))
         }
         if (all.size <= scoreCap) return all
-        // Fail-first prior: score only the smallest domains.
         return all.sortedBy { it.domSize }.subList(0, scoreCap)
     }
 
@@ -143,23 +119,21 @@ class RegressionVariableSelector private constructor(
             session.projection.intOccurrences[c.ref.varId].size
         }
         val slot = if (isBool) c.ref.varId else numBoolVars + c.ref.varId
-        val act = checkNotNull(activity)[slot] / maxActivity // VSIDS-style decayed activity, ∈ [0,1]
+        val act = checkNotNull(activity)[slot] / maxActivity
         val lc = checkNotNull(lastConflict)[slot]
-        val recency = if (lc < 0L) 0.0 else 1.0 / (1.0 + (conflicts - lc)) // LastConflict signal
+        val recency = if (lc < 0L) 0.0 else 1.0 / (1.0 + (conflicts - lc))
         return doubleArrayOf(
-            1.0 / c.domSize, // fail-first: small domain → large value (already ∈ (0, 0.5])
-            ln((c.domSize + 1).toDouble()) / lnDomScale, // domain scale ÷ the instance's max
-            min(degree / degreeScale, 1.0), // constraint degree ÷ the instance's max degree
-            min(session.decisionLevel / depthScale, 1.0), // depth ÷ var count (max possible depth)
+            1.0 / c.domSize,
+            ln((c.domSize + 1).toDouble()) / lnDomScale,
+            min(degree / degreeScale, 1.0),
+            min(session.decisionLevel / depthScale, 1.0),
             if (isBool) 1.0 else 0.0,
-            act, // conflict activity — weight→1 here recovers VSIDS branching
-            recency, // last-conflict recency — weight→1 here recovers LastConflict branching
+            act,
+            recency,
         )
     }
 
-    /** Lazily size the activity/last-conflict arrays and compute the instance-relative feature
-     *  scales (max degree, max domain, variable count) on the first pick — problem size isn't known
-     *  at construction. */
+    // Problem size is unknown at construction, so state is sized on the first pick.
     private fun ensureState(session: PropagationSession) {
         if (activity != null) return
         val problem = session.problem
@@ -180,9 +154,7 @@ class RegressionVariableSelector private constructor(
         depthScale = maxOf(1, n).toDouble()
     }
 
-    /** VSIDS-style bump of the variables involved in a conflict, with the inc-grows decay trick
-     *  (no O(n) per-conflict pass; rescale when the increment overflows). Also records the conflict
-     *  step for each involved var (the LastConflict recency signal). */
+    // Growing the increment decays every prior activity without an O(n) pass.
     private fun bumpConflict(boolVars: IntArray, intVars: IntArray) {
         val act = activity ?: return
         val lc = lastConflict ?: return
@@ -215,7 +187,6 @@ class RegressionVariableSelector private constructor(
     override fun onPropagation(implied: PropagationResult.Implied) = Unit
 
     override fun onRestart() {
-        // Trail unwinds to root; drop any half-attributed decision.
         pendingFeatures = null
         conflictSincePick = false
     }
@@ -224,17 +195,15 @@ class RegressionVariableSelector private constructor(
 
     /** Feature-vector size and the [linUcb] factory. */
     companion object {
-        /** Number of per-variable features the LinUCB context vector carries (see [features]):
-         *  fail-first (1/domSize), domain scale, degree, depth, kind, conflict activity, recency. */
+        /** Number of per-variable features in the LinUCB context vector. */
         const val FEATURE_SIZE: Int = 7
         private const val PROP_SQUASH = 16.0
-        private const val ACTIVITY_DECAY = 0.95 // VSIDS-style: increment grows by 1/decay per conflict
+        private const val ACTIVITY_DECAY = 0.95
         private const val RESCALE_THRESHOLD = 1e100
 
         /**
-         * Build a LinUCB-backed variable heuristic. [exploration] scales the LinUCB upper-confidence
-         * term (more = more exploratory), [priorVariance] the Bayesian prior, [scoreCap] the
-         * per-decision candidate budget (see the cost guard above).
+         * Build a LinUCB-backed variable heuristic. [exploration] scales the upper-confidence term,
+         * [priorVariance] the Bayesian prior, and [scoreCap] the per-decision candidate budget.
          */
         fun linUcb(
             seed: Long = 0L,

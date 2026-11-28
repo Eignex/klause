@@ -20,20 +20,9 @@ import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.MutableLongIntMap
 import com.eignex.util.collections.toSortedLongArray
 
-/*
- * Reversible GAC for the constant-array element constraint `result = arr(idx)`.
- *
- * A support count per distinct constant value records how many live index positions hold it:
- * result value v is supported iff supportCount(id(v)) > 0; index position pos is supported iff
- * arr(pos) remains in the result domain. Counts and fixpoint domain references live on the undo
- * trail, so a fire processes domain removals and backtracking restores the prior fixpoint.
- *
- * An internal worklist cascades index and result removals to a GAC fixpoint. A pruned result
- * value cites the index positions that hold it; a pruned index cites its result value.
- */
-
-/** Per-`Element` reversible state for incremental constant-array GAC. Built once per factor (the
- *  value→position structure is static); the support counts and domain refs are trailed. */
+// Reversible GAC for `result = arr(idx)`. A support count per distinct constant records how many live index
+// positions hold it. Counts and the last fixpoint's domain refs are trailed, so a fire processes only removals
+// and backtracking restores the prior fixpoint.
 internal class ElementConstState(
     state: PropagationState,
     private val idx: Int,
@@ -76,12 +65,11 @@ internal class ElementConstState(
     private val domRefIdx = RevRef<IntDomain?>(state, null)
     private val domRefResult = RevRef<IntDomain?>(state, null)
 
-    /** GAC prune to fixpoint. Returns false on a domain wipeout (conflict). */
     fun propagate(state: PropagationState): Boolean {
         val idxDom = state.intDomains[idx]
         val resDom = state.intDomains[result]
         if (valid.value == 1 && domRefIdx.value === idxDom && domRefResult.value === resDom) {
-            return true // nothing changed since the last fixpoint
+            return true
         }
         val ok = if (valid.value == 0 || widened(idxDom, resDom)) rebuild(state) else delta(state)
         if (!ok) return false
@@ -90,16 +78,13 @@ internal class ElementConstState(
         return true
     }
 
-    /** Value-id of the constant [value], or -1 when [value] is not one of the table's constants. */
     private fun idFor(value: Long): Int = idOfValue.getOrDefault(value, -1)
 
-    /** True if either watched domain gained a value since the last fire (a backtrack restored it) —
-     *  the support counts cannot be patched incrementally then, so the caller rebuilds. */
+    // A domain that gained a value since the last fire (a backtrack restored it) cannot be patched incrementally.
     private fun widened(idxDom: IntDomain, resDom: IntDomain): Boolean {
         val pi = domRefIdx.value
         if (pi != null && idxDom !== pi) {
-            // Rebuild (span-safe) whenever the current or previous domain is too large to walk: neither
-            // widening detection nor the delta's removed-set walk can touch such a domain.
+            // Neither widening detection nor the delta walk can touch a domain too large to walk.
             if (idxDom.spanOrNull(
                     DEFAULT_DOMAIN_WALK_CAP,
                 ) == null || pi.spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null
@@ -125,8 +110,6 @@ internal class ElementConstState(
         return false
     }
 
-    /** Recompute the support counts from the current idx domain, then seed and run the GAC cascade.
-     *  Used on the first fire and after any widening (backtrack). */
     private fun rebuild(state: PropagationState): Boolean {
         val idxDom = state.intDomains[idx]
         val resDom = state.intDomains[result]
@@ -138,13 +121,10 @@ internal class ElementConstState(
         for (id in 0 until numValues) supportCount[id] = counts[id]
         valid.set(1)
 
-        // Root fast path: at decision level 0 no reason is ever consumed (an unconditional root fact
-        // needs none), so restrict both domains to their survivor SETS in one O(#distinct-values) step
-        // instead of scanning the full result span and excluding each unsupported value one by one.
+        // No root reason is ever read, so the root restricts both domains to their survivor sets in one step
+        // instead of excluding unsupported values across the result span.
         if (state.currentLevel == 0) return seedRestrictAtRoot(state, idxDom, resDom, counts)
 
-        // Seed: idx positions whose constant is not a live result value, and result values with no
-        // supporting position (no constant, or zero live positions). Applying them feeds the cascade.
         val idxSeed = LongArrayList()
         for (pos in 0 until len) {
             val iv = indexOffset + pos.toLong()
@@ -162,15 +142,8 @@ internal class ElementConstState(
         return applyThenCascade(state, idxSeed, resSeed)
     }
 
-    /**
-     * Level-0 GAC by direct survivor-set restriction (see [rebuild]). A constant value-id survives iff
-     * it has a live supporting idx position ([counts] > 0) and is still a live result value; result
-     * keeps exactly those constants, idx keeps exactly the positions holding one of them. Removing the
-     * other idx positions cannot drop a surviving constant's support (its positions all remain), so this
-     * single two-sided restriction is the fixpoint — no cascade needed. [supportCount] is left matching
-     * the restricted domains (survivors keep their count, the rest drop to zero) for any later level-0
-     * delta fire. O(#distinct-values + idx positions), not O(result span).
-     */
+    // Removing the other positions cannot drop a surviving constant's support, so this two-sided restriction is
+    // the fixpoint. [supportCount] is left matching the restricted domains for later level-0 delta fires.
     private fun seedRestrictAtRoot(
         state: PropagationState,
         idxDom: IntDomain,
@@ -197,15 +170,12 @@ internal class ElementConstState(
         return state.restrictIntToSurvivors(idx, idxSurvivors.toLongArray())
     }
 
-    /** Incremental fire: account only for the values removed since the last fixpoint, then cascade. */
     private fun delta(state: PropagationState): Boolean {
         val idxRem = removedSince(domRefIdx.value, state.intDomains[idx])
         val resRem = removedSince(domRefResult.value, state.intDomains[result])
         return cascade(state, idxRem ?: LongArrayList(), resRem ?: LongArrayList())
     }
 
-    /** Values present in [prev] but gone from [cur] (ascending). `null` when [prev] is null or the
-     *  ref is unchanged (no delta). */
     private fun removedSince(prev: IntDomain?, cur: IntDomain): LongArrayList? {
         if (prev == null || prev === cur) return null
         val out = LongArrayList()
@@ -213,7 +183,6 @@ internal class ElementConstState(
         return out
     }
 
-    /** Apply the seed exclusions (rebuild path), then cascade their removals to the GAC fixpoint. */
     private fun applyThenCascade(state: PropagationState, idxSeed: LongArrayList, resSeed: LongArrayList): Boolean {
         if (idxSeed.size > 0) {
             val ex = sortedDistinct(idxSeed)
@@ -223,12 +192,6 @@ internal class ElementConstState(
         return cascade(state, idxSeed, resSeed)
     }
 
-    /**
-     * Drive the coupled prune to fixpoint. [idxRem0]/[resRem0] are the idx/result values that just left.
-     * Processing idx removals decrements support and yields newly-unsupported result values to prune;
-     * processing result removals yields the idx positions holding those constants to prune. Each
-     * applied prune is the next round's removal set, so the cascade runs until no value leaves.
-     */
     private fun cascade(state: PropagationState, idxRem0: LongArrayList, resRem0: LongArrayList): Boolean {
         var idxRem = idxRem0
         var resRem = resRem0
@@ -253,8 +216,7 @@ internal class ElementConstState(
         return true
     }
 
-    // idx removals → decrement support → result values that dropped to zero support. Each of a round's two scans is
-    // its own method so each compiles apart: in one body, on-stack replacement of any loop recompiles all of it.
+    // Each of a round's two scans is its own method: in one body, on-stack replacement of any loop recompiles all.
     private fun unsupportedResults(state: PropagationState, idxRem: LongArrayList): LongArrayList {
         val resultToExclude = LongArrayList()
         for (i in 0 until idxRem.size) {
@@ -270,7 +232,6 @@ internal class ElementConstState(
         return resultToExclude
     }
 
-    // result removals → idx positions whose constant just left result.
     private fun positionsOfLeftResults(state: PropagationState, resRem: LongArrayList): LongArrayList {
         val idxToExclude = LongArrayList()
         val idxDom = state.intDomains[idx]
@@ -346,7 +307,7 @@ internal class ElementConstState(
         else -> supports(state, side, values, state.undo.size)
     }
 
-    /** The reason a batch recorded by [reason] rests on, from [payload], as of undo-log position [atTrail]. */
+    // Decodes a payload recorded by [reason] or [boundReason], as of undo-log position [atTrail].
     fun explain(state: PropagationState, payload: IntArray, atTrail: Int): IntArray? {
         if (payload[0] == BELOW || payload[0] == ABOVE) {
             val bound = (payload[1].toLong() shl 32) or (payload[2].toLong() and 0xFFFFFFFFL)
@@ -397,8 +358,6 @@ internal class ElementConstState(
         val dRes = state.domainAt(result, atTrail)
         val rootIdx = state.rootDomains[idx]
         val rootRes = state.rootDomains[result]
-        // Each side's past domain is read once, and a position or value past that domain's bound cites the bound's
-        // one literal, looked up once however many lie past it.
         val idxCite = BoundOnce(state, idx, atTrail, dIdx)
         val resCite = BoundOnce(state, result, atTrail, dRes)
         for (id in 0 until numValues) {

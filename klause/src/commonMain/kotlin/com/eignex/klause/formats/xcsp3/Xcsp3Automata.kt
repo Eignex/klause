@@ -8,11 +8,9 @@ import com.eignex.klause.lowering.packLayeredMdd
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
 
-/** Dense interner assigning state names int ids `1..n` in first-occurrence order. Keyed on char ranges
- *  of the transitions text so a repeated state name — the common case in a large MDD — costs neither a
- *  `String` allocation nor a per-transition object; a name is materialized only the first time it is
- *  seen. Hashing uses its own range hash (not [String.hashCode], which is not guaranteed identical
- *  across Kotlin targets) so [intern] and [idOf] agree on every platform. */
+// Assigns ids `1..n` in first-occurrence order, keyed on char ranges of the transitions text so a repeated state
+// name allocates nothing. The range hash is our own because String.hashCode is not guaranteed identical across
+// Kotlin targets.
 private class StateInterner(sizeHint: Int) {
     private var slotKey = arrayOfNulls<String>(tableSize(sizeHint))
     private var slotId = IntArray(slotKey.size)
@@ -21,7 +19,7 @@ private class StateInterner(sizeHint: Int) {
 
     val size get() = count
 
-    /** Intern the range `text[from, to)` (already trimmed by the caller), returning its id. */
+    // The caller has already trimmed `text[from, to)`.
     fun intern(text: String, from: Int, to: Int): Int {
         var slot = hash(text, from, to) and mask
         while (true) {
@@ -31,10 +29,9 @@ private class StateInterner(sizeHint: Int) {
         }
     }
 
-    /** Intern a whole name (a `<start>`/`<final>` state, which may be absent from the transitions). */
+    // A `<start>`/`<final>` state may be absent from the transitions.
     fun internWhole(name: String): Int = intern(name, 0, name.length)
 
-    /** Existing id of [name], or -1 if never interned. */
     fun idOf(name: String): Int {
         var slot = hash(name, 0, name.length) and mask
         while (true) {
@@ -125,10 +122,8 @@ private fun parseSym(s: String, from: Int, to: Int): Int {
     return if (neg) -v else v
 }
 
-/** Parse `(src,sym,dst)(...)…` in a single scan, interning states to ids as it goes. Neither a
- *  per-transition object nor a `String` per repeated state is allocated — the ingestion time and heap
- *  footprint of a multi-million-transition MDD are dominated by exactly those. Whitespace
- *  around the fields is tolerated as the grammar allows; the fields themselves carry no separators. */
+// Allocates neither a per-transition object nor a String per repeated state, which would dominate ingestion of a
+// multi-million-transition MDD.
 private fun internTransitions(text: String, firstState: String? = null): InternedTransitions {
     val n = text.length
     val interner = StateInterner(n / 8) // ~1 state per short transition tuple, an over-estimate
@@ -159,9 +154,8 @@ private fun internTransitions(text: String, firstState: String? = null): Interne
     )
 }
 
-/** A regular/mdd automaton built from a `<transitions>` list, independent of the sequence it constrains:
- *  the symbol [offset] (`1 - minSym`) shifting symbols to the 1-based [transitions] table, plus [q0] and
- *  [accepting]. Cached and shared across the rows of a `<group>` that instantiate the same template. */
+// Independent of the sequence it constrains, so a group's rows share it. [offset] shifts symbols to the 1-based
+// [transitions] table.
 internal class RegularAutomaton(
     val numStates: Int,
     val alphabetSize: Int,
@@ -171,10 +165,8 @@ internal class RegularAutomaton(
     val accepting: IntArray,
 )
 
-/** Return the automaton for [text], reusing the last one when [text] is the same object — the case for
- *  every row of a group over one template. [compute] runs only on a miss; a throw is not cached.
- *  Referential equality is the intent: group rows share one `<transitions>` String object, and distinct
- *  constraints hold distinct objects, so `===` reuses within a group and never conflates unrelated text. */
+// Group rows share one `<transitions>` String object and distinct constraints hold distinct objects, so `===`
+// reuses within a group and never conflates unrelated text. A throw is not cached.
 @Suppress("AvoidReferentialEquality")
 private inline fun Compiler.Builder.automatonFor(text: String, compute: () -> RegularAutomaton): RegularAutomaton {
     cachedAutomaton?.let { if (text === cachedAutomatonText) return it }
@@ -224,11 +216,9 @@ internal fun Compiler.Builder.regular(e: XmlElement) {
     emitRegular(listVars(e), automaton)
 }
 
-/** Either the layered form of an `<mdd>` (when the diagram is cleanly layered) or null, signalling the
- *  [Regular] fallback. Cached by transitions-text identity like [RegularAutomaton]. */
+// A null layered form selects the Regular fallback.
 internal class MddResult(val layered: LayeredMddData?)
 
-/** Return the mdd lowering for [text], reusing the last one when [text] is the same object (a group). */
 @Suppress("AvoidReferentialEquality")
 private inline fun Compiler.Builder.mddResultFor(text: String, compute: () -> MddResult): MddResult {
     cachedMddResult?.let { if (text === cachedMddText) return it }
@@ -238,9 +228,8 @@ private inline fun Compiler.Builder.mddResultFor(text: String, compute: () -> Md
     return built
 }
 
-/** A multi-valued decision diagram is a layered automaton. It is lowered onto the native layered `Mdd`
- *  factor when the diagram is cleanly layered — every state at one depth from the root, all sinks at the
- *  final depth — and falls back to a flattened [Regular] automaton otherwise. */
+// A cleanly layered diagram (every state at one depth, all sinks at the final depth) lowers onto the layered Mdd
+// factor; any other falls back to a flattened Regular automaton.
 internal fun Compiler.Builder.mdd(e: XmlElement) {
     val text = requireNotNull(e.child("transitions")).textContent
     val seq = listVars(e)
@@ -257,8 +246,7 @@ internal fun Compiler.Builder.mdd(e: XmlElement) {
     emitRegular(seq, automaton)
 }
 
-/** The mdd root: the state named "root" if it is a source, else the unique source that is never a
- *  destination; -1 when there is none. */
+// The state named "root" if it is a source, else the first source that is never a destination.
 private fun mddRoot(trs: InternedTransitions, isSrc: BooleanArray, isDst: BooleanArray): Int {
     val rootId = trs.idOf("root")
     if (rootId != -1 && isSrc[rootId]) return rootId
@@ -282,9 +270,7 @@ private fun buildMddAutomaton(trs: InternedTransitions): RegularAutomaton {
     return buildAutomaton(trs, q, q0, accepting.toIntArray())
 }
 
-/** Try to lower the interned transitions onto a layered `Mdd` (states dense per layer). Returns null when
- *  the diagram is not cleanly layered — no root, a state reachable at two depths, an unreachable state, or
- *  a sink before the final layer — so the caller uses the [Regular] fallback. */
+// Null when the diagram is not cleanly layered.
 private fun layerMdd(trs: InternedTransitions): LayeredMddData? {
     val q = trs.numStates
     val nEdges = trs.srcIds.size
@@ -349,8 +335,7 @@ private fun layerMdd(trs: InternedTransitions): LayeredMddData? {
     )
 }
 
-/** Post a [Regular] factor over [seqVars] for the shared [automaton], allocating per-constraint only the
- *  offset-shifted sequence (and its channels) when the automaton's symbols are not already 1-based. */
+// Only the offset-shifted sequence and its channels are per constraint; the automaton is shared.
 private fun Compiler.Builder.emitRegular(seqVars: IntArray, automaton: RegularAutomaton) {
     if (seqVars.isEmpty()) throw UnsupportedXcsp3Exception("regular/mdd: empty sequence list")
     val offset = automaton.offset

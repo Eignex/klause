@@ -27,12 +27,6 @@ import com.eignex.util.numbers.BigFraction
 import com.eignex.util.process.flushStandardOutput
 import kotlin.time.TimeSource
 
-/**
- * MiniZinc / FlatZinc front-end. The default mode: MiniZinc invokes this binary via the
- * `klause.msc` wrapper with MiniZinc-standard flags and a `.fzn` file. Emits MiniZinc's
- * standard solution protocol (`----------` per solution, `==========` for completed search,
- * `=====UNSATISFIABLE=====` / `=====UNKNOWN=====`, `%%%mzn-stat` for `-s`).
- */
 internal object MiniZincMode {
     fun newSession(): ModeSession = Session()
 
@@ -51,10 +45,8 @@ internal object MiniZincMode {
                 valueLabel = "file",
                 help = "MiniZinc output model (.ozn) for solution reconstruction",
             ) { oznPath = it },
-            // Like `minizinc --output-objective`: append `_objective = <value>;` to each solution
-            // so a parser reading the raw solution stream can recover the optimised objective even
-            // when the objective var is not in the model's `output` section. Off by default — the
-            // standard MiniZinc flow renders objectives through solns2out, not this binary.
+            // Appends `_objective = <value>;` so a raw solution stream carries the objective even when the
+            // objective var is not an output var.
             FlagSpec(listOf("--output-objective"), false) { outputObjective = true },
             FlagSpec(listOf("--output-complete-assignment"), false,
                 help = "Include bounded original integer and Boolean coordinates as diagnostic comments",
@@ -63,9 +55,7 @@ internal object MiniZincMode {
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val config = common.config
-            // Stream the .fzn straight from disk: the lexer/parser pull characters incrementally, so the
-            // whole source is never held as one String. Parsing only reads; the base bake runs as
-            // presolve step 0, bounded by the presolve deadline.
+            // Parsing only reads; the base bake runs as presolve step 0, bounded by the presolve deadline.
             val overrides = common.sourceOverrides(flatZincSemantics)
             val program = openTextFile(path).useSource { source ->
                 parseFlatZinc(
@@ -158,7 +148,6 @@ internal object MiniZincMode {
     }
 }
 
-/** MiniZinc's standard FZN solution protocol. */
 internal class MiniZincOutput(
     private val sourceSemantics: EffectiveSourceSemantics? = null,
     private val floatSource: Boolean = false,
@@ -195,8 +184,7 @@ internal class MiniZincOutput(
     }
 
     override fun onSolution(rendered: String, objective: Long?, continuousObjective: Double?) {
-        // `writeFlatZincSolution` / `OznApplier.render` already include the per-solution
-        // `----------` terminator; objective is carried in the rendered text.
+        // The rendered text already ends in the `----------` terminator.
         print(rendered)
     }
 
@@ -251,8 +239,7 @@ internal class MiniZincOutput(
 
             Verdict.UNSATISFIABLE -> println("=====UNSATISFIABLE=====")
 
-            // A `%` line is a comment to every FlatZinc consumer, so the cause rides alongside the
-            // standard terminator without changing what the protocol promises.
+            // A `%` line is a comment to every FlatZinc consumer, so the cause leaves the protocol untouched.
             Verdict.UNKNOWN -> {
                 println("=====UNKNOWN=====")
                 val cause = when {
@@ -269,21 +256,15 @@ internal class MiniZincOutput(
         printStatPairs("%%%mzn-stat:", pairs)
     }
 
-    /**
-     * `-s`: MiniZinc-standard `%%%mzn-stat: key=value` lines closed by `%%%mzn-stat-end`.
-     * [stats] is [SolveStats.EMPTY] when the verdict reports no engine counters (enumeration /
-     * portfolio); the CLI-side time and solution count are always available.
-     */
+    // stats is EMPTY when the verdict reports no engine counters; time and solution count are always known.
     override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
         println("%%%mzn-stat: solveTime=${solveTimeMs / 1000.0}")
         println("%%%mzn-stat: solutions=$solutions")
         if (floatSource) println("%%%mzn-stat: floatApproximation=false")
-        // Presolve summary is backend-independent (presolve runs before any engine), so emit it here.
+        // Presolve runs before any engine, so its summary is backend-independent.
         printStatPairs("%%%mzn-stat:", presolveStatPairs(stats))
         if (stats.run.backend.isNotEmpty()) {
-            // Complete (backtrack/CDCL) counters are meaningful only when the systematic engine did work;
-            // a pure-LS solve has none, so its block stays empty rather than a wall of zeros. A `mixed`
-            // portfolio with a backtrack arm reports them alongside the LS block below.
+            // A pure-LS solve has no complete-search counters, so its block stays empty rather than zeros.
             val complete =
                 stats.search.nodes.sum > 0.0 || stats.search.propagations.sum > 0.0 || stats.run.backend == "backtrack"
             if (complete) {

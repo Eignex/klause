@@ -27,13 +27,8 @@ import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.util.ArmCatalog
 
 /**
- * The curated catalog of local-search arms — the recipes the `ls` portfolio races and the named base
- * recipes the CLI selects. Each arm is a [SourceDrivenStrategy] over the shared driver; the catalog
- * owns their credit-ranked order and the single string boundary ([byLabel]).
- *
- * Factories, not shared instances: strategies carry mutable per-search state (CBLS stall trackers,
- * sinks), so every portfolio slot must get fresh objects — sharing one across two parallel workers is
- * a data race.
+ * Catalog of local-search arm recipes, keyed by label, with a credit-ranked order per [Kind]. Every accessor
+ * builds fresh recipes: strategies carry mutable per-search state, so sharing one across workers is a data race.
  */
 object LocalSearchCatalog {
     private fun cblsTabu() = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)
@@ -223,9 +218,8 @@ object LocalSearchCatalog {
         Kind.CSP -> cspOrder
     }
 
-    // [rankedArms] led by the arms written for [problemClass]: on a pseudo-Boolean model, the flip walk over violated
-    // constraints and the jump moves that read its linear rows. Clausal satisfaction uses the fixed-break flip
-    // walk; optimizing clausal and mixed-integer models keep the general credit order.
+    // A pseudo-Boolean model leads with the flip walk over violated constraints and the jump moves that read its
+    // linear rows; clausal satisfaction leads with the fixed-break flip walk.
     private fun rankedArms(kind: Kind, problemClass: ProblemClass): List<LocalSearchArm> {
         val lead = when (problemClass) {
             ProblemClass.Sat -> if (kind == Kind.CSP) listOf(LocalSearchArm.ProbsatPlain) else emptyList()
@@ -236,8 +230,7 @@ object LocalSearchCatalog {
         return lead.filter { it in order } + order.filter { it !in lead }
     }
 
-    /** [rankedArms] for the model classified as [profile]. A scheduling optimization leads with the
-     *  primary-repair plateau neighbourhood beside the full one, both on iterated restarts. */
+    // A scheduling optimization leads with the primary-repair plateau neighbourhood beside the full one.
     internal fun rankedArms(kind: Kind, profile: ProblemProfile): List<LocalSearchArm> {
         val order = rankedArms(kind, profile.problemClass)
         if (kind != Kind.COP || !profile.scheduling) return order
@@ -245,32 +238,28 @@ object LocalSearchCatalog {
         return lead + order.filter { it !in lead }
     }
 
-    /** A fresh recipe for [arm]. */
     internal fun recipe(arm: LocalSearchArm): LocalSearchRecipe = make(arm)
 
-    /** The arm named [label], or null for a recipe the catalog does not hold. */
     internal fun armOf(label: String): LocalSearchArm? = LocalSearchArm.entries.firstOrNull { it.label == label }
 
     private val catalog = ArmCatalog(LocalSearchArm.entries, LocalSearchArm::label, ::make)
 
-    /** A fresh recipe for the arm named [label] (the single string boundary). */
+    /** A fresh recipe for the arm named [label]. */
     fun byLabel(label: String): LocalSearchRecipe = catalog.byLabel(label)
 
-    /** Every arm label across both kinds (COP is the superset), for validation and error messages. */
+    /** Every arm label across both kinds. */
     fun labels(): List<String> = catalog.labels(copOrder)
 
-    /** Every arm label for [kind], in credit order — for enumerating the pool by name. */
+    /** Every arm label for [kind], in credit order. */
     fun labels(kind: Kind): List<String> = catalog.labels(rankedArms(kind))
 
     /** One fresh recipe for every arm of [kind], in credit order. */
     fun ranked(kind: Kind): List<LocalSearchRecipe> = catalog.ranked(rankedArms(kind))
 
-    /** Per-arm factories for [kind], in credit order — each builds a *fresh* recipe (the strategies
-     *  carry mutable per-search state, so every portfolio slot must get its own). */
+    /** Per-arm factories of fresh recipes for [kind], in credit order. */
     fun factories(kind: Kind): List<() -> LocalSearchRecipe> = catalog.factories(rankedArms(kind))
 
-    /** The top-[count] prefix of [kind]'s credit-ordered pool (wrapping past the pool size). Every slot
-     *  is a fresh instance even when arms repeat. */
+    /** The top-[count] prefix of [kind]'s credit-ordered pool, wrapping past the pool size. */
     fun diverse(kind: Kind, count: Int, problemClass: ProblemClass = ProblemClass.FiniteCp): List<LocalSearchRecipe> {
         require(count >= 1) { "count must be ≥ 1" }
         val order = rankedArms(kind, problemClass)
@@ -278,13 +267,8 @@ object LocalSearchCatalog {
     }
 }
 
-/**
- * Typed identity of every catalog arm — the catalog's keys. [LocalSearchCatalog.ranked] /
- * [LocalSearchCatalog.diverse] order and instantiate these per [Kind] via [LocalSearchCatalog]; [label]
- * is the external name (CLI / telemetry). [role] is what the arm covers in a roster: an arm whose restarts
- * perturb its incumbents improves a neighbourhood, and every other arm searches for a first solution. The
- * primary-repair plateau arm is the exception: it leads a scheduling roster as its first-solution arm.
- */
+// An arm whose restarts perturb its incumbents improves a neighbourhood and every other arm searches for a first
+// solution, except the primary-repair plateau arm, which leads a scheduling roster as its first-solution arm.
 internal enum class LocalSearchArm(val label: String, val role: ArmRole) {
     CblsFixed("cbls/fixed", ArmRole.FirstSolution),
     ProbsatPlain("probsat/plain", ArmRole.FirstSolution),

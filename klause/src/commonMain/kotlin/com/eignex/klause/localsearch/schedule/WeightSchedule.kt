@@ -3,44 +3,28 @@ package com.eignex.klause.localsearch.schedule
 import kotlin.random.Random
 
 /**
- * The violation-weight schedule shared by the constraint-gradient strategies: when the search
- * stalls (no strict cost drop for [bumpAfter] steps) it **bumps** every currently-violated factor's
- * weight by [increment] (resistant constraints get heavier, reshaping the gradient) and optionally
- * **relaxes** every weight back toward its seeded baseline (so stale escalations fade and the
- * gradient doesn't grow without bound). A lower unweighted Cumulative fraction at equal cost also
- * counts as progress, so within-bucket overload reductions postpone bumps.
+ * The violation-weight schedule of the constraint-gradient strategies: after [bumpAfter] steps without a
+ * strict cost drop, every violated factor's weight gains [increment], and every weight may relax toward its
+ * seed by `w ← target + (w − target)·relaxKeep` with `target = relaxTargetScale·base`. A lower unweighted
+ * Cumulative fraction at equal cost also counts as progress.
  *
- * It unifies two weight regimes of the same family — `Cbls`'s bump + probabilistic smoothing (after
- * F. Hutter, D. A. D. Tompkins, H. H. Hoos, "Scaling and probabilistic smoothing: efficient dynamic
- * local search for SAT", CP 2002, https://doi.org/10.1007/3-540-46135-3_16) and `FeasibilityJump`'s
- * bump + geometric decay. Both relaxations are
- * `w ← target + (w − target)·`[relaxKeep] with `target =` [relaxTargetScale]`·base`:
- *
- *  - **FeasibilityJump**: [relaxKeep]`= weightDecay`, [relaxTargetScale]`= 1`, [relaxProbability]`= 1`,
- *    [relaxBeforeBump]`= true` (decay every bump, then escalate).
- *  - **Cbls**: [relaxKeep]`= 1 − smoothFactor`, [relaxTargetScale]`= baseWeight`,
- *    [relaxProbability]`= smoothProb`, [relaxBeforeBump]`= false` (escalate, then smooth with a
- *    probability).
- *
- * As an [AdaptivePolicy] it tracks the stall off the shared per-round feedback channel
- * ([observe]); the weight arrays live in the search state, so the actual mutation is a separate
- * [applyTo] (or the per-step convenience [maintain]) that hands them in. [relaxProbability]`= 0`
- * never draws the RNG, preserving the caller's random stream when smoothing is disabled.
+ * Covers bump with probabilistic smoothing (after F. Hutter, D. A. D. Tompkins, H. H. Hoos, "Scaling and
+ * probabilistic smoothing: efficient dynamic local search for SAT", CP 2002,
+ * https://doi.org/10.1007/3-540-46135-3_16) and bump with geometric decay. The weight arrays live in the
+ * search state, so [applyTo] hands them in. A zero [relaxProbability] never draws the RNG.
  */
 class WeightSchedule(
     /** Steps without a strict cost drop before a bump fires. */
     val bumpAfter: Int = 1,
     /** Weight added to each currently-violated factor on a bump. */
     val increment: Double = 1.0,
-    /** Relax retention in `[0, 1]`: each weight keeps this fraction and is pulled the rest of the way
-     *  to its target. `1.0` disables relaxing (monotone escalation). */
+    /** Fraction of its distance to the target each weight keeps on a relax; `1.0` disables relaxing. */
     val relaxKeep: Double = 1.0,
     /** Scale on the seed baseline that relaxing pulls toward (`target = relaxTargetScale·base`). */
     val relaxTargetScale: Double = 1.0,
-    /** Probability a bump is accompanied by a relax pass, in `[0, 1]`. `1.0` always relaxes, `0.0`
-     *  never does (and never draws the RNG). */
+    /** Probability a bump is accompanied by a relax pass, in `[0, 1]`. */
     val relaxProbability: Double = 1.0,
-    /** Whether the relax pass runs before the bump (FeasibilityJump) or after it (Cbls). */
+    /** Whether the relax pass runs before the bump or after it. */
     val relaxBeforeBump: Boolean = true,
 ) : AdaptivePolicy {
     init {
@@ -54,11 +38,10 @@ class WeightSchedule(
     private val progress = ProgressWindow(initialProgressStep = -1L, trackFraction = true)
     private var pendingBump: Boolean = false
 
-    /** True iff a relax pass can ever run, so callers can skip allocating a snapshot when not. */
+    /** Whether a relax pass can ever run. */
     val relaxes: Boolean get() = relaxKeep < 1.0 && relaxProbability > 0.0
 
-    /** Stall-detect off `(step, cost)`; arms a pending bump when the cost has not strictly dropped
-     *  for [bumpAfter] steps. A rewound step (restart) re-anchors the trackers to this epoch. */
+    /** Arms a pending bump after [bumpAfter] steps without a strict cost drop; a rewound step re-anchors. */
     fun observeStep(step: Long, cost: Long) = observeStep(step, cost, 0.0)
 
     internal fun observeStep(step: Long, cost: Long, fraction: Double) {
@@ -69,12 +52,9 @@ class WeightSchedule(
         }
     }
 
-    /** Shared-channel hook: stall-detect off the round's step and incumbent cost. */
     override fun observe(round: RoundLog) = observeStep(round.step, round.incumbentCost.toLong())
 
-    /** Apply an armed bump (and its relax pass) to [weights]; no-op when none is pending. [violated]
-     *  is the snapshot of currently-violated factor ids, [base] the seed weights, [rng] gates the
-     *  probabilistic relax. */
+    /** Apply an armed bump and its relax pass; [violated] holds the violated factor ids, [base] the seeds. */
     fun applyTo(weights: DoubleArray, base: DoubleArray, violated: IntArray, rng: Random) {
         if (!pendingBump) return
         pendingBump = false
@@ -87,8 +67,7 @@ class WeightSchedule(
         applyTo(weights, base, violated, rng)
     }
 
-    /** The unconditional bump + relax mutation, in the configured order. Public so a strategy can
-     *  drive it from its own stall control flow. */
+    /** The unconditional bump and relax, for strategies with their own stall control flow. */
     fun bumpAndRelax(weights: DoubleArray, base: DoubleArray, violated: IntArray, rng: Random) {
         val relaxNow = relaxKeep < 1.0 && relaxProbability > 0.0 &&
             (relaxProbability >= 1.0 || rng.nextDouble() < relaxProbability)
@@ -109,10 +88,9 @@ class WeightSchedule(
         pendingBump = false
     }
 
-    /** Factories for the two known weight regimes, so a strategy names its intent rather than wiring
-     *  the raw knobs. */
+    /** Factories for the two known weight regimes. */
     companion object {
-        /** FeasibilityJump's bump + geometric decay (decay every bump, toward the bare seed). */
+        /** Bump with geometric decay toward the bare seed, decaying before every bump. */
         fun feasibilityJump(
             weightBumpAfter: Int = 1,
             weightIncrement: Double = 1.0,
@@ -126,7 +104,7 @@ class WeightSchedule(
             relaxBeforeBump = true,
         )
 
-        /** Cbls's SAPS-style bump + probabilistic smoothing (smooth toward `baseWeight·seed`). */
+        /** SAPS-style bump with probabilistic smoothing toward `baseWeight·seed`. */
         fun cbls(
             stallSteps: Int = 1,
             stallIncrement: Double = 1.0,

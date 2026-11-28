@@ -3,13 +3,10 @@ package com.eignex.klause.bench.catalog
 import com.eignex.klause.bench.catalog.Expected.Sat
 import com.eignex.klause.bench.catalog.Expected.Unsat
 
-/**
- * `satcomp-compact-v1`: 40 SAT Competition main-track instances (2022-2024) from the Global Benchmark Database,
- * pinned by content hash, as `klause-bench/scripts/satcomp-compact.sh` drew them: Kissat (the organisers' entry)
- * decided each in 5-120 s, at most 2 MB as `.cnf.xz`, at most 1M variables and 5M clauses, one family per instance
- * (40 of the 50 eligible), 20 SAT and 20 UNSAT. The result is the competition's verified one. A redraw is a new
- * version: the problem names, and the lab's trend lines over them, would otherwise come to mean other instances.
- */
+// Drawn by `klause-bench/scripts/satcomp-compact.sh`: decided by the reference competition entry in 5-120 s, at most
+// 2 MB as `.cnf.xz`, at most 1M variables and 5M clauses, one per family, balanced SAT/UNSAT. The result is the
+// competition's verified one. A redraw is a new version, since the lab's trend lines would otherwise come to mean
+// other instances.
 internal object SatCompCompact {
     val instances: List<GbdInstance> = listOf(
         pin("c1b30b4e03c3024ad9d084e29e79aa46", "algorithm-equivalence-checking", "BubbleVsPancakeSort_6_6", Unsat),

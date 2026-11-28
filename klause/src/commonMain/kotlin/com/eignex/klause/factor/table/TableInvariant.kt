@@ -23,8 +23,6 @@ internal class TableInvariant(
     private val numTuples: Int,
     private val singleColumnByVar: IntIntMap,
     private val multiColumnsByVar: MutableIntObjectMap<IntArray>,
-    /** Per-cell upper bound for a short-support table (see [com.eignex.klause.factor.table.Table.hi]);
-     *  null when every cell is a point (a ground table). */
     private val hi: LongArray?,
     private val supportCache: TableGroupCache = TableGroupCache(arity, tuples, hi),
 ) : SteppedIntInvariant {
@@ -54,9 +52,7 @@ internal class TableInvariant(
         for (row in s.closestRows(state::checkScoringWork)) {
             for (col in 0 until arity) {
                 val cur = state.assignment.intValue(xs[col])
-                // Already inside the cell's interval (covers points that already match and wildcards).
                 if (tableCellContains(tuples, hi, arity, row, col, cur)) continue
-                // Move toward the nearest value the cell accepts (the point value, or the clamped bound).
                 val target = cur.coerceIn(
                     tableCellLo(tuples, arity, row, col),
                     tableCellHi(tuples, hi, arity, row, col),
@@ -225,9 +221,6 @@ internal class TableInvariant(
 private const val TABLE_STRUCTURED_JUMP_CAP: Int = 4
 private const val TABLE_JUMP_ATTEMPT_STRIDE: Int = 4
 
-/** Recompute the minimum Hamming distance after changing [intVar] from [oldV] to [newV], where a
- *  cell matches (costs 0) when the value lies in its interval `[lo, hi]`. If [commit] is true the
- *  per-row distances in [s] are updated in place. */
 @Suppress("LongParameterList") // per-column rescan needs the full table view plus the interval bounds
 internal fun tableRescanForChange(
     s: TableLsState,
@@ -326,12 +319,10 @@ internal fun tableBuildTupleMove(
     return parts
 }
 
-/** Lower/upper bound of the interval cell (row, col); equal for a point. */
 internal fun tableCellLo(tuples: LongArray, arity: Int, row: Int, col: Int): Long = tuples[row * arity + col]
 internal fun tableCellHi(tuples: LongArray, hi: LongArray?, arity: Int, row: Int, col: Int): Long =
     hi?.get(row * arity + col) ?: tuples[row * arity + col]
 
-/** Whether the cell (row, col) accepts [value] — i.e. `value ∈ [lo, hi]`. */
 internal fun tableCellContains(
     tuples: LongArray,
     hi: LongArray?,
@@ -341,15 +332,12 @@ internal fun tableCellContains(
     value: Long,
 ): Boolean = value in tableCellLo(tuples, arity, row, col)..tableCellHi(tuples, hi, arity, row, col)
 
-/** A point cell accepts exactly one value (`lo == hi`). */
 internal fun tableCellIsPoint(tuples: LongArray, hi: LongArray?, arity: Int, row: Int, col: Int): Boolean =
     tableCellLo(tuples, arity, row, col) == tableCellHi(tuples, hi, arity, row, col)
 
-/** A free (`*`) cell accepts any value — the unbounded interval `[MIN, MAX]`. */
 internal fun tableCellIsFree(tuples: LongArray, hi: LongArray?, arity: Int, row: Int, col: Int): Boolean =
     tableCellLo(tuples, arity, row, col) == Long.MIN_VALUE && tableCellHi(tuples, hi, arity, row, col) == Long.MAX_VALUE
 
-/** Build the var→column lookup structures. */
 internal fun tableColumnMaps(xs: IntArray, arity: Int): Pair<IntIntMap, MutableIntObjectMap<IntArray>> {
     val occ = MutableIntObjectMap<IntArrayList>()
     for (c in 0 until arity) occ.getOrPut(xs[c]) { IntArrayList() }.add(c)

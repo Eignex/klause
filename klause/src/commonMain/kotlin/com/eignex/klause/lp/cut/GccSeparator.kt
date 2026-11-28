@@ -9,20 +9,9 @@ import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.mulExact
 
-/**
- * GlobalCardinality sum cuts — the value-multiplicity generalization of the AllDifferent
- * Hall cut. A *closed* GCC pins every `x_i` to a cover value `v_k`, each used within `[low_k, high_k]`
- * times, so `Σ_{i} x_i` is bounded by the cheapest (and dearest) value distribution honouring those
- * occurrence caps: fill the `low_k` forced occurrences, then spread the remaining slots over the
- * smallest-valued (resp. largest-valued) residual capacity. Ignoring each variable's own domain only
- * relaxes the problem, so the greedy min/max stay valid bounds. With every `high_k = 1` this reduces
- * exactly to the AllDifferent Hall sum.
- *
- * Only the fully-present, closed form is separated. An *open* GCC lets `x_i` take values outside the
- * cover (potentially below every cover value), so the cover-only greedy could over-estimate the true
- * minimum — unsound for a `≥` cut — and is skipped. A factor with optional (maybe-absent) variables is
- * skipped too: the present-count is then a range, which the fixed-`n` greedy does not model.
- */
+// Generalizes the all-different Hall sum: a closed GCC bounds `Σ x_i` by the cheapest and dearest distributions
+// honouring each value's `[low_k, high_k]` window. An open GCC admits values below every cover value, and
+// optional positions make the present count a range, so both are skipped.
 internal class GccSeparator : CutSeparator {
     override val family: CutFamily = CutFamily.GCC
 
@@ -47,9 +36,7 @@ internal class GccSeparator : CutSeparator {
             if (!ok) continue
 
             val bounds = sumBounds(factor, xs.size, ctx.session) ?: continue
-            // The greedy distribution reads only the occurrence windows: factor constants make the
-            // cut global outright; count variables make it global while their live intervals are
-            // still the declared ones.
+            // Constant windows make the cut global; count variables only while their live intervals are declared.
             val countVars = factor.countVars
             val global = if (factor.countLow != null && factor.countHigh != null) {
                 true
@@ -78,16 +65,12 @@ internal class GccSeparator : CutSeparator {
         return cuts
     }
 
-    /**
-     * `[minSum, maxSum]` of `Σ x_i` over closed distributions of `n` variables honouring each cover
-     * value's `[low_k, high_k]` occurrence window. Returns null when the distribution is infeasible
-     * (too few/many slots), the cover is too large, or the arithmetic overflows — no cut, sound.
-     */
+    // `[minSum, maxSum]`, or null when the distribution is infeasible, the cover too large, or arithmetic overflows.
     private fun sumBounds(gcc: GlobalCardinality, n: Int, session: PropagationSession): LongArray? {
         val cover = gcc.cover
         if (cover.isEmpty() || cover.size > MAX_VALUES) return null
         val low = LongArray(cover.size)
-        val cap = LongArray(cover.size) // residual capacity high_k - low_k
+        val cap = LongArray(cover.size)
         var forcedSlots = 0L
         var totalCap = 0L
         val countLow = gcc.countLow
@@ -112,7 +95,7 @@ internal class GccSeparator : CutSeparator {
             forcedSlots += lo
             totalCap += hi
         }
-        if (forcedSlots > n || totalCap < n) return null // distribution infeasible: leave it to propagation
+        if (forcedSlots > n || totalCap < n) return null
 
         var forcedSum = 0L
         for (k in cover.indices) forcedSum = addExact(forcedSum, mulExact(low[k], cover[k]))
@@ -128,7 +111,6 @@ internal class GccSeparator : CutSeparator {
         }
     }
 
-    /** Spread [remaining] free slots over the residual capacities in [order] (cheapest- or dearest-first). */
     private fun fill(base: Long, remaining: Long, cover: LongArray, cap: LongArray, order: List<Int>): Long {
         var sum = base
         var left = remaining

@@ -20,7 +20,7 @@ object BacktrackPresets {
      * satisfaction and optimization.
      *
      * [inprocess] enables clause subsumption, self-subsumption and vivification every
-     * [inprocessingCadence] restarts (default: four), amortizing their probing cost.
+     * [inprocessingCadence] restarts, amortizing their probing cost.
      * [maxLearnedClauses] caps the database; reductions run at restarts once it exceeds the cap.
      * [randomSeed] seeds the RNG, or uses a fresh seed when null.
      * [cancellation] and [onEvent] supply cancellation and observation hooks.
@@ -52,7 +52,7 @@ object BacktrackPresets {
      * phase saving and Luby restarts.
      *
      * [randomSeed] seeds the RNG, or uses a fresh seed when null.
-     * [lubyRestartBase] sets the restart unit (default: 256).
+     * [lubyRestartBase] sets the restart unit.
      * [cancellation] and [onEvent] supply cancellation and observation hooks.
      */
     fun conflictDriven(

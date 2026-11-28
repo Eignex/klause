@@ -12,14 +12,9 @@ import com.eignex.util.collections.MutableLongIntMap
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.mulExact
 
-/**
- * The objective-weighted AllDifferent bound as an LP cut. For an AllDifferent over variables `V`, the
- * minimum of `Σ_{i∈V} c_i·x_i` subject to all-different is the exact min-cost assignment of the objective
- * coefficients to distinct values ([MinCostAssignment]) — stronger than the unweighted Hall sum cut
- * whenever the `c_i` differ. Emitting `Σ_{i∈V} c_i·x_i ≥ assignmentMin` injects that integral bound into
- * the LP; a plain multiplier→coefficient adjustment would buy nothing (LP strong duality). The cut is
- * emitted only when the LP point violates it.
- */
+// `Σ_{i∈V} c_i·x_i ≥ assignmentMin` over an all-different group, where the bound is the exact min-cost
+// assignment of the objective coefficients to distinct values. Stronger than the Hall sum cut when the `c_i`
+// differ; adjusting LP multipliers alone would buy nothing by strong duality.
 internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSeparator {
     override val family: CutFamily = CutFamily.ASSIGNMENT_OBJECTIVE
 
@@ -55,17 +50,11 @@ internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSepar
         return cuts
     }
 
-    /**
-     * Exact minimum of `Σ_{i∈V} c_i·x_i` over distinct assignments of the live domains, via
-     * [MinCostAssignment]. Returns null when the value set is too large to assign over or the
-     * arithmetic overflows (then no cut is produced — sound, just no strengthening).
-     */
     private fun assignmentMin(vars: IntArray, session: PropagationSession): Long? {
         val valueIndex = MutableLongIntMap()
         val values = LongArrayList()
         for (v in vars) {
-            // Abort before walking a domain wider than the cap, so a wide domain is never enumerated
-            // value-by-value. Sound: no cut is produced, only strengthening is skipped.
+            // Abort before enumerating a domain wider than the cap.
             if (session.intDomain(v).spanOrNull(MAX_VALUES.toLong()) == null) return null
             session.intDomain(v).values.forEach { value ->
                 if (!valueIndex.containsKey(value)) {

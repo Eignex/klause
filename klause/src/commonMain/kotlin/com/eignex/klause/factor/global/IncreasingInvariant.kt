@@ -12,14 +12,9 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.util.numbers.saturatedAdd
 import com.eignex.util.numbers.saturatedSub
 
-/**
- * LS invariant for [Increasing]. Violation degree is the summed overshoot `Σ max(0, xs(i)+gap −
- * xs(i+1))`, so a move that flattens a steep inversion scores a real improvement. The repair
- * neighbourhood is the point of keeping the chain whole: besides local snaps at the first
- * inversion, it offers two *cascading* compounds that re-monotonise the entire chain in one move —
- * pushing the suffix up or the prefix down — which single-variable moves on a decomposition cannot
- * express.
- */
+// Violation is the summed overshoot `Σ max(0, xs(i) + gap − xs(i+1))`, so flattening a steep inversion
+// scores. The cascading compounds re-monotonise the whole chain in one move, which a pairwise
+// decomposition cannot express.
 internal class IncreasingInvariant(private val xs: IntArray, private val gap: Int) : Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
@@ -82,15 +77,12 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
         if (k < 0) return
         val a = state.assignment.intValue(xs[k])
         val b = state.assignment.intValue(xs[k + 1])
-        // Local snaps at the inversion: pull xs(k) down to b−gap, or push xs(k+1) up to a+gap.
         step(b, raise = false)?.let { snap(state, sink, xs[k], target = it, lowering = true) }
         step(a, raise = true)?.let { snap(state, sink, xs[k + 1], target = it, lowering = false) }
-        // Cascading re-monotonisation of the whole chain in a single compound move.
         proposeCascade(state, sink, raise = true)
         proposeCascade(state, sink, raise = false)
     }
 
-    /** Snap [v] to [target] if reachable; otherwise to the nearest domain bound in that direction. */
     private fun snap(state: LocalSearchState, sink: MoveSink, v: Int, target: Long, lowering: Boolean) {
         val d = state.rootDomains[v]
         val cur = state.assignment.intValue(v)
@@ -103,13 +95,7 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
         if (pick != cur) sink.addChannelingIntSet(state, v, pick)
     }
 
-    /**
-     * Re-monotonise the chain by sweeping one direction and clamping each variable to the running
-     * bound: [raise] pushes the suffix up (`target(i) = max(cur, target(i−1)+gap)`), `!raise` pulls
-     * the prefix down (`target(i) = min(cur, target(i+1)−gap)`), a target in a hole rounding on in the
-     * sweep direction. Aborts if the running bound leaves a variable's domain (no monotone completion
-     * in that direction). Emitted as one compound move.
-     */
+    // Aborts when the running bound leaves a domain: no monotone completion exists in that direction.
     private fun proposeCascade(state: LocalSearchState, sink: MoveSink, raise: Boolean) {
         val n = xs.size
         val target = LongArray(n)
@@ -127,7 +113,7 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
                 target[i] = (if (raise) d.ceilingOrNull(want) else d.floorOrNull(want)) ?: return
             }
         }
-        // Distinct-var dedup (last write wins) keeps the compound well-formed if a var repeats.
+        // Last write wins, so a repeated var keeps the compound well-formed.
         val parts = LinkedHashMap<Int, Long>()
         for (i in 0 until n) {
             if (target[i] != state.assignment.intValue(xs[i])) parts[xs[i]] = target[i]
@@ -136,8 +122,7 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
     }
 
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        // Pre-condition: chain is satisfied. Each variable may move freely within its monotone window
-        // [xs(i−1)+gap, xs(i+1)−gap] without breaking the chain — a feasibility-preserving neighbourhood.
+        // On a satisfied chain each variable moves within `[xs(i−1) + gap, xs(i+1) − gap]`, preserving feasibility.
         val n = xs.size
         for (i in 0 until n) {
             val cur = state.assignment.intValue(xs[i])
