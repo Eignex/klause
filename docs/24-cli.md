@@ -20,12 +20,13 @@ the optimizing tier for long runs.
 ### JVM startup cache
 
 For repeated short JVM invocations, train a HotSpot ahead-of-time cache on a representative
-model and reuse it across processes. These POSIX shell commands use the installed launcher on
-`PATH`.
+model and reuse the cached class data across processes. These POSIX shell commands use the
+installed launcher on `PATH`.
 
 ```sh
-KLAUSE_CLI_OPTS="-XX:AOTCacheOutput=klause.aot" klause-cli training.cnf
-KLAUSE_CLI_OPTS="-XX:AOTCache=klause.aot -Xlog:aot*=off:stdout -Xlog:aot*=warning:stderr" \
+aot_options="-XX:-AOTClassLinking"
+KLAUSE_CLI_OPTS="$aot_options -XX:AOTCacheOutput=klause.aot" klause-cli training.cnf
+KLAUSE_CLI_OPTS="$aot_options -XX:AOTCache=klause.aot -Xlog:aot*=off:stdout -Xlog:aot*=warning:stderr" \
   klause-cli input.cnf
 ```
 
