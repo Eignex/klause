@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.optimization
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
@@ -33,7 +34,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class LinearAuthorityAggregateCutsTest {
+class LinearAuthorityAggregateCutsTest : RuntimeInitializedTest() {
     @Test
     fun `conditional projections should survive ordinary selection for a later receiving query`() {
         val integers = (0 until 5).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
@@ -116,6 +117,30 @@ class LinearAuthorityAggregateCutsTest {
             assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
         assertEquals(SourceEvidenceCheck.Checked,
             SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+    }
+
+    @Test
+    fun `dense root handoff should offer an installed aggregate cut`() {
+        val capacity = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val flow = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val premises = linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right),
+            "flow lower" to SourcePremise(SourceInequality(mapOf(flow to BigFraction.MINUS_ONE), BigFraction.ZERO)))
+        for (row in 0 until 5) {
+            premises["capacity $row"] = SourcePremise(SourceInequality(
+                mapOf(capacity to BigFraction.ofLong(2), flow to BigFraction.ONE), BigFraction.ofLong(3)))
+        }
+        val sum = mapOf(x to BigFraction.ONE, y to BigFraction.ONE)
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, real, capacity, flow), premises, sum)
+
+        val cuts = LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+            authority.advanceWithPointCuts(source, ExecutionControl.Never, allowDenseRootTrial = true)
+            authority.rootConditionalCuts(source, ExecutionControl.Never)
+        }
+
+        val expected = SourceClaim.Consequence(SourceInequality(sum, BigFraction.ONE))
+        val offered = assertNotNull(cuts.firstOrNull { it.claim == expected })
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(offered))
     }
 
     @Test
