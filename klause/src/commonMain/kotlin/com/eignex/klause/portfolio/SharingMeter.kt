@@ -7,10 +7,7 @@ import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.solver.result.SharingStats
 import kotlin.time.TimeSource
 
-/**
- * One worker's sharing traffic, recorded where it exchanges with the pools. A worker runs on one lane at a time,
- * so the meter needs no lock.
- */
+// A worker runs on one lane at a time, so its meter needs no lock.
 internal class SharingMeter {
     internal var onImport: ((SharingChannel, Long, Int) -> Unit)? = null
     private val observed = arrayOfNulls<Long>(CHANNELS)
@@ -61,7 +58,6 @@ internal class SharingMeter {
     private val imported = LongArray(CHANNELS)
     private val duplicates = LongArray(CHANNELS)
 
-    /** Run [block], charging the time it takes to [channel]. */
     fun <T> timed(channel: SharingChannel, block: () -> T): T {
         val start = TimeSource.Monotonic.markNow()
         try {
@@ -71,28 +67,23 @@ internal class SharingMeter {
         }
     }
 
-    /** Charge [elapsed] nanoseconds to [channel]. */
     fun charge(channel: SharingChannel, elapsed: Long) {
         nanos[channel.ordinal] += elapsed
     }
 
-    /** Count [count] entries published on [channel]. */
     fun exported(channel: SharingChannel, count: Int) {
         exported[channel.ordinal] += count.toLong()
     }
 
-    /** Count [count] entries taken in from other arms on [channel]. */
     fun imported(channel: SharingChannel, count: Int, cursor: Long = 0L) {
         imported[channel.ordinal] += count.toLong()
         onImport?.invoke(channel, cursor, count)
     }
 
-    /** Count [count] entries received on [channel] that were already seen. */
     fun duplicates(channel: SharingChannel, count: Int) {
         duplicates[channel.ordinal] += count.toLong()
     }
 
-    /** The traffic so far, leaving out channels with none. */
     fun snapshot(): SharingStats = SharingStats(
         SharingChannel.entries.mapNotNull { channel ->
             val i = channel.ordinal
@@ -108,7 +99,6 @@ internal class SharingMeter {
     }
 }
 
-/** This source read through [meter], charging each read to [SharingChannel.Incumbents]. */
 internal fun <A, V> IncumbentSource<A, V>.metered(meter: SharingMeter): IncumbentSource<A, V> =
     IncumbentSource {
         meter.timed(SharingChannel.Incumbents) {

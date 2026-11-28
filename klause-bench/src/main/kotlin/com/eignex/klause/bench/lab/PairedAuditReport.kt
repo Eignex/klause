@@ -3,11 +3,10 @@ package com.eignex.klause.bench.lab
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
-/** Row states; a [CENSORED] row is accepted but has an arm without a terminal verdict inside its budget. */
+// A CENSORED row is accepted but has an arm without a terminal verdict inside its budget.
 @Serializable
 internal enum class RowState { COMPLETE, CENSORED, INVALID, MISSING }
 
-/** The audit's verdict on one workload, seed and repetition across every declared arm. */
 @Serializable
 internal data class AuditedRow(
     val source: String,
@@ -24,14 +23,12 @@ internal data class AuditedRow(
     @Transient val cases: List<AuditedCase> = emptyList(),
 )
 
-/** A summed cost scope; [unknown] counts cases or attempts that retained no value for it. */
+// unknown counts cases or attempts that retained no value for the scope.
 @Serializable
 internal data class CostTotal(val sum: Double, val known: Int, val unknown: Int)
 
-/**
- * Cost scopes reported side by side and never added together: CLI CPU is nested in adapter CPU, solver elapsed
- * in command wall time, and checker time is a separate post-commit scope.
- */
+// Scopes are never added together: CLI CPU is nested in adapter CPU, solver elapsed in command wall time, and checker
+// time is a separate post-commit scope.
 @Serializable
 internal data class CaseCosts(
     val cases: Int,
@@ -42,7 +39,6 @@ internal data class CaseCosts(
     val checkerElapsedMs: CostTotal,
 )
 
-/** Native claims, checked witnesses and proofs per arm, counted over accepted rows and kept apart. */
 @Serializable
 internal data class ArmOutcomes(
     val rows: Int,
@@ -52,7 +48,7 @@ internal data class ArmOutcomes(
     val nativeProofsWithoutIndependentProof: Int,
 )
 
-/** Worker attempts of one execution class; costs are cumulative over every row an attempt ran. */
+// Costs are cumulative over every row an attempt ran.
 @Serializable
 internal data class AttemptCosts(
     val executionClass: String,
@@ -65,11 +61,10 @@ internal data class AttemptCosts(
     val scopes: List<String>,
 )
 
-/** Worker attempts from a retained execution listing. */
 @Serializable
 internal data class AttemptSummary(val classes: List<AttemptCosts>, val committedRows: Int, val errors: List<String>)
 
-/** One arm's declared revision and expected case parameters; a null value inherits the solver default. */
+// A null parameter value inherits the solver default.
 @Serializable
 internal data class DeclaredArm(
     val ref: String?,
@@ -78,7 +73,6 @@ internal data class DeclaredArm(
     val resolvedPlan: Boolean,
 )
 
-/** Expected paired rows from [source], how many were retained, and those absent or outside the cohort. */
 @Serializable
 internal data class CohortCoverage(
     val source: String,
@@ -88,7 +82,7 @@ internal data class CohortCoverage(
     val unexpected: List<String>,
 )
 
-/** Whether the requested experiment was verified; [gaps] name the evidence that withholds [verified]. */
+// gaps name the evidence that withholds verified.
 @Serializable
 internal data class DeclaredCoverage(
     val verified: Boolean,
@@ -97,10 +91,8 @@ internal data class DeclaredCoverage(
     val gaps: List<String>,
 )
 
-/**
- * The complete audit result; [accepted] holds when no row is invalid or missing and the job is consistent, and
- * [declared] reports how much of the requested experiment that acceptance covers.
- */
+// accepted holds when no row is invalid or missing and the job is consistent; declared reports how much of the
+// requested experiment that acceptance covers.
 @Serializable
 internal data class PairedAuditReport(
     val arms: List<String>,

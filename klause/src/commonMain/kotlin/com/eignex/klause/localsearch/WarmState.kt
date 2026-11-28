@@ -2,43 +2,27 @@ package com.eignex.klause.localsearch
 
 import com.eignex.util.arrays.emptyIntArray
 
-/**
- * Mutable container for per-strategy state that survives a [LocalSearchSolver] call boundary. Owned
- * by [LocalSearchSession]; never created directly by callers.
- *
- * `null` fields mean "no warm state available — fall back to the strategy's default initialisation."
- * [reset] returns the state to that empty baseline.
- */
+// Search state a [LocalSearchSession] carries across calls; a null field falls back to the strategy's default.
 internal class WarmState {
-    /** Per-factor weights, size = `problem.numFactors`, or `null` if not yet populated. */
     internal var factorWeights: DoubleArray? = null
 
-    /** Per-variable cumulative touch count, size = `numBoolVars + numIntVars` (bool ids
-     *  first, int ids offset by `numBoolVars`), or `null` if no call has completed yet. Read by
-     *  the ALNS `activityBiased` destroy operator. Survives [LocalSearchState.restart]. */
+    // Indexed like TabuBook.touchCount; read by the ALNS activity-biased destroy operator.
     internal var activityTouches: IntArray? = null
 
-    /** Lowest [LocalSearchState.cost] observed across every call made through the session.
-     *  Persisted so `AspirationCriterion.OrImprovesBestEver` sees the full-history low,
-     *  not just the current call's watermark. `Long.MAX_VALUE` until the first apply. */
+    // Kept across calls so best-ever aspiration sees the session's full history.
     internal var bestCostSeen: Long = Long.MAX_VALUE
 
-    /** Activity counts, or an empty array when none have been captured yet. */
     fun activityTouches(): IntArray = activityTouches ?: emptyIntArray()
 
-    /** `Long.MAX_VALUE` until the first apply through this session. */
     fun bestCostSeen(): Long = bestCostSeen
 
-    /** Discard all warm state so the next session call starts from defaults. */
     fun reset() {
         factorWeights = null
         activityTouches = null
         bestCostSeen = Long.MAX_VALUE
     }
 
-    /** Sync warm weights, activity counts, and the best-cost watermark into [state]
-     *  before the search loop starts. Warm arrays whose size does not match the current
-     *  problem's factor or variable count are dropped. */
+    // Arrays whose size does not match the current problem are dropped.
     internal fun applyTo(state: LocalSearchState) {
         applySteps(state).forEach { }
     }
@@ -66,13 +50,7 @@ internal class WarmState {
         if (bestCostSeen < state.bestCostSeen) state.bestCostSeen = bestCostSeen
     }
 
-    /** Capture the strategy's learned weights, per-variable touch counts, and best-cost
-     *  watermark at the end of a search session. Touch counts and the watermark survive
-     *  restart, so they reflect the whole call regardless of restart cadence.
-     *
-     *  Skips the weight copy when the state never allocated [FactorWeightBook.factorWeights]
-     *  (weight-blind strategies such as WalkSat or ProbSat); capturing the all-1.0 default
-     *  would force that allocation. */
+    // Weight-blind strategies never allocate weights, and capturing the defaults would force that allocation.
     internal fun captureFrom(state: LocalSearchState) {
         if (state.weights.allocated) {
             factorWeights = state.weights.factorWeights.copyOf()

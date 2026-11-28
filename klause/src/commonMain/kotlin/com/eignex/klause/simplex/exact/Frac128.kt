@@ -2,15 +2,9 @@ package com.eignex.klause.simplex.exact
 
 import com.eignex.util.numbers.BigFraction
 /**
- * Fixed-width exact rational: a signed 128-bit numerator over a positive 128-bit denominator, always
- * gcd-normalized. The first level of the exact rational arithmetic ([FracOps]): pivot chains whose
- * values stay within 128 bits — the overwhelmingly common case at a leaf — run here with two-word
- * integer operations (Stein gcd, shift-subtract division) and no big-integer allocation; the first
- * operation that would escape 128 bits latches the level's overflow flag and the caller escalates to
- * [BigFraction].
- *
- * Numerator sign is carried in [nHi]'s top bit (two's complement over the (hi, lo) pair); the
- * denominator is always strictly positive.
+ * Gcd-normalized signed 128-bit numerator (two's complement over `(nHi, nLo)`) over a positive 128-bit
+ * denominator. Pivot chains that stay within 128 bits run here without big-integer allocation; the first
+ * operation that escapes latches the overflow flag and the caller escalates to [BigFraction].
  */
 internal class Frac128(val nHi: Long, val nLo: Long, val dHi: Long, val dLo: Long) {
     val isZero: Boolean get() = nHi == 0L && nLo == 0L
@@ -44,7 +38,6 @@ internal class Frac128(val nHi: Long, val nLo: Long, val dHi: Long, val dLo: Lon
     }
 }
 
-/** Mutable unsigned 128-bit scratch for the [Frac128] integer kernels. */
 private class U128(var hi: ULong, var lo: ULong) {
     fun isZero(): Boolean = hi == 0uL && lo == 0uL
 
@@ -61,7 +54,7 @@ private fun cmpU(a: U128, b: U128): Int = when {
     else -> a.lo.compareTo(b.lo)
 }
 
-/** `a -= b`; requires `a >= b`. */
+// `a -= b`; requires `a >= b`.
 private fun subU(a: U128, b: U128) {
     val newLo = a.lo - b.lo
     val borrow = if (a.lo < b.lo) 1uL else 0uL
@@ -104,10 +97,8 @@ private fun bitLenU(a: U128): Int = if (a.hi != 0uL) {
     64 - a.lo.countLeadingZeroBits()
 }
 
-/**
- * Binary gcd of two magnitudes; either may be zero. Result overwrites [a]. J. Stein, "Computational problems
- * associated with Racah algebra", J. Comput. Phys. 1(3), 1967, https://doi.org/10.1016/0021-9991(67)90047-2.
- */
+// Binary gcd into `a`; either may be zero. J. Stein, "Computational problems associated with Racah algebra",
+// J. Comput. Phys. 1(3), 1967, https://doi.org/10.1016/0021-9991(67)90047-2.
 private fun gcdU(a: U128, b: U128) {
     if (a.isZero()) {
         a.set(b)
@@ -133,7 +124,7 @@ private fun gcdU(a: U128, b: U128) {
     while (left-- > 0) shl1U(a)
 }
 
-/** Shift-subtract `a / b` (b non-zero): quotient into [q], remainder into [a]. */
+// Quotient into `q`, remainder into `a`; `b` must be non-zero.
 private fun divModU(a: U128, b: U128, q: U128) {
     q.hi = 0uL
     q.lo = 0uL
@@ -153,10 +144,8 @@ private fun divModU(a: U128, b: U128, q: U128) {
     }
 }
 
-/** Full 256-bit product of two 128-bit magnitudes into four 64-bit limbs (little-endian).
- *  Classic schoolbook with a running carry: each 64×64 partial product `(pHi, pLo)` adds its low
- *  word (plus the carry so far) at position `i + j`, and the next carry is `pHi` plus the add's
- *  carry-outs — which cannot wrap, since `p + out[i + j] + carry ≤ (2⁶⁴ − 1)² + 2(2⁶⁴ − 1) = 2¹²⁸ − 1`. */
+// Little-endian limbs. The running carry cannot wrap, since
+// `p + out(i + j) + carry ≤ (2⁶⁴ − 1)² + 2(2⁶⁴ − 1) = 2¹²⁸ − 1`.
 @OptIn(ExperimentalUnsignedTypes::class)
 private fun mul256(a: U128, b: U128, out: ULongArray) {
     out.fill(0uL)
@@ -195,7 +184,7 @@ private fun mul256(a: U128, b: U128, out: ULongArray) {
     }
 }
 
-/** `a * b` into [out] when the product fits 128 bits; false (out unspecified) otherwise. */
+// False, with `out` unspecified, when the product exceeds 128 bits.
 @OptIn(ExperimentalUnsignedTypes::class)
 private fun mulU(a: U128, b: U128, out: U128): Boolean {
     val limbs = ULongArray(4)
@@ -206,7 +195,6 @@ private fun mulU(a: U128, b: U128, out: U128): Boolean {
     return true
 }
 
-/** Signed magnitude of the numerator pair. */
 private fun magOf(hi: Long, lo: Long): U128 {
     if (hi >= 0L) return U128(hi.toULong(), lo.toULong())
     val negLo = 0uL - lo.toULong()
@@ -215,8 +203,7 @@ private fun magOf(hi: Long, lo: Long): U128 {
     return U128(negHi, negLo)
 }
 
-/** The signed (hi, lo) pair for a magnitude with the given sign, or null when it exceeds 2^127−1
- *  (or 2^127 for the negative side). */
+// Null when the magnitude exceeds 2^127−1 (2^127 on the negative side).
 private fun signedOf(negative: Boolean, mag: U128): Frac128Num? {
     if (mag.hi shr 63 != 0uL) {
         // Magnitude uses bit 127: only −2^127 is representable.
@@ -235,10 +222,7 @@ private fun signedOf(negative: Boolean, mag: U128): Frac128Num? {
 
 private class Frac128Num(val hi: Long, val lo: Long)
 
-/**
- * The 128-bit [FracOps] level. Any operation whose exact result escapes 128 bits latches
- * [overflowed] and returns [Frac128.ZERO]; the caller must treat a latched run as void and escalate.
- */
+// An escaping result latches overflowed() and returns zero; the caller treats a latched run as void.
 internal class Frac128Ops : FracOps<Frac128> {
     private var latched = false
 
@@ -407,7 +391,7 @@ internal class Frac128Ops : FracOps<Frac128> {
         return if (latched) 0 else signum(diff)
     }
 
-    /** Reduce `±mag / den` by the gcd and re-sign; null when the signed numerator cannot fit. */
+    // Null when the signed numerator cannot fit.
     private fun normalized(negative: Boolean, mag: U128, den: U128): Frac128? {
         if (mag.isZero()) return zero
         if (den.hi == 0uL && den.lo == 1uL) {

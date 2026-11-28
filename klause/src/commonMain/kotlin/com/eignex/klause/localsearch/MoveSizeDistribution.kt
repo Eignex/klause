@@ -3,14 +3,8 @@ package com.eignex.klause.localsearch
 import kotlin.random.Random
 
 /**
- * A frequency-restoring sampler over move sizes — how many variables a structural move should touch.
- * Sizes `minSize, minSize+1, …` are drawn in proportion to [weights], but *without replacement within
- * a cycle*: each size is handed out its weighted share before any size repeats, so a short run of
- * draws matches the target mix instead of drifting the way independent weighted draws can. When the
- * cycle empties it refills.
- *
- * Shared, engine-side, and deterministic — all randomness comes from the caller's [Random]. A source
- * that wants a tunable move-size mix (rather than a fixed count) draws from one of these.
+ * Sampler over move sizes `minSize, minSize + 1, …` in proportion to [weights], without replacement within a
+ * cycle, so a short run of draws matches the target mix. Deterministic given the caller's [Random].
  */
 class MoveSizeDistribution(
     /** Weight of each size, starting at [minSize]; `weights[k]` is the share of size `minSize + k`. */
@@ -29,8 +23,7 @@ class MoveSizeDistribution(
     private val residual: IntArray = weights.copyOf()
     private var remaining: Int = total
 
-    /** The next move size, consuming one slot of the current cycle (refilling when the cycle empties).
-     *  Consumes one [Random] draw. */
+    /** The next move size, consuming one slot of the cycle and one [Random] draw. */
     fun nextSize(rng: Random): Int {
         if (remaining == 0) {
             weights.copyInto(residual)

@@ -1,7 +1,6 @@
 plugins {
-    // Pin the Kotlin plugins once in the root classloader so sibling KMP projects share one
-    // instance — the Kotlin/Native bundle build service can't span per-project classloaders.
-    // Subprojects apply the kotlin plugins without a version.
+    // Pinned once in the root classloader: the Kotlin/Native bundle build service cannot span per-project
+    // classloaders, so subprojects apply the plugins without a version.
     kotlin("multiplatform") version "2.4.21" apply false
     kotlin("plugin.serialization") version "2.4.21" apply false
 }
@@ -87,8 +86,7 @@ allprojects {
             applicationDefaultJvmArgs = applicationDefaultJvmArgs + koblasJvmArgs
         }
     }
-    // The CLI dist's start scripts come from the conventions plugin, which assigns its own
-    // defaultJvmOpts after this block configures them — so append once the task actually runs.
+    // The conventions plugin assigns its own defaultJvmOpts after this block, so append once the task runs.
     tasks.withType<CreateStartScripts>().configureEach {
         // Held in a local: referencing the script's own property from the action would put a script
         // object reference in the configuration cache, which cannot be serialized.

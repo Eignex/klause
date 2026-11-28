@@ -8,22 +8,14 @@ import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.random.Random
 
-/**
- * Approximate projected model counting (ApproxMC2) over the sampling set resolved by [CellContext].
- *
- * S. Chakraborty, K. S. Meel, M. Y. Vardi, "Algorithmic Improvements in Approximate Counting for
- * Probabilistic Inference: From Linear to Logarithmic SAT Calls", IJCAI 2016,
- * https://www.ijcai.org/Abstract/16/503
- *
- * XOR hashes are appended as one [com.eignex.klause.factor.bool.GaussianXor] system and each cell is
- * enumerated by the backtrack solver. Returns a count within a multiplicative `(1 ± ε)` factor with
- * probability at least `1 - δ`.
- *
- * Outer loop runs `t = ⌈17·log2(3/δ)⌉` (odd) independent iterations and reports the median.
- * Each iteration draws a nested sequence of hashes and finds the smallest prefix length `m`
- * whose cell holds at most `thresh = 1 + 9.84·(1 + ε/(1+ε))·(1 + 1/ε)²` projected models, then
- * estimates `cellCount · 2^m`.
- */
+// Approximate projected model counting (ApproxMC2): S. Chakraborty, K. S. Meel, M. Y. Vardi, "Algorithmic
+// Improvements in Approximate Counting for Probabilistic Inference: From Linear to Logarithmic SAT Calls",
+// IJCAI 2016, https://www.ijcai.org/Abstract/16/503
+//
+// XOR hashes are appended as one GaussianXor system and each cell is enumerated by the backtrack solver. The
+// count is within a `(1 ± ε)` factor with probability at least `1 - δ`: the median of `t = ⌈17·log2(3/δ)⌉`
+// iterations, each estimating `cellCount · 2^m` for the smallest hash prefix `m` whose cell holds at most
+// `thresh = 1 + 9.84·(1 + ε/(1+ε))·(1 + 1/ε)²` projected models.
 internal object ApproxMC {
 
     fun run(problem: BakedProblem, config: ApproxCountConfig): Count =
@@ -69,19 +61,12 @@ internal object ApproxMC {
         return Count(estimate = estimate, lower = lower, upper = upper, exact = false, confidence = 1.0 - config.delta)
     }
 
-    /** A finished iteration: its cell [estimate] and the transition prefix length [mStar] (to seed the next). */
     private data class CoreResult(val estimate: Long, val mStar: Int)
 
-    /**
-     * One ApproxMC2 iteration over a nested hash sequence (`H_1 ⊂ … ⊂ H_n`). The cell count is
-     * non-increasing in `m`, so "cell ≤ thresh" flips false→true exactly once; a galloping +
-     * bisection search seeded from [startM] (the previous iteration's transition) finds the smallest
-     * fitting `m` in `O(log n)` solves instead of the `O(n)` linear scan.
-     *
-     * Returns `count · 2^m` at that `m`; on an empty (over-split) cell it recovers with
-     * `thresh · 2^(m-1)` from the level below rather than discarding the run, which would bias the
-     * median upward. `null` only when no prefix in `[1, n]` is sub-threshold.
-     */
+    // One iteration over a nested hash sequence. The cell count is non-increasing in m, so a galloping and
+    // bisection search seeded from the previous transition finds the smallest fitting m in O(log n) solves. An
+    // empty (over-split) cell recovers with thresh · 2^(m-1) rather than discarding the run, which would bias the
+    // median upward. Null when no prefix fits or a cell was interrupted.
     private fun core(ctx: CellContext, thresh: Int, seed: Long, startM: Int): CoreResult? {
         val n = ctx.hashDomain.size
         val allHashes = XorHashFamily(ctx.hashDomain, seed).draw(n)
@@ -143,13 +128,12 @@ internal object ApproxMC {
         else -> count.toLong() shl hashes
     }
 
-    /** `thresh = 1 + 9.84·(1 + ε/(1+ε))·(1 + 1/ε)²`, rounded up. */
     private fun threshold(epsilon: Double): Int {
         val factor = (1.0 + epsilon / (1.0 + epsilon)) * (1.0 + 1.0 / epsilon) * (1.0 + 1.0 / epsilon)
         return ceil(1.0 + 9.84 * factor).toInt()
     }
 
-    /** `t = ⌈17·log2(3/δ)⌉`, forced odd so the median is unambiguous. */
+    // Forced odd so the median is unambiguous.
     private fun iterationCount(delta: Double): Int {
         val t = ceil(17.0 * (ln(3.0 / delta) / ln(2.0))).toInt().coerceAtLeast(1)
         return if (t % 2 == 0) t + 1 else t

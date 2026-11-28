@@ -10,16 +10,8 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.util.numbers.addExact
 
-/**
- * Variable groups that are pairwise all-different, harvested from the LP-relevant globals so the
- * Hall-set sum cut ([AllDifferentSeparator]) and the assignment-objective cut
- * ([AssignmentObjectiveCut]) — both valid over any all-different set — reach beyond plain
- * [AllDifferent]:
- *  - [AllDifferent] itself: its variables.
- *  - [SymmetricAllDifferent]: `xs` is a self-inverse permutation, hence all-different.
- *  - [Inverse]: each side (`f`, `g`) is injective (a channelled bijection), so each is its own
- *    all-different set; the two are returned separately.
- */
+// Pairwise all-different variable groups: plain AllDifferent, SymmetricAllDifferent, and each side of Inverse,
+// all injective. Both Hall-set and assignment-objective cuts are valid over any such group.
 internal fun allDifferentGroups(problem: Problem): List<IntArray> {
     val groups = ArrayList<IntArray>()
     for (factor in problem.factors) {
@@ -39,20 +31,11 @@ internal fun allDifferentGroups(problem: Problem): List<IntArray> {
     return groups
 }
 
-/**
- * AllDifferent cuts. AllDifferent is skipped by the base relaxation; this re-introduces
- * its strength linearly. For a set S of all-different variables, any assignment uses |S| distinct
- * values, so `Σ_{i∈S} x_i` is bounded below by the sum of the |S| smallest distinct values available
- * across their domains, and above by the sum of the |S| largest — Hall-set bounds. Treating each
- * domain as its `[min, max]` interval (ignoring holes) only widens the value pool, so the bounds stay
- * valid (a sound under-/over-estimate). Only the full variable set (the |S| = n Hall set, the dominant
- * cut) is separated, when the LP point violates it. See Williams and Yan, "Representations of the
- * all_different predicate of constraint satisfaction in integer programming", INFORMS J. Comput. 2001,
- * https://doi.org/10.1287/ijoc.13.2.96.10515.
- *
- * The set S is any group from [allDifferentGroups], so this also covers [SymmetricAllDifferent] and
- * each side of [Inverse] — all injective, hence all-different.
- */
+// The base relaxation skips all-different. For a group S, `Σ_{i∈S} x_i` lies between the sums of the |S| smallest
+// and largest distinct values in the union of the `[min, max]` intervals; ignoring holes only widens the pool.
+// Only the full-group Hall set is separated. Williams and Yan, "Representations of the all_different predicate
+// of constraint satisfaction in integer programming", INFORMS J. Comput. 2001,
+// https://doi.org/10.1287/ijoc.13.2.96.10515.
 internal class AllDifferentSeparator : CutSeparator {
     override val family: CutFamily = CutFamily.ALL_DIFFERENT
 
@@ -97,18 +80,13 @@ internal class AllDifferentSeparator : CutSeparator {
         return cuts
     }
 
-    /**
-     * Sum of the [vars].size smallest, and largest, distinct values across the union of the live
-     * `[min, max]` domain intervals — a valid lower/upper bound on `Σ x_i` under all-different.
-     */
     private fun distinctSumBounds(vars: IntArray, session: PropagationSession): Pair<Long, Long> {
-        // Merge domain intervals into disjoint ascending ranges.
         val ranges = vars.map {
             val d = session.intDomain(it)
             d.min to d.max
         }
             .sortedBy { it.first }
-        val merged = ArrayList<LongArray>() // [lo, hi]
+        val merged = ArrayList<LongArray>()
         for ((lo, hi) in ranges) {
             val last = merged.lastOrNull()
             if (last != null && (last[1] == Long.MAX_VALUE || lo <= last[1] + 1)) {

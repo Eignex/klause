@@ -68,7 +68,6 @@ internal sealed interface RealOptimizationStep {
 internal sealed interface RealOptimizationResult {
     val withinTolerance: Boolean
 
-    // A point attaining the minimum.
     class Optimum(
         val reals: List<BigFraction>,
         val value: BigFraction,
@@ -82,7 +81,6 @@ internal sealed interface RealOptimizationResult {
         override val withinTolerance: Boolean,
     ) : RealOptimizationResult
 
-    // No point holds every relation.
     class Refuted(override val withinTolerance: Boolean) : RealOptimizationResult
 
     // The minimum was not decided: a stop, a declining encoder, or an infimum the model does not attain. [incumbent]
@@ -179,7 +177,6 @@ internal sealed interface ToleranceSearchResult {
 internal fun ((Sample) -> Boolean)?.permitsToleranceOptimum(): Boolean =
     this != null && (this as? FiniteSourceAcceptance)?.permitsToleranceOptimum != false
 
-// The tolerance search of an acceptance that admits tolerance points, or null.
 internal fun ((Sample) -> Boolean)?.toleranceSearch(): ToleranceRealSearch? =
     (this as? FiniteSourceAcceptance)?.takeIf { it.permitsToleranceOptimum }?.search
 

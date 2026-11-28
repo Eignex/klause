@@ -9,13 +9,7 @@ import com.eignex.klause.solver.search.VariableBranching
 import kotlin.random.Random
 import com.eignex.klause.solver.search.Vsids as NeutralVsids
 
-/**
- * Bind a substrate-neutral branching to the finite lane.
- *
- * The heuristic keeps its own state and sees only [BranchingState]; the finite-only hooks a
- * [VariableSelector] additionally receives are dropped here, since a heuristic that wanted them would
- * not have been written against the neutral view in the first place.
- */
+/** Bind a substrate-neutral branching to the finite lane; finite-only [VariableSelector] hooks are dropped. */
 fun VariableBranching<BranchingState>.asSelector(): VariableSelector = NeutralVariableSelector(this)
 
 /**
@@ -28,7 +22,6 @@ fun VariableBranching<BranchingState>.asSelector(): VariableSelector = NeutralVa
 fun Vsids(decay: Double = 0.95, rescaleThreshold: Double = 1e100): VariableSelector =
     NeutralVsids(decay, rescaleThreshold).asSelector()
 
-/** [BranchingState] over one finite propagation session. */
 private class CpBranchingState(private val session: PropagationSession) : BranchingState {
     override val numBoolVars: Int get() = session.problem.numBoolVars
 
@@ -39,13 +32,8 @@ private class CpBranchingState(private val session: PropagationSession) : Branch
     override fun needsIntDecision(variable: Int): Boolean = session.needsIntDecision(variable)
 }
 
-/**
- * Adapts a neutral [VariableBranching] to the finite [VariableSelector] contract.
- *
- * The view is cached per session rather than rebuilt per pick: a heuristic that keeps an order heap
- * detects a reused instance by state identity, so a fresh view each pick would look like a fresh solve
- * every time.
- */
+// The view is cached per session: a heuristic that keeps an order heap detects reuse by state identity,
+// so a fresh view each pick would look like a fresh solve.
 private class NeutralVariableSelector(private val branching: VariableBranching<BranchingState>) : VariableSelector {
     private var view: CpBranchingState? = null
     private var viewOf: PropagationSession? = null

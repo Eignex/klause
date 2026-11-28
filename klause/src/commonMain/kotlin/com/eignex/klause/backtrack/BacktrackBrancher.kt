@@ -19,13 +19,9 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 
-/**
- * The columns a one-model search over [session] completes at leaves, or null when it decides every column.
- *
- * These are the columns no factor declares and [objective] gives no term. Only CP factors declare what they
- * read, while a [BacktrackParams.componentFactory] component may read any column through the shared trail,
- * so a search with such components decides every column.
- */
+// Columns no factor declares and the objective gives no term, completed at leaves. Only CP factors declare what
+// they read, while a componentFactory component may read any column through the shared trail, so a search with
+// such components decides every column (null).
 internal fun BacktrackParams.leafColumns(
     session: PropagationSession,
     objective: LinearObjective? = null,
@@ -227,7 +223,7 @@ internal fun splitIntAlternatives(
     return if (preferred <= split) listOf(lower, upper) else listOf(upper, lower)
 }
 
-/** Optional search-only branch guidance layered over the configured selectors. */
+// Search-only branch guidance layered over the configured selectors.
 internal interface BacktrackBranching {
     fun onBranch(variable: VarRef) {}
 

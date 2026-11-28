@@ -5,15 +5,11 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 
 /**
- * Turns a proposed local-search assignment into a solution of the model, or says why it
- * cannot.
+ * Turns a proposed local-search assignment into a solution of the model, or says why it cannot.
  *
- * Local search scores a model through its invariants, and on some models that scoring is not exact: a
- * continuous column it moves in floating point, an incremental sum past the 64-bit range, a row whose
- * coefficients outrun the invariant's width. On those models zero violation is a proposal rather than a
- * proof, and this is what decides it. Optimization may also complete a bounded set of candidate moves to score
- * their completed objectives. Each call runs under the search's cancellation and work allowance; a candidate stays
- * private until the completion accepts it.
+ * Where invariant scoring is inexact (floating-point continuous columns, sums past the 64-bit range), zero
+ * violation is only a proposal and this decides it. Optimization may also complete candidate moves to score
+ * their completed objectives. A candidate stays private until the completion accepts it.
  */
 fun interface CandidateCompletion {
     /** Decide [candidate] under the search's [cancellation]: a [Completion.Witness] is a solution of the model,
@@ -21,12 +17,9 @@ fun interface CandidateCompletion {
     fun complete(candidate: Sample, cancellation: ExecutionControl): Completion
 }
 
-/**
- * What a [CandidateCompletion] made of one candidate. Refutes the candidate alone, never the model. [work] is what
- * deciding it cost, in local-search moves, which the search charges against its own budget.
- */
+/** What a [CandidateCompletion] made of one candidate; a refutation covers the candidate, never the model. */
 sealed interface Completion {
-    /** What deciding the candidate cost, in local-search moves. */
+    /** What deciding the candidate cost, in local-search moves charged to the search budget. */
     val work: Long
 
     /**

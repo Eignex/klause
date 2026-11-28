@@ -19,8 +19,7 @@ import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 
 /**
- * `[min] ≤ (#true [literals]) ≤ [max]`. Payload at `longPayload(factorId)` is the count of true
- * literals. AtMostOne, AtLeastOne, ExactlyOne are special cases.
+ * `[min] ≤ (#true [literals]) ≤ [max]`. AtMostOne, AtLeastOne and ExactlyOne are special cases.
  */
 class Cardinality(literals: IntArray, val min: Int, val max: Int) : Factor {
 

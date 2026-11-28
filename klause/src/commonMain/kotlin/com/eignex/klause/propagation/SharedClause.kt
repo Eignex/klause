@@ -1,21 +1,9 @@
 package com.eignex.klause.propagation
 
 /**
- * A learned CDCL nogood in a **session-portable** form, for sharing across backtrack arms of one
- * `Problem` (a parallel or single-threaded portfolio). All arms share the
- * same problem, so a nogood any arm learns is logically valid for every arm — but klause is an LCG
- * solver whose int-bound *atoms* are allocated lazily per session, so a clause's atom ids differ
- * between sessions and cannot be copied raw. This form keeps the two literal kinds separately:
- *
- *  - [boolLits] — literals over real boolean variables (id `< numBoolVars`), [com.eignex.klause.ir.Lit]-encoded.
- *    Boolean var ids are stable across sessions of the same problem, so these travel as-is.
- *  - [atomQuads] — int-bound atom literals, flattened as `[intVar, kind, threshold, sign]` per atom
- *    (`kind` 0 = `≥`, 1 = `≤`, 2 = `=`; `sign` 0 = positive). Stored as `Long` because the atom
- *    threshold is a domain value that may exceed 32-bit range; `intVar` / `kind` / `sign` are small
- *    non-negative fields that fit `Long` losslessly. The importing session re-allocates each atom in
- *    its own space ([PropagationSession.importClause]).
- *
- * Built by [PropagationSession.exportGlueClauses] and consumed by [PropagationSession.importClause].
+ * A learned nogood in a session-portable form, for sharing across arms of one `Problem`. Order-literal atoms are
+ * allocated lazily per session, so their ids differ between sessions: Boolean literals travel as-is and each atom
+ * travels as `(intVar, kind, threshold, sign)`, re-allocated by [PropagationSession.importClause].
  */
 class SharedClause internal constructor(
     internal val boolLits: IntArray,
@@ -49,41 +37,33 @@ class SharedClause internal constructor(
 }
 
 /**
- * Engine hook the backtrack solver invokes at each restart boundary (decision level 0, where an
- * imported clause's literals are not all-false so it can be registered safely). A portfolio supplies
- * an implementation that imports pending shared nogoods into the session and exports the session's
- * new glue clauses to the shared pool. `null` on [com.eignex.klause.backtrack.BacktrackParams.clauseExchange]
- * (the default) means no sharing — a standalone solve is unaffected.
+ * Clause sharing at restart boundaries, where an imported clause's literals are not all false. `null` on
+ * [com.eignex.klause.backtrack.BacktrackParams.clauseExchange] means no sharing.
  */
 interface ClauseExchange {
-    /** Incremental import + export at a level-0 restart of a *continuous* search: import the nogoods
-     *  published since this arm last looked and export its new glue. The session persists across the
-     *  restart, so clauses the arm already holds are not re-imported. */
+    /** Import nogoods published since this arm last looked and export its new glue, at a level-0 restart. */
     fun onRestart(session: PropagationSession)
 
-    /** Import at the post-seed root before traversal. A fresh session needs the whole current pool,
-     *  including its own clauses from earlier sessions. Rebinding assumptions on a retained session
-     *  keeps its learned store, so the exchange preserves that session's duplicate suppression.
-     *  Default no-op for non-pooled exchanges. */
+    /**
+     * Import at the post-seed root before traversal. A fresh session needs the whole current pool, including its
+     * own clauses from earlier sessions; a retained session keeps its learned store and duplicate suppression.
+     */
     fun onSearchStart(session: PropagationSession) {}
 
-    /** Export-only hook fired when a search ends without a clean restart boundary — a slice-truncated
-     *  ([com.eignex.klause.backtrack.BacktrackParams.cancellation]) segment of a single-threaded
-     *  portfolio. The trail may not be at root, so this must not import (an imported clause's literals
-     *  could be all-false mid-search); exporting the learned DB is level-independent. Default no-op for
-     *  exchanges that publish only at restarts. */
+    /**
+     * Export-only hook for a search that ends off a restart boundary, such as a
+     * [com.eignex.klause.backtrack.BacktrackParams.cancellation] slice. The trail may not be at root, so it must
+     * not import: an imported clause's literals could all be false mid-search.
+     */
     fun onSearchEnd(session: PropagationSession) {}
 
-    /** Observe retained state at a cooperative pause without exchanging clauses or draining use credit.
-     *  ExecutionControl boundaries use [onSearchEnd] instead. Default no-op. */
+    /** Observe retained state at a cooperative pause without exchanging clauses or draining use credit. */
     fun onSearchPause(session: PropagationSession) {}
 
     /** Release worker-private exchange state when the owning search is retired, after its final use drain.
      *  [onSearchEnd] and [onSearchPause] retain that state for resumption. */
     fun onSearchClose(session: PropagationSession) {}
 
-    /** Publish a globally-valid nogood (an LP Farkas infeasibility certificate) to the shared pool
-     *  directly, bypassing the LBD glue filter: it holds for every arm of the same problem regardless
-     *  of its LBD, but is too long / high-LBD to pass the glue export. Default no-op. */
+    /** Publish a globally valid nogood, such as an LP Farkas certificate, bypassing the LBD glue filter. */
     fun publishGlobal(clause: SharedClause) {}
 }

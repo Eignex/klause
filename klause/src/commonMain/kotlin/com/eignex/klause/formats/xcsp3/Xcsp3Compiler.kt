@@ -39,7 +39,7 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableLongIntMap
 
-/** Split on runs of whitespace into non-blank tokens without allocating matcher state per call. */
+// Allocates no matcher state per call.
 internal fun String.splitWs(): List<String> {
     val out = ArrayList<String>()
     val n = length
@@ -54,8 +54,6 @@ internal fun String.splitWs(): List<String> {
     return out
 }
 
-/** Every `[integer]` group's value in [s], left to right — array `size` dimensions and cell indices.
- *  Hand-scanned in place of a `\[(\d+)]` findAll. */
 internal fun bracketInts(s: String): IntArray {
     val out = IntArrayList()
     var i = 0
@@ -76,10 +74,7 @@ internal fun bracketInts(s: String): IntArray {
     return out.toIntArray()
 }
 
-/**
- * XCSP3 run-length shorthand `vxn` as `(v, n)`, for integer v and nonnegative n.
- * Returns null when [tok] does not match the shorthand.
- */
+// XCSP3 run-length shorthand `vxn` as `(v, n)`.
 internal fun parseRle(tok: String): Pair<Int, Int>? {
     val xi = tok.indexOf('x')
     if (xi <= 0 || xi == tok.length - 1) return null
@@ -88,8 +83,7 @@ internal fun parseRle(tok: String): Pair<Int, Int>? {
     return if (n < 0) null else v to n
 }
 
-/** Split a `<condition>` `(op, operand)` into operator and operand, trimming whitespace. The first
- *  comma separates them; the operand may itself hold commas (an `(in, {set})`). */
+// The operand may itself hold commas, as in `(in, {set})`.
 internal fun splitCondition(text: String): Pair<String, String> {
     val t = text.trim()
     require(t.length >= 2 && t.first() == '(' && t.last() == ')') { "condition '$text'" }
@@ -99,7 +93,6 @@ internal fun splitCondition(text: String): Pair<String, String> {
     return inner.substring(0, comma).trim() to inner.substring(comma + 1).trim()
 }
 
-/** Compiler for the supported XCSP3 integer subset. */
 internal object Compiler {
     internal class Builder(
         private val settings: ProblemSettings = KlauseConfig.current.problemSettings(),
@@ -118,9 +111,7 @@ internal object Compiler {
         internal var objective: LinearObjectiveSpec? = null
         internal var objectiveMaximize = false
 
-        // Vars the front-end knows are functionally defined by a constraint it emitted (e.g. a `(eq, v)`
-        // sum makes v its value). These are the sound `defines_var` hints local search uses to derive
-        // them instead of searching them; the factor IR alone cannot tell an equality's output apart.
+        // Sound `defines_var` hints for local search: the factor IR alone cannot tell an equality's output apart.
         internal val definedVars = IntArrayList()
 
         // Typed orientations carry the defining relation itself, so local search maintains outputs such as
@@ -142,9 +133,8 @@ internal object Compiler {
         private fun operands(vars: IntArray): Array<DefinitionHint.Operand> =
             Array(vars.size) { DefinitionHint.Operand.Variable(vars[it]) }
 
-        // A fixed var for an integer constant is shared across its occurrences: an Element/sum `<list>`
-        // can repeat a constant tens of thousands of times, and a fresh var each time would multiply the
-        // variable count. A constant var is single-valued (never branched), so sharing it is solve-neutral.
+        // A `<list>` can repeat a constant many times, and a fixed var is never branched, so sharing it is
+        // solve-neutral.
         private val constVars = MutableLongIntMap()
         internal fun constVar(value: Long): Int {
             val existing = constVars.getOrDefault(value, -1)
@@ -152,21 +142,14 @@ internal object Compiler {
             return newAuxVar(value, value).also { constVars.put(value, it) }
         }
 
-        // A `<group>` instantiates its regular/mdd template once per `<args>` row over the same shared
-        // `<transitions>` text object; the built automaton depends only on that text, so cache the last
-        // one by reference identity and reuse it, rebuilding only each row's own sequence variables.
+        // A group's rows share one `<transitions>` String object, so the last automaton is cached by identity.
         internal var cachedAutomatonText: String? = null
         internal var cachedAutomaton: RegularAutomaton? = null
 
-        // Same reuse for the layered-Mdd lowering of an <mdd> (result.layered == null means the diagram
-        // was not cleanly layered and the Regular fallback — cached above — is used instead).
         internal var cachedMddText: String? = null
         internal var cachedMddResult: MddResult? = null
 
-        // Same reuse for a `<group>`'s positive `<extension>` template: the parsed short-support tuple
-        // arrays depend only on the shared `<supports>` text, so cache them by reference identity and
-        // share them across every row's [Table] (which treats its tuples as read-only) instead of
-        // re-parsing and retaining an identical high-arity table per row, which can exhaust the heap.
+        // Rows share the parsed tuple arrays read-only; an identical high-arity table per row can exhaust the heap.
         internal var cachedSupportsText: String? = null
         internal var cachedSupportTemplate: SupportTemplate? = null
 
@@ -182,8 +165,7 @@ internal object Compiler {
                     val mixed = mixedCellDomains(e, id, dims)
                     val uniform = if (mixed == null) domainFor(e) else null
 
-                    // Declare one variable per cell of the (possibly multi-dimensional) array,
-                    // naming cells x[i], x[i][j], … so index refs and `x[…][]` wildcards resolve.
+                    // Cells are named x[i], x[i][j], … so index refs and `x[…][]` wildcards resolve.
                     var flat = 0
                     fun declareCells(prefix: String, d: Int) {
                         if (d == dims.size) {
@@ -202,11 +184,8 @@ internal object Compiler {
             }
         }
 
-        /** Row-major per-cell domains of an array declared through `<domain for="…">` children, or null
-         *  for a uniform array. Each child's `for` lists cell references of this array (fixed indices,
-         *  `lo..hi` ranges, `[]` wildcards) or `others`, which covers every cell no other child lists. A
-         *  cell left uncovered is null. The children are never read through the array's `textContent`,
-         *  which concatenates their values into one union domain. */
+        // Null for a uniform array. `others` covers every cell no other child lists; an uncovered cell is null.
+        // The children are never read through the array's textContent, which would concatenate them into one union.
         private fun mixedCellDomains(e: XmlElement, id: String, dims: IntArray): Array<IntDomain?>? {
             if (e.children.none { it.tag == "domain" }) return null
             val size = dims.fold(1L) { acc, d -> acc * d }
@@ -228,7 +207,6 @@ internal object Compiler {
             return cells
         }
 
-        /** The per-dimension index bounds of a `<domain for="…">` target, which must reference [id]'s cells. */
         private fun domainTargetSpecs(tok: String, id: String, dims: IntArray): List<IntArray> {
             val specs = if (tok.startsWith("$id[")) parseBracketSpecs(tok, id.length) else null
             if (specs == null || specs.size != dims.size) {
@@ -237,7 +215,6 @@ internal object Compiler {
             return specs
         }
 
-        /** The row-major flat index of every cell [specs] selects within [dims]. */
         private fun forEachCell(specs: List<IntArray>, dims: IntArray, dim: Int, flat: Int, action: (Int) -> Unit) {
             if (dim == dims.size) return action(flat)
             val spec = specs[dim]
@@ -253,18 +230,14 @@ internal object Compiler {
         internal fun newAuxVar(lo: Long, hi: Long): Int = problemBuilder.newInt(IntDomain(lo, hi, settings.storage))
         override fun newBool(): Int = problemBuilder.newBool()
 
-        /** The domain of a `<var>`/`<array>`: its inline domain text, or — when that is empty and an
-         *  `as="ref"` attribute is present — the domain reused from a previously declared variable or
-         *  array (XCSP3 domain aliasing). */
+        // An empty domain with `as="ref"` reuses a previously declared variable's or array's domain.
         internal fun domainFor(e: XmlElement): IntDomain {
             val text = e.textContent.trim()
             if (text.isNotEmpty()) return parseDomain(text)
             val alias = e.attr("as")
             if (alias.isBlank()) throw UnsupportedXcsp3Exception("empty domain")
             varIds[alias]?.let { return domains[it] }
-            // An array alias reuses the referenced array's (uniform) cell domain. A declared array's
-            // first cell is `alias[0]…[0]` (one `[0]` per dimension), so index it directly instead of
-            // scanning every variable name; the scan below is a defensive fallback.
+            // A declared array's first cell is `alias[0]…[0]`, indexed directly; the scan below is a fallback.
             arrayDims[alias]?.let { dims ->
                 varIds[alias + "[0]".repeat(dims.size)]?.let { return domains[it] }
             }
@@ -274,10 +247,8 @@ internal object Compiler {
         }
 
         internal fun parseDomain(text: String): IntDomain {
-            // Parse the range/singleton tokens into intervals, then build `[lo,hi]` minus only the interior
-            // holes (the gaps between consecutive intervals). Enumerating a range's interior would be
-            // O(span) — a wide domain like `0..1000000000` would exhaust the heap — while a compact
-            // `IntDomain` needs just the holes, which a contiguous range has none of.
+            // Built from the gaps between intervals: enumerating a range's interior is O(span) and a wide domain
+            // would exhaust the heap.
             val intervals = ArrayList<LongArray>()
             for (tok in text.splitWs()) {
                 val separator = tok.indexOf("..")
@@ -357,8 +328,7 @@ internal object Compiler {
             }
         }
 
-        /** Post a lowered relation as a top-level factor: a [Linear] when it carries variable terms, else a
-         *  contradiction clause when the constant relation `0 op bound` is false (a true one is dropped). */
+        // A constant relation posts a contradiction clause when false and nothing when true.
         internal fun postRel(r: RelParts) {
             affineDistinctness.record(r.rel, r.op, factors.size)
             when (val rel = r.rel) {
@@ -390,7 +360,6 @@ internal object Compiler {
             val maximize = e.tag == "maximize"
             objectiveMaximize = maximize
             val type = e.attr("type").ifBlank { "sum" }
-            // Terms may be plain variables or expressions (e.g. `gt(x,0)`), each resolved to an int var.
             val listText = e.child("list")?.textContent ?: e.textContent
             val termVars = listText.splitWs()
                 .flatMap { tok -> expandNames(tok).map { termVar(it, shareIndicators = type == "sum") } }.toIntArray()
@@ -421,7 +390,6 @@ internal object Compiler {
             }
         }
 
-        /** An objective that minimizes (or, when [maximize], maximizes) a single variable. */
         internal fun singleVarObjective(v: Int, maximize: Boolean): LinearObjectiveSpec {
             val arr = LongArray(domains.size)
             arr[v] = if (maximize) -1L else 1L
@@ -430,10 +398,8 @@ internal object Compiler {
 
         internal fun linear(e: FExpr): IntComb = linearFold(e)
 
-        // Integer folds stay 64-bit until a coefficient or constant overflows Long, then promote to the
-        // arbitrary-precision [IntComb.Wide]; an over-Int64 comparison lowers to a wide [Linear] rather than
-        // being rejected. A wide value can only be a relation coefficient/bound — a materialising op
-        // ([materializeVar]) rejects it, since a Long-domain variable cannot hold it.
+        // Folds promote to IntComb.Wide on Long overflow, and an over-Int64 comparison lowers to a wide Linear. A
+        // wide value can only be a relation coefficient or bound: a Long-domain variable cannot hold it.
         private fun linearFold(e: FExpr): IntComb = when (e) {
             is FExpr.Num -> IntComb.Narrow(LinComb(emptyMap(), e.value.toLong()))
 
@@ -475,7 +441,6 @@ internal object Compiler {
 
                         nonConst.size == 1 -> scaleByConst(nonConst[0], k)
 
-                        // A genuine variable product: materialise each factor and chain `Product`s.
                         else -> {
                             var acc = materializeVar(nonConst[0])
                             for (idx in 1 until nonConst.size) {
@@ -496,7 +461,6 @@ internal object Compiler {
             }
         }
 
-        /** Channel a literal to a fresh 0/1 int var equal to its truth value. */
         internal fun litTo01(lit: Int): Int {
             val ch = problemBuilder.newBooleanInt(lit)
             definedVars.add(ch)
@@ -511,7 +475,6 @@ internal object Compiler {
             return IntComb.Narrow(LinComb(mapOf(m to 1L), 0L))
         }
 
-        /** `if(cond, a, b)` as a linear term: a fresh int pinned to `a` or `b` by the condition. */
         internal fun ifTerm(args: List<FExpr>): IntComb = selectionTerm(compileBool(args[0]),
             materializeVar(linear(args[1])),
             materializeVar(linear(args[2])))
@@ -562,9 +525,7 @@ internal object Compiler {
             return IntComb.Narrow(LinComb(mapOf(a to 1L), 0L))
         }
 
-        /** Materialise a linear expression as a single int var (returning it directly when it already
-         *  is one), posting `v = expr` otherwise. A wide (over-64-bit) expression cannot be materialised —
-         *  a Long-domain variable cannot hold its value — so it is rejected. */
+        // A wide expression is rejected: a Long-domain variable cannot hold its value.
         internal fun materializeVar(lin: IntComb): Int {
             val narrow = (lin as? IntComb.Narrow)?.lin
                 ?: throw UnsupportedXcsp3Exception("cannot materialise an over-64-bit expression into a variable")
@@ -578,7 +539,6 @@ internal object Compiler {
 
         internal fun productBounds(a: Int, b: Int): IntDomain = productBounds(domains[a], domains[b]) { x, y -> x * y }
 
-        /** Resolve one variable/constant term to a var id. */
         internal fun singleTermVar(text: String): Int {
             val t = text.trim()
             varIds[t]?.let { return it }
@@ -591,14 +551,11 @@ internal object Compiler {
 
         internal fun listText(e: XmlElement): String = e.child("list")?.textContent ?: e.textContent
 
-        /** Resolve vars from a constraint `<list>` child. */
         internal fun listVars(e: XmlElement): IntArray = refList(requireNotNull(e.child("list")).textContent)
 
         internal fun IntArray.widenToLong(): LongArray = LongArray(size) { this[it].toLong() }
 
-        /** Parse whitespace-separated integer constants, or null if [text] is null or any token
-         *  is not an integer (e.g. a variable reference) — callers treat null as "not constant".
-         *  Supports XCSP3 run-length shorthand `vxn` (value `v` repeated `n` times). */
+        // Null when any token is not an integer, which callers treat as "not constant".
         internal fun parseInts(text: String?): IntArray? {
             val toks = text?.splitWs() ?: return null
             val out = ArrayList<Int>(toks.size)
@@ -613,17 +570,13 @@ internal object Compiler {
             return out.toIntArray()
         }
 
-        /** Coefficients for a `<sum>`/objective: unit weights when absent, the parsed constants
-         *  when present, else unsupported (a present-but-non-constant `<coeffs>` must not default). */
+        // A present but non-constant `<coeffs>` must not default to unit weights.
         internal fun coeffsOrUnit(text: String?, n: Int): IntArray = when {
             text == null -> IntArray(n) { 1 }
             else -> parseInts(text) ?: throw UnsupportedXcsp3Exception("non-constant <coeffs>")
         }
 
-        // A `<list>` entry may be a declared variable (possibly a wildcard/range over cells), a constant,
-        // a reified relation, or an arithmetic expression; [termVar] resolves each to an int var
-        // (fast-pathing declared variables). Builds an [IntArray] directly: a large `<list>` would otherwise
-        // box every resolved id into a `List<Int>`.
+        // Builds an IntArray directly: a large `<list>` would otherwise box every resolved id.
         internal fun refList(text: String): IntArray {
             val out = IntArrayList()
             for (tok in text.splitWs()) for (name in expandNames(tok)) out.add(termVar(name))
@@ -637,10 +590,8 @@ internal object Compiler {
             val indices = ArrayList<IntArray>()
         }
 
-        // Declared cell names grouped by array base (the prefix before the first `[`), built lazily on
-        // the first wildcard/range reference, by which point every variable is declared. A wildcard can
-        // only match cells of its base, so expansion filters this bucket instead of every declared
-        // variable: O(cells of the base) rather than O(references × variables).
+        // Built on the first wildcard reference, when every variable is declared. A wildcard only matches cells of
+        // its base, so expansion costs O(cells of the base) rather than O(references × variables).
         private val cellsByBase: HashMap<String, BaseCells> by lazy(LazyThreadSafetyMode.NONE) {
             val index = HashMap<String, BaseCells>()
             for (name in varIds.keys) {
@@ -653,36 +604,29 @@ internal object Compiler {
             index
         }
 
-        /** Expand an array reference token into the declared cell names it denotes. Each `[...]`
-         *  group is a fixed index `[i]`, a range `[lo..hi]`, or a wildcard `[]` (any index), in
-         *  any position and dimensionality — e.g. `x[]`, `x[][]`, `x[2][]`, `x[0..1][0]`. A plain
-         *  reference with no wildcard or range is returned as-is (resolved later by [ref]). */
+        // Each `[...]` group is a fixed index, a `[lo..hi]` range or a `[]` wildcard, in any position, e.g.
+        // `x[2][]`, `x[0..1][0]`. A plain reference is returned as-is.
         internal fun expandNames(tok: String): List<String> {
             if ("[]" !in tok && ".." !in tok) return listOf(tok)
             val br = tok.indexOf('[')
             if (br <= 0) return listOf(tok)
             val base = tok.substring(0, br)
             val specs = parseBracketSpecs(tok, br) ?: return listOf(tok)
-            // When the base is a declared array of matching rank, generate exactly the referenced cell
-            // names from the per-dimension index ranges (a wildcard spanning `0 until size`) — O(selected)
-            // — instead of scanning every declared cell of the array. Row-major generation matches the
-            // declaration order [declareVar] used, so positional list semantics are preserved.
+            // A declared array of matching rank generates exactly the selected names, row-major as declared, so
+            // positional list semantics are preserved.
             val dims = arrayDims[base]
             if (dims != null && dims.size == specs.size) {
                 val out = ArrayList<String>()
                 generateCells(base, specs, dims, 0, StringBuilder(base), out)
                 return out
             }
-            // Fallback (non-array base, or a rank the array's shape doesn't match): scan the base's cells.
             val cells = cellsByBase[base] ?: return emptyList()
             val out = ArrayList<String>()
             for (i in cells.names.indices) if (cellMatches(cells.indices[i], specs)) out.add(cells.names[i])
             return out
         }
 
-        /** Emit `base[i0][i1]…` for every index tuple in the Cartesian product of the per-dimension ranges
-         *  [specs] gives (a wildcard `[Int.MIN, Int.MAX]` covering `0 until dims(d)`), keeping only names
-         *  that were actually declared. Row-major to match [declareVar]'s cell order. */
+        // Keeps only declared names, row-major to match declareVar's cell order.
         private fun generateCells(
             base: String,
             specs: List<IntArray>,
@@ -709,9 +653,7 @@ internal object Compiler {
             }
         }
 
-        /** The bracket groups of a reference token from [from] as per-dimension `[lo, hi]` bounds: a fixed
-         *  `[i]` → `[i, i]`, a range `[lo..hi]` → `[lo, hi]`, a wildcard `[]` → the full integer range. Null
-         *  when the tail is not a clean run of `[...]` groups (the caller then keeps the token verbatim). */
+        // A wildcard is the full integer range. Null when the tail is not a clean run of `[...]` groups.
         private fun parseBracketSpecs(tok: String, from: Int): List<IntArray>? {
             val specs = ArrayList<IntArray>()
             var i = from
@@ -739,8 +681,6 @@ internal object Compiler {
             return specs.ifEmpty { null }
         }
 
-        /** Whether a cell's pre-parsed bracket indices [idx] (same array base as the reference, so only
-         *  the indices matter) satisfy every per-dimension bound in [specs]. */
         private fun cellMatches(idx: IntArray, specs: List<IntArray>): Boolean {
             if (idx.size != specs.size) return false
             for (k in specs.indices) if (idx[k] < specs[k][0] || idx[k] > specs[k][1]) return false
@@ -750,8 +690,7 @@ internal object Compiler {
             "unknown variable '$name'",
         )
 
-        /** Instantiate a `<slide>` template over each sliding window of the list. `collect` (default:
-         *  the template's parameter count) is the window size; the window steps by one. */
+        // `collect` (default: the template's parameter count) is the window size; the window steps by one.
         internal fun slide(e: XmlElement) {
             val lists = e.children.filter { it.tag == "list" }
             if (lists.size != 1) throw UnsupportedXcsp3Exception("slide: only the single-list form is supported")
@@ -767,9 +706,7 @@ internal object Compiler {
             }
         }
 
-        /** Instantiate a `<group>` template for each `<args>` row of a fully materialized `<group>`. The
-         *  streaming path ([streamGroup]) shares the same per-row emit; this overload stays for a `<group>`
-         *  that reaches [constraint] already materialized (e.g. one nested as a template). */
+        // For a `<group>` that arrives already materialized, e.g. one nested as a template.
         internal fun group(e: XmlElement) {
             val template = e.children.firstOrNull { it.tag != "args" }
                 ?: throw UnsupportedXcsp3Exception("group without a template constraint")
@@ -780,9 +717,7 @@ internal object Compiler {
             }
         }
 
-        /** Drive the streaming cursor over a `<constraints>` (or `<block>`) body: dispatch each child
-         *  constraint as it arrives, recursing into `<block>` and streaming a `<group>`'s `<args>` rows one
-         *  at a time so neither the container nor a group's rows are ever all resident. */
+        // Neither the container nor a group's rows are ever all resident.
         internal fun streamConstraints(reader: XmlReader) {
             while (true) {
                 val tag = reader.nextChildTag() ?: return
@@ -797,7 +732,7 @@ internal object Compiler {
             }
         }
 
-        /** Open the peeked container's start tag; its `class` attribute, or null when it has no body. */
+        // The `class` attribute, or null when the container has no body.
         private fun enterStreamed(reader: XmlReader): String? {
             var containerClasses = ""
             val entered = reader.enterPeeked { name, value ->
@@ -807,8 +742,6 @@ internal object Compiler {
             return if (entered) containerClasses else null
         }
 
-        /** Stream an entered `<group>`: materialize the (first, bounded) template, then instantiate one
-         *  `<args>` row at a time, so a group over millions of rows never holds them all at once. */
         private fun streamGroup(reader: XmlReader) {
             val firstTag = reader.nextChildTag()
                 ?: throw UnsupportedXcsp3Exception("group without a template constraint")
@@ -823,9 +756,7 @@ internal object Compiler {
             }
         }
 
-        // An `<intension>` template over scalar `%i` placeholders is parsed once and reused: substitute the
-        // args into the expression tree per row instead of re-expanding and re-parsing the string, which
-        // otherwise dominates the parse of group-heavy models (millions of rows, one template).
+        // Re-parsing the expanded string per row would dominate the parse of group-heavy models.
         private fun intensionTemplateOf(template: XmlElement): FExpr? {
             requireHardConstraint(template)
             return if (template.tag == "intension" && FExpr.isScalarTemplate(template.textContent)) {
@@ -847,7 +778,6 @@ internal object Compiler {
 
         private fun argsTokens(args: XmlElement): List<String> = args.textContent.splitWs().flatMap { expandNames(it) }
 
-        // One `<group>` row: substitute into the pre-parsed intension tree, else expand the template's params.
         private fun applyGroupRow(
             template: XmlElement,
             used: Set<Int>,

@@ -42,71 +42,42 @@ import com.eignex.util.numbers.BigFraction
 
 internal class LpAssemblyCancelled : RuntimeException()
 
-/**
- * An LP relaxation of a `Problem` at one search node, plus the metadata mapping each LP column
- * back to the CP variable it stands for. The mapping is what lets reduced-cost fixing turn
- * an LP column reduction into a domain reduction on the right `(kind, varId)`.
- *
- * The LP objective is over the column costs only; the true objective is
- * `lpObjective + objectiveConstant`. Branch-and-bound must add [objectiveConstant] before
- * comparing the LP bound to the incumbent.
- */
+// Maps each LP column back to its CP variable so reduced-cost fixing can turn a column reduction into a
+// domain reduction. The LP objective omits objectiveConstant; add it before comparing against an incumbent.
 internal class LpRelaxation(
     val model: LpModel,
-    /** Structural LP column → origin CP variable id. */
     val colVarId: IntArray,
-    /** Structural LP column → true if it is a Boolean variable, false if an integer variable. */
     val colIsBool: BooleanArray,
-    /** Constant term of the objective, omitted from the LP and re-added to its bound. */
     val objectiveConstant: Long,
-    /** Integer variable id → its LP column, or -1 if none. For separators to write cuts. */
+    // Variable id → LP column, -1 if none.
     val intColOf: IntArray,
-    /** Boolean variable id → its LP column, or -1 if none. */
     val boolColOf: IntArray,
-    /** Arc-indicator models of any Circuit factors, for the subtour-elimination separator. */
     val circuitArcs: List<CircuitArcModel> = emptyList(),
-    /**
-     * Whether this relaxation keeps the same layout across search nodes, allowing column bounds
-     * to follow a trail over the fixed matrix. True when no row's coefficients depend on live domains
-     * and every structural column can be derived from the live session: either a CP variable's domain
-     * or an auxiliary column's [colReq] presence rule. These live bounds reproduce the feasible region
-     * of a per-node build.
-     */
+    // The layout stays fixed across nodes and column bounds follow a trail: no row's coefficients depend on
+    // live domains and every column derives from the session, through a CP domain or a colReq presence rule.
     val persistentEligible: Boolean = false,
-    /**
-     * Per structural column, an auxiliary column's presence requirement as flat `(intVar, value)`
-     * membership pairs — the column is present (upper [colPresentUpper]) only while every named value
-     * stays in its variable's live domain. Null for CP-var-backed columns and for auxiliary columns
-     * with no rule (which make the relaxation persistent-ineligible). Empty by default.
-     */
+    // Flat (intVar, value) membership pairs: an auxiliary column reaches colPresentUpper only while every
+    // named value stays live. Null for CP-var columns and for aux columns without a rule, which make the
+    // relaxation persistent-ineligible.
     val colReq: Array<LongArray?> = arrayOfNulls(model.n),
-    /** Per structural column, the upper bound an auxiliary column takes when present (see [colReq]);
-     *  unused for CP-var columns. */
     val colPresentUpper: LongArray = LongArray(model.n),
-    /** Ids of the factors that emitted at least one [Contribution.HULL] row, in factor order — the
-     *  candidates the root pruner (`LpEngine.pruneIneffectiveHulls`) probes for individual removal. */
+    /** Factors that emitted a [Contribution.HULL] row, in factor order: the root pruner's candidates. */
     val hullFactorIds: IntArray = emptyIntArray(),
-    /** Structural LP column → the LP-only continuous (real) variable id it stands for, or -1 for an
-     *  integer / Boolean / auxiliary column. Lets the leaf verdict read each continuous column's solved
-     *  value back onto its real variable. */
+    // Real variable id per column, -1 for integer, Boolean and auxiliary columns.
     val colRealId: IntArray = IntArray(model.n) { -1 },
-    /** Per structural column, the sign its primal contributes to its real variable's value: a
-     *  lower-unbounded real variable is split `x = x⁺ − x⁻` (two columns, both lower-bounded at 0, so
-     *  no huge lower-shift ever reaches the rhs doubles), and the negative part carries -1. */
+    // -1 for the negative part of a split lower-unbounded real x = x⁺ − x⁻, which keeps huge lower shifts
+    // out of the rhs doubles.
     val colRealSign: IntArray = IntArray(model.n) { 1 },
-    /** Gated residual rows (pure-real models only): row index per gated entry. Each reified real atom
-     *  contributes its atom row AND its complement row unconditionally — with their true rhs — so the
-     *  model's structure and coefficients never change across nodes and a persistent simplex's LU
-     *  factorization survives; a node merely tells the solver which rows are enforced
-     *  ([gatedEnforcement]), and an unenforced row's slack rides free. */
+    // Pure-real models only. Each reified real atom emits its row and its complement with true rhs, so the
+    // structure never changes across nodes and a persistent simplex keeps its factorization; a node only
+    // marks which rows it enforces.
     val gatedRows: IntArray = emptyIntArray(),
-    /** The aux Boolean whose pin activates gated entry k. */
     val gatedAux: IntArray = emptyIntArray(),
-    /** The pin value activating gated entry k (`true` = the atom row, `false` = its complement). */
+    // true activates the atom row, false its complement.
     val gatedWhenTrue: BooleanArray = BooleanArray(0),
     val sourceMap: CutSourceMap? = null,
     val colPresence: List<CutAuxiliaryDefinition?> = List(model.n) { null },
-    /** The factor each row of [model] was emitted for, or -1 for a cut or a row spanning several factors. */
+    // -1 for a cut or a row spanning several factors.
     val rowFactorIds: IntArray = emptyIntArray(),
     val realUpperRows: Map<Int, Int> = emptyMap(),
     val preparationTemplates: LpPreparationTemplates? = null,
@@ -121,15 +92,8 @@ internal class LpRelaxation(
     }
 }
 
-/**
- * Apply [action] to every candidate arc head of successor column `succ(i)` over an `n`-node graph: the
- * heads in `[0, n)` that [dom] admits, `i` itself only when [selfLoops].
- *
- * Walks whichever of the two sides is smaller, because neither can be the only one. A large sparse
- * routing graph carries a handful of heads per node, so sweeping the node range would cost `O(n²)` on
- * exactly the models the arc cap exists to let through; a successor declared far wider than the graph
- * makes the domain walk `O(box span)`, which past `2³¹` values cannot be enumerated at all.
- */
+// Walks whichever of the node range and the domain is smaller: over the node range a sparse routing graph
+// costs O(n²), and a successor declared far wider than the graph cannot be enumerated past 2³¹ values.
 internal inline fun eachCandidateArcHead(dom: IntDomain, i: Int, n: Int, selfLoops: Boolean, action: (Int) -> Unit) {
     if (dom.valueCount <= n) {
         val span = dom.values
@@ -144,10 +108,7 @@ internal inline fun eachCandidateArcHead(dom: IntDomain, i: Int, n: Int, selfLoo
     }
 }
 
-/**
- * Candidate arcs over `succ[0..n)` (see [eachCandidateArcHead]), counted no further than [cap] — above
- * it the arc model is declined, so the exact total is never read and a dense graph must not pay for one.
- */
+// Counts no further than cap: above it the arc model is declined, so a dense graph must not pay for a total.
 internal fun candidateArcCount(succ: IntArray, selfLoops: Boolean, cap: Int, domainOf: (Int) -> IntDomain): Int {
     var arcs = 0
     for (i in succ.indices) {
@@ -186,11 +147,7 @@ internal suspend fun SequenceScope<Unit>.prepareCandidateArcCount(
     return arcs
 }
 
-/**
- * Fill [out] (length `model.m`) with per-row enforcement at [session]'s pins: every non-gated row is
- * enforced, a gated row only while its activating pin holds — at most one of an atom/complement pair.
- * The persistent simplex treats an unenforced row's slack as free, so the row never constrains.
- */
+// The persistent simplex treats an unenforced row's slack as free, so the row never constrains.
 internal fun LpRelaxation.gatedEnforcement(session: PropagationSession, out: BooleanArray) {
     out.fill(true)
     for (k in gatedRows.indices) {
@@ -280,69 +237,37 @@ internal fun LpRelaxation.withModel(
     )
 }
 
-/**
- * The per-variable bounds the relaxation reads to size its columns: an integer variable's live domain
- * and a Boolean variable's pin (null when free). A [PropagationSession] is one source (its live search
- * state); [RootDomains] is another (the problem's root boxes, read without running the bake
- * fixpoint) so a root relaxation can be built in O(model) rather than O(domain span).
- */
 internal interface RelaxationDomains {
-    /** The live domain of integer variable [varId]. */
     fun intDomain(varId: Int): IntDomain
 
-    /** The pin of Boolean variable [varId] — `true`/`false` when fixed, null when free. */
     fun boolValue(varId: Int): Boolean?
 
-    /**
-     * Whether a side `Problem.intBounds` marks as invented should be built as an
-     * open LP column rather than at the finite clamp. Only the root view may: a bound in a live search
-     * state is a decision the node depends on, and cannot be told apart from the clamp it sits on, so
-     * relaxing it there would drop the branch's own constraint.
-     */
+    // Whether an invented side becomes an open LP column rather than the finite clamp. Only the root view
+    // may: in a live search state the bound may be a branch decision indistinguishable from the clamp.
     val honorsOpenSides: Boolean get() = false
 }
 
-/** [RelaxationDomains] over a `Problem`'s root boxes: every integer variable at its full box and every
- *  Boolean free. Reads endpoints only, so building a relaxation from it never triggers the O(domain
- *  span) bake fixpoint a [PropagationSession] runs on construction. */
+// Reads endpoints only, so it never triggers the O(domain span) bake fixpoint a session runs on construction.
 internal class RootDomains(private val problem: Problem) : RelaxationDomains {
     override fun intDomain(varId: Int): IntDomain = problem.rootDomainOf(varId)
     override fun boolValue(varId: Int): Boolean? = null
     override val honorsOpenSides: Boolean get() = true
 }
 
-/** [RelaxationDomains] backed by a live [PropagationSession]'s search state. */
 internal class SessionDomains(private val session: PropagationSession) : RelaxationDomains {
     override fun intDomain(varId: Int): IntDomain = session.intDomain(varId)
     override fun boolValue(varId: Int): Boolean? = session.boolValue(varId)
 }
 
-/** [RelaxationDomains] pinning every integer variable to its value in a full-assignment [sample] and
- *  every Boolean to its bit — the leaf view where the residual LP over the continuous columns is all
- *  that remains undecided (see [leafRealFeasibility]). */
 private class SampleDomains(private val sample: Sample) : RelaxationDomains {
     override fun intDomain(varId: Int): IntDomain = sample.intValue(varId).let { IntDomain(it, it) }
     override fun boolValue(varId: Int): Boolean = sample.boolValue(varId)
 }
 
-/**
- * The certified feasibility verdict of the LP-only continuous relaxation at a full-assignment leaf
- * [sample], with every discrete variable pinned to its assigned value so the LP decides only the
- * continuous columns. [LpVerdict.FEASIBLE] means the reals have an exact feasible completion — the leaf is a
- * genuine solution — and [LpVerdict.ATTAINED_OPTIMUM] that the completion is also exactly optimal;
- * [LpVerdict.TOLERANCE_OPTIMUM] is a float optimum [toleranceCheck] accepted, whose reals are not exact;
- * [LpVerdict.UNBOUNDED] is an exact completion plus a ray of the reals along which [objective] descends
- * without limit, checked against the factors by [provesUnbounded]; a ray that check declines leaves the
- * completion as [LpVerdict.FEASIBLE];
- * [LpVerdict.INFEASIBLE] rejects the leaf by an exact conflict, or by the numerical ray check when the
- * source and [toleranceCheck] permit numerical deductions;
- * [LpVerdict.INDETERMINATE] means neither could be certified within the caller's allowances, so the leaf's
- * status is unknown and the terminal verdict must degrade to `unknown` rather than claim UNSAT/SAT.
- *
- * The discrete constraints already hold at a CP-consistent leaf, so their linear rows are satisfiable by
- * the fixed values and only the LP-only real rows can bind — making this exactly a residual real-LP
- * feasibility test. Called only when the problem declares continuous variables.
- */
+// Residual real-LP test at a full-assignment leaf: discrete rows already hold at the fixed values, so only
+// real rows bind. FEASIBLE and ATTAINED_OPTIMUM are exact completions; TOLERANCE_OPTIMUM is a float optimum
+// toleranceCheck accepted; UNBOUNDED adds a ray provesUnbounded checked, else the completion stays FEASIBLE;
+// INFEASIBLE is an exact conflict or a permitted numerical ray; INDETERMINATE degrades the leaf to unknown.
 internal fun leafRealFeasibility(
     problem: Problem,
     objective: LinearObjective?,
@@ -359,9 +284,8 @@ internal fun leafRealFeasibility(
     val encoded = sourceEncoding ?: encoders.finiteLinearModel(sample, cancellation)
         ?: return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
     val relaxation = CpToLpRelaxation(problem, objective, projections = null).build(SampleDomains(sample))
-    // Bound the residual-LP solve by the search deadline: on a continuous-heavy model a single leaf LP is a
-    // large factorization, so an unbounded solve could outlast the whole budget. A solve cut short returns
-    // INDETERMINATE, degrading the leaf to `unknown` — never an unsound SAT/UNSAT.
+    // A single leaf LP on a continuous-heavy model can outlast the budget, so the solve honors cancellation;
+    // a solve cut short returns INDETERMINATE, never an unsound verdict.
     val certified = solveAndCertify(
         relaxation.model,
         cancellation = cancellation,
@@ -410,7 +334,6 @@ internal fun LpRelaxation.leafResult(
     } else exact
 }
 
-/** The factors behind the rows [certified]'s conflict or citable ray combines. */
 internal fun LpRelaxation.factorsOf(certified: CertifiedLpResult): IntArray {
     val rows = certified.infeasibleRows
         ?: (certified.farkasRay ?: certified.floatInfeasibility)
@@ -425,11 +348,7 @@ internal fun LpRelaxation.factorsOf(certified: CertifiedLpResult): IntArray {
     return factors.toIntArray()
 }
 
-/**
- * The exact completion a certified leaf LP gives [sample]'s discrete values, or INDETERMINATE without one. On
- * [LpVerdict.UNBOUNDED] it carries the ray of the reals only when [provesUnbounded] accepts the pair, and otherwise
- * stands as a [LpVerdict.FEASIBLE] completion.
- */
+// An UNBOUNDED certificate keeps its ray only when provesUnbounded accepts it, else stands as FEASIBLE.
 internal fun LpRelaxation.exactLeafResult(
     certified: CertifiedLpResult,
     problem: Problem,
@@ -454,10 +373,7 @@ internal fun LpRelaxation.exactLeafResult(
     }
 }
 
-/**
- * The continuous part of an LP recession [direction], summing each split variable's `x⁺ − x⁻` columns, or null
- * when it moves a discrete column. A real variable no column carries does not move.
- */
+// Null when the direction moves a discrete column.
 private fun LpRelaxation.realDirection(direction: List<BigFraction>, problem: Problem): List<BigFraction>? {
     val ray = MutableList(problem.numRealVars) { BigFraction.ZERO }
     for (col in direction.indices) {
@@ -470,10 +386,7 @@ private fun LpRelaxation.realDirection(direction: List<BigFraction>, problem: Pr
     return ray
 }
 
-/**
- * Continuous variable values of an LP [primal], summing each split variable's `x⁺ − x⁻` columns. A variable no
- * column carries appears in no emitted row and has no objective weight, so it takes [restingReal].
- */
+// A variable no column carries is in no emitted row and has no objective weight, so it takes restingReal.
 internal fun LpRelaxation.floatReals(primal: DoubleArray, problem: Problem): DoubleArray {
     val reals = DoubleArray(problem.numRealVars)
     val carried = BooleanArray(problem.numRealVars)
@@ -488,7 +401,6 @@ internal fun LpRelaxation.floatReals(primal: DoubleArray, problem: Problem): Dou
     return reals
 }
 
-/** The exact counterpart of [floatReals], over a certified exact [primal]. */
 internal fun LpRelaxation.exactReals(primal: List<BigFraction>, problem: Problem): MutableList<BigFraction> {
     val reals = MutableList(problem.numRealVars) { BigFraction.ZERO }
     val carried = BooleanArray(problem.numRealVars)
@@ -503,32 +415,25 @@ internal fun LpRelaxation.exactReals(primal: List<BigFraction>, problem: Problem
     return reals
 }
 
-/**
- * The point of real variable [r]'s bounds nearest zero. Any point of them completes a leaf for a variable the
- * relaxation leaves out; zero is not one when the bounds exclude it, as for a column fixed away from it.
- */
+// Any point within the bounds completes a leaf for an omitted variable; zero alone may lie outside them.
 private fun restingReal(problem: Problem, r: Int): Double = 0.0.coerceIn(problem.realLower[r], problem.realUpper[r])
 
-/** The residual-LP verdict at a leaf plus, on [LpVerdict.FEASIBLE], the continuous variables' solved
- *  values (indexed by real var id) that complete the discrete assignment into a full solution. On
- *  [LpVerdict.UNBOUNDED], [direction] is the checked ray of the reals through that completion. */
 internal class LeafRealResult(
     val verdict: LpVerdict,
     val reals: DoubleArray,
     val exactReals: List<BigFraction>? = null,
     val direction: List<BigFraction>? = null,
-    /** On [LpVerdict.INFEASIBLE], the factors whose rows the exact infeasibility proof combines; empty when the proof
-     *  names no rows. */
+    // Factors whose rows an infeasibility proof combines.
     val refutingFactors: IntArray = emptyIntArray(),
     // A private numerical proposal; only an original-source point check may give it witness authority.
     val uncertifiedReals: DoubleArray? = null,
-    // The exact coordinates [uncertifiedReals] rounds, when the proposal has them; the check reads these.
+    // The exact coordinates uncertifiedReals rounds, when the proposal has them; the check reads these.
     val uncertifiedExactReals: List<BigFraction>? = null,
     // The value of the real part of the objective that the leaf approaches but does not attain, when its search
     // proved that; no point of the leaf reaches it.
     val unattainedInfimum: BigFraction? = null,
-    // On [LpVerdict.INFEASIBLE], whether the refutation holds with every side widened by the solve's refutation slack,
-    // so no point within the source tolerance completes the leaf either.
+    // Whether an infeasibility refutation survives widening every side by the refutation slack, so no point
+    // within the source tolerance completes the leaf either.
     val refutesWithinSlack: Boolean = false,
 )
 

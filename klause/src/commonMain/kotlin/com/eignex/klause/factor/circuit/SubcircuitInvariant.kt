@@ -109,8 +109,7 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
         proposeActiveReversals(state, sink)
     }
 
-    /** 2-opt reversals over the active sub-tour, when the active nodes form a single cycle. Materializes
-     *  the active cycle into an order array and delegates to the shared reversal generator. */
+    // Emits nothing unless the active nodes form a single cycle.
     private fun proposeActiveReversals(state: LocalSearchState, sink: MoveSink) {
         if (n < 2) return
         val nextOf = IntArray(n) { nodeOf(state.assignment.intValue(succ[it])) }

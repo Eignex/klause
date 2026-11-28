@@ -7,10 +7,8 @@ import com.eignex.lab.bench.BenchCase
 import com.eignex.lab.bench.BenchInputRoot
 import java.io.File
 
-/**
- * Descriptor rules for frozen-source `cases` templates, shared by planning and offline pre-submission checks.
- * Every violation names its case and the record that supplies the missing identity; nothing is derived here.
- */
+// Shared by planning and offline checks. Every violation names its case and the record that supplies the missing
+// identity; nothing is derived here.
 internal object FrozenSourceDescriptors {
     const val MAX_CASES = 8
 
@@ -18,10 +16,9 @@ internal object FrozenSourceDescriptors {
 
     private val SHA256 = Regex("[a-f0-9]{64}")
 
-    /** The template attributes planning retains; `lab*` attributes belong to an earlier plan. */
+    // `lab*` attributes belong to an earlier plan.
     fun attributes(template: BenchCase): Map<String, String> = template.attributes.filterKeys { !it.startsWith("lab") }
 
-    /** All violations in [templates], empty when frozen planning accepts them. */
     fun violations(templates: List<BenchCase>): List<String> = buildList {
         if (templates.size !in 1..MAX_CASES) {
             add("descriptor lists ${templates.size} cases; frozen-source plans accept 1 to $MAX_CASES")

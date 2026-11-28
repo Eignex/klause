@@ -2,7 +2,7 @@ package com.eignex.klause.lp.engine
 
 import kotlin.math.nextDown
 
-/** Immutable proof-acceptance seam. Certifiers compute and report their own observations regardless. */
+// Certifiers compute and report their own observations whatever the policy accepts.
 internal fun interface LpCertificationPolicy {
     fun accepts(certifier: LpCertifier, successful: Boolean): Boolean
 }

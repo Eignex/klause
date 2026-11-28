@@ -2,23 +2,13 @@ package com.eignex.klause.bound
 
 import com.eignex.klause.propagation.PropagationSession
 
-/**
- * A Lagrangian dual relaxation bound with a persistent multiplier vector warm-started across nodes
- * (Fisher, "The Lagrangian Relaxation Method for Solving Integer Programming Problems", Management
- * Science 1981, https://doi.org/10.1287/mnsc.27.1.1).
- * Implemented by [LagrangianBound] and [KnapsackLagrangianBound]; the backtrack LP prune
- * cascade drives both through one arm that threads the multipliers.
- */
+// A Lagrangian dual bound whose multipliers are warm-started across nodes (Fisher, "The Lagrangian Relaxation
+// Method for Solving Integer Programming Problems", Management Science 1981, https://doi.org/10.1287/mnsc.27.1.1).
 internal interface LagrangianDualBound {
-    /** Length of the multiplier vector this bound optimizes (its warm-start dimension). */
     val multiplierCount: Int
 
-    /**
-     * Compute the Lagrangian bound at the current node. [incumbent] is the best objective to beat
-     * (`+∞` if none — the subgradient is skipped and only the base bound / infeasibility is
-     * reported). [startMultipliers] warm-starts λ from a parent node. Returns null when the bound
-     * is unavailable here (no eligible global, value set too large, or arithmetic overflow).
-     */
+    // An infinite incumbent skips the subgradient. Null when no eligible global applies, the value set is too
+    // large, or arithmetic overflows.
     fun computeBound(
         session: PropagationSession,
         incumbent: Double,
@@ -27,8 +17,6 @@ internal interface LagrangianDualBound {
     ): LagrangianResult?
 }
 
-/** Outcome of a [LagrangianDualBound.computeBound]: whether the node prunes, the bound as a
- *  numerator/denominator pair, and the (re-optimized) multipliers to carry to the next node. */
 internal class LagrangianResult(
     val prune: Boolean,
     val boundNumerator: Long,

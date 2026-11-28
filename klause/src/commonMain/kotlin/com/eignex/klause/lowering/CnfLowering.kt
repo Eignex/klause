@@ -9,19 +9,16 @@ import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.compareTo
 
-/** Shared CNF-lowering hooks for schema compilation and textual front-ends. */
+// Shared by schema compilation and textual front-ends.
 internal interface CnfLowering {
-    /** Sink for emitted factors. */
     val factors: MutableList<Factor>
 
-    /** Allocate a fresh boolean variable id. */
     fun newBool(): Int
 
-    /** Backing cache for [trueLit]; initialise to -1. */
+    // Initialise to -1.
     var trueLitCache: Int
 }
 
-/** Lazily allocated literal that is forced true. */
 internal fun CnfLowering.trueLit(): Int {
     if (trueLitCache < 0) {
         trueLitCache = Lit.make(newBool(), true)
@@ -30,32 +27,24 @@ internal fun CnfLowering.trueLit(): Int {
     return trueLitCache
 }
 
-/**
- * Tseitin gate for conjunction, reified onto a fresh positive literal.
- *
- * G. S. Tseitin, "On the complexity of derivation in propositional calculus", 1968; reprinted in
- * Automation of Reasoning 2, Springer 1983. https://doi.org/10.1007/978-3-642-81955-1_28
- */
+// G. S. Tseitin, "On the complexity of derivation in propositional calculus", 1968; reprinted in
+// Automation of Reasoning 2, Springer 1983. https://doi.org/10.1007/978-3-642-81955-1_28
 internal fun CnfLowering.tseitinAnd(lits: List<Int>): Int = tseitinAnd(lits, Lit.make(newBool(), true))
 
-/** Tseitin gate for conjunction reified onto the caller-provided [target] literal. */
 internal fun CnfLowering.tseitinAnd(lits: List<Int>, target: Int): Int {
     for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(target), l)))
     factors.add(Clause(IntArray(lits.size + 1) { i -> if (i == lits.size) target else Lit.negate(lits[i]) }))
     return target
 }
 
-/** Tseitin gate for disjunction, reified onto a fresh positive literal. */
 internal fun CnfLowering.tseitinOr(lits: List<Int>): Int = tseitinOr(lits, Lit.make(newBool(), true))
 
-/** Tseitin gate for disjunction reified onto the caller-provided [target] literal. */
 internal fun CnfLowering.tseitinOr(lits: List<Int>, target: Int): Int {
     factors.add(Clause(IntArray(lits.size + 1) { i -> if (i == lits.size) Lit.negate(target) else lits[i] }))
     for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(l), target)))
     return target
 }
 
-/** Tseitin gate for biconditional. */
 internal fun CnfLowering.tseitinIff(x: Int, y: Int): Int {
     val a = Lit.make(newBool(), true)
     factors.add(Clause(intArrayOf(Lit.negate(a), Lit.negate(x), y)))
@@ -65,8 +54,7 @@ internal fun CnfLowering.tseitinIff(x: Int, y: Int): Int {
     return a
 }
 
-/** Reify one linear relation onto a fresh positive literal. A relation whose terms all cancel to
- *  a constant (`0 ⟨op⟩ bound`) reifies to the true/false literal without a [ReifiedLinear] factor. */
+// A relation whose terms all cancel reifies to the constant literal without a factor.
 internal fun CnfLowering.reifyLinear(coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int): Int {
     if (vars.isEmpty()) return if (constRelationHolds(op, bound)) trueLit() else Lit.negate(trueLit())
     val aux = newBool()
@@ -74,7 +62,6 @@ internal fun CnfLowering.reifyLinear(coeffs: IntArray, vars: IntArray, op: Linea
     return Lit.make(aux, true)
 }
 
-/** [reifyLinear] over 64-bit coefficients and bound, for relations past the 32-bit range. */
 internal fun CnfLowering.reifyLinear(coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long): Int {
     if (vars.isEmpty()) return if (constRelationHolds(op, bound)) trueLit() else Lit.negate(trueLit())
     val aux = newBool()
@@ -82,7 +69,6 @@ internal fun CnfLowering.reifyLinear(coeffs: LongArray, vars: IntArray, op: Line
     return Lit.make(aux, true)
 }
 
-/** [reifyLinear] over arbitrary-precision coefficients and bound, enforced by a wide [ReifiedLinear]. */
 internal fun CnfLowering.reifyLinear(coeffs: Array<BigInt>, vars: IntArray, op: LinearOp, bound: BigInt): Int {
     if (vars.isEmpty()) {
         val holds = when (op) {
@@ -121,10 +107,7 @@ internal fun CnfLowering.reifyDifferenceLinear(coeffs: LongArray, vars: IntArray
     return literal
 }
 
-/**
- * Channel [auxBoolVar] onto the 0/1 integer [intVar] using [ReifiedLinear]: it holds iff [intVar]
- * is 1 when [whenTrue], else 0. The caller allocates [intVar] with domain `{0, 1}`.
- */
+// The caller allocates `intVar` with domain `{0, 1}`.
 internal fun channelBoolTo01(factors: MutableList<Factor>, auxBoolVar: Int, intVar: Int, whenTrue: Boolean = true) {
     factors.add(
         ReifiedLinear(
@@ -137,7 +120,6 @@ internal fun channelBoolTo01(factors: MutableList<Factor>, auxBoolVar: Int, intV
     )
 }
 
-/** Whether the constant relation `0 ⟨op⟩ bound` holds — the value of a linear whose terms cancel. */
 internal fun constRelationHolds(op: LinearOp, bound: Int): Boolean = when (op) {
     LinearOp.LE -> 0 <= bound
     LinearOp.GE -> 0 >= bound
@@ -145,7 +127,6 @@ internal fun constRelationHolds(op: LinearOp, bound: Int): Boolean = when (op) {
     LinearOp.NE -> 0 != bound
 }
 
-/** [constRelationHolds] over a 64-bit bound. */
 internal fun constRelationHolds(op: LinearOp, bound: Long): Boolean = when (op) {
     LinearOp.LE -> 0L <= bound
     LinearOp.GE -> 0L >= bound

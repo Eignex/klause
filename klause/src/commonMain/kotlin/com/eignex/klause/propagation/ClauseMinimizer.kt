@@ -6,20 +6,14 @@ import com.eignex.util.collections.DynamicBits
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableIntIntMap
 
-/**
- * The [ConflictAnalyzer]'s view of the frozen implication graph that [ClauseMinimizer] walks:
- * the live variable universe (bool vars + atoms), the per-variable decision level, and the
- * antecedent literals. Levels and antecedents are invariant for the duration of one analysis
- * (the search path is frozen while the graph is walked), so the minimizer may query them freely.
- */
+// Levels and antecedents are invariant during one analysis because the search path is frozen.
 internal interface ReasonGraph {
-    /** Size of the live var space (bool vars + atoms) for the current analysis. */
     fun universeSize(): Int
 
-    /** Decision level of bool var or atom var `v`; ≤ 0 = root fact. */
+    // ≤ 0 is a root fact.
     fun levelOf(v: Int): Int
 
-    /** Antecedent literals of `v`'s pin, or null when `v` is a decision/leaf. */
+    // Null for a decision or leaf.
     fun antecedentsOf(v: Int): IntArray?
 
     fun knownLeaf(v: Int): Boolean = false
@@ -27,22 +21,14 @@ internal interface ReasonGraph {
     fun deferredReason(v: Int): Boolean = false
 }
 
-/**
- * Learned-clause minimization: self-subsuming resolution ([minimize]) followed by
- * binary-resolution minimization ([binaryMinimize]), applied by [ConflictAnalyzer] to every 1UIP
- * clause before it is emitted. Clause in, shorter implied clause out — dropping a redundant
- * literal always yields a strictly stronger clause, so the result stays an implied, asserting
- * nogood. Owns the scratch buffers the two passes need, persisted across conflicts (one instance
- * per analyzer) instead of reallocating per analysis.
- */
+// Self-subsuming then binary-resolution minimization of every 1UIP clause. Dropping a redundant literal yields a
+// strictly stronger implied clause, so the result stays an asserting nogood.
 internal class ClauseMinimizer(private val state: PropagationState, private val graph: ReasonGraph) {
     private var inClause = DynamicBits()
     private var toDrop = DynamicBits()
     private val redundancyCache = MutableIntIntMap()
 
-    // Reusable explicit-stack buffers for the iterative [isRedundant] DFS (cleared per call),
-    // so deep implication graphs can't overflow the call stack. Three parallel stacks: the
-    // variable under examination, its antecedent literals, and the resume index into them.
+    // Explicit DFS stacks for [isRedundant], so deep implication graphs cannot overflow the call stack.
     private val redVarStack = IntArrayList()
     private val redIdxStack = IntArrayList()
     private val redAntStack = ArrayList<IntArray>()
@@ -51,7 +37,6 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
     // graphs can be cyclic) is detected as a cycle rather than re-pushed forever.
     private var onPath = DynamicBits()
 
-    /** Run both minimization passes on [learned] and return the (possibly shorter) clause. */
     fun reduce(learned: IntArrayList, currentLevel: Int): IntArrayList =
         binaryMinimize(minimize(learned, currentLevel), currentLevel)
 
@@ -60,17 +45,9 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
         it.clear()
     }
 
-    /**
-     * Recursive self-subsuming-resolution clause minimization (N. Sörensson, A. Biere, "Minimizing
-     * Learned Clauses", SAT 2009, https://doi.org/10.1007/978-3-642-02777-2_23). After 1UIP produces
-     * the learned clause, any literal `l` whose variable has antecedents fully implied by the rest
-     * of the clause is *redundant* — dropping it yields a strictly stronger clause.
-     *
-     * The UIP literal (at [currentLevel]) is never dropped — it's the asserting literal
-     * the engine relies on at the backjump level. Other literals are checked via
-     * [isRedundant], which walks antecedents recursively with a per-call cache to keep
-     * the cost linear in the implication graph reached.
-     */
+    // Recursive self-subsuming minimization (N. Sörensson, A. Biere, "Minimizing Learned Clauses", SAT 2009,
+    // https://doi.org/10.1007/978-3-642-02777-2_23). The UIP literal is never dropped: the engine asserts it at
+    // the backjump level.
     private fun minimize(learned: IntArrayList, currentLevel: Int): IntArrayList {
         if (learned.size <= 1) return learned
         val universeSize = graph.universeSize()
@@ -104,26 +81,13 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
         return out
     }
 
-    /**
-     * Binary-resolution minimization, run as a second stage after [minimize]. For the kept
-     * asserting (UIP) literal `u`, every binary clause `(u ∨ x)` lets us drop the clause literal
-     * `¬x` by one resolution step:
-     *   `C ⊗ (u ∨ x)` on `var(x)` = `(C \ {¬x}) ∪ {u}` = `C \ {¬x}`   (since `u ∈ C`).
-     * Because every removal is justified by the single, never-removed UIP literal, the
-     * removals can't interact, so the result stays an implied, asserting clause however many
-     * literals are dropped. Gated on binary clauses being present and on the clause being a
-     * genuine 1UIP clause (exactly one literal at the conflict level); a non-asserting clause
-     * is left untouched.
-     *
-     * Complements self-subsuming minimization: it removes literals reachable by a *binary*
-     * implication from the asserting literal that the antecedent-recursion pass does not,
-     * typically shrinking the clause a few percent further and lowering its LBD.
-     */
+    // For the asserting literal `u`, every binary clause `(u ∨ x)` drops `¬x` by one resolution step:
+    // `C ⊗ (u ∨ x)` on `var(x)` = `(C \ {¬x}) ∪ {u}` = `C \ {¬x}` since `u ∈ C`. Every removal is justified by
+    // the never-removed UIP literal, so removals cannot interact and the clause stays asserting.
     private fun binaryMinimize(clause: IntArrayList, currentLevel: Int): IntArrayList {
         if (clause.size <= 2 || !state.hasBinaryClauses) return clause
-        // The asserting literal is the unique literal at the conflict level. Bail when there
-        // isn't exactly one (non-asserting clause) or it's an atom literal (the binary watch
-        // index covers bool vars only).
+        // Bail unless exactly one literal sits at the conflict level and it is Boolean: the binary watch
+        // index covers bool vars only.
         var uip = 0
         var uipCount = 0
         for (i in 0 until clause.size) {
@@ -151,28 +115,20 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
         for (i in 0 until clause.size) {
             val lit = clause[i]
             val v = Lit.variable(lit)
-            // Keep the UIP and any literal not marked. A var appears once in a clause (no
-            // tautologies), so the marked var corresponds to exactly the removable literal.
+            // A var appears once in a clause, so the marked var is exactly the removable literal.
             if (lit == uip || v >= universeSize || !toDrop[v]) out.add(lit)
         }
         return out
     }
 
-    /** Linear membership test for [lit] in [clause]; clauses are short, so this beats a
-     *  per-conflict set allocation. */
+    // Clauses are short, so a scan beats a per-conflict set allocation.
     private fun clauseContains(clause: IntArrayList, lit: Int): Boolean {
         for (i in 0 until clause.size) if (clause[i] == lit) return true
         return false
     }
 
-    /**
-     * True iff every chain of antecedents leading to `v`'s pin terminates in either a
-     * variable that's *already in the learned clause* ([inClause]) or a level-0 fact.
-     * Decision-style leaves (variables with `null` antecedents) make `v` non-redundant.
-     *
-     * Cached per variable for the duration of a single [minimize] call, which keeps the total
-     * work linear in the implication graph reached.
-     */
+    // Redundant iff every antecedent chain ends in a clause literal or a level-0 fact; a decision leaf makes it
+    // non-redundant. The per-call cache keeps total work linear in the graph reached.
     private fun isRedundant(root: Int, inClause: BitSet, cache: MutableIntIntMap): Boolean {
         val numBoolVars = state.problem.numBoolVars
         val cachedRoot = cache.getOrDefault(root, -1)
@@ -181,9 +137,7 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
             cache.put(root, 0)
             return false
         }
-        // Iterative post-order DFS over the implication graph — recursion overflows the call
-        // stack on deep graphs. The stack holds the root-to-current path; a node is redundant
-        // iff all its antecedents are redundant / in-clause / level-0.
+        // Iterative post-order DFS: recursion overflows the call stack on deep graphs.
         redVarStack.clear()
         redIdxStack.clear()
         redAntStack.clear()
@@ -202,12 +156,9 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
                 val u = Lit.variable(ant[i])
                 i++
                 if (u == v) continue
-                // Two order literals of one integer variable are coupled views of the same domain,
-                // joined by the monotonicity / duality / eq↔bound channeling clauses — and a bound
-                // atom's reason cites the same-var frontier atom by design. Self-subsuming resolution
-                // treats them as independent and can circularly drop the coupled set that jointly
-                // constrains the variable, which is unsound. Keep the literal rather than resolving
-                // through the coupling (the LCG minimizer rule for a variable's auxiliary literals).
+                // Order literals of one integer variable are coupled views of the same domain, and a bound
+                // atom's reason cites the same-var frontier atom by design. Resolving through the coupling can
+                // circularly drop the set that jointly constrains the variable, which is unsound.
                 if (u >= numBoolVars && v >= numBoolVars &&
                     state.atoms.intVar[u - numBoolVars] == state.atoms.intVar[v - numBoolVars]
                 ) {
@@ -216,8 +167,7 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
                 }
                 if (graph.levelOf(u) <= 0) continue
                 if (u < inClause.size && inClause[u]) continue
-                // A back-edge to a variable already on the path is a cycle; it can't be proven
-                // redundant, so treat it (and thus v) as non-redundant — sound, just keeps the literal.
+                // A back-edge is a cycle and cannot be proven redundant.
                 if (u < onPath.size && onPath[u]) {
                     failed = true
                     break
@@ -256,8 +206,7 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
             }
             if (pushed) continue
             if (failed) {
-                // A non-redundant antecedent makes v — and therefore every ancestor on the
-                // current path — non-redundant. Mark them all and stop.
+                // A non-redundant antecedent makes every ancestor on the path non-redundant.
                 rejectPath(cache)
                 return false
             }

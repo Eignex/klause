@@ -17,24 +17,13 @@ import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
 
-/*
- * Exact arbitrary-precision reasoning for a linear row `Σ coeffs·vars ⟨op⟩ bound` whose coefficients or
- * bound exceed the 64-bit range. Shared by the bare `WideLinearPropagator` and the reified
- * `WideReifiedLinearPropagator`, so the soundness-critical
- * interval and division logic lives in one place. Every operand is a [BigInt], so there is no overflow to
- * guard against; only a derived variable bound is narrowed to `Long`, and only when it fits — a bound beyond
- * the `Long` range cannot constrain a `Long` domain, so skipping it is exact.
- */
+// Every operand is a BigInt, so nothing overflows. A derived bound beyond the `Long` range cannot constrain a
+// `Long` domain, so skipping it is exact.
 
 private val LONG_MAX = bigIntOf(Long.MAX_VALUE)
 private val LONG_MIN = bigIntOf(Long.MIN_VALUE)
 
-/**
- * The bounds behind one side of the activity range, excluding term [excludeIdx]: each other term's least
- * contribution ([useLo]) or greatest, its lower bound for a positive coefficient and its upper bound for a
- * negative one (the reverse for the greatest), with the reifying [auxLit] when given. Root bounds are facts and
- * drop out.
- */
+// The bounds behind one side of the activity range, excluding term [excludeIdx]. Root bounds drop out.
 internal fun wideSideReason(
     state: PropagationState,
     vars: IntArray,
@@ -61,7 +50,6 @@ internal fun wideSideReason(
     return if (out.size == 0) null else out.toIntArray()
 }
 
-/** `[sumLo, sumHi]`, the exact activity range of `Σ coeffs·vars` over the current domains. */
 internal fun wideSumRange(state: PropagationState, vars: IntArray, coeffs: Array<BigInt>): Pair<BigInt, BigInt> {
     var sumLo = BIG_ZERO
     var sumHi = BIG_ZERO
@@ -76,7 +64,6 @@ internal fun wideSumRange(state: PropagationState, vars: IntArray, coeffs: Array
     return sumLo to sumHi
 }
 
-/** Whether the row is entailed by the current activity range (`[sumLo, sumHi]`). */
 internal fun wideAlwaysHolds(op: LinearOp, sumLo: BigInt, sumHi: BigInt, bound: BigInt): Boolean = when (op) {
     LinearOp.LE -> sumHi <= bound
     LinearOp.GE -> sumLo >= bound
@@ -84,7 +71,6 @@ internal fun wideAlwaysHolds(op: LinearOp, sumLo: BigInt, sumHi: BigInt, bound: 
     LinearOp.NE -> sumHi < bound || sumLo > bound
 }
 
-/** Whether the row is refuted by the current activity range (`[sumLo, sumHi]`). */
 internal fun wideNeverHolds(op: LinearOp, sumLo: BigInt, sumHi: BigInt, bound: BigInt): Boolean = when (op) {
     LinearOp.LE -> sumLo > bound
     LinearOp.GE -> sumHi < bound
@@ -92,12 +78,7 @@ internal fun wideNeverHolds(op: LinearOp, sumLo: BigInt, sumHi: BigInt, bound: B
     LinearOp.NE -> sumLo == bound && sumHi == bound
 }
 
-/**
- * Enforce `Σ coeffs·vars ⟨op⟩ bound` exactly: return `false` on a definite conflict, otherwise narrow each
- * variable's `Long` bound as far as the row implies (skipping a derived bound that escapes the `Long` range).
- * [auxLit] is the reifying literal to thread into every tighten's antecedent, null for a bare, unreified row
- * (every int is a literal, so 0 cannot mean none).
- */
+// [auxLit] joins every antecedent; null for an unreified row, since 0 is a valid literal.
 internal fun wideEnforceRow(
     state: PropagationState,
     vars: IntArray,

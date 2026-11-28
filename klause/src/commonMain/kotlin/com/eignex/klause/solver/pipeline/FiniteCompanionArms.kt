@@ -14,7 +14,6 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 
-/** Caller choices for the numerical traversal and joint repair arms of a finite linear-source portfolio. */
 internal class FiniteCompanionControls(
     val params: TheoryParams? = null,
     val incumbentCompletionCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)? = null,
@@ -24,10 +23,8 @@ internal class FiniteCompanionControls(
     val onJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
 )
 
-/**
- * Numerical traversal and joint repair seated beside the finite workers: admission, construction,
- * arm order, preparation telemetry and scheduler shares. The finite portfolio only places them.
- */
+// Admission, construction, arm order, preparation telemetry and scheduler shares of the companions; the finite
+// portfolio only places them.
 internal class FiniteCompanionArms private constructor(
     private val controls: FiniteCompanionControls,
     private val admission: FiniteCompanionAdmission?,
@@ -35,10 +32,9 @@ internal class FiniteCompanionArms private constructor(
     private val companions: FiniteNumericalCompanions?,
     private val gap: OptimalityGap?,
 ) {
-    /** Canonical incumbents the finite workers accept from the companions. */
     val incumbents: PortfolioIncumbents<BigFraction>? get() = companions?.incumbents
 
-    /** Seed positions the leading numerical arm shifts the finite workers by. */
+    // Seed positions the leading numerical arm shifts the finite workers by.
     val finiteSeedOffset: Int get() = if (companions == null) 0 else 1
 
     val preparationStages: Map<String, Long> get() = preparation?.let {
@@ -52,7 +48,7 @@ internal class FiniteCompanionArms private constructor(
 
     val objectiveBound: (() -> SourceEvidence?)? get() = companions?.let { { it.objectiveBound } }
 
-    /** Put the numerical arm first and joint repair after the finite workers. */
+    // The numerical arm first, joint repair after the finite workers.
     fun arrange(plan: PreparedSourcePlan, finite: List<PortfolioArmFactory>): List<PortfolioArmFactory> {
         val additional = companions?.factories(plan, finite.size, gap = gap).orEmpty()
         return additional.take(1) + finite + additional.drop(1)
@@ -64,13 +60,13 @@ internal class FiniteCompanionArms private constructor(
         }
     }
 
-    /** Joint repair keeps 30% of scheduled search time before the first incumbent. */
+    // Joint repair keeps 30% of scheduled search time before the first incumbent.
     fun reserve(workers: List<PortfolioWorker>, finite: DoubleArray): DoubleArray = if (companions == null) finite
     else (if (finite.isEmpty()) DoubleArray(workers.size) else finite).also {
         it[workers.indexOfFirst { worker -> worker.label == JOINT_REPAIR }] = 0.3
     }
 
-    /** Probe weights giving the numerical arm three initial turns, or null without companions. */
+    // The numerical arm gets three initial turns.
     fun probeWeights(workers: List<PortfolioWorker>): IntArray? = if (companions == null) null
     else IntArray(workers.size) { arm -> if (workers[arm].label == NUMERICAL_TRAVERSAL) 3 else 1 }
 

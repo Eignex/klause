@@ -67,28 +67,8 @@ class PipelineConfigException(message: String) : RuntimeException(message)
 fun pipelineConfigError(message: String): Nothing = throw PipelineConfigException(message)
 
 /**
- * Engine tuning knobs passed as repeatable `--param key=value` flags. (`-p` is NOT an
- * alias: it is the MiniZinc-standard parallelism flag.)
- * Each engine consumes the keys it understands; an unrecognised or malformed key is a
- * hard usage error (exit 2) so typos never silently fall back to defaults.
- *
- * Keys per engine:
- *  - `cp`: `bt-arm=label,label` pins named catalog arms; the per-solver overrides `seed`,
- *    `max-decisions`, `luby`, `phase-saving`, `max-learned`, `lbd-glue`, `pb-learning`, `var-selector`
- *    (see [VarSelectorKind]), `val-selector` (see [ValSelectorKind]), … edit **every** arm of whatever
- *    pool results. A single-worker heuristic comparison sets both `bt-arm=X` and `arms=1`;
- *    the named recipe repeats across the selected worker count otherwise. An override without
- *    `bt-arm` edits the applicable curated recipes; plus the portfolio knobs below
- *  - `ls`: `strategy` (base `auto` (curated pool, default) | `cbls|feasibilityjump|walksat|probsat|sa`
- *    | `bare`), or `arm=<catalog-label>` to select a named recipe pool,
- *    plus per-axis edits applied across the pool — `sources` (bare force-exactly list or
- *    `+`/`-` add/remove), `scoring` (`weighted|raw|break`), `acceptance`
- *    (`greedy|walksat|probsat|skew|sa`), `restart` (`fixed|luby|perturb`); any token may carry an
- *    arm-family selector (`cbls.break`). Axis numerics `noise`/`cb`/`skew-alpha`/`initial-temp`/
- *    `cooling-rate`/`min-temp`/`smooth-prob`/`smooth-factor`/`tabu-tenure`; portfolio knobs `arms`,
- *    `ls`, `bt`, `seed`, `lambda`; `dry-run-solver` lists the resolved arms instead of solving
- *  - `portfolio`: `arms`, `ls`, `bt`, `seed`, `lambda`; `bt-arm=label,label` (cp/mixed only) pins the
- *    backtrack pool to named catalog arms, the backtrack analogue of `ls`'s `arm=`
+ * Engine tuning knobs passed as repeatable `--param key=value` flags. Each engine consumes the keys it
+ * understands; an unrecognised or malformed key is a usage error so typos never fall back to defaults.
  */
 class EngineParams(pairs: List<String>) {
     private val map: MutableMap<String, String> = mutableMapOf()
@@ -128,19 +108,15 @@ class EngineParams(pairs: List<String>) {
         }
     }
 
-    /** Consume and validate the var-selector [key] into its [VarSelectorKind] (the instance is built
-     *  fresh per worker via [VarSelectorKind.selector]); null when absent. */
     internal fun varSelectorKind(key: String): VarSelectorKind? = map.remove(key)?.let { raw ->
         VarSelectorKind.fromId(raw) ?: fail("engine param `$key` expects ${VarSelectorKind.ids()}, got `$raw`")
     }
 
-    /** Consume and validate the val-selector [key] into its [ValSelectorKind]; null when absent. */
     internal fun valSelectorKind(key: String): ValSelectorKind? = map.remove(key)?.let { raw ->
         ValSelectorKind.fromId(raw) ?: fail("engine param `$key` expects ${ValSelectorKind.ids()}, got `$raw`")
     }
 
-    /** Call after an engine consumed its keys: anything left over is a typo or a key for
-     *  another engine — reject loudly rather than ignore. */
+    /** Rejects any key left after an engine consumed its own: a typo or a key for another engine. */
     fun finish(engine: String, valid: String) {
         if (map.isNotEmpty()) {
             fail("unknown $engine engine param(s) ${map.keys.joinToString()}; valid keys: $valid")
@@ -157,8 +133,7 @@ class EngineParams(pairs: List<String>) {
     }
 }
 
-/** The backtrack override keys consumed by [backtrackOverride], excluding `seed` (owned by the naked
- *  engine / the portfolio scenario) — the set that, when present, edits the `cp` arm pool. */
+/** The backtrack override keys consumed by [backtrackOverride]; `seed` is owned by the caller. */
 val BACKTRACK_OVERRIDE_KEYS = listOf(
     "max-decisions", "luby", "adaptive-restart", "ema-restart", "mode-switching-restart", "phase-saving",
     "target-phasing", "solution-phasing", "rephase-interval", "max-learned", "lbd-glue", "tiered-db",
@@ -183,15 +158,12 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
 
 private val BACKTRACK_SELECTOR_KEYS = setOf("var-selector", "val-selector")
 
-/** Read the backtrack `--param` overrides in [BACKTRACK_OVERRIDE_KEYS] **once** (consuming them) into a
- *  reusable [BacktrackParams] edit — applied to *each arm* of a pool the way the `ls` axis edits are, so
- *  `-e cp -p8 --param var-selector=vsids` still runs a full 8-worker portfolio with the override pinned
- *  across it (the arms keep their own seed/lp/luby diversity). Selectors are rebuilt **per worker** (the
- *  edit closure constructs a fresh instance from the arm's seed), so parallel arms never share mutable
- *  heuristic state. `seed` is left to the caller. [allowSelectors] gates the `var-selector`/`val-selector`
- *  keys: `cp`/`mixed` always pass `true` (inherently free-search); the `fixed` engine passes `false` only
- *  while a source annotation selects its heuristic, and `true` otherwise (no heuristic to preserve).
- *  Null when no override key is present. */
+/**
+ * Reads the backtrack overrides in [BACKTRACK_OVERRIDE_KEYS] once into an edit applied to each arm of a
+ * pool; arms keep their own seed and diversity. Selectors are rebuilt per worker, so parallel arms never
+ * share mutable heuristic state. [allowSelectors] is false only while a source annotation selects the
+ * heuristic. Null when no override key is present.
+ */
 fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackParams) -> BacktrackParams)? =
     backtrackOverride(p.reader(), allowSelectors)
 
@@ -364,9 +336,8 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
 fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): BacktrackParams =
     applyFixedBacktrackParams(base, p, allowSelectors = false)
 
-/** Apply fixed-route overrides. [allowSelectors] is false only when a source annotation selects the
- *  heuristic; an unannotated finite model has no heuristic to preserve, so its single fixed run accepts
- *  selector overrides without becoming a portfolio. */
+// [allowSelectors] is false only when a source annotation selects the heuristic; an unannotated model has
+// none to preserve, so its single fixed run accepts selector overrides.
 internal fun applyFixedBacktrackParams(
     base: BacktrackParams,
     p: EngineParams,
@@ -387,10 +358,10 @@ internal fun applyFixedBacktrackParams(
     return out
 }
 
-/** Resolved local-search arm pool for the `ls` engine: per-arm factories (a *fresh* recipe per slot,
- *  so parallel workers never share mutable strategy state). A null [pool] means the default curated
- *  pool — the portfolio builds it unchanged. [dryRunSolver] short-circuits the solve to print the
- *  resolved arm pool (the solver configuration) instead of solving. */
+/**
+ * Resolved local-search arm pool for the `ls` engine: a fresh recipe per slot. A null [pool] means the
+ * default curated pool. [dryRunSolver] prints the resolved arms instead of solving.
+ */
 class LsResolution(val pool: List<() -> LocalSearchRecipe>?, val dryRunSolver: Boolean)
 
 private fun parseScoring(s: String): MoveScoring = when (s.lowercase()) {
@@ -417,8 +388,7 @@ private fun parseRestart(s: String): RestartPolicy = when (s.lowercase()) {
     else -> pipelineConfigError("ls: restart expects fixed|luby|perturb, got `$s`")
 }
 
-/** Parse a single-valued axis spec into its tokens, rejecting `+`/`-` (only the sources list axis
- *  takes set edits). */
+// Only the sources list axis takes `+`/`-` set edits.
 internal fun scalarTokens(spec: String?, axis: String): List<AxisToken> {
     val tokens = spec?.let { AxisEdits.tokens(it) } ?: return emptyList()
     return scalarTokens(tokens, axis)
@@ -434,9 +404,8 @@ internal fun scalarTokens(tokens: List<AxisToken>, axis: String): List<AxisToken
 private fun cblsStrategy(noise: Double?, smoothProb: Double, smoothFactor: Double, tabu: TabuFilter) =
     Cbls(noiseProbability = noise ?: 0.05, smoothProb = smoothProb, smoothFactor = smoothFactor, tabu = tabu)
 
-/** A factory for a named base recipe with the CLI numerics applied. CBLS gets an independent optimize
- *  strategy (the unified minimize path); the SAT-family / fjump arms leave it null so the engine's
- *  built-in objective descent owns the optimize phase. */
+// CBLS and SA get an independent optimize strategy; the other arms leave it null so the engine's built-in
+// objective descent owns the optimize phase.
 private fun namedFactory(
     name: String,
     noise: Double?,
@@ -471,9 +440,8 @@ private fun namedFactory(
     }
 
     "sa", "annealing" -> {
-        // The unified minimize path (both halves the optimizer form, independent schedules) so SA
-        // anneals on the objective at feasibility like the catalog sa/* arms, rather than being
-        // ratcheted as a plain finder on a COP.
+        // Anneals on the objective at feasibility like the catalog sa arms, rather than being ratcheted as a
+        // plain finder on a COP.
         {
             LocalSearchRecipe(
                 "sa",
@@ -486,7 +454,6 @@ private fun namedFactory(
     else -> pipelineConfigError("ls: strategy expects auto|cbls|feasibilityjump|walksat|probsat|sa|bare, got `$name`")
 }
 
-/** A bare driver with no preset axes; its sources are supplied by a force-exactly `sources=` spec. */
 private fun bareRecipe(tabu: TabuFilter): LocalSearchRecipe = LocalSearchRecipe(
     "bare",
     SourceDrivenStrategy(sources = emptyList(), tabu = tabu, feasibleDescent = FeasibleDescent.RatchetAsConstraint),
@@ -509,8 +476,7 @@ private fun applyEdits(
     scoring.filter { it.appliesTo(r.label) }.forEach { r = r.withScoring(parseScoring(it.value)) }
     val acceptEdits = acceptance.filter { it.appliesTo(r.label) }
     acceptEdits.forEach { r = r.withAcceptance(parseAcceptance(it.value, noise, cb, skewAlpha)) }
-    // An acceptance edit to simulated annealing needs a cooling schedule; attach one (a fresh
-    // stateful instance) when the recipe carried none — a named `strategy=sa` already has one.
+    // Simulated annealing needs a cooling schedule; a named `strategy=sa` already carries one.
     if (acceptEdits.isNotEmpty() &&
         r.strategy.acceptance is AcceptanceRule.Metropolis &&
         r.strategy.schedule.temperature == null
@@ -522,14 +488,10 @@ private fun applyEdits(
 }
 
 /**
- * Resolve the `ls` engine's `--param` overrides into an arm pool. `strategy=` picks the base —
- * `auto` (default; the curated [LocalSearchCatalog] pool), a named recipe (`cbls`/`feasibilityjump`/`walksat`/
- * `probsat`/`sa`), or `bare` (a driver whose sources come from a force-exactly `sources=` spec). The
- * axis keys then *edit* the base across all matching arms, presolve-style: `sources=` takes a bare
- * force-exactly list or `+`/`-` add/remove; `scoring`/`acceptance`/`restart` set a single value. Any
- * token may carry an arm-family selector (`cbls.break`) so an edit scopes to part of the pool. Plain
- * `-e ls` with no overrides keeps the curated pool unchanged (a null pool). `dry-run-solver=on` lists
- * the resolved arms instead of solving.
+ * Resolves the `ls` engine's `--param` overrides into an arm pool. `strategy=` picks the base: `auto`
+ * (default, the curated [LocalSearchCatalog] pool), a named recipe, or `bare` (sources from a
+ * force-exactly `sources=` spec). The axis keys then edit the base across all matching arms; a token may
+ * carry an arm-family selector (`cbls.break`). With no overrides the pool is null.
  */
 fun resolveLocalSearchRecipes(p: EngineParams): LsResolution =
     resolveLocalSearchRecipes(p.reader())
@@ -608,8 +570,8 @@ internal fun resolveLocalSearchRecipes(p: ExecutionOptionReader): LsResolution {
 
         strategyName == "auto" && !hasEdits -> null
 
-        // The CLI `auto` pool is the COP superset (all arms); the portfolio applies per-kind ordering
-        // to its own curated default (an explicit CLI pool is used as-is, like the backtrack side).
+        // The CLI `auto` pool is the COP superset; the portfolio applies per-kind ordering only to its own
+        // curated default.
         strategyName == "auto" -> LocalSearchCatalog.factories(Kind.COP).map { factory -> { edit(factory()) } }
 
         strategyName == "bare" -> {
@@ -634,7 +596,6 @@ internal fun resolveLocalSearchRecipes(p: ExecutionOptionReader): LsResolution {
     return LsResolution(guidedPool, dryRunSolver)
 }
 
-/** Canonical base name for consumption checks — collapses the `strategy=` aliases. */
 private fun canonicalBase(strategyName: String): String = when (strategyName) {
     "annealing" -> "sa"
     "feasibility-jump", "feasibilityjump" -> "fjump"
@@ -644,9 +605,10 @@ private fun canonicalBase(strategyName: String): String = when (strategyName) {
 private val LS_KNOWN_BASES = setOf("auto", "cbls", "walksat", "probsat", "sa", "fjump", "bare")
 private val LS_TABU_BASES = setOf("cbls", "walksat", "probsat", "sa", "bare")
 
-/** The [provided] numeric knobs that the resolved [canonical] base + [acceptanceValues] edits can't
- *  consume (e.g. `noise` on the curated pool with no walksat acceptance). An unknown base consumes
- *  nothing here — its own factory reports the bad name. */
+/**
+ * The [provided] numeric knobs that neither the [canonical] base nor the [acceptanceValues] edits consume.
+ * An unknown base consumes nothing here; its own factory reports the bad name.
+ */
 fun ineffectiveNumerics(canonical: String, acceptanceValues: Set<String>, provided: List<String>): List<String> {
     if (canonical !in LS_KNOWN_BASES) return emptyList()
     val consumed = buildSet {
@@ -667,8 +629,6 @@ fun ineffectiveNumerics(canonical: String, acceptanceValues: Set<String>, provid
     return provided.filterNot { it in consumed }
 }
 
-/** Reject numeric knobs the resolved base + acceptance edits can't consume, rather than silently
- *  ignoring them. */
 private fun rejectIneffectiveNumerics(canonical: String, acceptanceValues: Set<String>, provided: List<String>) {
     val unconsumed = ineffectiveNumerics(canonical, acceptanceValues, provided)
     if (unconsumed.isNotEmpty()) {
@@ -680,18 +640,9 @@ private fun rejectIneffectiveNumerics(canonical: String, acceptanceValues: Set<S
 }
 
 /**
- * Build the [PortfolioScenario] from `-p N` parallelism ([cores]) and `--param` overrides.
- * [fallbackSeed] is `-r`, [kind] is whether the model optimizes, [defaultEngine] comes from `-e`,
- * and [defaultArms] is the auto-tuned pool size used when the user doesn't override it.
- *
- * Arm count and engine mix:
- *  - `--param arms=N` sets the pool size directly (the common tuning knob); the engine mix is
- *    [defaultEngine]. Clamped up to [cores] (a parallel track needs ≥ one arm per core).
- *  - `--param ls=N` / `bt=N` instead set BOTH the count (`ls + bt`) and the mix (LS-only /
- *    backtrack-only / mixed). Mutually exclusive with `arms`.
- *  - neither ⇒ [defaultArms] arms of [defaultEngine].
- *
- * The exact LS:backtrack split within a MIXED pool stays the composition's (kind-derived) decision.
+ * Builds the [PortfolioScenario] from [cores] and `--param` overrides. `arms=N` sets the pool size with
+ * the [defaultEngine] mix, clamped up to [cores]; `ls=N`/`bt=N` set both the count and the mix and exclude
+ * `arms`; with neither, [defaultArms] arms of [defaultEngine] run.
  */
 fun buildPortfolioScenario(
     p: EngineParams,
@@ -851,17 +802,10 @@ class BtResolution(
 )
 
 /**
- * Resolve the `cp`/`mixed` engine's backtrack arms from `--param`, the backtrack analogue of
- * [resolveLocalSearchRecipes]. Two forms, which compose:
- *  - `bt-arm=label,label` pins named [BacktrackCatalog] arms, each validated for [kind] (so a CSP
- *    rejects the COP-only LP/LinUCB arms); an unknown label is a hard usage error.
- *  - the per-solver override keys ([BACKTRACK_OVERRIDE_KEYS] — `var-selector`/`val-selector`/`luby`/…)
- *    *edit* the arms ([backtrackOverride]): every arm keeps its own seed/lp/luby diversity with the override
- *    pinned across it, retaining the configured worker count. An edit without
- *    `bt-arm` edits the curated pool after it is composed, so the arms the model offers nothing to stay out.
- *
- * A pinned pool is the *set* of arms; the worker *count* still comes from `arms=`/`bt=`/the default and wraps
- * over it, exactly as `lsPool` does.
+ * Resolves the `cp`/`mixed` engine's backtrack arms from `--param`. `bt-arm=label,label` pins named
+ * [BacktrackCatalog] arms, each validated for [kind]; the [BACKTRACK_OVERRIDE_KEYS] edit every arm
+ * ([backtrackOverride]). A pinned pool is the set of arms; the worker count still comes from
+ * `arms=`/`bt=` or the default.
  */
 fun resolveBtRecipes(p: EngineParams, kind: Kind): BtResolution =
     resolveBtRecipes(p.reader(), kind)
@@ -883,23 +827,23 @@ internal fun resolveBtRecipes(p: ExecutionOptionReader, kind: Kind): BtResolutio
     return BtResolution(labels.map { label -> { BacktrackCatalog.byLabel(label) } }, edit)
 }
 
-/** The `--param` key naming a [NodeBudget]; consumed in `SolveCore` rather than here, because one
- *  budget has to serve the whole invocation and [EngineParams] consumes keys per instance. */
+/**
+ * The `--param` key naming a [NodeBudget]; consumed by the caller because one budget serves the whole
+ * invocation and [EngineParams] consumes keys per instance.
+ */
 const val NODE_LIMIT_KEY = "node-limit"
 
-/** Auto-tuned default arm-pool size, scaling with the core count: [ARMS_PER_CORE] arms per
- *  core — always *more* arms than cores, so the bandit (single core) / parallel race always has a
- *  pool to draw on — floored at [PortfolioScenario.DEFAULT_ARMS] so the single-core free track still
- *  gets a real pool. Overridable via `--param arms=N`. */
+/**
+ * Default arm-pool size: [ARMS_PER_CORE] arms per core so every core has a pool to draw on, floored at
+ * [PortfolioScenario.DEFAULT_ARMS].
+ */
 fun autoArms(cores: Int): Int = maxOf(PortfolioScenario.DEFAULT_ARMS, cores * ARMS_PER_CORE)
 
-/** Default arms-per-core oversubscription factor for [autoArms]. */
 private const val ARMS_PER_CORE = 2
 
-/** `var-selector` `--param` values for the `cp` engine's override pool (each maps to a [VariableSelector]).
- *  Covers the public no-argument selectors; the objective-/base-parameterised ones (MaxRegret,
- *  IndomainBest, LastConflict, …) and the `internal` ones (DomWdeg, ActivityBasedSearch) are not
- *  exposable as a bare value here. */
+/**
+ * `var-selector` `--param` values, each mapping to a no-argument [VariableSelector].
+ */
 enum class VarSelectorKind(val id: String) {
     VSIDS("vsids"),
     CHB("chb"),
@@ -913,8 +857,7 @@ enum class VarSelectorKind(val id: String) {
     DOMAIN_MAX_REGRET("domain-max-regret"),
     ;
 
-    /** A **fresh** selector instance (constructed per worker so parallel arms never share mutable
-     *  heuristic state); [seed] feeds the LinUCB RNG so an A/B is reproducible under the run seed. */
+    /** A fresh selector per worker; [seed] feeds the LinUCB RNG. */
     fun selector(seed: Long?): VariableSelector = when (this) {
         VSIDS -> Vsids()
         CHB -> Chb()
@@ -935,9 +878,7 @@ enum class VarSelectorKind(val id: String) {
     }
 }
 
-/** `val-selector` `--param` values for the `cp` engine's override pool (each maps to a [ValueSelector]).
- *  Covers no-argument selectors and bounded MaxSd with its default probe cap.
- *  IndomainBest, IndomainSet and Impact require other context. */
+/** `val-selector` `--param` values, each mapping to a [ValueSelector] that needs no other context. */
 enum class ValSelectorKind(val id: String) {
     RANDOM("random"),
     MIN("min"),
@@ -949,8 +890,7 @@ enum class ValSelectorKind(val id: String) {
     MAX_SD("max-sd"),
     ;
 
-    /** The value selector for this kind; the stateful [SolutionGuided] is constructed fresh per call so
-     *  parallel arms never share it. */
+    /** A fresh selector per call, so parallel arms never share the stateful [SolutionGuided]. */
     fun selector(): ValueSelector = when (this) {
         RANDOM -> IndomainRandom
         MIN -> IndomainMin

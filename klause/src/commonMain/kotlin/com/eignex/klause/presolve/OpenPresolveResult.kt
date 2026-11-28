@@ -105,30 +105,12 @@ fun Problem.presolveOpen(
     }
 }
 
-/**
- * Close what the model's own rows prove about its open integer sides.
- *
- * Runs on a model source-safe preparation has already produced, and only ever narrows bounds: the factor
- * set it reads is the one the caller's component plan was selected from, and stays so.
- *
- * Sides close by optimization-based bound tightening over the unconditional linear rows, behind a
- * feasibility-based interval prefilter.
- *
- * Ahead of that runs an exact refutation over the same rows, in arithmetic that does not wrap. It answers
- * only in the refuting direction, so it costs a bounded pass and can only ever add a verdict.
- *
- * Behind it, each side the tightening leaves open is offered what the equality structure implies
- * ([structuralIntBounds]), which reaches the columns a `Long`/`Double` relaxation cannot represent. Both
- * kinds of bound are the model's own, so closing a side with either keeps it equisatisfiable — the
- * property that lets a later `unsat` be reported as one.
- *
- * Unconditional [Linear] rows and rows whose reifying Boolean is fixed by a unit clause participate. A
- * wide row carries no `Long` reading, so it is skipped: the phase then proves fewer bounds, never a
- * wrong one.
- *
- * [cancellation] is polled between variables and threaded into each LP solve, so a budget spent partway
- * through leaves the bounds it had already proved — every one of them sound on its own.
- */
+// Closes what the model's own rows prove about its open integer sides, only ever narrowing bounds, so the
+// factor set the caller's component plan was selected from stays valid. An exact refutation runs first,
+// then a relaxation refutation, then optimization-based bound tightening, then structural bounds
+// ([structuralIntBounds]) for sides still open. Every bound is the model's own, so closing a side keeps
+// the model equisatisfiable and a later `unsat` reportable. A wide row has no `Long` reading and is
+// skipped, proving fewer bounds but never a wrong one. A budget spent partway leaves only sound bounds.
 internal fun Problem.closeOpenBounds(
     cancellation: ExecutionControl = ExecutionControl.Never,
     lpStats: LpStatsSink? = null,
@@ -189,7 +171,6 @@ internal fun Problem.closeOpenBounds(
     return OpenPresolveResult.Tightened(tighter, closedSides = closed)
 }
 
-/** Unconditional integer rows plus the integer rows a root unit clause asserts. */
 private fun Problem.openPresolveRows(): List<Linear> {
     val activeIndicators = factors.filterIsInstance<LinearIndicator>().filter { indicator ->
         val id = indicator.indicator
@@ -199,7 +180,6 @@ private fun Problem.openPresolveRows(): List<Linear> {
     return presolveLinearRows(factors.asList() + activeIndicators).map(::roundIntegerRow)
 }
 
-/** Divide a whole integer inequality by its coefficient gcd, rounding its bound inward. */
 private fun roundIntegerRow(row: Linear): Linear {
     val constants = row.integerConstants ?: return row
     val gcd = PresolveShared.gcdOf(constants.coeffs)
@@ -217,13 +197,7 @@ private fun roundIntegerRow(row: Linear): Linear {
     )
 }
 
-/**
- * [tightened] with each still-open side filled from what the model's equality structure implies.
- *
- * Run only while a side is still open: the Hermite reduction behind it is the expensive half, and a
- * column the relaxation already closed has nothing left to gain. A structural bound is the model's own,
- * so unlike a fallback box it closes a side without costing equisatisfiability.
- */
+// Runs only while a side is still open: the Hermite reduction behind it is the expensive half.
 private fun fillFromStructure(
     tightened: Array<OpenIntBounds>,
     rows: List<Linear>,
@@ -244,22 +218,14 @@ private fun fillFromStructure(
     }
 }
 
-/** Whether [b] pins a column to an empty range. */
 private fun crossed(b: OpenIntBounds): Boolean {
     val lo = b.lo ?: return false
     val hi = b.hi ?: return false
     return lo > hi
 }
 
-/**
- * This model over [bounds], carrying every other part of it through unchanged, or `null` when the tighter
- * range leaves a declared value set empty.
- *
- * A column that declares a value set keeps it: the proved bounds intersect that set rather than replacing
- * it, so a non-contiguous declaration does not widen back to its hull on the way through. The
- * intersection can empty a column the endpoints alone would not have crossed, and an empty column is a
- * refutation.
- */
+// Null when the intersection empties a declared value set. The bounds intersect a declared set rather
+// than replacing it, so a non-contiguous declaration does not widen to its hull.
 private fun Problem.withBounds(bounds: Array<OpenIntBounds>): Problem? {
     val lower = LongArray(bounds.size)
     val upper = LongArray(bounds.size)

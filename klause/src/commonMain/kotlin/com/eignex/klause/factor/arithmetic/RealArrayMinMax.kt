@@ -31,11 +31,9 @@ class RealArrayMinMax(
         require(result >= 0 && xs.all { it >= 0 })
     }
 
-    // Whether finite search leaves this relation inert for leaf completion to enforce within the tolerance.
     internal var leafEnforced: Boolean = false
         private set
 
-    // This relation marked for leaf completion.
     internal fun leafEnforcedCopy(): RealArrayMinMax =
         RealArrayMinMax(result, xs, max).also { it.leafEnforced = true }
 

@@ -433,7 +433,6 @@ private class LuConstruction(
         return true
     }
 
-    // The rows other than pivot row [i] in pivot column [j], sorted into [affectedRows].
     private fun collectAffectedRows(i: Int, j: Int): Int {
         var count = 0
         columns[j].forEach { row, _ -> if (row != i) affectedRows[count++] = row }
@@ -441,7 +440,6 @@ private class LuConstruction(
         return count
     }
 
-    // The columns of pivot row [i], sorted into [affectedColumns].
     private fun collectAffectedColumns(i: Int): Int {
         var count = 0
         rows[i].forEach { column -> affectedColumns[count++] = column }

@@ -81,12 +81,9 @@ class PseudoBoolean private constructor(
 
     override fun remap(mapping: VarRemap): Factor = PseudoBoolean(constants, mapping.lits(literals), op)
 
-    // Unit weights make `Σ 1·lit ⟨op⟩ bound` a plain count of true literals, i.e. a [Cardinality] — a
-    // single canonical form that shares its dedicated counting propagator and lets an equivalent
-    // pseudo-Boolean and cardinality dedup. (Coefficient strengthening first GCD-reduces equal weights to
-    // unit, so this also catches `Σ c·lit`.) Solution-set exact; a vacuous bound drops the factor, while
-    // an infeasible one is left to propagation. Mixed-polarity literals carry over — [Cardinality] counts
-    // literals, not variables.
+    // Unit weights make the row a [Cardinality], sharing its counting propagator and dedup. A vacuous bound
+    // drops the factor; an infeasible one is left to propagation. Mixed-polarity literals carry over since
+    // [Cardinality] counts literals, not variables.
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
         val c = integerConstants ?: return Unchanged
         if ((0 until size).any { c.coeff(it) != 1L }) return Unchanged

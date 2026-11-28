@@ -21,8 +21,6 @@ class MpsFormatException(msg: String) : FormatException("MPS", msg)
 // Exact decimal powers beyond this scale are disproportionate parser inputs even when Double underflows.
 private const val MAX_EXACT_DECIMAL_SCALE = 100_000
 
-/** Reject a malformed line with a clean [MpsFormatException]; `Nothing`-typed so call sites stay
- *  expression-friendly (an elvis branch reads as a value, not a statement). */
 internal fun mpsError(msg: String): Nothing = throw MpsFormatException(msg)
 
 /**
@@ -32,10 +30,8 @@ internal fun mpsError(msg: String): Nothing = throw MpsFormatException(msg)
  * `RANGES`, `BOUNDS`, `INDICATORS` — into an [MpsModel]. Whitespace ("free") tokenisation is used, which handles the
  * common case; fixed-column files whose names embed spaces are not supported.
  *
- * Bound conventions: a variable defaults to `[0, +∞)`. A marker-declared integer column with no
- * `BOUNDS` entry defaults to `[0, 1]`, following the common MPS convention.
- * Explicit bound entries replace this binary default. `RANGES` and `RHS` follow the standard sign
- * rules (see [applyRange]).
+ * A variable defaults to `[0, +∞)`, and a marker-declared integer column without a `BOUNDS` entry to `[0, 1]`.
+ * `RANGES` and `RHS` follow the standard sign rules.
  */
 object Mps {
 
@@ -57,7 +53,6 @@ object Mps {
     private enum class RowType { OBJECTIVE, LE, GE, EQ, FREE }
 
     private class Row(val name: String, val type: RowType) {
-        /** Sparse column coefficients, keyed by variable index. */
         val coeffs = LinkedHashMap<Int, MpsSourceNumber>()
         var rhs = MpsSourceNumber.parsed(BigFraction.ZERO)
         var range: MpsSourceNumber? = null
@@ -100,8 +95,7 @@ object Mps {
                 section = openSection(fields).also {
                     if (it == Section.NAME) name = fields.getOrElse(1) { "" }
                 }
-                // ENDATA ends the model: some files append sections after it, such as MIPLIB 3's IMPORTANCES
-                // branching priorities, which are no part of the model.
+                // Some files append non-model sections, such as branching priorities, after ENDATA.
                 if (section == Section.ENDATA) break
                 // OBJSENSE may state MAX/MAXIMIZE on the header line itself.
                 if (section == Section.OBJSENSE && isMaximize(fields.getOrNull(1))) sense = ObjectiveSense.MAXIMIZE
@@ -141,7 +135,6 @@ object Mps {
         return build(name, sense, rows, vars, objectiveRow)
     }
 
-    /** Recognise which section a header line opens, from its first token. */
     private fun openSection(fields: List<String>): Section = when (fields[0].uppercase()) {
         "NAME" -> Section.NAME
         "OBJSENSE" -> Section.OBJSENSE
@@ -160,10 +153,8 @@ object Mps {
     private fun isMaximize(token: String?): Boolean =
         token != null && (token.equals("MAX", true) || token.equals("MAXIMIZE", true))
 
-    // A ROWS data line: `<type> <name>`, type in `N`(free/objective) `L`(≤) `G`(≥) `E`(=). Returns whether
-    // an objective row exists once this line has been read. The flag is carried by the caller rather than
-    // re-derived: only the FIRST free row is the objective, and rescanning every row parsed so far to learn
-    // that costs O(rows) per free row, which is quadratic on a free-row-heavy file.
+    // `<type> <name>`. The caller carries the objective-seen flag because rescanning parsed rows per free row
+    // is quadratic on a free-row-heavy file.
     private fun readRow(
         fields: List<String>,
         rows: MutableList<Row>,
@@ -191,8 +182,7 @@ object Mps {
         return hasObjective || type == RowType.OBJECTIVE
     }
 
-    /** A COLUMNS data line: either a `MARKER`/`INTORG`/`INTEND` integer-section toggle (returns the new
-     *  in-integer-section flag) or `<col> <row> <val> [<row> <val>]` accumulating column coefficients. */
+    // A `MARKER` integer-section toggle, returning the new flag, or `<col> <row> <val> [<row> <val>]`.
     private fun readColumn(
         fields: List<String>,
         rowByName: Map<String, Row>,
@@ -210,7 +200,6 @@ object Mps {
         val colName = fields[0]
         val v = varByName.getOrPut(colName) { Var(colName, vars.size).also { vars.add(it) } }
         if (inMarker) v.integer = true
-        // Row/value pairs follow the column name; one or two per line.
         var i = 1
         while (i < fields.size) {
             val rowName = fields[i]
@@ -224,17 +213,13 @@ object Mps {
         return inMarker
     }
 
-    /** An RHS data line: `[<setname>] <row> <val> [<row> <val>]`. A value against the objective row is
-     *  kept on its [Row.rhs] and folded into the objective constant (negated) by [build]. */
+    // A value against the objective row becomes the negated objective constant in build.
     private fun readRhs(fields: List<String>, rowByName: Map<String, Row>) =
         forEachRowValue(fields, rowByName, "RHS") { row, value -> row.rhs = value }
 
-    /** A RANGES data line: `[<setname>] <row> <val> [<row> <val>]`. */
     private fun readRanges(fields: List<String>, rowByName: Map<String, Row>) =
         forEachRowValue(fields, rowByName, "RANGES") { row, value -> row.range = value }
 
-    /** Apply a callback over the `(row, value)` pairs of an RHS/RANGES line, tolerating an optional
-     *  leading set-name column (present in most files, absent in some). */
     private inline fun forEachRowValue(
         fields: List<String>,
         rowByName: Map<String, Row>,
@@ -256,8 +241,7 @@ object Mps {
         }
     }
 
-    /** An INDICATORS data line: `IF <row> <col> <0|1>`, reading as `col == value ⇒ row holds` — the row
-     *  is relaxed at the other value. The leading `IF` keyword is optional (some writers omit it). */
+    // `IF <row> <col> <0|1>`: `col == value ⇒ row holds`. Some writers omit the `IF`.
     private fun readIndicators(fields: List<String>, rowByName: Map<String, Row>, varByName: Map<String, Var>) {
         val rest = if (fields.isNotEmpty() && fields[0].equals("IF", true)) fields.drop(1) else fields
         if (rest.size < 3) {
@@ -274,7 +258,6 @@ object Mps {
         row.indicator = MpsIndicator(v.index, whenOne)
     }
 
-    /** A BOUNDS data line: `<type> [<setname>] <col> [<val>]`. */
     private fun readBounds(fields: List<String>, varByName: Map<String, Var>) {
         if (fields.size < 2) throw MpsFormatException("BOUNDS line too short: '${fields.joinToString(" ")}'")
         val type = fields[0].uppercase()
@@ -300,8 +283,6 @@ object Mps {
         )
     }
 
-    /** Apply one BOUNDS entry of [type] with [value] to variable [v] (the standard MPS bound types;
-     *  a `null` bound is left standing for infinity). */
     private fun applyBound(v: Var, type: String, value: MpsSourceNumber) {
         when (type) {
             "UP" -> {
@@ -404,7 +385,6 @@ object Mps {
         return MpsModel(name, sense, objective, variables, constraints, mpsSemantics).withSourceNumbers(source)
     }
 
-    /** Resolve a row's `[lower, upper]` from its type, rhs and optional range (`null` = open side). */
     private fun bounds(row: Row): Pair<MpsSourceNumber?, MpsSourceNumber?> {
         val r = row.range
         if (r == null) {
@@ -418,12 +398,7 @@ object Mps {
         return applyRange(row.type, row.rhs, r)
     }
 
-    /**
-     * The standard `RANGES` sign rules turning a one-sided row plus a range `R` into a finite interval:
-     *  - `L` (`≤ rhs`): `[rhs − |R|, rhs]`
-     *  - `G` (`≥ rhs`): `[rhs, rhs + |R|]`
-     *  - `E` (`= rhs`): `[rhs, rhs + R]` when `R ≥ 0`, else `[rhs + R, rhs]`.
-     */
+    // `L`: `[rhs − |R|, rhs]`; `G`: `[rhs, rhs + |R|]`; `E`: `[rhs, rhs + R]` when `R ≥ 0`, else `[rhs + R, rhs]`.
     private fun applyRange(
         type: RowType,
         rhs: MpsSourceNumber,

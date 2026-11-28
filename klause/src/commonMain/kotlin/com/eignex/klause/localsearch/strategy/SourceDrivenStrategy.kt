@@ -18,13 +18,11 @@ import com.eignex.klause.localsearch.schedule.StallSchedule
 import com.eignex.klause.localsearch.scoring.MoveScoring
 import com.eignex.klause.util.ExecutionControl
 
-/** Temperature a Metropolis acceptance falls back to when the schedule axis supplies none. */
 private const val DEFAULT_METROPOLIS_TEMPERATURE = 1.0
 
 /**
- * How a strategy conducts the feasible (`cost == 0`) phase of a minimize — an explicit per-strategy
- * choice with no default, so a portfolio arm can never fall into a descent it didn't ask for. The
- * [com.eignex.klause.localsearch.LocalSearchSolver] dispatches the feasible phase exhaustively on it.
+ * How a strategy conducts the feasible (`cost == 0`) phase of a minimize. Every strategy declares it explicitly,
+ * so no portfolio arm falls into a descent it did not ask for.
  */
 enum class FeasibleDescent {
     /** Violation-native (probSAT / WalkSAT / feasibility-jump): the strategy does not optimize at
@@ -51,11 +49,9 @@ enum class FeasibleDescent {
  *    draw can take; [Pool.ScoreOnly] moves (coordinated swaps/chains) compete by score only, never
  *    by dice.
  *
- * A source is consumed entirely by configuration, so any source is available to any recipe with no
- * new generation code: a focused arm is `{ViolatedRepairs}`, a structured-descent arm adds
- * `{SatisfiedStructured, ObjectiveSeed}`. The recipe's behaviour is its four axes — [sources],
- * [scoring], [acceptance], [schedule]. Each local-search arm (CBLS, Feasibility-Jump, the
- * WalkSAT/probSAT/SA family) is a named recipe over this driver, built by the factories in this package.
+ * Sources are consumed entirely by configuration, so any source is available to any recipe: a focused arm is
+ * `{ViolatedRepairs}`, a structured-descent arm adds `{SatisfiedStructured, ObjectiveSeed}`. A recipe's behaviour
+ * is its four axes: [sources], [scoring], [acceptance] and [schedule].
  */
 class SourceDrivenStrategy(
     /** The sources this strategy draws from, with their per-source caps and enable gates. */
@@ -77,9 +73,7 @@ class SourceDrivenStrategy(
     /** Optional perturbation: consulted once per pick before generation; a non-null result is taken
      *  immediately as a diversification kick. The closure owns its own trigger/stall state. */
     val perturbation: ((LocalSearchState) -> Move?)? = null,
-    /** How this strategy conducts the feasible (`cost == 0`) phase of a minimize — see [FeasibleDescent].
-     *  Explicit with no default: every strategy declares it, so no portfolio arm can silently inherit a
-     *  descent it didn't choose (the `LocalSearchSolver` dispatches on it exhaustively). */
+    /** How this strategy conducts the feasible (`cost == 0`) phase of a minimize. */
     val feasibleDescent: FeasibleDescent,
     /** Acceptance used only in the feasible (`cost == 0`) phase, when the objective is scored, in place
      *  of [acceptance]. Lets a strategy fight infeasibility with noise but descend the objective
@@ -92,8 +86,7 @@ class SourceDrivenStrategy(
     val feasibleResampleCap: Int = 0,
 ) {
 
-    /** A copy with selected axes replaced, used by recipe assembly and the axis-edit transform to
-     *  swap one dimension while preserving the rest. */
+    /** A copy with selected axes replaced. */
     fun copy(
         sources: List<ConfiguredSource> = this.sources,
         scoring: MoveScoring = this.scoring,
@@ -383,15 +376,12 @@ class SourceDrivenStrategy(
         return move
     }
 
-    /** Restrict [moves] to configuration-changed candidates when [configurationChecking] is on,
-     *  falling back to the unfiltered pool when every candidate is CC-blocked. */
     private fun ccFilter(state: LocalSearchState, moves: List<Move>): List<Move> {
         if (!configurationChecking || moves.isEmpty()) return moves
         val cc = moves.filter { confChanged(state, it) }
         return cc.ifEmpty { moves }
     }
 
-    /** A move is configuration-changed iff every variable it touches has moved since its last flip. */
     private fun confChanged(state: LocalSearchState, move: Move): Boolean = when (move) {
         is Move.BoolFlip -> state.boolConfChange[move.varId]
         is Move.IntSet -> state.intConfChange[move.varId]
@@ -399,9 +389,8 @@ class SourceDrivenStrategy(
         is Move.Compound -> move.parts.all { confChanged(state, it) }
     }
 
-    /** Scored value on the [scoring] basis. Weighted/raw net-delta add the objective change only once
-     *  feasible (gated on `cost == 0`, so the infeasibility fight keeps the constraint gradient); the
-     *  break basis already folds the shaped objective. */
+    // Weighted/raw net-delta add the objective change only once feasible, so the infeasibility fight keeps the
+    // constraint gradient; the break basis already folds the shaped objective.
     private fun score(state: LocalSearchState, move: Move): Double {
         // Feasibility-first gating must retain the objective gradient at a feasible point.
         // Complete grades prevent objective gains from admitting a hard violation.

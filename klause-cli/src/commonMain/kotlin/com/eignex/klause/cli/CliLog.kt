@@ -6,13 +6,7 @@ import co.touchlab.kermit.Severity
 import co.touchlab.kermit.StaticConfig
 import com.eignex.util.process.printErrorLine
 
-/**
- * CLI logger for the `-v` (verbose) flag, backed by Kermit (KMP).
- *
- * Lines use the invocation diagnostic destination, prefixed with `% `.
- * With `-v` off the logger's minimum severity is [Severity.Assert] and nothing we emit
- * (all [Logger.v]/[Logger.i]) passes the filter, so the hot paths stay silent and cheap.
- */
+// With `-v` off the minimum severity is Assert, so nothing the CLI emits passes and hot paths stay cheap.
 private class DiagnosticCommentWriter(private val emit: (String) -> Unit) : LogWriter() {
     override fun log(severity: Severity, message: String, tag: String, throwable: Throwable?) {
         emit("% $message")

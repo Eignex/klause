@@ -33,8 +33,8 @@ import kotlinx.serialization.json.JsonElement
 import kotlin.jvm.JvmName
 
 // Native factors bind declared variables by name: a factor built over local ids `0 until n` of each
-// namespace reads its Boolean id `i` as `bools[i]`, its integer id `i` as `ints[i]` and its real id `i`
-// as `reals[i]`. Compilation renames the ids to the compiled columns and posts the factor unchanged.
+// namespace reads its Boolean id `i` as `bools(i)`, its integer id `i` as `ints(i)` and its real id `i`
+// as `reals(i)`. Compilation renames the ids to the compiled columns and posts the factor unchanged.
 
 /**
  * Post [relation] as written, over the declared variables it binds by local id. [codecs] must know the

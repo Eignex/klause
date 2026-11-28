@@ -13,8 +13,6 @@
 #   - mzn-error   : minizinc failed to flatten (syntax / type / search / data)
 #   - timeout     : flattening exceeded the per-instance flatten budget
 #
-# Reusable across corpora — pass the root directory as $1.
-#
 # Usage:
 #   verify-corpus.sh CORPUS_ROOT [FLATTEN_TIMEOUT_S]
 #
@@ -45,7 +43,6 @@ if ! command -v minizinc >/dev/null 2>&1; then
   exit 2
 fi
 
-# Counts for the summary footer.
 ok_count=0
 decomposed_count=0
 mzn_error_count=0
@@ -55,14 +52,11 @@ total=0
 unsupported_index="$(mktemp)"
 trap 'rm -f "$SUPPORTED_FILE" "$unsupported_index"' EXIT
 
-# Iterate problem dirs: each directory under CORPUS holds .mzn files + .dzn data
-# files. Pair each .mzn with each .dzn that lives alongside it. If no .dzn, the
-# .mzn is run alone.
+# Each .mzn pairs with .dzn files in its own directory, or runs alone without one.
 echo "path,status,unsupported_names"
 
 while IFS= read -r -d '' mzn; do
   dir="$(dirname "$mzn")"
-  # Match data files in the same directory.
   shopt -s nullglob
   dzns=("$dir"/*.dzn)
   shopt -u nullglob
@@ -71,9 +65,8 @@ while IFS= read -r -d '' mzn; do
   elif [[ "${PAIR_ALL_DZN:-0}" == "1" ]]; then
     pairs=("${dzns[@]}")
   else
-    # Default: pair each .mzn with the smallest .dzn — the constraint set is the
-    # same across data instances (only sizes vary), so one instance is enough to
-    # exercise the constraint-coverage path. Set PAIR_ALL_DZN=1 to fully sweep.
+    # The constraint set is the same across data instances, so the smallest .dzn is enough by default.
+    # Set PAIR_ALL_DZN=1 to pair every .dzn.
     smallest="$(ls -S "${dzns[@]}" | tail -1)"
     pairs=("$smallest")
   fi
@@ -86,13 +79,9 @@ while IFS= read -r -d '' mzn; do
     total=$((total + 1))
     fzn="$(mktemp --suffix=.fzn)"
     err="$(mktemp)"
-    # MiniZinc 2.9 wants `-c` to compile to FZN (no solve). `--no-output-ozn`
-    # speeds it up since we're not running the solver here.
+    # `-c` compiles to FZN without solving.
     args=(--solver "$SOLVER_MSC" -c "$mzn" -o "$fzn" --no-output-ozn)
     [[ -n "$dzn" ]] && args+=("$dzn")
-    # Capture minizinc's exit code without aborting the sweep. The script header is
-    # `set -uo pipefail` (no `-e`), so the non-zero exit is observable via `$?`
-    # without triggering early termination.
     rc=0
     timeout "${FLATTEN_TIMEOUT_S}s" minizinc "${args[@]}" >"$err" 2>&1 || rc=$?
     if (( rc != 0 )); then

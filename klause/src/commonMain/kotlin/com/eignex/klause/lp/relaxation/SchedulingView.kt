@@ -10,28 +10,18 @@ import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.constructionLongArray
 
 /**
- * A [Cumulative] normalized to the constant data the LP relaxations and the flow
- * bound consume: per-task constant duration, **minimum** resource demand, and the **maximum**
- * (declared) capacity. Using the min demand and max capacity keeps every derived constraint a sound
- * relaxation — it can only loosen, never cut off a feasible schedule.
- *
- * Only the cases all three scheduling relaxations ([CumulativeRelaxation], [buildCumulativeTimeIndexed]
- * and [CumulativeFlowBound]) can soundly handle are surfaced: constant durations (a variable duration is
- * not a two-variable makespan link and changes the resource window) and non-optional tasks (a presence
- * literal makes every derived obligation conditional). Other factors are dropped, which only weakens the bound.
+ * A [Cumulative] with constant durations, minimum demands and the declared maximum capacity, which keeps
+ * every derived constraint a relaxation. Only cases [CumulativeRelaxation], [buildCumulativeTimeIndexed]
+ * and [CumulativeFlowBound] all handle soundly are surfaced: a variable duration is no two-variable
+ * makespan link, and a presence literal makes every obligation conditional.
  */
 internal class SchedulingView(
     val starts: IntArray,
-    /** Constant per-task durations; a zero-duration task consumes no resource. */
     val durations: LongArray,
-    /** Per-task minimum resource demand. */
     val resources: LongArray,
-    /** Declared (maximum) capacity, `> 0`. */
     val capacity: Long,
 )
 
-/** Every [Cumulative] of [problem], normalized; factors the relaxations cannot soundly
- *  encode (variable durations, optional tasks, non-positive capacity, empty) are omitted. */
 internal fun schedulingViews(problem: Problem): List<SchedulingView> {
     var result: List<SchedulingView> = emptyList()
     sequence<Unit> { result = prepareSchedulingViews(problem) }.forEach { }
@@ -57,21 +47,15 @@ internal suspend fun SequenceScope<Unit>.prepareSchedulingViews(problem: Problem
     return out
 }
 
-/**
- * The declared (maximum) capacity of [f], or null when the model states none above 0.
- *
- * A capacity variable the model leaves open above states no ceiling at all, so every obligation an
- * energetic relaxation would derive from it vanishes. The factor is dropped rather than capped at the
- * search box, whose endpoint would state a resource limit the model never declared.
- */
+// Null when the model states no capacity above 0. A capacity open above states no ceiling, so the factor is
+// dropped rather than capped at a search-box endpoint the model never declared.
 internal fun declaredCapacityOf(problem: Problem, f: Cumulative): Long? {
     if (f.capacityVar < 0) return f.capacity.takeIf { it > 0L }
     if (!problem.statesUpperBound(f.capacityVar)) return null
     return problem.rootDomainOf(f.capacityVar).max.takeIf { it > 0L }
 }
 
-/** Per-task minimum resource demand of [f], or null when a demand variable is open below — its minimum
- *  is then the search box's invented endpoint rather than a demand the model states. */
+// Null when a demand is open below: its minimum would be an invented search-box endpoint.
 internal fun minimumResourcesOf(problem: Problem, f: Cumulative): LongArray? {
     if (f.resourceVars.isEmpty()) return LongArray(f.starts.size) { i -> f.resources[i] }
     if (f.resourceVars.any { !problem.statesLowerBound(it) }) return null

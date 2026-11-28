@@ -4,12 +4,9 @@ import java.io.InputStream
 import java.security.MessageDigest
 import java.util.Locale
 
-/**
- * The Global Benchmark Database's content hash of a DIMACS CNF (`gbdhash`): the MD5 of its clause literals with
- * comment and header lines dropped and each run of whitespace between tokens written as one space, ending in a
- * clause terminator. Two files that differ only in comments, header or layout share it, so it names an instance
- * whatever its file name or compression. Mirrors `cnf_hash` in GBD's `gbd_init/gbdhash.py`.
- */
+// The MD5 of the clause literals with comment and header lines dropped and each whitespace run written as one space,
+// ending in a clause terminator, so it names an instance whatever its file name, layout or compression. Mirrors
+// `cnf_hash` in GBD's `gbd_init/gbdhash.py`.
 internal object GbdHash {
     private const val BUFFER_BYTES = 1 shl 16
     private const val BYTE_MASK = 0xFF

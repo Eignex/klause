@@ -70,16 +70,7 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
         proposeReversalMoves(state, sink)
     }
 
-    /**
-     * 2-opt segment reversals. On the current Hamiltonian tour, reverse a bounded interior segment:
-     * this removes two edges and reconnects their endpoints while flipping the direction of the
-     * segment between them — the classic routing move that a single successor change cannot reach.
-     * Each reversal is emitted as one atomic [Move.Compound] over the reversed segment's successor
-     * variables. Feasibility-preserving (reversing a segment of a valid tour yields a valid tour), so
-     * it belongs with the structured moves; if the successor array is not a single Hamiltonian cycle
-     * (mid-repair) the move is undefined and nothing is emitted. Croes, "A method for solving
-     * traveling-salesman problems", Oper. Res. 6(6), 1958, https://doi.org/10.1287/opre.6.6.791.
-     */
+    // Emits nothing unless the successor array is a single Hamiltonian cycle.
     private fun proposeReversalMoves(state: LocalSearchState, sink: MoveSink) {
         if (n < 4) return
         val order = IntArray(n)

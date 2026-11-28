@@ -40,7 +40,6 @@ import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.negate
 
 internal sealed interface ExactLiraReduction {
-    /** The bounded transformed system proves this leaf impossible. */
     data object Infeasible : ExactLiraReduction
 
     class Bounded(
@@ -62,12 +61,8 @@ internal sealed interface ExactLiraReduction {
     data object Interrupted : ExactLiraReduction
 }
 
-/**
- * Cache the Boolean-leaf Double-Bounded Reduction artefact across integer branch-and-bound nodes.
- *
- * Reduced-coordinate branches are deliberately not part of this key: they search the fixed
- * double-bounded artefact, while source bounds and Boolean/disjunction choices select that artefact.
- */
+// Reduced-coordinate branches are not part of the key: they search the fixed artefact, while source bounds
+// and Boolean/disjunction choices select it.
 internal class ExactLiraReductionCache(
     private val model: Problem,
     private val exactForms: List<List<ExactRowForm>>,
@@ -296,15 +291,10 @@ private data class ExactLiraReductionKey(
     val sourceBranches: Set<SourceBoundAtom>,
 )
 
-/**
- * The bounded phase of the Double-Bounded Reduction in mixed-echelon/Hermite coordinates; M. Bromberger,
- * "A Reduction from Unbounded Linear Mixed Arithmetic Problems into Bounded Problems", IJCAR 2018,
- * https://doi.org/10.1007/978-3-319-94205-6_22.
- *
- * Only nonzero integer columns of the transformed double-bounded system are branched. Lemma 8 of that paper
- * makes each of those coordinates finite; zero columns are deliberately absent from this search and
- * are filled by [ExactLiraReduction.Bounded.extend] after the bounded witness is found.
- */
+// The bounded phase of the Double-Bounded Reduction in mixed-echelon/Hermite coordinates; M. Bromberger,
+// "A Reduction from Unbounded Linear Mixed Arithmetic Problems into Bounded Problems", IJCAR 2018,
+// https://doi.org/10.1007/978-3-319-94205-6_22. Only nonzero integer columns are branched (Lemma 8 makes
+// them finite); zero columns are filled by `Bounded.extend` after the bounded witness is found.
 internal class ExactReducedLiraSystem(private val reduction: ExactLiraReduction.Bounded) : AutoCloseable {
     private val realColumns = reduction.system.realColumns
     private val integerColumns = reduction.system.integerColumns

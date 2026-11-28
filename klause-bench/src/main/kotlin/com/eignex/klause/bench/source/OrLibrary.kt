@@ -1,16 +1,11 @@
 package com.eignex.klause.bench.source
 
-/**
- * OR-Library problem classes as MIPs: each class's own text format read and written out as MPS, one model per
- * instance. A converter returns (instance name, MPS) pairs; a file that holds several instances names them
- * `<file>-<k>`. The formats are those of the library's `<class>info.html`.
- *
- * J. E. Beasley, "OR-Library: distributing test problems by electronic mail", J. Oper. Res. Soc. 41(11), 1990,
- * https://doi.org/10.1057/jors.1990.166; library at https://people.brunel.ac.uk/~mastjjb/jeb/orlib/.
- */
+// Converts OR-Library text formats (per the library's `<class>info.html`) to MPS, one model per instance; a file
+// holding several instances names them `<file>-<k>`.
+// J. E. Beasley, "OR-Library: distributing test problems by electronic mail", J. Oper. Res. Soc. 41(11), 1990,
+// https://doi.org/10.1057/jors.1990.166.
 internal object OrLibrary {
-    /** Set covering (`scp*`): `m n`, the cost of each column, then for each row the number of columns covering it and
-     *  those columns (1-based). Minimise cost so every row is covered at least once. */
+    // `m n`, the cost of each column, then for each row the number of columns covering it and those columns (1-based).
     fun setCovering(file: String, text: String): List<Pair<String, String>> {
         val t = Tokens(text)
         val (m, n) = t.int() to t.int()
@@ -23,8 +18,7 @@ internal object OrLibrary {
         return listOf(file to model.mps())
     }
 
-    /** Set partitioning (`sppnw*`, airline crew scheduling): `m n`, then for each column its cost, the number of rows
-     *  it covers and those rows (1-based). Minimise cost so every row is covered exactly once. */
+    // `m n`, then for each column its cost, the number of rows it covers and those rows (1-based).
     fun setPartitioning(file: String, text: String): List<Pair<String, String>> {
         val t = Tokens(text)
         val (m, n) = t.int() to t.int()
@@ -38,9 +32,8 @@ internal object OrLibrary {
         return listOf(file to model.mps())
     }
 
-    /** Capacitated warehouse location (`cap41`…`cap134`): `m n`, each warehouse's capacity and fixed cost, then each
-     *  customer's demand and the cost of serving all of it from each warehouse. Open warehouses and split each customer
-     *  among the open ones within their capacity; the `x ≤ y` rows give the strong formulation. */
+    // `m n`, each warehouse's capacity and fixed cost, then each customer's demand and the cost of serving all of it
+    // from each warehouse. The `x ≤ y` rows give the strong formulation.
     fun warehouseLocation(file: String, text: String): List<Pair<String, String>> {
         val t = Tokens(text)
         val (m, n) = t.int() to t.int()
@@ -70,9 +63,8 @@ internal object OrLibrary {
         return listOf(file to model.mps())
     }
 
-    /** Generalised assignment (`gap1`…`gap12`): the number of problems, then each one's `m n`, the m×n costs, the m×n
-     *  resources and the m capacities. Maximised, as the library's optimal values are stated: each job to one agent,
-     *  each agent within its capacity. */
+    // The number of problems, then each one's `m n`, the m×n costs, the m×n resources and the m capacities. Maximized,
+    // as the library states its optimal values.
     fun generalisedAssignment(file: String, text: String): List<Pair<String, String>> {
         val t = Tokens(text)
         return List(t.int()) { k ->
@@ -86,9 +78,8 @@ internal object OrLibrary {
         }
     }
 
-    /** Multidimensional knapsack (`mknapcb1`…`mknapcb9`): the number of problems, then each one's `n m` and optimal
-     *  value (0 when unknown), the n profits, the m×n weights and the m capacities. Maximise profit within every
-     *  capacity. */
+    // The number of problems, then each one's `n m` and optimal value (0 when unknown), the n profits, the m×n weights
+    // and the m capacities.
     fun multidimensionalKnapsack(file: String, text: String): List<Pair<String, String>> {
         val t = Tokens(text)
         return List(t.int()) { k ->
@@ -102,11 +93,9 @@ internal object OrLibrary {
         }
     }
 
-    /** One-dimensional bin packing (`binpack1`…`binpack8`): the number of problems, then each one's identifier, bin
-     *  capacity, item count and best known bin count, and the item sizes. Bins are capped a tenth above the best known
-     *  count: at exactly it, merely finding a packing is the hard part for a MIP solver, and the spare bins leave the
-     *  optimum where it was. Bins are used in order, which removes the symmetry between empty bins. An
-     *  instance whose model would exceed [MAX_BIN_VARIABLES] item-bin variables is left out. */
+    // The number of problems, then each one's identifier, bin capacity, item count, best known bin count and item
+    // sizes. Bins are capped a tenth above the best known count: at exactly it, finding any packing is the hard part,
+    // and the spare bins leave the optimum unchanged. Bins are used in order to break empty-bin symmetry.
     fun binPacking(file: String, text: String): List<Pair<String, String>> {
         val t = Tokens(text)
         return List(t.int()) { _ ->
@@ -128,12 +117,10 @@ internal object OrLibrary {
         }.filterNotNull()
     }
 
-    /** Aircraft landing (`airland1`…`airland13`), one runway, the static case: `p` and the freeze time, then for each
-     *  plane its appearance, earliest, target and latest landing times, its early and late penalties per unit, and
-     *  the separation it needs before each plane. Each pair of planes lands in one order, the separation enforced by a
-     *  big-M on the order chosen. An instance of more than [MAX_PLANES] planes is left out. The model follows
-     *  Beasley, Krishnamoorthy, Sharaiha and Abramson, "Scheduling aircraft landings: the static case",
-     *  Transportation Science 34(2), 2000, https://doi.org/10.1287/trsc.34.2.180.12302. */
+    // One runway, static case: `p` and the freeze time, then for each plane its appearance, earliest, target and latest
+    // landing times, early and late penalties per unit, and the separation before each plane. Each pair's order is
+    // chosen with a big-M. Beasley, Krishnamoorthy, Sharaiha and Abramson, "Scheduling aircraft landings: the static
+    // case", Transportation Science 34(2), 2000, https://doi.org/10.1287/trsc.34.2.180.12302.
     fun aircraftLanding(file: String, text: String): List<Pair<String, String>> {
         val t = Tokens(text)
         val p = t.int()
@@ -184,16 +171,14 @@ internal object OrLibrary {
         return listOf(file to model.mps())
     }
 
-    /** Item-bin variables beyond which a bin packing instance makes too large a model for a seconds-scale solve. */
+    // Larger models are too big for a seconds-scale solve.
     private const val MAX_BIN_VARIABLES = 60_000L
 
-    /** One spare bin per this many of the best known count. */
     private const val SPARE_BINS_PER = 10
 
-    /** Planes beyond which the pairwise ordering makes too large a model for a seconds-scale solve. */
+    // Pairwise ordering beyond this is too big for a seconds-scale solve.
     private const val MAX_PLANES = 200
 
-    /** The whitespace-separated words of a file, read in order. */
     private class Tokens(text: String) {
         private val words = text.split(Regex("\\s+")).filter { it.isNotEmpty() }
         private var next = 0

@@ -14,8 +14,6 @@ import com.eignex.klause.ir.materializeKey
  * `symmetric_all_different(xs)` — `xs` is a self-inverse permutation: `xs(xs(i)) = i` for
  * every `i`. Strictly stronger than `all_different`: each value also points back to its pointer.
  *
- * [indexOffset] is the value that means position 0 — typically `1` for the MiniZinc 1-based default.
- *
  * Propagation: bounds to the index range, clash detection among fixed variables, and forcing
  * the mirror of each fixed variable.
  */
@@ -32,7 +30,6 @@ class SymmetricAllDifferent(
 
     override fun remap(mapping: VarRemap): Factor = SymmetricAllDifferent(mapping.ints(xs), indexOffset)
 
-    /** A self-inverse permutation references positions (`xs(xs(i)) = i`), so [xs] is positional. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.SYMMETRIC_ALL_DIFFERENT, ::buildKey)
 
     override fun remapStructuralHash(mapping: VarRemap): Int =

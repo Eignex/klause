@@ -4,78 +4,46 @@ import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 
-/**
- * Bound-atom registry for [PropagationState] (LCG with virtual int-bound literals).
- *
- * An "atom" represents a fact `[x ≥ k]`, `[x ≤ k]` or `[x = k]`. Each atom gets a virtual variable id
- * past the bool var space (`numBoolVars + atomId`), so atom *literals* — encoded with `Lit.make`
- * using that virtual id — slot into the same array structure the analyzer already understands.
- * Allocation is lazy: an atom only enters the registry when first referenced (`allocAtom` in `Atoms.kt`).
- *
- * Each materialized order literal carries the same trail metadata a bool var does: stored truth
- * ([truth]), the decision level it was established at ([lvl]) and the literal-form antecedents of
- * the force ([ant]) — stored at the moment the bound crosses the threshold and undone on backtrack
- * alongside the int-domain change that set them. The channeling and wake logic lives in `Atoms.kt`.
- */
+// Bound-atom registry for lazy clause generation. An atom `[x ≥ k]`, `[x ≤ k]` or `[x = k]` gets the virtual
+// variable id `numBoolVars + atomId`, so its literals share the Boolean literal encoding. Atoms are allocated
+// lazily on first reference. Each carries the trail metadata a Boolean variable does: [truth], [lvl] and [ant],
+// recorded when the bound crosses the threshold and undone with the domain change that set them.
 internal class AtomStore(numIntVars: Int) {
-    /** Atom id → int variable. The reverse (var, kind, threshold) → atom lookup searches the
-     *  per-variable sorted threshold index ([byIntVar]). */
+    // The reverse (var, kind, threshold) → atom lookup searches [byIntVar].
     val intVar: IntArrayList = IntArrayList()
 
-    /** The relational form of each atom, parallel to [intVar] / [threshold]. */
     val kind: ArrayList<AtomKind> = ArrayList()
 
     val threshold: LongArrayList = LongArrayList()
 
-    /** Stored truth of this order literal — a BCP-cheap forward cache that avoids re-deriving it
-     *  from the int domains on every clause touch (the dominant cost in BCP profiles). 0 =
-     *  uncached / undetermined, 1 = true, 2 = false. Filled the instant a bound move crosses the
-     *  threshold (`wakeAtom`) or a clause forces the literal (`pinAtomLit`); restored on backtrack
-     *  by the reversible atom trail ([undoAtomId]). A 0 slot is not proof of "undetermined": an atom
-     *  materialized *after* its bound already crossed carries no cached truth, so a read falls back
-     *  to the domain-derived `atomTruthOf` — sound and current, just uncached. */
+    // Cached truth (0 = uncached, 1 = true, 2 = false) so BCP avoids re-deriving it from the domains on every
+    // clause touch. A 0 slot is not proof of "undetermined": an atom materialized after its bound crossed has
+    // no cached truth, and readers fall back to the domain-derived `atomTruthOf`.
     val truth: IntArrayList = IntArrayList()
 
-    /** Decision level at which this atom's current truth was established (-1 = none, i.e. truth
-     *  undetermined or a root/bake fact). */
+    // -1 when the truth is undetermined or a root/bake fact.
     val lvl: IntArrayList = IntArrayList()
 
-    /** Literal-form antecedents of this atom's current truth (null = leaf / root). */
+    // Null for a leaf or root fact.
     val ant: ArrayList<IntArray?> = ArrayList()
 
-    /** The reason of the bound move currently being channeled by `propagateAtomsForVar` — the
-     *  literals whose conjunction forced it. `wakeAtom` stores it on each crossed atom's [ant]
-     *  slot (the trail-resident reason, recorded at the atom's establishment level). */
+    // Reason of the bound move `propagateAtomsForVar` is channeling; `wakeAtom` stores it on each crossed atom.
     var pendingMoveAnt: IntArray? = null
 
-    /** Per-atom-lit watcher list — factor ids that fire when this atom-lit transitions to false.
-     *  Mirrors [BoolWatcherIndex.byLit] for atoms. Array-indexed by atom-lit (two slots per atom:
-     *  positive at `atomId*2`, negative at `atomId*2+1`), grown two slots per `allocAtom`, so
-     *  order literals get the same O(1) array access in the BCP hot path instead of a boxed-Int
-     *  hash probe per wake. A null slot means "no watchers". */
+    // Factor ids woken when an atom literal becomes false: positive literal at `atomId*2`, negative at
+    // `atomId*2+1`. Array-indexed to avoid a boxed hash probe per wake on the BCP hot path.
     val watchersByLit: ArrayList<IntArrayList?> = ArrayList()
 
-    /** For each int variable, the atoms whose truth depends on it — used to recompute atom truth
-     *  and fire watchers after a successful tighten / exclude. Dense-indexed by the int-var id so
-     *  the post-tighten wake path pays no boxed-Int hash probe; a null slot means "no atoms
-     *  materialised for this var yet". */
+    // Dense by int-var id so the post-tighten wake path pays no boxed hash probe.
     val byIntVar: Array<VarAtomIndex?> = arrayOfNulls(numIntVars)
 
-    /** Per-var sorted thresholds that some factor watches (either polarity of the atom's literal),
-     *  registered by `markAtomWatched` at watch installation. Dense-indexed like [byIntVar]. */
+    // Thresholds some factor watches, registered by `markAtomWatched`.
     val watchedByVar: Array<VarAtomIndex?> = arrayOfNulls(numIntVars)
 
-    /** Factor ids woken by atom-lit transitions during the current propagation step.
-     *  Drained alongside dirty-int / dirty-bool processing in `runToFixpoint`. */
     val dirtyFactors: IntArrayDeque = IntArrayDeque(initialCapacity = 8)
 
-    /** Reversible atom-truth trail. Every change to [truth]/[lvl]/[ant] pushes the *prior* value
-     *  here (via `recordAtomTruthChange`) while undo-logging is on; `undoTo` replays it top-down to
-     *  the level mark, restoring each atom to its mark-time truth/level/reason. This makes atom
-     *  assignment (whether by a bound move or by a channeling/learned clause forcing the literal
-     *  directly) backtrack correctly on its own, independent of the domain — the trail the
-     *  literal-primary LCG design needs. Parallel arrays: which atom, and its prior 3-valued truth,
-     *  level and antecedents. */
+    // Prior truth/level/antecedents of each atom change, so atom assignment backtracks on its own even when
+    // a clause forced the literal without a domain move.
     val undoAtomId: IntArrayList = IntArrayList()
     val undoTruth: IntArrayList = IntArrayList()
     val undoLvl: IntArrayList = IntArrayList()

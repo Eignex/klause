@@ -18,29 +18,12 @@ import kotlin.math.floor
 import kotlin.math.log2
 import kotlin.math.roundToLong
 
-/**
- * Integer-multiplier exact lower bound on the minimized objective `cᵀz`, in 128-bit integer arithmetic; the
- * integer-valued counterpart of [safeObjectiveLowerBound]. Instead of solving the dual system exactly it rounds
- * the approximate float duals [y] to integer multipliers at a power-of-two scale `2ᵏ` and evaluates the
- * Lagrangian `L(y) = y·rhs + Σⱼ min_{[lⱼ,uⱼ]} dⱼ·zⱼ` exactly with an [Int128] accumulator.
- *
- * The slack-form constraints are equalities, so `L(y)` bounds the optimum for any `y`; rounding the duals only
- * weakens the bound. This is the safe-bound argument of Neumaier and Shcherbina, "Safe bounds in linear and
- * mixed-integer linear programming", Math. Program. 99, 2004, https://doi.org/10.1007/s10107-003-0433-3.
- * Every error path returns null (the caller keeps the node):
- *  - a non-finite dual, or a multiplier that escapes the exactly-representable range;
- *  - a reduced cost too large to evaluate in 64 bits, or a 128-bit accumulator overflow;
- *  - a strictly-negative reduced cost on a variable with no finite upper bound (unbounded Lagrangian).
- *
- * The result is `⌈L⌉` when the source objective has a verified integer lattice; otherwise it declines. The scale
- * is a power of two, so the final division is an arithmetic shift ([Int128.ceilDivPow2]).
- *
- * @param model the slack-form relaxation (`A z = rhs`, `0 ≤ z ≤ upper`) whose objective is bounded.
- * @param y approximate dual vector over the `m` rows (e.g. from [RevisedSimplex]); length `≥ model.m`.
- * @param scaleBits the requested power-of-two scale exponent; capped down so the rounded multipliers
- *   stay exactly representable as `Double` (and below the [MAX_EXACT_INT] round-trip guard).
- * @param observer optional sink for the integer-certificate attempt.
- */
+// Rounds the float duals [y] to integer multipliers at scale 2ᵏ and evaluates L(y) = y·rhs + Σⱼ min_{[lⱼ,uⱼ]} dⱼ·zⱼ
+// exactly in [Int128]. The slack-form rows are equalities, so L(y) bounds the optimum for any y and rounding only
+// weakens it: Neumaier and Shcherbina, "Safe bounds in linear and mixed-integer linear programming", Math. Program.
+// 99, 2004, https://doi.org/10.1007/s10107-003-0433-3. Returns ⌈L⌉ only for a verified integer source objective
+// lattice. Null (the caller keeps the node) on a non-finite or unrepresentable multiplier, an overflow, or a negative
+// reduced cost on a column without a finite upper bound.
 internal fun integerDualLowerBoundCeil(
     model: LpModel,
     y: DoubleArray,
@@ -52,14 +35,10 @@ internal fun integerDualLowerBoundCeil(
     null
 }
 
-/**
- * `⌈L⌉` on a **continuous** model's true minimized objective, certified over its scaled-integer
- * rationalization: the integer certificate bounds the scaled objective `s·(cᵀz + objConstant)` exactly,
- * and the scale divides back out through `⌈⌈N / 2ᵏ⌉ / s⌉ = ⌈N / (2ᵏ·s)⌉`, so the result is a sound
- * lower bound only for a verified integer source objective lattice. The float duals need no rescaling:
- * scaling by `s` leaves the optimal duals unchanged, and any multipliers are sound regardless. Null when the model
- * does not rationalize (an exactly-scaled objective constant included) or the certification overflows.
- */
+// Certified over the scaled-integer rationalization: the certificate bounds s·(cᵀz + objConstant) and the scale
+// divides out through ⌈⌈N / 2ᵏ⌉ / s⌉ = ⌈N / (2ᵏ·s)⌉, sound only for a verified integer source objective lattice.
+// Scaling by s leaves the optimal duals unchanged, so the float duals need no rescaling. Null when the model, its
+// objective constant included, does not rationalize or the certification overflows.
 internal fun rationalizedDualLowerBoundCeil(
     model: LpModel,
     y: DoubleArray,
@@ -76,18 +55,14 @@ internal fun rationalizedDualLowerBoundCeil(
     return if (model.hasIntegralObjective()) ceilDivPositive(scaled, r.scale) else null
 }
 
-/** `⌈a / d⌉` for a positive [d]: truncating division adjusted upward on a positive remainder. */
 private fun ceilDivPositive(a: Long, d: Long): Long {
     val q = a / d
     return if (a % d > 0L) q + 1L else q
 }
 
-/** The integer duals from rounding the float duals at the chosen power-of-two scale `2ᵏ`. */
 internal class RoundedDuals(val scaleBits: Int, val scale: Long, val mult: LongArray)
 
-/** Round the float duals `y` to integer multipliers at a capped power-of-two scale `2ᵏ`, or null when a
- *  dual is non-finite or its scaled value escapes the exactly-representable range (so [roundToLong]
- *  recovers the true nearest integer). */
+// Null when a dual is non-finite or its scaled value escapes the range where [roundToLong] is exact.
 internal fun roundDuals(
     model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS, inspect: (() -> Unit)? = null,
 ): RoundedDuals? {
@@ -123,21 +98,16 @@ internal fun dualRoundingScaleBits(
     return k.takeIf { scaled.isFinite() && scaled < MAX_EXACT_INT }
 }
 
-/**
- * The integer-multiplier Lagrangian data a node deduction needs (objective lower bound, per-column reduced cost,
- * dual-row support), carried as exact scaled integers from rounded duals at scale `2ᵏ`. Every quantity is a valid
- * deduction for any integer multipliers, so rounding only weakens it (see [integerCertify]).
- */
+// Every quantity is a valid deduction for any integer multipliers, so rounding the duals only weakens it.
 internal class IntegerCertificate(
     model: LpModel,
     private val scaleBits: Int,
     private val scale: Long,
-    /** Scaled integer duals `2ᵏ·yᵢ`, one per row. */
+    // 2ᵏ·yᵢ.
     private val mult: LongArray,
-    /** Scaled reduced cost `Dⱼ = 2ᵏ·cⱼ − Σᵢ multᵢ·Aᵢⱼ`, one per column. Rounded
-     *  multipliers can leave a nonzero exact reduced cost even on a float-basic column. */
+    // Dⱼ = 2ᵏ·cⱼ − Σᵢ multᵢ·Aᵢⱼ; rounded multipliers can leave it nonzero even on a float-basic column.
     private val reduced: LongArray,
-    /** `N = 2ᵏ · objective` (the Lagrangian lower bound, including `model.objConstant`). */
+    // N = 2ᵏ·objective, including model.objConstant.
     private val numerator: Int128,
 ) : LpDeductionCertificate {
     // Row weights and endpoint support cannot be reinterpreted after a pop or an objective edit.
@@ -162,11 +132,9 @@ internal class IntegerCertificate(
         BIG_ONE shl scaleBits,
     )
 
-    /** The scale exponent `k`: the objective is `objectiveNumerator / 2ᵏ`. Lets a caller summing several
-     *  certificates' objectives bring them to a common denominator. */
+    // The objective is objectiveNumerator / 2ᵏ.
     val objectiveScaleBits: Int get() = scaleBits
 
-    /** A copy of `N = 2ᵏ · objective` (the exact scaled objective numerator); see [objectiveScaleBits]. */
     fun objectiveNumerator(): Int128 = numerator.copy()
 
     override fun exactMultipliers(): List<BigFraction> = mult.indices.map(::exactMultiplier)
@@ -191,7 +159,7 @@ internal class IntegerCertificate(
         return n.ceilDivPow2(scaleBits)
     }
 
-    /** The scaled source-objective improving gap `G = improvingMax·2ᵏ − (N + sourceConstant·2ᵏ)`. */
+    // G = improvingMax·2ᵏ − (N + sourceConstant·2ᵏ).
     private fun gapNumerator(improvingMax: Long, sourceConstant: Long): Int128 {
         val g = Int128()
         g.addProduct(improvingMax, scale)
@@ -233,13 +201,8 @@ internal class IntegerCertificate(
         }
     }
 
-    /**
-     * Max integer steps column [col] may move from its reduced-cost-minimizing endpoint before it pushes the objective
-     * past [improvingMax]: `⌊ (improvingMax − sourceConstant − objective) / |reducedCost| ⌋`.
-     * Sound for any duals because `sourceObjective = sourceConstant + y·rhs + Σₖ rcₖzₖ` and every
-     * other box term is `≥ 0`, so `|rcⱼ|·Δⱼ ≤ improvingMax − sourceConstant − objective`.
-     * Null on a zero reduced cost or on overflow (the caller then skips the fix, which is sound).
-     */
+    // ⌊(improvingMax − sourceConstant − objective) / |rcⱼ|⌋. Sound for any duals: sourceObjective = sourceConstant +
+    // y·rhs + Σₖ rcₖzₖ with every other box term ≥ 0. Null on a zero reduced cost or overflow, skipping the fix.
     override fun fixSteps(col: Int, improvingMax: Long, sourceConstant: Long): Long? {
         if (authority?.model?.column(col)?.integral == false) return null
         val dj = reduced[col]
@@ -248,15 +211,8 @@ internal class IntegerCertificate(
     }
 }
 
-/**
- * Certify a node LP optimum from the float duals [y] as an [IntegerCertificate] over exact scaled integers:
- * rounds the duals to integer multipliers and evaluates the Lagrangian `L(y) = y·rhs + Σⱼ min_{[lⱼ,uⱼ]} dⱼ·zⱼ`
- * and every reduced cost in a 128-bit accumulator. Sound for any integer multipliers, since the slack-form
- * constraints are equalities. Null (the caller keeps the node) on:
- *  - a non-finite dual or a multiplier outside the exactly-representable range;
- *  - a reduced cost too large to evaluate in 64 bits, or a 128-bit accumulator overflow;
- *  - a strictly-negative reduced cost on a column with no finite upper bound (unbounded Lagrangian).
- */
+// Null (the caller keeps the node) on a non-finite or unrepresentable multiplier, an overflow, or a negative
+// reduced cost on a column without a finite upper bound.
 internal fun integerCertify(
     model: LpModel,
     y: DoubleArray,
@@ -411,17 +367,11 @@ internal class IntegerLpView private constructor(private val model: LpModel) {
     }
 }
 
-/** Which route produced a Farkas certificate, for a caller measuring where the chain earns its keep. */
 internal enum class FarkasRoute { RECONSTRUCTED, EXACT_BASIS, ROUNDED, NONE }
 
-/**
- * Exact Farkas infeasibility certificate as an integer ray. [ray] is the float `ρ = B⁻ᵀeᵣ` the dual-unbounded
- * termination produced ([RevisedSimplex.infeasibleRay]). It is tried, in order, through rational reconstruction,
- * an exact basis solve of [basis] at [basisRow], and rounding to integer multipliers; each candidate and its
- * negation are checked against the exact Farkas condition `ρ·rhs > Σⱼ max(0, ρ·Aⱼ)·uⱼ`. The check holds for any
- * integer ρ, so a float-misled ray simply fails it and the node is kept. Null when no route certifies or on
- * cancellation.
- */
+// [ray] is the float ρ = B⁻ᵀeᵣ from [RevisedSimplex.infeasibleRay]. It is tried through rational reconstruction, an
+// exact basis solve of [basis] at [basisRow], then rounding; each candidate and its negation must pass the exact
+// Farkas condition, so a float-misled ray fails and the node is kept. Null when no route certifies or on cancellation.
 internal fun integerFarkasRay(
     model: LpModel,
     ray: DoubleArray,
@@ -516,9 +466,7 @@ internal fun integerFarkasRay(
     return null
 }
 
-/** Whether integer ray [rho] is a Farkas infeasibility certificate: `ρ·rhs > Σⱼ max(0, ρ·Aⱼ)·uⱼ`,
- *  evaluated exactly in 128 bits. A column with `ρ·Aⱼ > 0` but no finite upper bound makes the box max
- *  unbounded (this ρ cannot certify); a term that escapes 64/128 bits likewise bails (false, keep node). */
+// ρ·rhs > Σⱼ max(0, ρ·Aⱼ)·uⱼ, exactly. A column with ρ·Aⱼ > 0 and no finite upper bound, or an overflow, fails it.
 private fun farkasCertifies(model: LpModel, rho: LongArray): Boolean {
     if (model.hasContinuous) return sourceFarkasValid(model, rho)
     val lhs = Int128()
@@ -547,30 +495,21 @@ private fun farkasCertifies(model: LpModel, rho: LongArray): Boolean {
     return diff.isNonNegative() && !(diff.hi == 0L && diff.lo == 0L) // strictly > 0
 }
 
-/** The power-of-two scale exponent: the requested [scaleBits], capped so `maxY · 2ᵏ` stays below the
- *  exactly-representable range, and clamped to the shift range [Int128.ceilDivPow2] accepts. */
+// Caps [scaleBits] so maxY·2ᵏ stays exactly representable and within [Int128.ceilDivPow2]'s shift range.
 private fun chooseScale(maxY: Double, scaleBits: Int): Int {
     if (maxY <= 0.0) return scaleBits.coerceIn(0, MAX_SCALE_BITS)
     val headroom = MULTIPLIER_BITS - ceil(log2(maxY)).toInt()
     return scaleBits.coerceAtMost(headroom).coerceIn(0, MAX_SCALE_BITS)
 }
 
-/** A continuous model's scaled-integer copy: the integral [model], the positive [scale] `s` its
- *  coefficients were multiplied by, and whether the objective constant scaled exactly
- *  ([objConstantExact] — Farkas and feasibility certificates never read the objective, so they
- *  tolerate an inexact constant; an objective-bound certificate must decline). */
+// Farkas and feasibility certificates never read the objective, so they tolerate an inexact objective constant;
+// an objective-bound certificate must decline without [objConstantExact].
 internal class RationalizedLp(val model: LpModel, val scale: Long, val objConstantExact: Boolean)
 
-/**
- * A dyadically scaled copy of the exact finite binary data in an [LpDoubleView], or null outside
- * the bounded Long scaling budget. Parsed rational authority belongs to [ExactLpModel] and cannot be
- * recovered from this projection. Structural coordinates stay unchanged; logical coordinates scale
- * with the rows, so their costs stay unchanged and their finite sides scale with the RHS.
- *
- * Real structural uppers round outward for bounds/refutations and inward for point candidates.
- * Those candidates still require an authoritative point check. Row premises, strictness and absent
- * probe sides retain their source meaning. An inexact objective constant is usable only for feasibility.
- */
+// Dyadically scales the exact binary data of an [LpDoubleView]; null outside the bounded Long scaling budget. Parsed
+// rational authority belongs to [ExactLpModel] and cannot be recovered here. Logical coordinates scale with the rows,
+// so their costs stay and their finite sides scale with the RHS. Real structural uppers round outward for bounds and
+// refutations and inward for point candidates, which still need an authoritative point check.
 internal fun rationalizeToIntegerModel(
     model: LpModel,
     outwardRealUppers: Boolean,
@@ -685,17 +624,16 @@ private fun scaleRange(value: BigFraction): IntRange {
 
 private fun IntRange.meet(other: IntRange): IntRange = maxOf(first, other.first)..minOf(last, other.last)
 
-/** Requested scale: fine enough to keep rounding loss negligible, capped by [chooseScale]. */
+// Fine enough to keep rounding loss negligible; [chooseScale] caps it.
 internal const val DEFAULT_SCALE_BITS = 40
 
-/** Hard cap on the scale exponent (must satisfy [Int128.ceilDivPow2]'s `0..62` and `1L shl k`). */
+// Must satisfy [Int128.ceilDivPow2]'s 0..62 and `1L shl k`.
 private const val MAX_SCALE_BITS = 40
 
-/** Keep scaled multipliers below `2⁵²` so they remain exact `Double`s and round-trip cleanly. */
+// Scaled multipliers stay below 2⁵² so they remain exact Doubles.
 private const val MULTIPLIER_BITS = 52
 
-/** Integers below this magnitude round-trip exactly through `Double` (`2⁵³`); matches the certifier. */
+// 2⁵³: integers below it round-trip exactly through Double.
 private const val MAX_EXACT_INT: Double = 9.007199254740992E15
 
-/** Integers below [MAX_EXACT_INT] in magnitude have at most this many bits. */
 private const val EXACT_INT_BITS = 53

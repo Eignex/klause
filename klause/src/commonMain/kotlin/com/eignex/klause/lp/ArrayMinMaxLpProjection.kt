@@ -3,13 +3,8 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.ir.LinearOp
 
-/**
- * LP relaxation: the always-emitted envelope (`result ≥ xs(i)` for max, `result ≤ xs(i)` for min) as
- * CORE rows, plus the tight convex-hull face as HULL — one-hot selectors `z(i)` with `Σ z(i) = 1` and a
- * per-operand big-M row forcing `result = xs(i)` when `z(i) = 1`. Each `M(i)` comes from the root boxes of
- * the two columns it spans, and is emitted only where the model states both — there it bounds
- * `|result − xs(i)|` globally and the row holds at every integer solution.
- */
+// The envelope (`result ≥ xs(i)` for max) is CORE; the tight face is HULL: one-hot selectors `z(i)` with
+// `Σ z(i) = 1` and a big-M row per operand forcing `result = xs(i)` when `z(i) = 1`.
 internal fun ArrayMinMax.emitLpRelaxation(builder: RelaxationBuilder) {
     val resultCol = builder.intColumn(result)
     val op = if (max) LinearOp.GE else LinearOp.LE
@@ -22,13 +17,11 @@ internal fun ArrayMinMax.emitLpRelaxation(builder: RelaxationBuilder) {
 private fun ArrayMinMax.emitTightFace(builder: RelaxationBuilder, resultCol: Int) {
     val n = xs.size
     if (n == 0) return
-    // `M_i` spans the two root boxes, so it bounds `|result − xs[i]|` only while both are the model's
-    // own; over an invented endpoint the pair may separate further at a genuine solution and the row
-    // would cut it off. The result's box gates the whole face — no operand row survives without it.
+    // `M(i)` spans the two root boxes, so it bounds `|result − xs(i)|` only while both are the model's
+    // own; over an invented endpoint the row could cut off a genuine solution.
     if (!builder.statesBothBounds(result)) return
     val rDom = builder.rootDomain(result)
-    // `M_i` per operand, or `-1` where no row links it: an unstated endpoint, or an empty box whose
-    // span is negative (left to propagation).
+    // `-1` where no row links the operand: an unstated endpoint, or an empty box (left to propagation).
     val bigM = LongArray(n) { i ->
         val x = xs[i]
         if (!builder.statesBothBounds(x)) return@LongArray -1L
@@ -36,8 +29,7 @@ private fun ArrayMinMax.emitTightFace(builder: RelaxationBuilder, resultCol: Int
         maxOf(rDom.max, xDom.max) - minOf(rDom.min, xDom.min)
     }
     if (bigM.none { it >= 0L }) return
-    // Σ z_i = 1 keeps a selector for every operand, linked or not: dropping the unlinked ones would
-    // force the extremum onto an operand that carries a row, which the factor never says.
+    // Unlinked operands keep a selector: dropping them would force the extremum onto a linked operand.
     val sel = IntArray(n) { builder.auxColumn(0L, 1L) }
     builder.row(sel, LongArray(n) { 1L }, LinearOp.EQ, 1L, Contribution.HULL)
     for (i in 0 until n) {
@@ -45,7 +37,7 @@ private fun ArrayMinMax.emitTightFace(builder: RelaxationBuilder, resultCol: Int
         if (m < 0L) continue
         val xCol = builder.intColumn(xs[i])
         val z = sel[i]
-        // max: result − xs[i] + M·z_i ≤ M.  min: xs[i] − result + M·z_i ≤ M.
+        // max: result − xs(i) + M·z(i) ≤ M.  min: xs(i) − result + M·z(i) ≤ M.
         val cols = if (max) intArrayOf(resultCol, xCol, z) else intArrayOf(xCol, resultCol, z)
         builder.row(cols, longArrayOf(1L, -1L, m), LinearOp.LE, m, Contribution.HULL)
     }

@@ -6,24 +6,15 @@ import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.util.collections.LongArrayList
 
 /**
- * Mutable accumulator that factors push repair-move suggestions into. Optionally consults
- * an [Assumptions] set so a frozen variable never enters the candidate list. LS-only — the
- * propagation contract doesn't use it.
- *
- * Backs primitive additions with a resizable [LongArray] key lane (one Long per move: bit 63 marks
- * `IntSet`, bit 62 `RealSet`, bits 0..30 = varId) paired with a value lane (the `IntSet` target, or
- * the `RealSet` target's raw bits), so a fill-clear cycle — the dominant pattern during local
- * search — touches no per-move objects. Compound moves are boxed in a small side list.
- *
- * [list] materializes [Move] objects lazily on first read and caches them until the next
- * mutation; adds themselves allocate nothing per move.
+ * Accumulator that move sources push candidate moves into, filtering moves on variables frozen by [Assumptions],
+ * defined by the invariant network or owned by another factor. Primitive moves are packed into a [LongArray] key
+ * lane and a value lane, so a fill-clear cycle allocates nothing per move; [list] materializes [Move] objects
+ * lazily.
  */
 class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     private val lane = LongArrayList(INITIAL_CAPACITY)
 
-    /** Parallel value lane: `valueLane[i]` is the `IntSet` target value for `lane[i]` (unused for a
-     *  `BoolFlip`, padded 0). Kept apart from the key lane because a domain value spans the full
-     *  [Long] range and does not fit the packed key word. */
+    // A domain value spans the full Long range, so it cannot share the packed key word.
     private val valueLane = LongArrayList(INITIAL_CAPACITY)
 
     @Suppress("DoubleMutabilityForCollection") // lazily allocated on first compound move
@@ -34,8 +25,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     internal var compoundTally: CompoundTally? = null
     internal var absRepairDepth: Int = 0
 
-    /** Materialized [Move] view. Stable across reads until the sink is mutated.
-     *  Compound moves follow primitives in the iteration order. */
+    /** Materialized [Move] view, stable until the sink is mutated; compound moves follow primitives. */
     val list: List<Move> get() = cachedList ?: materialize().also { cachedList = it }
 
     internal val size: Int get() = lane.size + (compounds?.size ?: 0)
@@ -46,18 +36,15 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         compounds!![index - lane.size]
     }
 
-    /** Replace the [Assumptions] this sink filters against, so a sink reused across solves honours
-     *  the current call's pins. */
+    /** Replaces the pins this sink filters against. */
     fun setAssumptions(a: Assumptions) {
         assumptions = a
     }
 
     private var invariants: InvariantNetwork? = null
 
-    /** Install the per-move invariant index: defined vars are determined, not searched, so moves
-     *  targeting them are filtered at the sink — the single choke point all candidate sources go
-     *  through. Compound parts on defined vars are dropped individually; a compound whose parts all
-     *  drop is skipped. */
+    /** Installs the invariant network whose defined vars the sink filters out; a compound drops those parts
+     *  individually. */
     fun setInvariants(net: InvariantNetwork?) {
         invariants = net
     }
@@ -65,21 +52,16 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     private var ownerInt: IntArray? = null
 
     /**
-     * Install the implicit-solving owner map: `owners[v]` is the factor id that owns int var `v`
-     * (`-1` = unowned). An owned variable is a decision variable of an implicit-solving global that
-     * was seeded feasible and is kept feasible only by that global's own structure-preserving moves
-     * (see [com.eignex.klause.localsearch.ImplicitSeeding.ownerInt]). The sink drops any int
-     * move on an owned variable unless [proposer] is its owner, so the generic repair/jump/swap
-     * sources never break an implicitly-solved constraint — the search treats those variables as
-     * removed from its neighbourhood, exactly as a defined var is. `null` disables ownership.
+     * Installs the implicit-solving owner map ([ImplicitSeeding.ownerInt]): an int move on an owned variable is
+     * dropped unless [proposer] is its owner, so generic sources never break an implicitly solved global. Null
+     * disables ownership.
      */
     fun setOwners(owners: IntArray?) {
         ownerInt = owners
     }
 
-    /** The factor currently proposing into this sink, or [NO_PROPOSER] for the generic sources that
-     *  add moves without a proposing factor. Set around a factor's propose call so its own moves on
-     *  the variables it owns survive the owner filter while every other source's do not. */
+    /** The factor proposing into this sink, so its moves on variables it owns survive the owner filter, or
+     *  [NO_PROPOSER]. */
     var proposer: Int = NO_PROPOSER
 
     private fun ownedByOther(varId: Int): Boolean {
@@ -124,16 +106,15 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         cachedList = null
     }
 
-    /** Queue a real-set move on [varId]. Real columns are never pinned, defined or owned. */
+    /** Queue a real-set move on [varId]; real columns are never pinned, defined or owned. */
     fun addRealSet(varId: Int, newValue: Double) {
         lane.add(encodeRealSet(varId))
         valueLane.add(newValue.toRawBits())
         cachedList = null
     }
 
-    /** Add a multi-variable atomic transition. Skips the move entirely if any part would touch a
-     *  frozen variable — a Compound is all-or-nothing. Parts on defined or foreign-owned variables are
-     *  dropped individually; a single survivor is added as a primitive move. */
+    /** Adds an atomic multi-variable move, skipped whole when any part touches a frozen variable. Parts on defined
+     *  or foreign-owned variables are dropped individually; a single survivor is added as a primitive move. */
     fun addCompound(parts: List<Move>) {
         if (touchesFrozen(parts)) {
             compoundTally?.recordOffer(parts.size, frozen = true, kept = 0)
@@ -164,8 +145,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         return false
     }
 
-    // Under per-move invariants, parts targeting defined vars are redundant (propagation
-    // recomputes them) — drop them individually rather than the whole compound.
+    // Propagation recomputes defined vars, so parts targeting them are dropped individually.
     private fun withoutRedundantParts(parts: List<Move>): List<Move> {
         val net = invariants
         if (net == null && ownerInt == null) return parts
@@ -198,20 +178,10 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         alternativeRepairs = null
     }
 
-    /** Channeling-aware variant of [addIntSet]. Asks [state] to synthesize the coordinated
-     *  move that sets [varId] to [newValue] *and* atomically updates any sibling reified
-     *  single-var equality factors mentioning [varId] (their indicator bools get
-     *  consistency-preserving flips). Falls back to the plain [Move.IntSet] when no
-     *  sibling indicators need updating, so the cost on non-channeling problems is just
-     *  the occurrence-list walk.
-     *
-     *  A defined [varId] is not set directly: its definition (abs, element result, literal channel,
-     *  power, affine or extremum) is backsolved into an atomic repair of its searched inputs.
-     *
-     *  Use this in any factor's `proposeRepairMoves` when proposing an int-set move on a
-     *  variable that could be part of a value-to-indicator channeling cluster (the common
-     *  decomposition of `x in S` / per-period choice / `course(i) = p` over int vars). Without
-     *  channeling synthesis, the engine chases one indicator flip at a time after every int change.
+    /**
+     * Channeling-aware [addIntSet]: sets [varId] together with the consistency-preserving flips of sibling reified
+     * equality indicators, so the engine does not chase one indicator at a time. A defined [varId] is instead
+     * backsolved through its definition into an atomic repair of its searched inputs.
      */
     fun addChannelingIntSet(state: LocalSearchState, varId: Int, newValue: Long) {
         if (invariants?.isDefinedInt(varId) == true) {
@@ -305,8 +275,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
 
     /** Move encoding and the [NO_PROPOSER] sentinel. */
     companion object {
-        /** [proposer] value for the generic sources that add moves without a proposing factor — no
-         *  factor owns their moves, so any owned variable is filtered. */
+        /** [proposer] of the generic sources, whose moves on any owned variable are filtered. */
         const val NO_PROPOSER: Int = -1
 
         private const val INITIAL_CAPACITY: Int = 16
@@ -317,11 +286,9 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
 
         internal fun encodeBoolFlip(varId: Int): Long = varId.toLong() and VAR_MASK
 
-        /** Layout: bit 63 = kind (1 = IntSet), bits 0..30 = varId. The `IntSet` target value rides
-         *  the parallel value lane, not this word. */
+        // Bit 63 marks an IntSet, bit 62 a RealSet; bits 0..30 hold the var id.
         internal fun encodeIntSet(varId: Int): Long = KIND_BIT or (varId.toLong() and VAR_MASK)
 
-        /** Layout: bit 62 marks a `RealSet`, whose target rides the value lane as raw `Double` bits. */
         internal fun encodeRealSet(varId: Int): Long = REAL_BIT or (varId.toLong() and VAR_MASK)
 
         internal fun decode(packed: Long, value: Long): Move = when {

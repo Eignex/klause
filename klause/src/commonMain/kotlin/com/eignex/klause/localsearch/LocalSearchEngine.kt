@@ -39,15 +39,9 @@ import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.random.Random
 
-/**
- * The local-search engine over a [LocalSearchModel]: strategy, restart cadence and the satisfy and minimize loops.
- * Assignments and payloads belong to each draw; strategy and restart policy belong to the engine.
- * A resumable handle owns the engine exclusively until completion, failure or close.
- *
- * [LocalSearchSolver] is its [com.eignex.klause.solver.Solver] over a baked finite model; a model with an open
- * integer side, which has no baked form, is searched through the engine directly. Local search never refutes a
- * model whose [LocalSearchModel.refutesModel] is false.
- */
+// Assignments and payloads belong to each draw; strategy and restart policy belong to the engine. A resumable handle
+// owns the engine exclusively until completion, failure or close. Local search never refutes a model whose
+// refutesModel is false.
 internal class LocalSearchEngine(
     val model: LocalSearchModel,
     val strategy: SourceDrivenStrategy = Cbls(),
@@ -117,17 +111,12 @@ internal class LocalSearchEngine(
     private val unscoredCandidateCheck = UnscoredCandidateCheck(problem, model.selection,
         (completion as? FiniteFactorEnforcer)?.enforcingFiniteFactors(problem).orEmpty()).takeIf { it.required }
 
-    /** Objective-as-constraint ratchet handle (opt-in). Set non-null only for an arm whose [problem]
-     *  carries an [com.eignex.klause.factor.objective.ObjectiveBoundFactor] sharing this bound: on each
-     *  feasible incumbent the minimize loop tightens it below the incumbent, so the objective slack
-     *  re-enters the violation set and the feasibility fight repairs it — the SAT→optimization ratchet
-     *  for the violation-native arms (probSAT / WalkSAT). Null leaves objective handling unchanged. */
+    // Opt-in ratchet for violation-native arms: each feasible incumbent tightens this bound below it, so the
+    // objective re-enters the violation set and the feasibility fight repairs it.
     var objectiveBound: MutableObjectiveBound? = null
 
     private val greedyInit: GreedyInit = GreedyInit()
 
-    // The strategy's schedule-axis restart cadence (`ScheduleBundle.restart`) when it declares one,
-    // else the solver-level restartPolicy.
     private val configuredRestart: RestartPolicy =
         strategy.schedule.restart ?: restartPolicy
     private var preparedBoardRestart: PreparedBoardRestart? = null
@@ -153,9 +142,7 @@ internal class LocalSearchEngine(
         }
     }
 
-    // When a definitionalSweep is present or seedImplicitOnRestart is set, every restart is followed
-    // by implicit feasible-init and/or the sweep plus a recompute, so all restart call sites get the
-    // same post-randomization treatment.
+    // Every restart call site gets the same post-randomization seeding, sweep and recompute.
     private val restarts: RestartPolicy = if (definitionalSweep == null && !seedImplicitOnRestart) {
         configuredRestart
     } else {
@@ -376,7 +363,6 @@ internal class LocalSearchEngine(
         }
     }
 
-    /** A one-line summary of this engine's configuration under [params]. */
     fun describe(params: LocalSearchParams): String {
         val sources = strategy.sources.joinToString(",") { it.source.id.label }
         return """
@@ -389,7 +375,6 @@ internal class LocalSearchEngine(
         """.trimIndent()
     }
 
-    /** Search once for a solution, syncing learned weights through [warm] when it is non-null. */
     fun solve(params: LocalSearchParams, warm: WarmState?): SolveResult = exclusiveSearch {
         solveExclusive(params, warm)
     }.withSourceSemantics(problem.semantics)
@@ -423,7 +408,6 @@ internal class LocalSearchEngine(
         }
     }
 
-    /** Stream independent solutions, syncing learned weights through [warm] when it is non-null. */
     fun samples(params: LocalSearchParams, warm: WarmState?): Sequence<Sample> {
         // Same soundness boundary as [solve]: stream nothing rather than assignments that may violate factors.
         if (!localSearchSupports(model, completion != null)) return emptySequence()
@@ -484,22 +468,9 @@ internal class LocalSearchEngine(
         )
     }
 
-    /**
-     * Streaming best-effort minimisation of [objective] under the hard constraints. Yields one
-     * [MinimizeResult.BestFound] per new incumbent established during the inner loop (i.e. every time
-     * `obj < bestObj` strictly improves), followed by exactly one terminal verdict.
-     *
-     * Local search is **incomplete**: it never proves optimality or infeasibility. The terminal verdict is
-     * [MinimizeResult.Infeasible] only when root propagation refutes a model whose domains it declared, before
-     * any LS work happens; otherwise either a final [MinimizeResult.BestFound] (carrying the same sample as the
-     * last intermediate yield, with the real termination reason) or [MinimizeResult.Unknown] when LS never
-     * reached feasibility.
-     *
-     * Reaches feasibility via the configured [strategy], then descends on the objective per its
-     * [SourceDrivenStrategy.feasibleDescent]. Scores moves by the O(arity) incremental [LinearObjective] delta,
-     * or by [LocalSearchParams.lsObjective]'s `deltaIfApplied` when the caller supplies that gradient view of
-     * the same objective (the functionally-defined-cone case).
-     */
+    // Yields a BestFound per strict improvement, then exactly one terminal verdict. Local search is incomplete:
+    // Infeasible only when root propagation refutes a model whose domains it declared; otherwise a final BestFound
+    // repeating the last incumbent with the real termination reason, or Unknown without feasibility.
     fun improvements(
         objective: LinearObjective,
         params: LocalSearchParams,
@@ -562,12 +533,9 @@ internal class LocalSearchEngine(
             )
             return@sequence
         }
-        // The caller's gradient view reads the objective's defined variables off their definitions, so it
-        // agrees with the linear objective only while per-move invariants hold them there. Without them a
-        // defined variable is searched like any other and can sit wherever the model lets it, and the view
-        // would score an incumbent better than its own assignment. Even with them, presolve may have
-        // eliminated a definition the view reads, so the view only guides moves: every incumbent is valued
-        // by the linear objective, the one the portfolio checks it against.
+        // The gradient view reads defined variables off their definitions, so it agrees with the linear objective
+        // only while per-move invariants hold them there, and presolve may have eliminated a definition it reads.
+        // It only guides moves; every incumbent is valued by the linear objective.
         val gradient = params.lsObjective?.takeIf {
             params.objectiveGuidance == ObjectiveGuidance.Functional && perMoveInvariants && definitionalSweep != null
         }
@@ -786,15 +754,8 @@ internal class LocalSearchEngine(
         }.withActiveLocalSearchTime(timing)
     }
 
-    /**
-     * Streaming body of the LS minimize loop. Yields a [MinimizeResult.BestFound] on
-     * every strict improvement; yields exactly one terminal verdict
-     * ([MinimizeResult.BestFound] with reason, or [MinimizeResult.Unknown]) on exit.
-     * Two-phase per restart attempt: the strategy fights to feasibility, then descends on the
-     * objective per its [FeasibleDescent] mode. At a local optimum it restarts; the best feasible
-     * objective persists across restarts, so reported incumbents improve monotonically.
-     */
-    // [guide] scores moves; [objective] values every incumbent this stream reports.
+    // Per restart attempt the strategy fights to feasibility, then descends per its FeasibleDescent mode; the best
+    // feasible objective persists across restarts. [guide] scores moves; [objective] values every reported incumbent.
     @Suppress("LongParameterList")
     private suspend fun SequenceScope<MinimizeResult?>.runMinimizeStream(
         guide: Objective,
@@ -827,10 +788,8 @@ internal class LocalSearchEngine(
         var liveCompletion: Completion? = null
         var pendingCompletedMove = false
 
-        // Cross-engine solution flow: publish each improvement into the shared exchange, and before a
-        // restart adopt a fresher-and-better published assignment as the incumbent so the restart anchors
-        // on a peer arm's solution. Purely heuristic in that direction — the anchor only seeds the next
-        // descent — and skipped under assumption pins a foreign assignment may violate.
+        // Publishes each improvement and, before a restart, adopts a fresher and better peer assignment as the
+        // anchor. Skipped under assumption pins a foreign assignment may violate.
         val pooled = PooledIncumbents(
             exchange = params.pooledIncumbents,
             importEnabled = effectiveAssumptions.isEmpty,
@@ -847,27 +806,17 @@ internal class LocalSearchEngine(
             return bestSample
         }
 
-        // Each restart counts as one unit of work against maxFlips; otherwise a degenerate objective
-        // on a constraint-free problem would loop forever (cost stays 0, descent never improves, and
-        // the restart path wouldn't bump totalFlips).
-        // Phase strategy: an optimizeStrategy (when set) drives both phases; else the satisfy strategy
-        // drives, and the optimize phase follows the strategy's own [FeasibleDescent] mode.
+        // An optimize strategy, when set, drives both phases.
         val descentStrategy = optimizeStrategy
         val unified = descentStrategy != null
         // Read the ratchet handle once per stream; the feasible-incumbent hook uses this capture.
         val ratchetBound = objectiveBound
-        // The explicit feasible-phase descent mode — the optimize strategy's when present, else the
-        // satisfy strategy's. The cost==0 branch dispatches on it exhaustively (no fall-through), so an
-        // arm always optimizes the way it declared and never lands in a default descent by accident.
+        // The cost==0 branch dispatches on this exhaustively, so an arm always optimizes the way it declared.
         val feasibleStrategy = descentStrategy ?: strategy
         val feasibleMode = feasibleStrategy.feasibleDescent
-        // Sampling-miss tolerance for a SelfOwned feasible walk: how many consecutive null picks to
-        // re-sample before a restart (see [SourceDrivenStrategy.feasibleResampleCap]).
         val feasibleResampleCap = feasibleStrategy.feasibleResampleCap
         val supportsBoardCoverage = feasibleStrategy.supportsBoardCoverage
         var feasibleMisses = 0
-        // The feasibility-fight strategy whose moves form the rounds (the unified descent strategy
-        // when one drives both phases, else the satisfy strategy).
         val satisfyStrategy: SourceDrivenStrategy = if (unified) descentStrategy else strategy
         // Feed round stats to the unwrapped restart policy so an adaptive one is detected even when a
         // definitional-sweep wrapper stands in for shouldRestart/restart.
@@ -928,21 +877,16 @@ internal class LocalSearchEngine(
                     break
                 }
                 if (cancelled) break
-                // Auto-tune the next poll window to ~[CANCEL_CHECK_TARGET_MS] of wall-clock: cheap flips
-                // keep the full interval (negligible overhead), while expensive move sources
-                // (flip-propagate / clique-swap / ejection chains) shrink it, so a slow flip window can't
-                // overrun the deadline by more than that margin.
+                // Shrink the next poll window toward CANCEL_CHECK_TARGET_MS, so expensive move sources cannot overrun
+                // the deadline by more than that.
                 val nowMs = sink.elapsedMs()
                 val gapMs = maxOf(nowMs - lastCheckMs, 1L)
                 cancelCountdown = (CANCEL_CHECK_INTERVAL.toLong() * CANCEL_CHECK_TARGET_MS / gapMs)
                     .coerceIn(1L, CANCEL_CHECK_INTERVAL.toLong()).toInt()
                 lastCheckMs = nowMs
             } else if ((cancelCountdown and (CANCEL_CLOCK_STRIDE - 1)) == 0) {
-                // Mid-window escape hatch: the window is tuned on the *previous* window's
-                // cost, so a step mix that suddenly turns expensive — an ultra-wide row entering the
-                // violated repair pool — would otherwise grind out up to a full window of monster
-                // steps before the next poll. A clock glance every [CANCEL_CLOCK_STRIDE] steps costs
-                // nothing on the fast path and forces the poll once the window blows its budget.
+                // The window is tuned on the previous window's cost, so steps that turn expensive would grind out a
+                // full window before the next poll; a clock glance every CANCEL_CLOCK_STRIDE steps forces it.
                 if (sink.elapsedMs() - lastCheckMs >= CANCEL_CHECK_TARGET_MS * CANCEL_OVERRUN_FACTOR) {
                     cancelCountdown = 0
                 }
@@ -1065,12 +1009,9 @@ internal class LocalSearchEngine(
                 }
                 if (totalFlips >= maxFlips) break
                 when (feasibleMode) {
-                    // Violation-native: the objective is an `objective ≤ incumbent` factor the portfolio
-                    // overlaid on a COP. Reaching cost==0 means it already holds — tighten the bound below
-                    // this incumbent so "beat it" re-enters the violation set, reconcile just the bound
-                    // factor (its degree shifts with no move; the overlay appends it last), and drop back
-                    // into the feasibility fight. Surgical, not a full recompute. With no bound (a var-less
-                    // objective) there is nothing to optimize, so restart to diversify.
+                    // The objective is an appended `objective ≤ incumbent` factor; cost 0 means it holds, so tighten
+                    // the bound below this incumbent, reconcile only that factor and return to the feasibility fight.
+                    // Without a bound there is nothing to optimize, so restart.
                     FeasibleDescent.RatchetAsConstraint -> {
                         if (ratchetBound != null) {
                             ratchetBound.tightenBelow(obj)
@@ -1091,11 +1032,9 @@ internal class LocalSearchEngine(
                         continue
                     }
 
-                    // The strategy's own pickMove (its sources + acceptance) owns the feasible walk: the
-                    // engine commits whatever feasibility-preserving move it picks — CBLS descends greedily
-                    // on its objective / structured / pair-swap sources, SA anneals through worse-objective
-                    // states. Best-feasible is snapshotted above, so wandering never loses the incumbent. A
-                    // feasibility-breaking pick is reverted and retried; misses spend the resample allowance.
+                    // The strategy's own pickMove owns the feasible walk. Best-feasible is snapshotted above, so
+                    // wandering never loses the incumbent; a feasibility-breaking pick is reverted and retried, and
+                    // misses spend the resample allowance.
                     FeasibleDescent.SelfOwned -> {
                         if (feasibleResampleCap == 0 && supportsBoardCoverage && !state.boardCoverage.requested) {
                             state.boardCoverage.request(state)
@@ -1184,8 +1123,6 @@ internal class LocalSearchEngine(
                 roundFeedback?.endRound()
                 continue
             }
-            // Pre-feasibility: drive through the unified strategy when one is configured, else the
-            // satisfy-mode strategy.
             val costBefore = state.cost
             val move = timing.inPhase("selection") {
                 if (unified) descentStrategy.pickMove(state, params.cancellation)
@@ -1247,11 +1184,6 @@ internal class LocalSearchEngine(
         )
     }
 
-    /** Build and prime the per-call [LocalSearchState] for a [runMinimizeStream] draw: config the
-     *  violation cap / weight normalisation, install invariants and warm state, plumb the objective and
-     *  its shaping lambda, then reach a start pose — warm-seed (with a definitional reconcile) when the
-     *  caller supplied [LocalSearchParams.initialAssignment], else a random restart followed by the
-     *  size-gated greedy repair. Ends where the loop's own bookkeeping begins. */
     private suspend fun <T> SequenceScope<T?>.newMinimizeState(
         objective: Objective,
         params: LocalSearchParams,
@@ -1265,13 +1197,9 @@ internal class LocalSearchEngine(
             newState(params, effectiveAssumptions, seed, checkpoint, timing)
         }
         warm?.let { prepareSteps(it.applySteps(state), params, checkpoint) }
-        // Mirror newSatisfyState: a restart policy instance can be reused across solves (one tuning
-        // recipe over many problems), so clear its per-solve state before any restart here — else a
-        // stale incumbent of a different variable arity is anchored/perturbed against this problem.
+        // A reused policy may still hold an incumbent of another arity from a previous solve.
         configuredRestart.reset()
-        // Plumb shaping into the state so strategies consulting shapedBreakScore see the objective
-        // during pre-feasibility moves. Only CostShaping.Linear contributes a non-zero lambda;
-        // FeasibilityFirst leaves it at 0.0, identical to the no-shaping path.
+        // Strategies consulting shapedBreakScore see the objective before feasibility.
         timing?.recordObjectiveScoring(if (objective is FunctionalObjective) "functional" else "plain")
         state.shaping.objective = objective
         state.shaping.shapingLambda = (params.costShaping as? CostShaping.Linear)?.lambda ?: 0.0
@@ -1284,22 +1212,14 @@ internal class LocalSearchEngine(
                 prepareSteps(prepareObjectiveProposals(state, params.lsObjective), params, checkpoint)
             }
         }
-        // Warm-start from a caller-supplied (arity-compatible) assignment instead of a random
-        // restart; null by default. See [LocalSearchParams.initialAssignment].
         val seeded = seedInitial(state, params, checkpoint, reconcile = true)
         if (!seeded) initialRestart(state, params, checkpoint)
-        // Greedy-repair is gated on problem size: on tiny problems LS reaches feasibility in
-        // microseconds and the repair pass is pure overhead. Skip it on a warm start: the seed is
-        // already feasible, and the repair sweep is objective-blind (it accepts any flip that doesn't
-        // raise cost), so on a cost-0 seed it would wander across equal-cost feasibles and discard the
-        // seed's objective — defeating the warm start.
+        // Greedy repair is objective-blind, so on a feasible warm seed it would wander across equal-cost
+        // assignments and discard the seed's objective.
         if (greedyRepairOnRestart && isLargeEnoughForGreedy() && !seeded) greedyRepairPass(state, params, checkpoint)
         state
     }
 
-    /** Build and prime the per-call [LocalSearchState] for a [streamImpl] satisfy draw: config the
-     *  violation cap / weight normalisation, install invariants and warm state, reset the (possibly
-     *  reused) restart policy's per-solve state, then take the first random restart. */
     private suspend fun <T> SequenceScope<T?>.newSatisfyState(
         params: LocalSearchParams,
         effectiveAssumptions: Assumptions,
@@ -1312,8 +1232,7 @@ internal class LocalSearchEngine(
             newState(params, effectiveAssumptions, seed, checkpoint, timing)
         }
         warm?.let { prepareSteps(it.applySteps(state), params, checkpoint) }
-        // Reset the underlying policy: an incumbent from another solve may have a different arity.
-        // ScheduleBundle leaves this reset to the engine; the wrapper's reset is a no-op.
+        // An incumbent from another solve may have a different arity; ScheduleBundle leaves this reset to the engine.
         configuredRestart.reset()
         // A caller-supplied starting point stands in for the first random restart; later restarts are the policy's.
         val seeded = seedInitial(state, params, checkpoint, reconcile = false)
@@ -1367,8 +1286,7 @@ internal class LocalSearchEngine(
         return decided
     }
 
-    /** Move [state]'s continuous columns onto [solution]'s completed values, so the search goes on from the exact
-     *  point the completion found rather than its own floating-point guess. */
+    // Continue from the completion's exact point rather than the search's floating-point guess.
     private fun adoptReals(state: LocalSearchState, solution: Sample) {
         for (r in 0 until problem.numRealVars) {
             val value = solution.approximateRealValue(r)
@@ -1376,8 +1294,7 @@ internal class LocalSearchEngine(
         }
     }
 
-    /** Restart [state] from [anchor] and re-run the greedy repair sweep under the same size gate as
-     *  the initial restart — the pairing every minimize restart site must preserve. */
+    // Every minimize restart site pairs the restart with the size-gated greedy repair.
     private suspend fun SequenceScope<MinimizeResult?>.restartAndRepair(
         state: LocalSearchState,
         anchor: Sample?,
@@ -1410,14 +1327,10 @@ internal class LocalSearchEngine(
         }
     }
 
-    /** True when the problem is big enough that the post-restart greedy-repair sweep pays for
-     *  itself; tiny problems reach feasibility in microseconds and the sweep is pure overhead. */
+    // Tiny problems reach feasibility before the greedy sweep pays for itself.
     private fun isLargeEnoughForGreedy(): Boolean = (problem.numBoolVars + problem.numIntVars) >= 32
 
-    /** Load [sample] into [state]'s assignment (re-pinning assumed slots), reset the tabu/CC
-     *  epoch, and recompute cost/degrees — the warm-start seed path for
-     *  [LocalSearchParams.initialAssignment]. Returns false (leaving the state untouched for a
-     *  normal random restart) when the sample's arity doesn't match this problem. */
+    // False, leaving the state untouched, when the sample's arity does not match.
     private fun seedFrom(state: LocalSearchState, sample: Sample, recompute: Boolean = true): Boolean {
         if (sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) return false
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, sample.boolValue(b))
@@ -1433,7 +1346,6 @@ internal class LocalSearchEngine(
         return true
     }
 
-    /** Run one [GreedyInit] repair pass over [state] right after a restart, pausing at checkpoints. */
     private suspend fun <T> SequenceScope<T?>.greedyRepairPass(
         state: LocalSearchState,
         params: LocalSearchParams,
@@ -1451,8 +1363,7 @@ internal class LocalSearchEngine(
         return true
     }
 
-    /** Undo [move] on [state] so it matches [baselineSnap] again. BoolFlip self-inverts;
-     *  IntSet uses [baselineSnap] to recover the old value; Compound reverts each part. */
+    // BoolFlip self-inverts; IntSet recovers the old value from the baseline snapshot.
     private fun revertMove(state: LocalSearchState, move: Move, baselineSnap: Sample) {
         when (move) {
             is Move.BoolFlip -> state.apply(move)
@@ -1477,12 +1388,8 @@ internal class LocalSearchEngine(
         }
     }
 
-    /**
-     * Accumulates per-step move statistics into rounds and flushes each completed round to a
-     * strategy's adaptive policies. Created only for a strategy that
-     * [SourceDrivenStrategy.wantsRoundFeedback], so common non-adaptive strategies allocate nothing.
-     * A restart ends the current round ([endRound]) so a round never spans one.
-     */
+    // Created only for strategies that want round feedback, so non-adaptive ones allocate nothing. A restart ends
+    // the current round.
     private class RoundFeedback(
         private val strategy: SourceDrivenStrategy?,
         private val restartObserver: AdaptivePolicy?,
@@ -1490,9 +1397,7 @@ internal class LocalSearchEngine(
         private val acc = RoundAccumulator()
         private var sinceRound = 0
 
-        /** Record one applied move (a non-worsening move is the round's acceptance signal) and flush
-         *  the round to the strategy's schedules and an adaptive restart policy when
-         *  [ROUND_FEEDBACK_STEPS] moves have accumulated. */
+        // A non-worsening move is the round's acceptance signal.
         fun record(costBefore: Long, costAfter: Long, step: Long) {
             acc.record((costAfter - costBefore).toDouble(), costAfter <= costBefore)
             acc.observeCost(costAfter.toDouble())
@@ -1505,15 +1410,12 @@ internal class LocalSearchEngine(
             }
         }
 
-        /** Drop the partial round (a restart ended it before it completed). */
         fun endRound() {
             acc.clear()
             sinceRound = 0
         }
 
         companion object {
-            /** A feedback accumulator driving [strategy]'s schedules and/or an adaptive [restart]
-             *  policy, or `null` when neither wants per-round feedback (no accumulation overhead). */
             fun of(strategy: SourceDrivenStrategy, restart: RestartPolicy): RoundFeedback? {
                 val s = strategy.takeIf { it.wantsRoundFeedback }
                 val r = restart as? AdaptivePolicy
@@ -1525,38 +1427,25 @@ internal class LocalSearchEngine(
     private companion object {
         const val INITIAL_FACTOR_BATCH: Int = 256
 
-        /** Steps between cooperative cancellation polls. */
         const val CANCEL_CHECK_INTERVAL: Int = 1024
 
-        /** Wall-clock target between cancellation polls (ms): the optimize loop auto-tunes its flip
-         *  window down toward this when moves are expensive, so a solve honours its deadline within
-         *  roughly this margin regardless of per-flip cost. */
+        // The optimize loop shrinks its poll window toward this, so the deadline holds within about this margin.
         const val CANCEL_CHECK_TARGET_MS: Long = 50
 
-        /** Steps between mid-window clock glances (a power of two; masks the countdown). Bounds the
-         *  deadline overrun of a window whose steps turn expensive after the window was tuned. */
+        // A power of two: it masks the countdown.
         const val CANCEL_CLOCK_STRIDE: Int = 16
 
-        /** Mid-window wall-clock budget as a multiple of [CANCEL_CHECK_TARGET_MS]; past it the glance
-         *  forces the full poll. Loose enough that a normally-tuned window never trips it. */
+        // Loose enough that a normally tuned window never trips it.
         const val CANCEL_OVERRUN_FACTOR: Long = 4
 
-        /** Feasibility-fight moves per round of adaptive-schedule feedback. A round is the batch over
-         *  which an adaptive [com.eignex.klause.localsearch.schedule.Schedule] retunes; sized
-         *  so the acceptance-ratio estimate is stable yet the schedule still reacts many times. */
+        // Large enough for a stable acceptance-ratio estimate, small enough that schedules react often.
         const val ROUND_FEEDBACK_STEPS: Int = 1024
     }
 }
 
-/**
- * Whether local search can soundly run on [model]. Every invariant scores any domain exactly: linear rows keep their
- * sum in the narrowest exact form, and the others measure violation with saturating arithmetic, which is zero exactly
- * when the factor holds. Built-in [Cumulative] scoring is admitted when its integer columns have enumerable
- * 32-bit search domains and uses task events when the horizon is too wide for a dense timeline.
- * A model with continuous columns also needs [completes]: its
- * rows are scored in floating point, so a candidate is a solution only once a [CandidateCompletion] decides it. A
- * portfolio leaves its local-search arms out otherwise.
- */
+// Every invariant scores any domain exactly: linear rows keep their sum in the narrowest exact form and the rest use
+// saturating arithmetic, which is zero exactly when the factor holds. Built-in Cumulative scoring needs enumerable
+// 32-bit domains. Continuous columns are scored in floating point, so they also need a CandidateCompletion.
 internal fun localSearchSupports(model: LocalSearchModel, completes: Boolean = false): Boolean {
     val problem = model.problem
     if (problem.numRealVars != 0 && !completes) return false

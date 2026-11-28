@@ -7,59 +7,45 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-/**
- * The engine families a portfolio shares time between before it chooses an arm. [observable] says whether a
- * segment that shows no progress is evidence against the family: a local-search or LNS arm's whole state is
- * visible, so a segment that lowers no violation and improves no incumbent is a plateau; a backtrack arm can be
- * closing in on a proof while showing nothing, so its silence says nothing.
- */
+// observable says whether a segment that shows no progress is evidence against the family: a local-search or
+// LNS arm's whole state is visible, so a segment that lowers no violation and improves no incumbent is a
+// plateau; a backtrack arm can be closing in on a proof while showing nothing.
 internal enum class ArmFamily(val observable: Boolean) {
-    /** Complete search: resumable backtrack arms. */
     Backtrack(observable = false),
 
-    /** Local search: counted arms that restart from the incumbent. */
     LocalSearch(observable = true),
 
-    /** Large-neighbourhood search around the incumbent; its bootstrap competes within [LocalSearch]. */
+    // Its bootstrap competes within LocalSearch.
     Lns(observable = true),
 }
 
-/**
- * The Beta pseudo-counts each [ArmFamily] starts from, by family: what a family is expected to earn on a model of a
- * given class before the run has shown anything. They stay under the fading evidence for the whole run, so a class
- * leans its families without ever shutting one out.
- */
+// Beta pseudo-counts per family by model class. They stay under the fading evidence for the whole run, so a
+// class leans its families without ever shutting one out.
 internal class FamilyPrior(private val successes: DoubleArray, private val failures: DoubleArray) {
     init {
         require(successes.size == ArmFamily.entries.size && failures.size == ArmFamily.entries.size)
         require(successes.all { it > 0.0 } && failures.all { it > 0.0 }) { "Beta pseudo-counts must be positive" }
     }
 
-    /** The success pseudo-count of [family]. */
     fun successes(family: ArmFamily): Double = successes[family.ordinal]
 
-    /** The failure pseudo-count of [family]. */
     fun failures(family: ArmFamily): Double = failures[family.ordinal]
 
-    /** The priors by class. */
     companion object {
         // Odds of success to failure: NEUTRAL is Beta(1, 1), LEANING Beta(2, 1), FAVOURED Beta(3, 1).
         private const val NEUTRAL = 1.0
         private const val LEANING = 2.0
         private const val FAVOURED = 3.0
 
-        /** Every family as likely as any other. */
         val UNIFORM = FamilyPrior(
             DoubleArray(ArmFamily.entries.size) { NEUTRAL },
             DoubleArray(ArmFamily.entries.size) { NEUTRAL },
         )
 
-        /**
-         * The prior a model of [profile] starts from. Complete search leads on pseudo-Boolean models, where cutting
-         * planes and clause learning carry the proof, and on continuous and open models, where the relaxation or the
-         * theory decides. Local search leads on a finite satisfaction model, where its first solution ends the run.
-         * Clausal and mixed-integer models start evenly to balance solution discovery and proof search.
-         */
+        // Complete search leads on pseudo-Boolean models, where cutting planes and clause learning carry the
+        // proof, and on continuous and open models, where the relaxation or the theory decides. Local search leads
+        // on a finite satisfaction model, where its first solution ends the run. Clausal and mixed-integer models
+        // start evenly to balance solution discovery and proof search.
         fun of(profile: ProblemProfile): FamilyPrior = when (profile.problemClass) {
             ProblemClass.Sat, ProblemClass.MixedInteger -> UNIFORM
             ProblemClass.PseudoBoolean -> leaning(backtrack = FAVOURED, localSearch = LEANING)
@@ -79,18 +65,11 @@ internal class FamilyPrior(private val successes: DoubleArray, private val failu
     }
 }
 
-/**
- * Thompson sampling over [ArmFamily], so the time each family gets does not depend on how many arms it has: a fourth
- * local-search variant splits the local-search share instead of taking a share of its own from backtrack. Each family
- * starts from [prior], the lean its model's class gives it.
- *
- * Before an incumbent exists, only observable progress counts for a family: complete-search deductions do not
- * predict which family will reach a witness. Once an incumbent exists, credit counts for every family, and a
- * segment that earned none counts against
- * it when the family is [ArmFamily.observable]. Evidence fades over [halfLife] segments, short enough that a family
- * which stops progressing loses its share within a few of them: a local search stuck on a plateau hands the time to
- * the complete search that can still prove the answer, and wins it back as soon as it improves again.
- */
+// Thompson sampling over families, so the time each family gets does not depend on how many arms it has: another
+// local-search variant splits the local-search share instead of taking one from backtrack.
+//
+// Evidence fades over halfLife segments, short enough that a local search stuck on a plateau hands the time to
+// the complete search within a few segments and wins it back as soon as it improves again.
 internal class FamilyPolicy(
     private val random: Random,
     private val prior: FamilyPrior = FamilyPrior.UNIFORM,
@@ -99,7 +78,6 @@ internal class FamilyPolicy(
     private val successes = DoubleArray(ArmFamily.entries.size)
     private val failures = DoubleArray(ArmFamily.entries.size)
 
-    /** The family to run next among [eligible], which must not be empty. */
     fun choose(eligible: Collection<ArmFamily>): ArmFamily {
         require(eligible.isNotEmpty()) { "no eligible family" }
         return eligible.maxBy {
@@ -115,13 +93,10 @@ internal class FamilyPolicy(
         }
     }
 
-    /**
-     * Record one segment of [family]: whether it [progressed], and [plateau] once an incumbent exists, when a
-     * segment without progress counts against an observable family. Before that, only an observable family's
-     * progress counts; complete-search deductions supply no evidence that its family is closer to a witness.
-     * An explicit [reward] prices zero-yield segments of every family after an incumbent.
-     * [weight] scales fading and evidence by paid exposure; a unit retains the ordinary segment update.
-     */
+    // plateau is set once an incumbent exists. Before that only an observable family's progress counts, since
+    // complete-search deductions are no evidence that its family is closer to a witness. After it, a segment
+    // without progress counts against an observable family, and an explicit reward prices zero-yield segments
+    // of every family. weight scales fading and evidence by paid exposure.
     fun record(family: ArmFamily, progressed: Boolean, plateau: Boolean,
         reward: Double? = null, weight: Double = 1.0) {
         require(reward == null || reward in 0.0..1.0) { "family reward must be in [0, 1]" }
@@ -148,7 +123,6 @@ internal class FamilyPolicy(
     }
 }
 
-/** A draw from Beta([alpha], [beta]), both positive, as the ratio of two Gamma draws. */
 internal fun Random.nextBeta(alpha: Double, beta: Double): Double {
     val x = nextGamma(alpha)
     val y = nextGamma(beta)

@@ -23,97 +23,46 @@ import com.eignex.koblas.koblas
 import kotlin.math.abs
 import kotlin.time.TimeSource
 
-/**
- * Result of a [RevisedSimplex] solve: the retained [basis] (to warm-start or exactly certify), the
- * float objective, and the dual vector `y` (one per row) used by the safe bound of Neumaier and
- * Shcherbina, "Safe bounds in linear and mixed-integer linear programming", Math. Program. 99 (2004),
- * https://doi.org/10.1007/s10107-003-0433-3. All values are double-precision; the authoritative bound
- * comes from exact certification of [basis], never from these.
- */
+// Double-precision guides only; the authoritative bound comes from exact certification of [basis].
 internal class FloatLpResult(
     val basis: Basis,
     val objective: Double,
     val duals: DoubleArray,
-    /** Per-structural-variable primal value (unshifted, length `n`); the LP point. */
+    // Unshifted, length n.
     val primal: DoubleArray,
-    /** Simplex pivots taken to reach this result (0 when the warm/cold start was already optimal). */
     val pivots: Int = 0,
-    /**
-     * Maximum factor fill ratio `(nnz factors)/nnz B` across this solve's factorizations,
-     * measured by the basis solver.
-     */
+    // Max (nnz factors) / nnz(B) across this solve's factorizations.
     val luMaxFill: Double = 0.0,
-    /** Max factor density `(nnz of the factors)/m²` — approaching 1.0 means they filled in to dense. */
+    // Max (nnz factors) / m².
     val luMaxDensity: Double = 0.0,
-    /** Basis dimension `m` at which [luMaxDensity] was observed — density alone hides whether the
-     *  dense basis was tiny or large. */
+    // Density alone hides whether the dense basis was tiny or large.
     val luMaxDim: Int = 0,
-    /** Column components this solve decomposed into ([ComponentLpSolver]); 1 for a monolithic solve. */
+    // 1 for a monolithic solve.
     val blocks: Int = 1,
-    /** Whether the solve started from a prior basis rather than the slack cold start. A warm basis saves
-     *  pivots; it does not save the factorization, which [refactorizations] counts separately. */
     val warmStarted: Boolean = false,
-    /** Basis factorizations this solve built; 0 when it continued on factors kept from a previous solve. */
+    // 0 when the solve continued on kept factors.
     val refactorizations: Int = 0,
-    /**
-     * Whether the solve reached a primal-feasible basis, i.e. the optimum.
-     *
-     * False for an iterate the solve stopped short of optimality — the dual simplex holds dual
-     * feasibility from its first basis, so such an iterate still carries a valid *bound*. Its finite
-     * coordinates can guide a separately checked candidate without supplying a complete feasible
-     * point. It is not an optimum: no reduced-cost fixing, no tableau cuts, and
-     * no claim of infeasibility rests on it.
-     */
+    // False for an iterate stopped short: dual feasibility still makes it a valid bound and its coordinates can guide
+    // a checked candidate, but no reduced-cost fixing, tableau cut or infeasibility claim rests on it.
     val optimal: Boolean = true,
     val exactState: LpExactState? = null,
 )
 
-/** Updates folded into the basis before it is rebuilt; bounds fill and rounding drift. */
+// Updates folded into the basis before it is rebuilt; bounds fill and rounding drift.
 internal const val DEFAULT_REFACTOR_UPDATE_LIMIT: Int = 64
 
-/**
- * Double-precision bounded-variable **dual** simplex in *revised* form: the basis is held as a
- * factorization (`O(nnz)` memory) and the constraint columns in sparse CSC,
- * instead of a full `m × (n+m)` dense tableau or an explicit dense `B⁻¹`.
- * The decision logic — slack cold start, most-violated leaving variable, dual ratio-test entering
- * variable — is the textbook bounded-variable dual simplex; only the linear algebra is revised
- * (FTRAN/BTRAN through the factors), so it scales to large sparse models without materializing an `m²`
- * structure.
- *
- * It is a heuristic that can return null (non-convergence / dual-unbounded /
- * singular basis). Its candidates require independent certification against original source data.
- *
- * The basis itself is held by a [BasisSolver], which owns the factors, the pivot order and
- * the updates while phase owners execute pricing and ratio tests through its numerical operations.
- * This coordinates refactorization, recovery and publication. A basis is named
- * by index into `columns`, whose columns are fixed for the solver's lifetime, so a pivot hands the solver the
- * spike it already computed for the ratio test rather than a rebuilt square matrix. The default is klause's
- * Kotlin factorization on every platform; an injected factory can supply another implementation.
- *
- * [refactorUpdateLimit] caps the updates folded in before the basis is rebuilt, bounding fill and
- * rounding drift beyond whatever the solver itself advises through [BasisUpdate.REFACTORIZE]. It is a
- * constructor knob so a caller whose pivots accumulate across solves can raise it, and so tests can
- * force a refactorization per pivot and compare.
- *
- * [iterationLimit] bounds the combined numerical phases; 0 derives a limit from the model's size. A caller
- * solving one node of a search sets it low deliberately: the dual simplex is dual-feasible at every
- * basis it passes through, so stopping short still yields a valid bound, and on a model where the
- * optimum costs thousands of pivots the truncated bound is usually worth as much for a fraction of
- * the time. A truncated primal iterate is withheld because primal feasibility alone provides no bound.
- *
- * [workLimit] is the same idea in the better unit ([LpWork]): pivots are not a measure of cost, since one
- * on a dense basis carrying many updates outweighs many cheap sparse steps, so a pivot budget means
- * something different on every model while a work budget does not. 0 leaves it unbounded. Both limits
- * apply when both are set; whichever binds first stops the solve.
- *
- * Leaving rows are priced by Devex weights and the entering ratio test is Harris's two-pass test:
- * P. M. J. Harris, "Pivot selection methods of the Devex LP code", Math. Program. 5 (1973),
- * https://doi.org/10.1007/BF01580108. The weights approximate dual steepest edge: J. J. Forrest and
- * D. Goldfarb, "Steepest-edge simplex algorithms for linear programming", Math. Program. 57 (1992),
- * https://doi.org/10.1007/BF01581089. The bound-flipping long-step ratio test follows I. Maros, "A
- * generalized dual phase-2 simplex algorithm", Eur. J. Oper. Res. 149 (2003),
- * https://doi.org/10.1016/S0377-2217(02)00448-4.
- */
+// Bounded-variable dual simplex in revised form: a [BasisSolver] owns the factors and updates, and the columns stay
+// in sparse CSC. May return null (non-convergence, dual unboundedness, singular basis); candidates need independent
+// certification against the source. A basis is named by index into `columns`, fixed for the solver's lifetime, so a
+// pivot hands the solver the spike it already computed. [refactorUpdateLimit] caps updates beyond what the solver
+// advises through [BasisUpdate.REFACTORIZE]. [iterationLimit] (0 derives one from size) and [workLimit] (0 is
+// unbounded) may truncate a solve: every dual iterate is dual-feasible, so stopping short still bounds, while a
+// truncated primal iterate is withheld.
+// Devex pricing and Harris's two-pass ratio test: P. M. J. Harris, "Pivot selection methods of the Devex LP code",
+// Math. Program. 5 (1973), https://doi.org/10.1007/BF01580108. Dual steepest edge: J. J. Forrest and D. Goldfarb,
+// "Steepest-edge simplex algorithms for linear programming", Math. Program. 57 (1992),
+// https://doi.org/10.1007/BF01581089. Bound-flipping ratio test: I. Maros, "A generalized dual phase-2 simplex
+// algorithm", Eur. J. Oper. Res. 149 (2003), https://doi.org/10.1016/S0377-2217(02)00448-4.
 internal class RevisedSimplex(
     private var model: LpModel,
     cancellation: ExecutionControl = ExecutionControl.Never,
@@ -244,26 +193,17 @@ internal class RevisedSimplex(
     private val alphaValues = workspace.alphaValues
     private val reconcileQueue = workspace.reconcileQueue
 
-    /**
-     * The LP's owned columns with the logical ones explicit, for the current scaling view.
-     *
-     * Fixed structure within that view lets a basis be named by index: [basicVar] *is* what the basis solver
-     * factorizes, so a refactorization hands over the choice of columns rather than a square matrix
-     * assembled for the occasion.
-     */
+    // Logical columns explicit, so [basicVar] names exactly what the basis solver factorizes.
     private var columns: SparseMatrix = initialMatrix?.also {
         require(initialScaling != null && it.matches(numerical))
     }?.columns ?: lpColumns(numerical)
 
-    // The CSC of `columns` as flat arrays — the same structure the seam holds, read here for pricing rather
-    // than copied into a second representation. Column j occupies colPtr(j) until colPtr(j+1).
+    // The CSC the seam holds, read for pricing rather than copied.
     private var colPtr: IntArray = initialMatrix?.colPtr ?: columns.copyColumnPointers()
     private var rowIdx: IntArray = initialMatrix?.rowIdx ?: columns.copyRowIndices()
     private var colVal: DoubleArray = initialMatrix?.colVal ?: columns.values
 
-    // `columns` by row. The pivot row is formed from the nonzeros of ρ = B⁻ᵀeᵣ over these, so a hypersparse ρ
-    // costs the rows it touches instead of a pass over every column — which is what makes a hypersparse
-    // BTRAN worth having, since dotting ρ against all numVars columns would swamp it.
+    // `columns` by row, so the pivot row from a hypersparse ρ = B⁻ᵀeᵣ costs only the rows it touches.
     private lateinit var rowCols: Array<IntArray>
     private lateinit var rowVals: Array<DoubleArray>
 
@@ -469,53 +409,33 @@ internal class RevisedSimplex(
         return true
     }
 
-    // The solve carriers, one per role and reused for this engine's whole life. Reuse is not only
-    // about allocation: a solver may recognise the vector its own solve filled and reuse the form it
-    // kept when the same one comes back to [BasisSolver.update], which is what makes an update cost
-    // one FTRAN. So the entering spike and the pivotal row each keep a vector of their own, and the
-    // dual/rhs solves keep theirs, rather than sharing one and defeating that.
+    // One carrier per role: a solver may reuse the form it kept when its own vector comes back to
+    // [BasisSolver.update], which keeps an update at one FTRAN; a shared vector would defeat that.
     private val spikeVec = workspace.spikeVec
     private val pricingSpikeVec = workspace.pricingSpikeVec
     private val pivotEtaVec = workspace.pivotEtaVec
     private val rhsVec = workspace.rhsVec
     private val dualVec = workspace.dualVec
 
-    /**
-     * Nonzeros in the basis matrix `B` — `Σ_t nnz(A_{basicVar(t)})`, maintained across pivots.
-     *
-     * The work meter is charged from this rather than from the solver's own `nnz`. A backend's fill is
-     * its own business and two of them differ on the same basis, so metering it would make a work
-     * budget mean something different per deployment, and an A/B keyed on one would stop comparing.
-     * This is a property of the model and the pivot path, which is what [LpWork] promises.
-     */
+    // The work meter charges from this rather than the solver's fill, which differs between basis solvers; this
+    // depends only on the model and the pivot path.
     private var nnzB = 0
 
-    /** Density estimates for the last FTRAN and BTRAN results, which steer the solver's choice of
-     *  sweep. Fed from what the previous iteration actually produced, as the seam asks. */
+    // Fed from the previous iteration's FTRAN and BTRAN results to steer the solver's sweep choice.
     private var ftranDensity = 1.0
     private var btranDensity = 1.0
 
-    /** When [solve] returns null because the primal is infeasible (dual unbounded — no entering column
-     *  for the most-violated basic row), the basis and that leaving row at termination, for the exact
-     *  Farkas infeasibility check ([integerFarkasRay]). Null on any other failure (non-convergence,
-     *  singular pivot, budget) — so the caller only prunes on a genuine infeasibility. */
+    // Null on any failure other than dual unboundedness, so the caller only prunes on a genuine infeasibility.
     override var infeasibleBasis: Basis? = null
         private set
     override var infeasibleRow: Int = -1
         private set
 
-    /** The float candidate Farkas ray `ρ = B⁻ᵀeᵣ` at a dual-unbounded termination, for [integerFarkasRay]
-     *  to round and certify. Null unless [solve] returned null on infeasibility. */
+    // ρ = B⁻ᵀeᵣ; null unless [solve] returned null on infeasibility.
     override var infeasibleRay: DoubleArray? = null
         private set
 
-    /**
-     * Count nonbasic columns with zero reduced cost against duals [y].
-     *
-     * Deliberately does not charge [work]: this pass exists to inform the budgeting policy, and a meter
-     * that grows when the policy is switched on would be measuring itself — budgets derived from it
-     * would then depend on whether they are in use.
-     */
+    // Uncharged: it informs the budgeting policy, and a meter that grew when the policy is on would measure itself.
     private fun recordDegeneracy(y: DoubleArray) {
         if (!trackDegeneracy) return
         var count = 0
@@ -603,8 +523,7 @@ internal class RevisedSimplex(
 
     private fun columnNnz(j: Int): Int = colPtr[j + 1] - colPtr[j]
 
-    /** Column [j] of `columns` scattered into [into], which is emptied first. Costs the column's nonzeros
-     *  rather than `m`, since an indexed vector clears only what it stored. */
+    // Costs the column's nonzeros rather than m, since an indexed vector clears only what it stored.
     private fun scatterColumn(j: Int, into: IndexedVector) {
         work.add(columnNnz(j))
         into.scatterStored(rowIdx, colPtr[j], colVal, colPtr[j], columnNnz(j))
@@ -623,7 +542,6 @@ internal class RevisedSimplex(
         return koblas.dotColumn(columns, j, DenseVector.wrap(y))
     }
 
-    /** `y · A_j` for the dual vector [y], charged to the work meter. */
     private fun dotColumn(y: DoubleArray, j: Int): Double {
         work.add(columnNnz(j))
         return columnDot(y, j)
@@ -679,12 +597,8 @@ internal class RevisedSimplex(
     private var repairStop: BasisRepairStop? = null
     private var repairCallbackFailure: Throwable? = null
 
-    /**
-     * Refactorize the seated basis — the columns of `columns` that `basicVar` names — and drop any updates
-     * folded into it. A singular factorization goes to basis repair: [SimplexBasisRefactor.BASIS_CHANGED] when
-     * repair seated a different basis, [SimplexBasisRefactor.FAILED] when it could not, which leaves this engine
-     * unable to solve until a later call succeeds.
-     */
+    // A singular factorization goes to basis repair; [SimplexBasisRefactor.FAILED] leaves this engine unable to solve
+    // until a later call succeeds.
     private fun refactorize(reason: LpRefactorReason): SimplexBasisRefactor = profiled(SimplexProfilePhase.REFACTOR) {
         if (repairStop != null) {
             observations.termination = repairTermination()
@@ -724,8 +638,7 @@ internal class RevisedSimplex(
         }
         nnzB = 0
         for (t in 0 until m) nnzB += columnNnz(basicVar[t])
-        // The elimination's deterministic stand-in: the entries it reads. Not what it produces — that
-        // is the backend's fill, which [nnzB] deliberately does not follow.
+        // The entries the elimination reads, not the fill it produces.
         work.add(nnzB)
         val solver = solver()
         val buildBefore = operationWork(solver)
@@ -799,9 +712,7 @@ internal class RevisedSimplex(
     private fun recordFactorization(solver: BasisSolver, basisChanged: Boolean) {
         numericalFailure = false
         observations.factorEntriesBuilt += solver.nnz.toLong()
-        // Fill of the factors the solver now holds: how much they grow the basis, and how dense they
-        // become. Read off the solver, so unlike the work meter this measures the backend in play — a
-        // density approaching 1 on real bases says the sparse factors are dense after all.
+        // Read off the solver, so unlike the work meter this measures the basis solver in play.
         if (m > 0 && nnzB > 0) {
             val held = solver.nnz.toDouble()
             val fill = held / nnzB
@@ -849,14 +760,8 @@ internal class RevisedSimplex(
         basisLifecycle.kept = false
     }
 
-    /**
-     * Charge one basis solve: the basis's own entries, then `m` per update folded in since the last
-     * refactorization.
-     *
-     * Both terms are the model's shape and the pivot path, never the solver's fill, so the meter reads
-     * the same on a deployment that found an accelerated backend and one that did not.
-     * An empty right-hand side requires no traversal through the factors or updates.
-     */
+    // nnz(B) plus m per folded update: the model's shape and pivot path, never the solver's fill. An empty
+    // right-hand side traverses nothing.
     private fun chargeSolve(rhs: IndexedVector, operation: SimplexBasisOperation) {
         if (rhs.count == 0) return
         val charge = nnzB.toLong() + (basisLifecycle.current?.updateCount ?: 0).toLong() * m
@@ -932,7 +837,6 @@ internal class RevisedSimplex(
         }
     }
 
-    /** `B x = b` for a dense right-hand side, into [out] through [carrier]. */
     private fun ftranDense(
         b: DoubleArray,
         out: DoubleArray,
@@ -957,7 +861,6 @@ internal class RevisedSimplex(
         for (x in b) if (!x.isFinite()) throw BasisArithmeticException("nonfinite basis right-hand side")
     }
 
-    /** `Bᵀ x = b` for a dense right-hand side, into [out] through [carrier]. */
     private fun btranDense(b: DoubleArray, out: DoubleArray, carrier: IndexedVector): DoubleArray {
         requireFiniteRhs(b)
         carrier.scatter(b)
@@ -970,12 +873,7 @@ internal class RevisedSimplex(
         return carrier.gather(out)
     }
 
-    /**
-     * The entering column's spike `η = B⁻¹A_q` into [spikeVec].
-     *
-     * Left exactly as the solver filled it, so [foldPivot] can hand it back and the solver reuse the
-     * form it kept instead of solving again.
-     */
+    // Left exactly as the solver filled it, so [foldPivot] can hand it back without another solve.
     private fun spike(q: Int) {
         scatterColumn(q, spikeVec)
         chargeSolve(spikeVec, SimplexBasisOperation.ENTERING_FTRAN)
@@ -989,20 +887,14 @@ internal class RevisedSimplex(
         ftranDensity = spikeVec.density
     }
 
-    /**
-     * The entering column's spike densely in [out], which is returned; [spikeVec] keeps the indexed
-     * form so [foldPivot] can still hand it back.
-     *
-     * The dual loop reads the spike through its nonzeros, but the ratio tests that pick a leaving row
-     * by strictly-better step length — and, under Bland's rule, by lowest variable index among equal
-     * ones — resolve near-ties in visit order. Reading those densely keeps them ascending by row.
-     */
+    // Ratio tests choosing by strictly better step, or lowest index under Bland's rule, resolve near-ties in visit
+    // order; reading densely keeps that ascending by row. [spikeVec] keeps the indexed form for [foldPivot].
     private fun spikeDense(q: Int, out: DoubleArray): DoubleArray {
         spike(q)
         return spikeVec.gather(out)
     }
 
-    /** The pivotal row `ρ = eᵣᵀB⁻¹ = B⁻ᵀeᵣ` into [pivotEtaVec], likewise left as the solver filled it. */
+    // ρ = B⁻ᵀeᵣ, left as the solver filled it.
     private fun pivotalRow(r: Int) {
         pivotEtaVec.unit(r)
         chargeSolve(pivotEtaVec, SimplexBasisOperation.PIVOTAL_BTRAN)
@@ -1020,13 +912,8 @@ internal class RevisedSimplex(
         btranDensity = pivotEtaVec.density
     }
 
-    /**
-     * Fold the pivot that seated column [q] in slot [r], evicting [leaving], into the basis.
-     *
-     * [basicVar] must already name the new basis, since a rebuild here factorizes it. The spike in
-     * [spikeVec] is handed back for the update; [withPivotEta] additionally offers [pivotEtaVec], which
-     * a dual pivot has in hand and a primal one does not.
-     */
+    // [basicVar] must already name the new basis, since a rebuild here factorizes it. [withPivotEta] offers
+    // [pivotEtaVec], which a dual pivot has in hand and a primal one does not.
     private fun foldPivot(r: Int, q: Int, leaving: Int, withPivotEta: Boolean): PivotFold {
         work.add(m)
         nnzB += columnNnz(q) - columnNnz(leaving)
@@ -1073,18 +960,11 @@ internal class RevisedSimplex(
         return btranDense(dualRhs, dualValues, dualVec)
     }
 
-    /** Whether every objective coefficient is zero (pure feasibility): [duals] is then identically 0. */
     private val allZeroCost: Boolean get() = (0 until numVars).all { cost(it) == 0.0 }
     private fun resetGamma() = pricingState.resetReference()
 
-    /**
-     * Solve the relaxation, optionally warm-started from [warm] — a prior **optimal** basis of the same
-     * model structure (cross-node basis reuse). Tightening a child's variable bounds leaves the
-     * parent basis dual-feasible (reduced costs are bound-independent), so the dual simplex resumes from
-     * near the optimum in a few pivots. The warm basis only changes the search path, never the result:
-     * a structural mismatch or a singular factorization silently falls back to a cold start, so reuse is
-     * sound regardless of how the basis was obtained.
-     */
+    // Bound tightening keeps a parent's optimal basis dual-feasible, so a warm solve resumes in a few pivots. A
+    // mismatched or singular warm basis falls back to a cold start, so reuse is sound whatever its origin.
     override fun solve(warm: Basis?): FloatLpResult? {
         check(activeSolve == null) { "LP solve is suspended" }
         val progress = SolveProgress()
@@ -1137,20 +1017,10 @@ internal class RevisedSimplex(
         }
     }
 
-    /**
-     * Re-solve with per-row enforcement, keeping the basis AND its LU factorization from this
-     * instance's previous terminated solve — the persistent gated-residual filter. A row with
-     * `enforced(i) = false` does not constrain: its slack is driven into the basis (one designated
-     * pivot when nonbasic) and then never selected as violated and never re-enters, so the row's
-     * equation merely defines the free slack's value. Node-to-node only [enforced] and the rhs
-     * change, neither of which touches the basis matrix, so the kept factorization carries over and
-     * feasibility is repaired in a few dual pivots instead of a fresh factorization.
-     *
-     * Only sound for an all-zero objective (the gated filter's shape): with zero costs every basis is
-     * dual-feasible, so the designated reconciliation pivots can never break the dual simplex's
-     * invariant. When nothing usable is kept (first call, or the previous solve bailed), this is an
-     * ordinary cold start — whose all-slack basis has every unenforced slack basic already.
-     */
+    // An unenforced row's slack is pivoted into the basis and never leaves or re-enters, so the row only defines it.
+    // Only [enforced] and the rhs change between calls, so the kept factorization carries over. Sound only for an
+    // all-zero objective, where every basis is dual-feasible; with nothing kept this is a cold start, whose all-slack
+    // basis already has every unenforced slack basic.
     override fun resolveGated(enforced: BooleanArray): FloatLpResult? {
         check(activeSolve == null) { "LP solve is suspended" }
         val progress = SolveProgress()
@@ -1237,7 +1107,7 @@ internal class RevisedSimplex(
         return true
     }
 
-    /** Refresh under the owner's immutable matrix scale, retiring scaled factors atomically on decline. */
+    // Retires scaled factors atomically on decline.
     private fun refreshNumerical(next: LpModel) {
         val refreshed = numerical.refresh(next)
         if (refreshed != null) {
@@ -1337,7 +1207,6 @@ internal class RevisedSimplex(
         }
     }
 
-    /** Re-solve after [adopt], continuing from the kept basis and factorization. */
     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
         check(activeSolve == null) { "LP solve is suspended" }
         val previous = solveControl.floatAllowance
@@ -1607,7 +1476,7 @@ internal class RevisedSimplex(
         // A kept factorization implies the basis it factorizes is still seated, so that is the warmest
         // start there is; a warm basis alone still pays for a factorization.
         observations.warmStarted = if (reset) kept else observations.warmStarted || kept
-        // A warm basis can be singular; fall back to the (always non-singular) slack cold start.
+        // A warm basis can be singular; the slack cold start never is.
         if (!kept) {
             artificialBounds.clear()
             if (warm == null) {
@@ -1684,7 +1553,7 @@ internal class RevisedSimplex(
                 }
             }
         }
-        resetGamma() // fresh Devex reference frame for this solve
+        resetGamma()
         // Bounds stay fixed for this solve; the leaving scan otherwise reads every basic column from the
         // exact model on every iteration. Artificial sides count as finite until they are dropped.
         val finiteLower = if (m > 0 && model.exactState != null) {
@@ -1771,7 +1640,7 @@ internal class RevisedSimplex(
             else -> false
         }
 
-    /** `b − Σ_{j nonbasic at upper} A_j·u_j` into [out], the right-hand side the basic values solve. */
+    // b − Σ_{j nonbasic at upper} A_j·u_j.
     private fun adjustedRhs(out: DoubleArray) {
         work.add(m)
         for (i in 0 until m) out[i] = numerical.rhsD(i)
@@ -1799,7 +1668,7 @@ internal class RevisedSimplex(
             VarStatus.AT_LOWER
         }
 
-    /** [seat] on the numerical view, reading an artificial side where one is installed. */
+    // Reads an artificial side where one is installed.
     private fun currentSeat(side: VarStatus, column: Int): Double = when (side) {
         VarStatus.AT_UPPER -> upperAt(column)
         VarStatus.AT_LOWER, VarStatus.FIXED -> lowerAt(column)
@@ -1930,10 +1799,7 @@ internal class RevisedSimplex(
             }
         }
 
-    /**
-     * The boxed solve cannot settle the real LP. Its basis rests on artificial seats the primal would only reseat
-     * arbitrarily, so the primal restarts from the slack start the solve had before boxing.
-     */
+    // The primal would only reseat artificial seats arbitrarily, so it restarts from the slack start.
     private suspend fun handArtificialBasisToPrimal(progress: SolveProgress): FloatLpResult? {
         observations.numericalMetrics.artificialHandoffs++
         artificialBounds.clear()
@@ -1942,14 +1808,9 @@ internal class RevisedSimplex(
         return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
     }
 
-    /**
-     * Drive every unenforced row's slack into the basis with one designated pivot each, so the main
-     * loop's free-slack invariant holds: an unenforced slack that is basic never leaves (skipped as a
-     * violation) and never re-enters. Evicting another unenforced slack re-queues it, bounded by a
-     * `2m` guard; a singular spike or an exhausted guard returns false and the caller cold-starts (the
-     * all-slack basis seats every slack trivially). Only called with an all-zero objective, where any
-     * basis is dual-feasible, so the arbitrary evicted-to-lower statuses never break the dual simplex.
-     */
+    // Evicting another unenforced slack re-queues it, bounded by a 2m guard; a singular spike or exhausted guard fails
+    // and the caller cold-starts. Only called with an all-zero objective, so arbitrary evicted statuses keep the
+    // basis dual-feasible.
     private fun reconcileUnenforced(enforced: BooleanArray): IterationResult {
         val alphaBuf = alphaValues
         var guard = 0
@@ -2161,14 +2022,7 @@ internal class RevisedSimplex(
         }
     }
 
-    /**
-     * The iterate a solve stopped short on, as a bound-only result.
-     *
-     * Deliberately does *not* record [optimalBasis] / [optimalPrimal]: those gate tableau cut generation,
-     * which needs an optimal tableau, so leaving them alone makes the cut path decline on its own rather
-     * than relying on every caller to remember. Same objective arithmetic as [optimal], since the bound
-     * is read the same way.
-     */
+    // Leaves [optimalBasis] and [optimalPrimal] alone, so tableau cut generation declines on its own.
     private fun truncated(beta: DoubleArray): FloatLpResult = profiled(SimplexProfilePhase.OUTPUT) {
         solvedExactState = model.exactState
         var obj = model.objConstantD
@@ -2211,10 +2065,8 @@ internal class RevisedSimplex(
     // A boxed iterate bounds only the boxed LP, a restriction of the real one, so it is withheld.
     private fun boundOnly(beta: DoubleArray): FloatLpResult? = if (artificialBounds.active) null else truncated(beta)
 
-    /** The basis at the last optimal [solve]; null until an optimal solve. For tableau cut generation. */
     private var optimalBasis: Basis? = null
 
-    /** The structural primal `x*` at the last optimal [solve], for scoring tableau cuts by violation. */
     private var optimalPrimal: DoubleArray? = null
 
     internal fun probeObjective(token: ExecutionControl): Double? {
@@ -2530,25 +2382,20 @@ internal class RevisedSimplex(
         return LpDirectionalCost(down / scale, up / scale)
     }
 
-    /** Gomory (Chvátal) integrality cuts from the last optimal basis, up to [maxCuts]; empty if the
-     *  last solve was not optimal. Integer-multiplier row aggregation + super-additive rounding in 128
-     *  bits ([integerTableauCuts]), so the cuts are rigorously valid. */
     override fun gomoryCuts(maxCuts: Int): List<Cut> {
         val basis = optimalBasis ?: return emptyList()
         val primal = optimalPrimal ?: return emptyList()
         return integerTableauCuts(model, basis, primal, maxCuts, mir = false)
     }
 
-    /** Gomory mixed-integer (MIR) cuts from the last optimal basis, up to [maxCuts]. */
     override fun mirCuts(maxCuts: Int): List<Cut> {
         val basis = optimalBasis ?: return emptyList()
         val primal = optimalPrimal ?: return emptyList()
         return integerTableauCuts(model, basis, primal, maxCuts, mir = true)
     }
 
-    /** Seed the basis from a prior [warm] basis; false (⇒ cold start) on a structural mismatch, an
-     *  out-of-range column, a rejected basis, or a status the bounds cannot seat. A singular warm
-     *  factorization is caught by [solveCore]'s refactor fallback. */
+    // False (cold start) on a mismatch, a rejected basis, or a status the bounds cannot seat. A singular warm
+    // factorization is caught by [solveCore]'s refactor fallback.
     private fun tryWarmStart(warm: Basis): Boolean {
         if (rejectedExactBasis?.contentEquals(warm.basicVars) == true) return false
         basisCaptureEligible = basisCaptureEligible && warm.captureEligible
@@ -2587,9 +2434,7 @@ internal class RevisedSimplex(
         }
     }
 
-    /** All slacks basic, every structural variable at its (shifted) lower bound. Primal-feasible
-     *  whenever every row's slack value `rhs_i` is within the slack's bounds — the common `≤`/`rhs ≥ 0`
-     *  case — which is the starting point [solvePrimal] needs. */
+    // All slacks basic, structurals at lower: primal-feasible whenever each rhs(i) is within its slack's bounds.
     private fun lowerStart() {
         exactBasisCache.clear()
         for (i in 0 until m) {
@@ -2599,8 +2444,6 @@ internal class RevisedSimplex(
         for (j in 0 until n) status[j] = if (model.hasFiniteLower(j)) sideStatus(j, false) else defaultStatus(j)
     }
 
-    /** Current basic values `β = B⁻¹(b − Σ_{j nonbasic at upper} A_j·u_j)` into [out], which is
-     *  returned. */
     private fun basicValues(out: DoubleArray): DoubleArray {
         adjustedRhs(basicRhs)
         return ftranDense(basicRhs, out, rhsVec)
@@ -2615,17 +2458,8 @@ internal class RevisedSimplex(
         return true
     }
 
-    /**
-     * Primal **phase-1**: drive an infeasible basis to primal feasibility by minimizing the total bound
-     * infeasibility `w = Σ max(0, l_i − β_i) + max(0, β_i − u_i)` over the same primal pivot machinery. The
-     * phase-1 gradient `γ` (−1 for a basic below its lower bound, +1 above its upper, 0 feasible) gives
-     * the phase-1 duals `π = B⁻ᵀγ`. Pricing selects an improving column; the ratio test minimizes the
-     * piecewise-linear violation along its edge, passing crossings that leave a negative slope.
-     * [IterationResult.CONTINUE] once feasible; [IterationResult.FAILED] when no improving column remains
-     * while `w > 0` (an infeasibility candidate) or on a singular pivot / cancellation / budget;
-     * [IterationResult.RESTART] or [IterationResult.BASIS_CHANGED] when a refactorization requires the
-     * caller to restart. Mutates [basicVar] / [status].
-     */
+    // Minimizes w = Σ max(0, l_i − β_i) + max(0, β_i − u_i) with phase-1 duals π = B⁻ᵀγ, γ the violation sign. The
+    // ratio test passes crossings that leave a negative slope. FAILED with w > 0 is only an infeasibility candidate.
     private suspend fun primalPhase1(progress: SolveProgress): IterationResult =
         profiled(SimplexProfilePhase.FEASIBILITY_REPAIR) {
             when (primalPhases.repair(model, numerical, progress, phaseOneLongSteps, phaseOneIncrementalValues)) {
@@ -2649,19 +2483,10 @@ internal class RevisedSimplex(
             }
         }
 
-    /**
-     * Bounded-variable **primal** simplex (the dual [solve] is the workhorse; this is the complementary
-     * engine for callers that optimize from a primal start). [primalPhase1] drives an infeasible
-     * start to feasibility, then phase-2 pivots toward the optimum by the textbook Dantzig rule, switching
-     * to Bland's lowest-index rule after a degenerate stall (R. G. Bland, "New finite pivoting rules for
-     * the simplex method", Math. Oper. Res. 2 (1977), https://doi.org/10.1287/moor.2.2.103), with a
-     * **bound-flipping** ratio test: an entering variable that reaches its own opposite bound before any
-     * basic variable blocks simply flips bounds, taking a long step with no basis change. Returns null on
-     * a genuinely infeasible model, an unbounded objective, a singular pivot, cancellation, or the
-     * iteration budget — so the caller falls back to the dual path. Like [solve], the float basis it
-     * returns is certified exactly downstream, so this never affects soundness, only which vertex is
-     * reached.
-     */
+    // Phase 2 prices by Dantzig's rule, switching to Bland's after a degenerate stall (R. G. Bland, "New finite
+    // pivoting rules for the simplex method", Math. Oper. Res. 2 (1977), https://doi.org/10.1287/moor.2.2.103), and an
+    // entering variable that reaches its opposite bound first just flips. Null on any failure, so the caller falls
+    // back to the dual path; the result is certified downstream like [solve]'s.
     override fun solvePrimal(warm: Basis?): FloatLpResult? {
         check(activeSolve == null) { "LP solve is suspended" }
         val progress = SolveProgress()
@@ -2753,10 +2578,8 @@ internal class RevisedSimplex(
 
         const val THEORY_SUPPORT_TOLERANCE: Double = 1e-7
 
-        /** Primal feasibility tolerance on basic values. */
         const val FEAS_TOL: Double = 1e-6
 
-        /** Iterations between cooperative cancellation polls. */
         const val CANCEL_POLL: Int = 32
 
         const val MAX_SOLVE_RESTARTS: Int = 4
@@ -2786,16 +2609,8 @@ private fun EngineRefactorTrigger.refactorReason(): LpRefactorReason = when (thi
     EngineRefactorTrigger.RESIDUAL -> LpRefactorReason.NUMERICAL_RECOVERY
 }
 
-/**
- * The LP's columns as one CSC matrix with the logical columns explicit: structural column `j` as the
- * model stores it, then slack column `n + i` as the unit vector `e_i`.
- *
- * The slacks are materialized rather than left implicit because the basis seam names its columns by
- * index into this matrix, so a basis slot holding a slack has to be an ordinary column for the solver
- * to factor it where it lies. Built once per engine and rebuilt only when the unscaled fallback replaces
- * the scaling view: bound-only adoption preserves the model's matrix, and anything that replaces it builds a
- * fresh engine.
- */
+// Slack column n + i is materialized as e_i because the basis seam names columns by index into this matrix. Rebuilt
+// only when the unscaled fallback replaces the scaling view; anything replacing the matrix builds a fresh engine.
 private fun lpColumns(model: LpScalingView): SparseMatrix {
     val m = model.m
     val n = model.n
@@ -2827,15 +2642,11 @@ internal class SimplexNumericalMetrics {
     var primalBlandEntries = 0
     var capExits = 0
 
-    /** Solves whose slack start the dual simplex took over from artificial bounds. */
     var artificialStarts = 0
 
-    /** Rounds that widened an artificial bound an optimum of the boxed LP sat on. */
     var artificialWidenings = 0
 
-    /** Boxed solves that restarted the primal simplex from the slack start instead of publishing. */
     var artificialHandoffs = 0
 
-    /** Dual-degenerate columns moved off an artificial seat onto a real one. */
     var artificialReleases = 0
 }

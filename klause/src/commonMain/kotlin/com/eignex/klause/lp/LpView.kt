@@ -1,10 +1,6 @@
 package com.eignex.klause.lp
 
-/**
- * A gated convex-hull family a factor's LP relaxation can belong to. A factor names its family once via
- * [lpHullFamily]; the relaxation driver gates it with [HullFlags] and the LP auto-config groups
- * factors by it — so neither pattern-matches the concrete factor type.
- */
+/** An optional convex-hull family of a factor's LP relaxation, switched per build by [HullFlags]. */
 enum class HullFamily {
     /** Constant-array Element one-hot selector hull. */
     ELEMENT,
@@ -31,12 +27,7 @@ enum class HullFamily {
     PRODUCT,
 }
 
-/**
- * The per-family convex-hull switches for one relaxation build — each names a gated hull the driver
- * ([com.eignex.klause.lp.relaxation.CpToLpRelaxation]) can turn on. A factor's
- * [lpHullEnabled] reads its family's flag through [enabled]; the
- * driver owns the values (from its plan) and never pattern-matches the factor type to pick one.
- */
+/** The per-family convex-hull switches for one relaxation build. */
 class HullFlags(
     /** Constant-array Element one-hot selector hull. */
     val element: Boolean,
@@ -77,9 +68,7 @@ class LpSizeEstimate(
 )
 
 /**
- * How the root relaxation treats an emitted row. [CORE] rows define the relaxation's feasible region
- * and are always kept; [HULL] rows only strengthen the bound and may be dropped when they add no root
- * strength. Dropping rows from a valid relaxation only loosens it — it never invalidates it — so this
+ * How the root relaxation treats an emitted row. Dropping a [HULL] row only loosens the relaxation, so this
  * gates effort, not soundness.
  */
 enum class Contribution {

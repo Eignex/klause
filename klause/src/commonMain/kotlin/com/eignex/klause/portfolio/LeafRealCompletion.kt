@@ -35,14 +35,10 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 import kotlin.math.ceil
 
-/**
- * Completes a local-search candidate over LP-only continuous columns the way a backtrack leaf is completed: pin every
- * Boolean and integer column to the candidate's value and solve the residual LP over the continuous columns.
- *
- * The candidate's own continuous values are floating-point guesses; the residual LP decides whether a completion
- * exists. [objective], when given, is what that LP minimizes. An exact point is a witness outright; a tolerance-only
- * point is one only when [toleranceCheck] accepts it. A solve that cancellation cuts short decides nothing.
- */
+// Completes a local-search candidate the way a backtrack leaf is completed: pin every Boolean and integer column
+// and solve the residual LP over the continuous columns. The candidate's own continuous values are only guesses.
+// An exact point is a witness outright; a tolerance-only point only when toleranceCheck accepts it. A solve that
+// cancellation cuts short decides nothing.
 internal class LeafRealCompletion(
     private val problem: Problem,
     private val objective: LinearObjective?,

@@ -37,8 +37,7 @@ class OptIntHandle(
     /** Inclusive upper bound of the value's domain. */
     val max: Long get() = value.max
 
-    /** Yields an [IntExpr] equal to [value] when [present], otherwise [default]. Safe in any
-     *  arithmetic context. */
+    /** [value] when [present], otherwise [default]; safe in any arithmetic context. */
     fun valueOr(default: Int): IntExpr = IntIfThenElse(present.toExpr(), value.toIntExpr(), IntLit(default))
 
     /** Yields an [IntExpr] equal to [value] when [present], otherwise [default]. */
@@ -94,22 +93,22 @@ class OptIntHandle(
     /** `this ≠ c`, and present (false if absent). */
     infix fun ne(c: Int): BoolExpr = cmpRhsConst(c, IntCmpOp.NE)
 
-    /** `this ≤ other`, and present (false if absent). */
+    /** `this ≤ other`, and both present (false if either absent). */
     infix fun le(other: OptIntHandle): BoolExpr = cmpRhsOpt(other, IntCmpOp.LE)
 
-    /** `this < other`, and present (false if absent). */
+    /** `this < other`, and both present (false if either absent). */
     infix fun lt(other: OptIntHandle): BoolExpr = cmpRhsOpt(other, IntCmpOp.LT)
 
-    /** `this ≥ other`, and present (false if absent). */
+    /** `this ≥ other`, and both present (false if either absent). */
     infix fun ge(other: OptIntHandle): BoolExpr = cmpRhsOpt(other, IntCmpOp.GE)
 
-    /** `this > other`, and present (false if absent). */
+    /** `this > other`, and both present (false if either absent). */
     infix fun gt(other: OptIntHandle): BoolExpr = cmpRhsOpt(other, IntCmpOp.GT)
 
-    /** `this = other`, and present (false if absent). */
+    /** `this = other`, and both present (false if either absent). */
     infix fun eq(other: OptIntHandle): BoolExpr = cmpRhsOpt(other, IntCmpOp.EQ)
 
-    /** `this ≠ other`, and present (false if absent). */
+    /** `this ≠ other`, and both present (false if either absent). */
     infix fun ne(other: OptIntHandle): BoolExpr = cmpRhsOpt(other, IntCmpOp.NE)
 }
 
@@ -129,22 +128,15 @@ class OptBoolHandle(
     /** Coerces to `present ∧ value` — false whenever the variable is absent. */
     override fun toExpr(): BoolExpr = And(listOf(present.toExpr(), value.toExpr()))
 
-    /** Yields a [BoolExpr] equal to [value] when [present], otherwise [default]. Useful when
-     *  the caller wants a non-false fallback (e.g. `valueOr(true)`). */
+    /** [value] when [present], otherwise [default]. */
     fun valueOr(default: Boolean): BoolExpr =
         if (default) Or(listOf(Not(present.toExpr()), value.toExpr())) else toExpr()
 }
 
 /**
- * Optional float variable: a `(present, value)` pair, mirroring [OptIntHandle] for the
- * bucketised-float kind. The presence bool is an ordinary Boolean; the value is a [FloatHandle]
- * meaningful only when [present]. Comparisons follow MiniZinc opt semantics — any comparison
- * involving an absent operand evaluates to false rather than dropping out of the constraint.
- *
- * Unlike [OptIntHandle] there is no `valueOr`: floats lower only to linear
- * ([com.eignex.klause.model.FloatLinearConstraint]) factors, and the AST has no float
- * if-then-else node to express "value when present, default otherwise" in an arithmetic
- * context. Use [present] / [value] directly when a conditional real value is needed.
+ * Optional float variable: a `(present, value)` pair mirroring [OptIntHandle]; any comparison involving
+ * an absent operand is false. There is no `valueOr` because the AST has no float if-then-else node; use
+ * [present] and [value] directly when a conditional real value is needed.
  */
 class OptFloatHandle(
     /** Name of the optional variable. */

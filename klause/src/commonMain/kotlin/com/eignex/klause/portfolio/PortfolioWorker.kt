@@ -24,20 +24,13 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 
 /**
- * One configured engine instance in a `Portfolio`: a [Session] together with the base
- * params it runs under. The param type is **erased** behind plain `(ExecutionControl) -> …`
- * closures, so a single portfolio can hold a *heterogeneous* mix of workers — e.g. several
- * local-search workers racing alongside a backtrack worker — even though their param types
- * ([com.eignex.klause.localsearch.LocalSearchParams] vs
- * [com.eignex.klause.backtrack.BacktrackParams]) differ. Construct via [of], which
- * closes over the concrete `Session<P>`/`P` so the only unchecked cast is the
- * already-idiomatic `withCancellation` covariant-return one.
+ * One configured engine instance in a [Portfolio]: a [Session] with the base params it runs under, erased behind
+ * closures so one portfolio can hold workers of different engines. Construct via [of].
  */
 class PortfolioWorker private constructor(
-    /** Human-readable id for progress / telemetry (e.g. "ls/cbls/fixed", "bt/domwdeg"). */
+    /** Id for progress and telemetry, such as `ls/cbls/fixed`. */
     val label: String,
-    /** Index of this worker's arm in the composed pool; replicas of the same arm — extra lanes when
-     *  arms < cores — share it, so per-arm credit pools across them. */
+    /** Index of this worker's arm in the composed pool; replicas of one arm share it. */
     val armId: Int,
     private val solveFn: (ExecutionControl, Long?) -> SolveResult,
     private val improvementsFn: (() -> Double, Sample?, ExecutionControl, Long?) -> Sequence<MinimizeResult>,
@@ -51,16 +44,14 @@ class PortfolioWorker private constructor(
     /** Solve once, honouring [cancel] (set when a sibling wins the race). */
     fun solve(cancel: ExecutionControl, maxInstructions: Long? = null): SolveResult = solveFn(cancel, maxInstructions)
 
-    /** The cross-arm channels this worker shares with the rest of its pool, or null when it shares none. */
     internal var sharedPools: SharedPools? = null
 
-    /** The contributions this worker publishes through [sharedPools], each earning it that contribution's signal. */
+    // Each contribution earns this worker that contribution's signal.
     internal var sharing: Set<Contribution> = emptySet()
 
-    /** Where this worker's sharing traffic is recorded, or null when it is not measured. */
     internal var sharingMeter: SharingMeter? = null
 
-    /** The optimality gap this worker prunes against, in its pool's objective units; null closes bounds exactly. */
+    // In the pool's objective units; null closes bounds exactly.
     internal var optimalityGap: OptimalityGap? = null
 
     internal var publicationExchange: IncumbentExchange<Sample, Double>? = null
@@ -72,19 +63,17 @@ class PortfolioWorker private constructor(
             { block -> meter.timed(SharingChannel.Incumbents, block) }, action)
     }
 
-    /** The reward signals this worker can earn: its engine's own and those of the channels it shares through. */
     internal val signals: Set<Signal>
         get() = (if (withInstructions) COUNTED_SIGNALS else SEARCH_SIGNALS) + sharing.map { it.signal }
 
     /** Whether this worker accepts the counted instruction budget used to schedule LS segments. */
     val acceptsInstructionBudget: Boolean get() = withInstructions
 
-    /** The family the portfolio shares time with before it picks among the family's arms; see [FamilyPolicy]. */
     internal var family: ArmFamily = if (withInstructions) ArmFamily.LocalSearch else ArmFamily.Backtrack
 
     internal var restartingSearch: Boolean = false
 
-    /** The role this worker's arm fills in its roster, or its rank fill; null outside a composed roster. */
+    // Null outside a composed roster.
     internal var role: String? = null
 
     internal var improvementOnly: Boolean = false
@@ -156,11 +145,9 @@ class PortfolioWorker private constructor(
     }
 
     /**
-     * Open a fresh pause/resume handle over this worker's optimisation, or `null` when the engine
-     * can't be paused/resumed. [readBound] exposes the portfolio's shared best objective so the resumable backtrack
-     * search prunes on it, through the same `withBound` seam of [of] that [improvements] uses. A [Portfolio]
-     * holds one handle per resumable arm and resumes it each segment, so the arm never cold-restarts between
-     * slices. */
+     * Opens a pause/resume handle over this worker's optimisation, or `null` when the engine cannot pause.
+     * [readBound] exposes the portfolio's shared best objective for bound pruning.
+     */
     fun newResumableSearch(readBound: () -> Double): ResumableSearch? = resumableFn?.invoke(readBound, null, null)
 
     internal fun newResumableSearch(
@@ -169,27 +156,17 @@ class PortfolioWorker private constructor(
         warmStart: Sample? = null,
     ): ResumableSearch? = resumableFn?.invoke(readBound, cancellation, warmStart)
 
-    /**
-     * Open a fresh pause/resume handle over this worker's satisfaction search, or `null` when the engine can't be
-     * paused. Local-search handles retain their walk across segments. The satisfaction counterpart of
-     * [newResumableSearch]: [Portfolio.solve] resumes it each segment rather than restarting the arm.
-     */
+    /** Opens a pause/resume handle over this worker's satisfaction search, or `null` when the engine cannot pause. */
     fun newResumableSolve(): ResumableSolve? = resumableSolveFn?.invoke(null)
 
     internal fun newResumableSolve(cancellation: ExecutionControl): ResumableSolve? =
         resumableSolveFn?.invoke(cancellation)
 
-    /** Stream improving incumbents against this worker's *own* objective representation (the one
-     *  it was built with — see [of]). [readBound] exposes the portfolio's shared best objective
-     *  scalar; workers that prune on it (backtrack) read it via their injected bound supplier,
-     *  workers that don't (LS) ignore it. The representations stay comparable because all of them
-     *  minimise the same canonical [LinearObjective], so [MinimizeResult.objectiveValue] is one
-     *  scalar the portfolio can fold across a heterogeneous pool.
-     *
-     *  [warmStart] is the portfolio's current incumbent assignment, handed to workers that can
-     *  resume from it (local search via its `initialAssignment` seam; see [of]'s `withWarmStart`).
-     *  Workers without that seam ignore it. A [Portfolio] passes the incumbent so a fresh LS
-     *  segment descends from it rather than a random restart. */
+    /**
+     * Streams improving incumbents. [readBound] exposes the portfolio's shared best objective to engines that
+     * prune on it. [warmStart] is the portfolio's incumbent, used by engines with a warm-start seam. Every worker
+     * minimises the same canonical objective, so [MinimizeResult.objectiveValue] is comparable across the pool.
+     */
     fun improvements(
         readBound: () -> Double,
         cancel: ExecutionControl,
@@ -306,23 +283,11 @@ class PortfolioWorker private constructor(
     /** Factory for type-erased workers over a concrete typed session. */
     companion object {
         /**
-         * Wrap a typed [session] + base [params] as a type-erased worker. [objective] is the
-         * canonical [LinearObjective] the worker minimises (engine-specific views, like the LS
-         * gradient objective, travel inside the worker's own params). It may be null for a
-         * satisfaction-only worker that never streams [improvements]; calling [improvements] on
-         * such a worker fails fast. [withBound] injects
-         * the portfolio's shared objective bound into the params for [improvements] (e.g.
-         * `{ p, supplier -> p.copy(objectiveBoundSupplier = supplier) }` for backtrack); pass
-         * null for engines that don't bound-prune (local search). [withWarmStart] injects a
-         * portfolio incumbent assignment into the params for [improvements] (e.g.
-         * `{ p, sample -> p.copy(initialAssignment = sample) }` for local search); pass null for
-         * engines with no warm-start seam (backtrack, which only consumes the shared bound).
-         * [withInstructionBudget] installs a counted per-segment allowance. Local search and ALNS
-         * (both [com.eignex.klause.localsearch.LocalSearchParams]-based) map it to
-         * [com.eignex.klause.localsearch.LocalSearchParams.maxInstructions] — ALNS spends it against
-         * its own outer destroy/repair loop rather than a single inner solve (see
-         * [com.eignex.klause.meta.alns.Alns]'s class KDoc). Engines without a deterministic segment
-         * counter leave it null and retain their own execution path.
+         * Wraps a typed [session] and base [params] as a type-erased worker. [objective] may be null for a
+         * satisfaction-only worker, on which [improvements] fails fast. [withBound] injects the shared objective
+         * bound and [withWarmStart] a portfolio incumbent into the params; pass null for an engine without that
+         * seam. [withInstructionBudget] installs a counted per-segment allowance; engines without a deterministic
+         * segment counter leave it null.
          */
         fun <P : SolverParams> of(
             label: String,
@@ -339,9 +304,6 @@ class PortfolioWorker private constructor(
             @Suppress("UNCHECKED_CAST")
             fun withCancel(c: ExecutionControl): P = params.withCancellation(c) as P
 
-            // Apply the counted-segment allowance when both the caller supplied one and this engine
-            // exposes the seam for it; a no-op otherwise (engines without a deterministic segment
-            // counter, or a call with no budget for this segment).
             fun withInstructions(p: P, maxInstructions: Long?): P {
                 val budget = withInstructionBudget
                 return if (maxInstructions != null && budget != null) budget(p, maxInstructions) else p
@@ -382,11 +344,8 @@ class PortfolioWorker private constructor(
             ).also { it.executionAssumptions = params.assumptions }
         }
 
-        /**
-         * A worker over an engine that has no [Session]: [solve] runs one segment under the segment's cancellation
-         * and, when [countsInstructions], its counted allowance. It streams no improvements and no samples. With
-         * [resumable] a [Portfolio] resumes one handle each segment instead of calling [solve].
-         */
+        // A worker over an engine with no Session. With resumable, a Portfolio resumes one handle each segment
+        // instead of calling solve.
         internal fun ofSolve(
             label: String,
             armId: Int,
@@ -405,12 +364,8 @@ class PortfolioWorker private constructor(
             closeFn = {},
         )
 
-        /**
-         * An optimizing worker over an engine that has no [Session]: [improvements] streams one segment's incumbents
-         * given the shared bound, the portfolio's incumbent, the segment's cancellation and, when [countsInstructions],
-         * its counted allowance. With [resumable] a [Portfolio] resumes one handle each segment instead. It neither
-         * solves nor samples.
-         */
+        // An optimizing worker over an engine with no Session. With resumable, a Portfolio resumes one handle each
+        // segment instead of calling improvements.
         internal fun ofMinimize(
             label: String,
             armId: Int,

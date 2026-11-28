@@ -12,16 +12,9 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToLong
 
-/**
- * LS invariant for a linear row over continuous columns: a [Linear] carrying real terms, or the body of a
- * [ReifiedRealLinear] when [auxBoolVar] is set.
- *
- * The running sum lives in floating point in [LocalSearchState.doublePayload], so the row is decided within a
- * tolerance scaled to its constants: an equality holds within that tolerance, and an inequality must clear its bound by
- * that much on the strict side. That makes zero violation a proposal rather than a proof — the exact decision
- * belongs to the candidate completion — and the engine re-sums these rows from scratch on a schedule so incremental
- * rounding cannot accumulate past the tolerance.
- */
+// The running sum is floating point, so the row is decided within a tolerance scaled to its constants and zero
+// violation is a proposal, not a proof: the candidate completion decides exactly. The engine re-sums these rows
+// periodically so incremental rounding cannot accumulate past the tolerance.
 internal class RealRowInvariant(
     private val intVars: IntArray,
     private val intCoeffs: DoubleArray,
@@ -30,7 +23,7 @@ internal class RealRowInvariant(
     private val op: LinearOp,
     private val bound: Double,
     private val strict: Boolean,
-    /** The reifying Boolean, or -1 for a plain row. */
+    // -1 for a plain row.
     private val auxBoolVar: Int = -1,
 ) : Invariant {
     private val intIndex = IntIntMap.build(intVars, IntArray(intVars.size) { it }, absent = -1)
@@ -43,7 +36,7 @@ internal class RealRowInvariant(
         realCoeffs.maxOfOrNull(::abs) ?: 0.0,
     )
 
-    /** How far the row may miss its bound and still read as satisfied, and how far a strict side must clear it. */
+    // How far the row may miss its bound and still hold, and how far a strict side must clear it.
     private val tolerance: Double = TOLERANCE_PER_SCALE * scale
 
     // Residuals are counted in units of this size before compression.
@@ -53,7 +46,6 @@ internal class RealRowInvariant(
 
     private fun realCoeff(r: Int): Double = realIndex[r].let { if (it < 0) 0.0 else realCoeffs[it] }
 
-    // How far [sum] misses the body, 0 when it holds; the strict side must clear the bound by the tolerance.
     private fun shortfall(sum: Double): Double {
         val r = sum - bound
         return when (op) {
@@ -157,7 +149,6 @@ internal class RealRowInvariant(
         val want = auxBoolVar < 0 || aux(state)
         if ((shortfall(sum) == 0.0) == want) return
         if (auxBoolVar >= 0) sink.addBoolFlip(auxBoolVar)
-        // The sum the row must reach: inside the body when it should hold, past the bound when it should fail.
         val goal = goalSum(want) ?: return
         for (i in realVars.indices) {
             val c = realCoeffs[i]
@@ -182,7 +173,7 @@ internal class RealRowInvariant(
         }
     }
 
-    // A sum on the wanted side of the bound with twice the tolerance to spare, or null for a disequality to fail.
+    // Twice the tolerance to spare, so the proposed sum is not lost to rounding.
     private fun goalSum(want: Boolean): Double? {
         val margin = 2 * tolerance
         return when (op) {
@@ -200,10 +191,6 @@ internal class RealRowInvariant(
     }
 }
 
-/**
- * LS invariant for [RealProduct]: `result = intOperand · realOperand`, decided in floating point within a tolerance
- * scaled to the operands, like [RealRowInvariant].
- */
 internal class RealProductInvariant(
     private val intOperand: Int,
     private val realOperand: Int,

@@ -23,8 +23,6 @@ import com.eignex.util.numbers.unaryMinus
 /**
  * `a * b = result` over signed integer domains. Repeated operands and result aliases retain
  * their source roles in finite propagation, local-search scoring and coordinate remapping.
- *
- * No payload: the product is recomputed in O(1) from the current assignment on each query.
  */
 class Product(
     /** First factor variable id. */
@@ -37,9 +35,8 @@ class Product(
 
     override fun remap(mapping: VarRemap): Factor = Product(mapping.int(a), mapping.int(b), mapping.int(result))
 
-    // A fixed operand collapses the nonlinear product to a linear equality the LP/affine machinery can
-    // then exploit: with `a = c` the constraint is `result = c·b`, i.e. `result − c·b = 0` (and just
-    // `result = 0` when `c = 0`). Solution-set exact given the fixing domain; symmetric in `a` and `b`.
+    // A fixed operand `c` collapses the product to the linear equality `result = c·b`, which the LP and
+    // affine machinery can exploit.
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
         val aDom = domains[a]
         val bDom = domains[b]

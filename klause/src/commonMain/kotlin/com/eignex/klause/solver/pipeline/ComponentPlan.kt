@@ -101,7 +101,6 @@ class ComponentPlan internal constructor(
     val hasTheoryComponent: Boolean get() =
         theoryPipeline != ProblemPipeline.FINITE_CP && theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN
 
-    /** Verify that this plan can hand the whole canonical model to finite preparation. */
     internal fun requireFullFiniteProjection(spec: Problem) {
         require(!hasTheoryComponent && cpIntVars.size == spec.numIntVars) {
             "a full finite projection requires every integer column to be CP-owned"
@@ -109,18 +108,10 @@ class ComponentPlan internal constructor(
         requireBelongsTo(spec)
     }
 
-    /**
-     * This plan for [spec], the model it was selected from without the factor a caller appended to it.
-     *
-     * Column ownership and every remaining factor's owner are the ones already selected, so the finite
-     * projection is untouched and the theory fragment only loses a row — and a complete theory that
-     * decides a fragment decides a subset of it. A caller whose own row belongs to some rounds and not
-     * others selects ownership once from the shape carrying it, then drops it from plan and model
-     * together.
-     *
-     * Retained factors must be the selected source factors by identity, and declarations may only
-     * narrow their bounds. The resulting plan is bound to [spec].
-     */
+    // Column ownership and every remaining factor's owner stay as selected, so the finite projection is
+    // untouched and the theory fragment only loses a row; a complete theory deciding a fragment decides a
+    // subset of it. Retained factors must be the selected source factors by identity, and declarations may
+    // only narrow their bounds. The resulting plan is bound to [spec].
     internal fun withoutAppendedFactor(spec: Problem): ComponentPlan {
         requireSamePrefix(spec, factorOwners.size - 1)
         require(spec.factors.size == factorOwners.size - 1) {
@@ -188,11 +179,8 @@ class ComponentPlan internal constructor(
     }
 
     /**
-     * Each CP-owned column's finite domain, materialized from what [spec] declares for it.
-     *
-     * The bound hull is the wrong reading: a column that admits less than its range would be searched
-     * over values the model excludes, and the search would answer with one of them. Call this after any
-     * open-bound closure, so a side a bound proved is the side the domain gets.
+     * Each CP-owned column's finite domain, materialized from what [spec] declares for it rather than from
+     * its bound hull, which would admit values the model excludes. Call after any open-bound closure.
      */
     fun cpSourceDomains(spec: Problem): Map<Int, IntDomain> {
         requireBelongsTo(spec)
@@ -572,13 +560,11 @@ internal fun Problem.buildComponentPlan(
         if (route == ProblemPipeline.UNSUPPORTED_OPEN) failures[target] else null)
 }
 
-/**
- * The column no lane could own, and the first factor that demanded it be finite.
- *
- * A refusal that names only the model leaves nothing to act on: the column has no bound for CP to index,
- * and some factor no theory holds reads it. Which factor that is decides the remedy — bound the column,
- * or state a decomposition for that global the theories can take.
- */
+// The column no lane could own, and the first factor that demanded it be finite.
+//
+// A refusal that names only the model leaves nothing to act on: the column has no bound for CP to index,
+// and some factor no theory holds reads it. Which factor that is decides the remedy — bound the column,
+// or state a decomposition for that global the theories can take.
 private fun unplaceable(
     column: Int,
     projections: PreparedFactorProjections,

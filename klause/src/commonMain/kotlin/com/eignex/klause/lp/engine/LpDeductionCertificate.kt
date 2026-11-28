@@ -12,19 +12,17 @@ internal interface LpDeductionCertificate {
     fun usesRationalArithmetic(): Boolean = false
     fun fixingColumns(): IntArray? = null
 
-    /** Whether row [row] carries nonzero dual weight, so its premises are cited by a deduction. */
     fun dualNonzeroRow(row: Int): Boolean
 
-    /** Sign of column [col]'s reduced cost: -1, 0 or +1. */
     fun reducedCostSign(col: Int): Int
 
-    /** Bounds of column [col] the bound reads beyond its reduced cost's minimizing side: bit 0 lower, bit 1 upper. */
+    // Bounds read beyond the reduced cost's minimizing side: bit 0 lower, bit 1 upper.
     fun extraCitedSides(col: Int): Int = 0
 
-    /** `⌈objective + extraConstant⌉`, or null when it does not fit a `Long` (the caller keeps the node). */
+    // ⌈objective + extraConstant⌉, or null when it does not fit a Long (the caller keeps the node).
     fun objectiveBoundCeil(extraConstant: Long): Long?
 
-    /** Whether `improvingMax ≥ objective + sourceConstant`, i.e. the fixing gap is non-negative. */
+    // improvingMax ≥ objective + sourceConstant.
     fun improvingGapNonNegative(improvingMax: Long, sourceConstant: Long): Boolean
 
     fun fixSteps(col: Int, improvingMax: Long, sourceConstant: Long): Long?
@@ -41,7 +39,6 @@ internal interface LpDeductionCertificate {
         return cost * BigFraction.ofLong(steps) <= gap
     }
 
-    /** Whether column [col] may move [steps] from its minimizing endpoint within the objective [gap]. */
     fun permitsMovementWithin(col: Int, steps: Long, gap: BigFraction): Boolean {
         val reduced = exactReducedCost(col)
         val cost = if (reduced.signum() < 0) reduced.negated() else reduced

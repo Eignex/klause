@@ -9,7 +9,7 @@ internal class NativeWatchEntries(initialCapacity: Int = 0) {
         private set
     var retirementEpoch = 0
 
-    /** Set by every retirement of a clause posted here; cleared once propagation drops the retired postings. */
+    // Set by every retirement of a clause posted here; cleared once propagation drops the retired postings.
     var holdsRetired = false
     val primitiveBytes: Long get() = 17L + capacityWords * Long.SIZE_BYTES
     val referenceSlots: Long get() = pages.size + 1L

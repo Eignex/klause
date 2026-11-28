@@ -9,13 +9,7 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.defaultIrSemantics
 import com.eignex.klause.ir.withStorage
 
-/**
- * Mutable construction context for a solver `Problem`.
- *
- * Front-ends and schema compilation allocate source columns and auxiliary variables through this
- * context, emit factors into [factors], and finish with [build]. Source names remain available to
- * callers that need to decode or render a solution, while the built problem stays name-free.
- */
+// Source names stay available to callers that render a solution; the built problem is name-free.
 internal class ProblemBuilder(
     private val settings: ProblemSettings = ProblemSettings(),
     private val semantics: EffectiveSourceSemantics = defaultIrSemantics,
@@ -61,10 +55,7 @@ internal class ProblemBuilder(
     private val openLower = HashSet<Int>()
     private val openUpper = HashSet<Int>()
 
-    /**
-     * Declare integer column [id] open below and/or above. Its allocated domain on an open side is a
-     * fallback box for finite lanes, not a declaration.
-     */
+    // The allocated domain on an open side is a fallback box for finite lanes, not a declaration.
     fun markOpen(id: Int, lower: Boolean, upper: Boolean) {
         require(id in 0 until numIntVars) { "integer column $id has not been allocated" }
         if (lower) openLower += id

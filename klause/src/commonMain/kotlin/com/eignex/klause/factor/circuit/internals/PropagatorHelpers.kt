@@ -5,7 +5,6 @@ import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.util.collections.IntArrayList
 
-/** Subscribe to all four event types for each distinct variable in [succ]. */
 internal fun buildSuccWatches(succ: IntArray): IntArray {
     val distinct = succ.toHashSet()
     val out = IntArray(distinct.size * IntEvent.COUNT)
@@ -19,16 +18,9 @@ internal fun buildSuccWatches(succ: IntArray): IntArray {
     return out
 }
 
-/**
- * Directed reachability from [root] over the candidate-arc graph of a circuit successor array, the
- * strong-connectivity DFS both [com.eignex.klause.factor.circuit.CircuitPropagator] and
- * [com.eignex.klause.factor.circuit.SubcircuitPropagator] run (once forward via each node's live
- * successor domain, once reverse via the caller-built [rev] adjacency). A *forward* arc `(u, v)` is
- * followed only when [arcAllowed] holds (circuit: any `v` in range; subcircuit: also `v != u`, since
- * a self-loop is an opt-out, not a tour edge) — [rev] is expected pre-filtered the same way. A
- * reached node counts toward the total when [counts] (circuit: every node; subcircuit: only
- * mandatory nodes). Returns true iff [target] nodes are counted as reached.
- */
+// Strong-connectivity DFS shared by the circuit and subcircuit propagators, forward over live successor
+// domains or reverse over [rev]. A forward arc is followed only when [arcAllowed] holds, and [rev] must be
+// pre-filtered the same way: a subcircuit self-loop is an opt-out, not a tour edge.
 internal inline fun PropagationState.circuitReachesAll(
     succ: IntArray,
     n: Int,
@@ -71,18 +63,11 @@ internal inline fun PropagationState.circuitReachesAll(
     return reached == target
 }
 
-/** Gate used to skip propagation until the first real domain event. */
 internal open class CpGate {
     var started: Boolean = false
 }
 
-/**
- * Open (or lazily install) the [CpGate] stored in `refPayload[factorId]` and drain the factor's
- * int-event delta. Returns `true` when the propagator should short-circuit — the gate has already
- * fired once and no subscribed variable changed since, so there is nothing new to deduce; the
- * caller returns `true` (fixpoint). Returns `false` on the first fire and whenever a subscribed
- * variable moved, having marked the gate started.
- */
+// True when the gate already fired and no subscribed variable changed since, so the caller is at a fixpoint.
 internal fun PropagationState.cpGateShouldSkip(factorId: Int): Boolean {
     val gate = (refPayload[factorId] as? CpGate) ?: run {
         val fresh = CpGate()
@@ -97,11 +82,8 @@ internal fun PropagationState.cpGateShouldSkip(factorId: Int): Boolean {
 
 internal class PredChain(val head: Int, val length: Int, val cycleDetected: Boolean)
 
-/**
- * Walks the predecessor chain from [from] using [pred] (pred(j) = i iff succ(i) is fixed to j,
- * -1 means no predecessor). Returns the chain head and length; [PredChain.cycleDetected] is true
- * when the walk loops back to the current head or exceeds [n] steps.
- */
+// `pred(j) = i` iff `succ(i)` is fixed to `j`, -1 for none. A walk that loops back to its head or exceeds [n]
+// steps reports a cycle.
 internal fun walkPredChain(pred: IntArray, from: Int, n: Int): PredChain {
     var head = from
     var len = 1

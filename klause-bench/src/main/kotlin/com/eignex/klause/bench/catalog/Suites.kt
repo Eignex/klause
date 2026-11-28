@@ -18,10 +18,6 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
 
-/**
- * Catalog suites: in-code problems, vendored smoke fixtures, MiniZinc test models,
- * and the on-demand corpora declared in [ExternalCollections].
- */
 internal object Suites {
 
     val all: List<Suite> by lazy {
@@ -42,9 +38,7 @@ internal object Suites {
             IntegerAggregateSuite.suite + QuadraticProposalSuite.suite
     }
 
-    /** Discovered-on-demand suites over fetched external corpora. The provider runs the
-     *  [com.eignex.klause.bench.source.CorpusSelection] machinery (per-family caps / sampling
-     *  via `-Dklause.bench.select.*`) and fetches the collection on first resolve. */
+    // Providers fetch the collection on first resolve.
     val dynamic: List<DynamicSuite> by lazy {
         listOf(
             DynamicSuite(
@@ -275,8 +269,7 @@ internal object Suites {
                 "Pseudo-Boolean Competition 2024 selected OPB set (fetched; 1/family by default)",
                 defaultPerFamily = 1,
             ) { sel ->
-                // The archive ships both `.opb.xz` (linear + non-linear PB) and `.wbo.xz` (soft
-                // constraints); this layout takes the `.opb` instances, `pb-comp-wbo` the `.wbo`.
+                // `pb-comp-wbo` takes the archive's `.wbo` instances.
                 CorpusSelection.select(
                     ExternalCollections.pbComp2024,
                     CorpusSelection.Layout.Flat("PB24", "opb", familyOf = { it.substringBeforeLast('/', it) }),
@@ -414,14 +407,9 @@ internal object Suites {
         }
     }
 
-    /**
-     * Golomb-ruler feasibility: ordered marks with pairwise differences in `1..maxLen`,
-     * constrained all-different. The excess values create slack Hall sets and multiple
-     * strongly connected components in the matching graph of Régin's filtering (J.-C. Régin,
-     * "A filtering algorithm for constraints of difference in CSPs", AAAI 1994,
-     * https://mlanthology.org/aaai/1994/regin1994aaai-filtering), exercising responsible-subset
-     * conflict explanations. SAT when `maxLen` is at least the optimum length.
-     */
+    // The excess difference values create slack Hall sets and several strongly connected components in the matching
+    // graph of Régin's filtering (J.-C. Régin, "A filtering algorithm for constraints of difference in CSPs", AAAI
+    // 1994), exercising responsible-subset conflict explanations. SAT when maxLen is at least the optimum length.
     private fun golomb(m: Int, maxLen: Int): Problem {
         val pairs = buildList { for (i in 0 until m) for (j in i + 1 until m) add(i to j) }
         val nDiffs = pairs.size
@@ -437,22 +425,18 @@ internal object Suites {
             }
         }
         val factors = ArrayList<Factor>()
-        // Strictly increasing marks: mark[i] - mark[i+1] <= -1.
         for (i in 0 until m - 1) factors.add(Linear(intArrayOf(1, -1), intArrayOf(i, i + 1), LinearOp.LE, -1))
-        // Difference channeling: mark[j] - mark[i] - d = 0.
         pairs.forEachIndexed { k, (i, j) ->
             factors.add(Linear(intArrayOf(1, -1, -1), intArrayOf(j, i, m + k), LinearOp.EQ, 0))
         }
-        // All differences distinct — the slack all_different under test.
         factors.add(AllDifferent(IntArray(nDiffs) { m + it }, domainMin = 1, domainSize = maxLen))
-        // Symmetry break: first gap shorter than last (d_first - d_last <= -1).
+        // Symmetry break: first gap shorter than last.
         factors.add(Linear(intArrayOf(1, -1), intArrayOf(m, m + nDiffs - 1), LinearOp.LE, -1))
         return Problem.of(numBoolVars = 0, numIntVars = numInt, intDomains = domains, factors = factors.toTypedArray())
     }
 
     private val slackAllDifferent = suite("slack-alldiff", "Slack all_different (Golomb rulers; Hall-prone)") {
         license = "internal"
-        // (m, maxLen) with maxLen >= optimal ruler length ⇒ satisfiable; a spread of slack/size.
         for ((m, maxLen) in listOf(6 to 17, 6 to 20, 7 to 25, 7 to 30, 7 to 40, 8 to 45, 8 to 50)) {
             inCode("golomb_${m}_$maxLen", Category.CSP, Expected.Sat) { golomb(m, maxLen) }
         }
@@ -771,21 +755,13 @@ internal object Suites {
         }
     }
 
-    /** XCSP3 family key: the series prefix before the first `-`. Competition instance names encode
-     *  the series then a `-`-joined parameter tail (`AircraftAssemblyLine-1-178-00-0_c23`), so this
-     *  groups the ~76 COP / CSP series for `per-family` sampling instead of treating every
-     *  parameterization as its own singleton family. */
+    // Groups the parameterizations of a series (`AircraftAssemblyLine-1-178-00-0_c23`) into one family.
     private fun xcspSeries(name: String): String = name.substringBefore('-')
 
-    /** MaxSAT family key: the descriptive prefix before the first `-` of a flat MSE filename
-     *  (`causal-discovery-causal_n6_…` → `causal`), grouping parameterizations for `per-family`
-     *  sampling instead of treating every instance as its own family. */
     private fun maxsatFamily(name: String): String = name.substringBefore('-')
 
-    /** MIPLIB family key: the instance-name stem of a flat `.mps` extraction — the name lowercased,
-     *  stripped of any extension and of a trailing `-<digits>`/`_<digits>` parameterization suffix
-     *  (`neos-1122047` → `neos`, `rmatr100-p10` → `rmatr100-p10`). The extraction is flat, so without
-     *  this every instance would be its own family and a `per-family` cap would be inert. */
+    // The extraction is flat, so without stripping the parameterization suffix (`neos-1122047` → `neos`) every
+    // instance would be its own family and a per-family cap would be inert.
     private fun miplibStem(name: String): String =
         name.substringAfterLast('/').substringBefore('.').replace(PARAM_SUFFIX, "").lowercase()
 
@@ -871,7 +847,6 @@ internal object Suites {
         vendored("open-rounded-sat", Category.CSP, Expected.Sat)
     }
 
-    /** Parametric pigeonhole and random-3SAT workloads for performance regression tracking. */
     private val satCrafted = suite(
         "sat-crafted",
         "In-code crafted SAT: pigeonhole (UNSAT) + random-3SAT (phase transition)",

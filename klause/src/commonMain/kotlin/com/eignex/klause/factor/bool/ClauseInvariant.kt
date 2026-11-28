@@ -163,16 +163,11 @@ internal class ClauseInvariant private constructor(private val clause: Clause? =
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
-    /**
-     * Update break/make counts after [flippedVar] is flipped. Only transitions of `numTrueLits`
-     * between 0, 1 and 2 change contributions:
-     *  - `0→1`: [flippedVar] is the sole true literal and gains a break.
-     *  - `1→0`: every variable becomes a make candidate.
-     *  - `1→2`: the former sole true literal loses its break.
-     *  - `2→1`: the remaining true literal gains a break.
-     *
-     * Transitions among counts above 1 leave break/make counts unchanged. O(arity), typically O(1).
-     */
+    // Only transitions of `numTrueLits` between 0, 1 and 2 change contributions:
+    //  - `0→1`: [flippedVar] is the sole true literal and gains a break.
+    //  - `1→0`: every variable becomes a make candidate.
+    //  - `1→2`: the former sole true literal loses its break.
+    //  - `2→1`: the remaining true literal gains a break.
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
         val clause = clause(state, factorId)
         val literals = clause.literals

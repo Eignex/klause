@@ -7,26 +7,10 @@ import com.eignex.klause.solver.search.VarRef
 import com.eignex.util.arrays.emptyLongArray
 import kotlin.random.Random
 
-/**
- * Conflict-Ordering Search (Gay, Hartert, Lecoutre and Schaus, "Conflict Ordering Search for Scheduling
- * Problems", CP 2015, https://doi.org/10.1007/978-3-319-23219-5_10). Generalisation of
- * [LastConflict]: instead of pinning the *single*
- * most recent conflict variable, COS maintains a per-variable *timestamp* of its last conflict
- * and picks the unpinned variable with the most recent stamp. Variables never implicated in a
- * conflict have stamp 0 and fall through to the [base] heuristic.
- *
- * When the search backjumps past several conflict layers, COS replays them in
- * reverse-chronological order, whereas plain last-conflict remembers only the most recent one.
- *
- *  - Stamps persist across [onRestart]: the conflict structure is a global property of the
- *    constraint network, not a per-run signal.
- *  - The richer [onConflict] hook (with `unsat`) stamps **every** variable in the
- *    reason set, not just the failed decision.
- *
- * Composes cleanly: `ConflictOrdering(Vsids())` gives COS-on-VSIDS — recent conflicts
- * lead, activity drives the long tail; `ConflictOrdering(DomWdeg())` pairs it with
- * constraint-hardness weighting.
- */
+// Conflict-Ordering Search (Gay, Hartert, Lecoutre and Schaus, "Conflict Ordering Search for Scheduling
+// Problems", CP 2015, https://doi.org/10.1007/978-3-319-23219-5_10): picks the unpinned variable with the
+// most recent conflict stamp; never-stamped variables fall through to [base]. Stamps persist across
+// restarts, since the conflict structure is a property of the constraint network.
 internal class ConflictOrdering(private val base: VariableSelector) : VariableSelector {
 
     override fun fresh() = ConflictOrdering(base.fresh())

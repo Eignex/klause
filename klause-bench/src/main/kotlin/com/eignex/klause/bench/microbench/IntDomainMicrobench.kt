@@ -8,7 +8,7 @@ import kotlin.time.measureTime
 /** Host-sensitive timing probes for the wide [IntDomain] representations. */
 object IntDomainMicrobench {
 
-    /** Run every host-sensitive IntDomain representation timing probe. */
+    /** Runs every probe. */
     @JvmStatic
     fun main(args: Array<String>) {
         membershipIsSpanIndependent()

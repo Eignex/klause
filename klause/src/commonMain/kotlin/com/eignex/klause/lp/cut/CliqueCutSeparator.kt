@@ -5,19 +5,10 @@ import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.util.collections.IntHashSet
 
-/**
- * Clique cuts for set-packing structure. Two Boolean variables are *mutually exclusive* when at most
- * one can be true; a set of pairwise mutually exclusive variables is a clique, and `Σ_{clique} x ≤ 1`
- * is a valid inequality. The conflict graph is read straight off the problem: a binary clause
- * `¬a ∨ ¬b` is an edge, and an at-most-one constraint (a `Cardinality` with `max = 1`, or a unit-weight
- * `Σ x ≤ 1` PseudoBoolean) over positive literals is a base clique whose members are all pairwise
- * adjacent. Each base clique is greedily extended with the highest-fractional variables that are
- * adjacent to every current member — keeping it a true clique — and the cut is emitted when the
- * extended clique's LP value exceeds 1. The base constraint alone is already in the relaxation; the
- * value is the extension across constraints. See Atamtürk, Nemhauser and Savelsbergh, "Conflict graphs
- * in solving integer programming problems", Eur. J. Oper. Res. 2000,
- * https://doi.org/10.1016/S0377-2217(99)00015-6.
- */
+// Each at-most-one base clique is greedily extended with the highest-fractional variables adjacent to every
+// member, and `Σ_{clique} x ≤ 1` is emitted when the LP violates it. The base row is already in the relaxation;
+// the gain is the extension across constraints. Atamtürk, Nemhauser and Savelsbergh, "Conflict graphs in
+// solving integer programming problems", Eur. J. Oper. Res. 2000, https://doi.org/10.1016/S0377-2217(99)00015-6.
 internal class CliqueCutSeparator : CutSeparator {
     override val family: CutFamily = CutFamily.CLIQUE
 
@@ -29,7 +20,6 @@ internal class CliqueCutSeparator : CutSeparator {
         val baseCliques = graph.baseCliques
         if (baseCliques.isEmpty()) return emptyList()
 
-        // Variables with a Boolean column, ordered by descending fractional value — the extension order.
         val adjKeys = ArrayList<Int>(adj.size)
         adj.forEach { k, _ -> adjKeys.add(k) }
         val ranked = adjKeys
@@ -57,7 +47,6 @@ internal class CliqueCutSeparator : CutSeparator {
             if (lhs <= 1.0 + tol) continue
             val key = cols.sorted().joinToString(",")
             if (!emitted.add(key)) continue
-            // The conflict graph is read off binary clauses and at-most-one factors — global.
             cuts.add(Cut(cols, LongArray(cols.size) { 1L }, Relation.LE, 1L, global = true))
         }
         return cuts

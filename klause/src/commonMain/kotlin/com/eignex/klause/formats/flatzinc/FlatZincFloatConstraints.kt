@@ -35,7 +35,6 @@ internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean
     )
 }
 
-/** Lower `int2float` as a mixed integer/real row, over source coordinates. */
 internal fun FlatZincCompiler.emitInt2Float(c: FznConstraint) {
     expectArity(c, 2)
     val xInt = resolveIntVar(c.args[0])
@@ -93,7 +92,6 @@ internal fun FlatZincCompiler.resolveFloatElement(
     }
 }
 
-/** Lower a float comparison as an exact real row, over source coordinates. */
 internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp, strict: Boolean, reified: Boolean) {
     expectArity(c, if (reified) 3 else 2)
     val a = resolveFloatVarOrConst(c.args[0])
@@ -149,7 +147,6 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
     )
 }
 
-/** Strict float linear compare: an exact strict real row, over source coordinates. */
 internal fun FlatZincCompiler.emitFloatLinearStrict(c: FznConstraint, reified: Boolean) {
     expectArity(c, if (reified) 4 else 3)
     val variables = evalFloatVarArray(c.args[1])
@@ -173,8 +170,8 @@ internal fun FlatZincCompiler.emitFloatMinMax(c: FznConstraint, max: Boolean) {
     emitRealMinMax(c, max)
 }
 
-/** `float_div(a, b, c)` constrains `c = a / b`; model it as `float_times(b, c, a)` (`a = b·c`). The
- *  arity is checked before the args are reordered so a truncated call fails with a located error. */
+// c = a / b posted as float_times(b, c, a); arity is checked before reordering so a truncated call fails
+// with a located error.
 internal fun FlatZincCompiler.emitFloatDiv(c: FznConstraint) {
     expectArity(c, 3)
     val denominator = resolveFloatVarOrConst(c.args[1])
@@ -198,7 +195,6 @@ internal fun FlatZincCompiler.emitFloatDiv(c: FznConstraint) {
     )
 }
 
-/** Retain `float_times` over source real coordinates. */
 internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
     expectArity(c, 3)
     val aRef = resolveFloatVarOrConst(c.args[0])
@@ -243,13 +239,11 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
     emitFiniteFloatProduct(aRef, bRef, cRef)
 }
 
-/** Retain `float_abs(x, y)` over source real coordinates. */
 internal fun FlatZincCompiler.emitFloatAbs(c: FznConstraint) {
     expectArity(c, 2)
     val xRef = resolveFloatVarOrConst(c.args[0])
     val yRef = resolveFloatVarOrConst(c.args[1])
     if (xRef is FloatRef.Const) {
-        // |constant| is itself a constant: constrain the result to equal it, via the linear path.
         emitFloatLinear(
             FznConstraint(
                 "float_lin_eq",

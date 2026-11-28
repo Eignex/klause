@@ -31,7 +31,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
         return false
     }
 
-    /** Clause-form literals, each false in the current state, that together justify a deduction over [succ]. */
+    // Clause-form literals, each false in the current state.
     private inner class Reason(val state: PropagationState) {
         private val seen = IntHashSet()
         private val literals = IntArrayList()
@@ -46,7 +46,6 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
             return this
         }
 
-        /** The edge node [i] is fixed to. */
         fun fixed(i: Int): Reason = fixedVar(succ[i])
 
         fun fixedVar(v: Int): Reason = add(Lit.make(state.atomVarEq(v, state.intDomains[v].min), false))
@@ -63,7 +62,6 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
             return this
         }
 
-        /** Node [u] can no longer move to [target]. */
         fun lacks(u: Int, target: Int): Reason = add(
             if (state.undoLogging) {
                 state.exclusionLiteral(succ[u], target.toLong(), state.undo.size)
@@ -74,7 +72,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
             },
         )
 
-        /** Every node of [inside] lacks every target outside it (and outside [also]): no arc leaves the set. */
+        // No arc leaves the set, except possibly to also.
         fun closed(inside: BooleanArray, also: Int = -1): Reason {
             for (u in 0 until n) {
                 if (!inside[u]) continue
@@ -85,7 +83,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
             return this
         }
 
-        /** Every node outside [inside] lacks every target in it: no arc enters the set. */
+        // No arc enters the set.
         fun unentered(inside: BooleanArray): Reason {
             for (u in 0 until n) {
                 if (inside[u]) continue
@@ -97,7 +95,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
         fun build(): IntArray? = if (state.currentLevel == 0) null else literals.toIntArray()
     }
 
-    /** The successor variables on a fixed-edge cycle of length < n, or null if none exists. */
+    // Successor variables on a fixed-edge cycle shorter than n, or null.
     private fun fixedSubtour(state: PropagationState): IntArray? {
         val nextFixed = IntArray(n) { -1 }
         for (i in 0 until n) {
@@ -251,16 +249,10 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
             if (state.excludeIntValue(variable, target, reason.build())) true else fail(reason.fixed(competitor))
         }
 
-    /**
-     * Dominator-based arc removal. Split node 0 into a virtual
-     * source whose out-arcs are node 0's candidate successors, and compute that source's dominator
-     * tree over the candidate digraph. If value `y` dominates node `x` — every path from the source
-     * to `x` passes through `y` — then `succ(x) = y` would close a loop `y ⇝ x → y` that bypasses
-     * the source, a premature subtour; so `y` is removed from `succ(x)`. Dominators via the iterative
-     * algorithm of Cooper, Harvey and Kennedy, "A Simple, Fast Dominance Algorithm", Softw. Pract. Exper.
-     * 2001, https://www.cs.tufts.edu/comp/150FP/archive/keith-cooper/dom14.pdf (same tree as
-     * Lengauer–Tarjan, simpler to verify).
-     */
+    // Node 0 is split into a virtual source with node 0's candidate successors. If y dominates x, then
+    // succ(x) = y closes a subtour `y ⇝ x → y` bypassing the source, so y is removed from succ(x).
+    // Dominators by Cooper, Harvey and Kennedy, "A Simple, Fast Dominance Algorithm", Softw. Pract. Exper.
+    // 2001, https://www.cs.tufts.edu/comp/150FP/archive/keith-cooper/dom14.pdf.
     private fun dominatorFilter(state: PropagationState): Boolean {
         val total = n + 1
         val source = n
@@ -319,8 +311,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
         return seen
     }
 
-    /** Cooper–Harvey–Kennedy iterative dominators from [source]; `idom(source) = source`, `-1` for
-     *  nodes the source cannot reach. */
+    // idom(source) = source; -1 for nodes the source cannot reach.
     private fun computeDominators(
         succAdj: Array<IntArrayList>,
         predAdj: Array<IntArrayList>,
@@ -394,21 +385,14 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
         return c == y
     }
 
-    /**
-     * Necessary condition for a Hamiltonian circuit: the candidate-successor digraph (node `i` →
-     * every value still in `succ(i)`'s domain) must be strongly connected, since the circuit itself
-     * is a strongly-connected spanning subgraph. Tested as forward + reverse reachability from node
-     * 0 — both must cover all `n` nodes. Done right, per-arc SCC pruning reduces to exactly this
-     * check (an arc between two SCCs is in no cycle, but if any such arc exists the graph is already
-     * not strongly connected). A correct circuit never trips it, so it only ever rules out dead ends.
-     */
+    // The candidate-successor digraph must be strongly connected, tested as forward and reverse
+    // reachability from node 0. Per-arc SCC pruning reduces to this check: an arc between two SCCs
+    // exists only when the graph is already not strongly connected.
     private fun stronglyConnected(state: PropagationState): Boolean {
         val rev = Array(n) { IntArrayList() }
         for (i in 0 until n) {
             state.intDomains[succ[i]].values.forEach { k -> if (k in 0 until n) rev[k.toInt()].add(i) }
         }
-        // A Hamiltonian circuit visits every node, so from node 0 all n must be reachable both
-        // forward (over candidate successors) and backward — any node in range is a tour edge.
         val arc = { _: Int, v: Int -> v in 0 until n }
         val counts = { _: Int -> true }
         fun reaches(forward: Boolean) = state.circuitReachesAll(

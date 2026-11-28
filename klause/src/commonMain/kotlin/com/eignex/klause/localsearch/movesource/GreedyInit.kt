@@ -11,13 +11,9 @@ import com.eignex.klause.localsearch.MoveSink
  * var tries every value of a domain of at most 16 values, otherwise 16 sampled ones, and a tie keeps
  * the current value. A single forward pass with no fixed-point loop; it never raises the cost.
  *
- * Unlike the candidate generators in this package, this is not a [MoveSource]: it mutates the
- * assignment in place rather than producing a scored candidate pool (each variable's commit changes
- * the cost the next variable is evaluated against), so it carries no [Phase]/[Pool] and fills no
- * sink. The satisfy and optimize restart paths share it.
- *
- * The point isn't to reach feasibility (the LS strategies handle that) but to start the search from
- * a low-violation pose, so a pass stopped early leaves a valid, partly repaired start.
+ * Not a [MoveSource]: each commit changes the cost the next variable is evaluated against, so it mutates
+ * the assignment in place instead of filling a sink. It aims at a low-violation start, not feasibility, so a
+ * pass stopped early still leaves a valid start.
  */
 class GreedyInit {
     /** Run one greedy-repair pass over [state], mutating its assignment in place, until [stop] says to end it. */

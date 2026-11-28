@@ -2,7 +2,7 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.util.collections.LongArrayList
 
-/** Recursive-descent FlatZinc 1.6 parser with one-token lookahead. */
+// Recursive-descent FlatZinc 1.6 parser with one-token lookahead.
 internal class FlatZincParser(private val lexer: FlatZincLexer) {
     private var lookahead: FznToken? = null
 

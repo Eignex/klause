@@ -22,12 +22,7 @@ import com.eignex.klause.util.ScanMeter
 
 /** The solver pipeline selected once from a source [Problem]. */
 enum class ProblemPipeline {
-    /**
-     * Finite search and optimization route.
-     *
-     * Source setup selects this execution family independently of variable ownership.
-     * [Problem.componentPlan] can describe complete arithmetic mechanisms for the same finite source.
-     */
+    /** Finite search and optimization route. */
     FINITE_CP,
 
     /** Open integer sides are covered entirely by difference logic. */
@@ -98,22 +93,16 @@ sealed interface SourceProblemRoute {
     ) : SourceProblemRoute
 
     /**
-     * Bounding the model's open sides refuted it, so no lane needs to run.
-     *
-     * Derived over the genuinely open ranges rather than inside an invented box, which is what makes it
-     * the unbounded model's own verdict and reportable as `unsat`. A caller that dropped this would ask a
-     * lane to re-derive the same proof — or, where the model is one no lane accepts, would report it
-     * unsupported having already decided it.
+     * Bounding the model's open sides refuted it over its genuinely open ranges, so the unbounded model is
+     * `unsat` and no lane needs to run.
      */
     data object Refuted : SourceProblemRoute
 }
 
 /**
- * Select the same source route as [SourceSetup.prepare].
- *
- * [routePureRealToTheory] and [routeLinearToTheory] are compatibility arguments; source mathematics, objective
- * precision and the source feasibility tolerance determine ownership. [boundCancellation] bounds optional deduction
- * and required admission.
+ * Select the same source route as [SourceSetup.prepare]. [boundCancellation] bounds optional deduction and
+ * required admission. [routePureRealToTheory] and [routeLinearToTheory] are ignored: source mathematics,
+ * objective precision and the source feasibility tolerance determine ownership.
  */
 @Suppress("UNUSED_PARAMETER")
 fun Problem.pipelineRoute(
@@ -125,9 +114,8 @@ fun Problem.pipelineRoute(
 ): SourceProblemRoute = sharedPipelineRoute(objective, maximize, boundCancellation, boundCancellation)
 
 /**
- * Select the shared source route and observe bound-probing LP work.
- * [routePureRealToTheory] and [routeLinearToTheory] retain compatibility without overriding the ownership that
- * source mathematics, objective precision and the source feasibility tolerance determine.
+ * Select the shared source route and observe bound-probing LP work. [routePureRealToTheory] and
+ * [routeLinearToTheory] are ignored.
  */
 @Suppress("UNUSED_PARAMETER")
 fun Problem.pipelineRoute(
@@ -146,9 +134,8 @@ fun Problem.pipelineRoute(
 )
 
 /**
- * Select the shared source route with per-invocation factor projection providers.
- * [routePureRealToTheory] and [routeLinearToTheory] retain compatibility without overriding the ownership that
- * source mathematics, objective precision and the source feasibility tolerance determine.
+ * Select the shared source route with per-invocation factor projection providers. [routePureRealToTheory]
+ * and [routeLinearToTheory] are ignored.
  */
 @Suppress("UNUSED_PARAMETER")
 fun Problem.pipelineRoute(
@@ -173,9 +160,7 @@ fun Problem.pipelineRoute(
  *
  * [boundCancellation] stops optional deductions. [preparationCancellation] bounds complete source
  * installation and retains the containing invocation's deadline and work allowance. Completed bounds
- * survive either stop. [routePureRealToTheory] and [routeLinearToTheory] retain compatibility without
- * overriding the ownership that source mathematics, objective precision and the source feasibility tolerance
- * determine.
+ * survive either stop. [routePureRealToTheory] and [routeLinearToTheory] are ignored.
  */
 @Suppress("UNUSED_PARAMETER")
 fun Problem.pipelineRoute(
@@ -430,24 +415,14 @@ private fun Problem.withNumericalRealSemantics(control: ExecutionControl): Probl
     return if (margined) withFactors(rewritten, impliedFactorMask?.copyOf()) else null
 }
 
-/**
- * This model with every open integer side replaced by a bound optimization-based tightening proves, or
- * this model unchanged when any side survives open.
- *
- * A source that states no upper bound is not thereby a model for a complete theory: the relaxation
- * routinely proves one, and a model every side of which is proved finite is a finite model that the
- * finite lane owns. Deciding that here rather than after the lane is chosen is what stops a proved-finite
- * model being handed to the exact theory, which cannot use the proof and can spend the whole budget inside
- * one exact reduction.
- *
- * A closure that reaches only some of the open sides is kept too. Which lane runs is not all that reads
- * these bounds: [componentPlan] owns a column CP or THEORY by whether its sides are stated, and an open
- * column some CP-only factor reads is what refuses a model outright. So dropping a partial closure can
- * decline a model on account of the very column the proof had just bounded. Tightening only ever closes
- * sides, so keeping it can move a column to CP or admit a complete fragment, never the reverse.
- *
- * A refutation the bounding derives is the model's verdict and travels as one; see [BoundedRouting].
- */
+// Replaces every open integer side by a bound optimization-based tightening proves.
+//
+// A model every side of which is proved finite is a finite model the finite lane owns; handing it to the
+// exact theory wastes the proof and can spend the whole budget inside one exact reduction.
+//
+// A partial closure is kept too: [componentPlan] owns a column CP or THEORY by whether its sides are
+// stated, and an open column a CP-only factor reads refuses the model outright. Tightening only closes
+// sides, so keeping it can move a column to CP or admit a complete fragment, never the reverse.
 private fun Problem.proveBounded(cancellation: ExecutionControl, lpStats: LpStatsSink?): BoundedRouting {
     if (hasFiniteIntegerRanges()) return BoundedRouting.Proved(this)
     val closed = when (val outcome = closeOpenBounds(cancellation, lpStats)) {
@@ -464,20 +439,16 @@ private fun Problem.proveBounded(cancellation: ExecutionControl, lpStats: LpStat
     )
 }
 
-/** What bounding a model's open sides established: the model to route, or that there is nothing to route. */
 private sealed interface BoundedRouting {
-    /** The model as far as bounding could prove it, which is the model the lane is chosen from. */
+    // The model as far as bounding could prove it, which is the model the lane is chosen from.
     class Proved(val problem: Problem) : BoundedRouting
 
-    /** Bounding refuted the model over its open ranges. */
     data object Refuted : BoundedRouting
 }
 
 /**
- * Inspect finite and linear component ownership without selecting a source invocation.
- *
- * This inspection prefers finite ownership for bounded integer declarations and performs no source
- * bound closure. [SourceSetup.prepare] selects an operation's route with source deductions, objective
- * precision and polynomial composition; this component view does not replace that setup.
+ * Inspect finite and linear component ownership without selecting a source invocation. Prefers finite
+ * ownership for bounded integer declarations and performs no source bound closure, unlike
+ * [SourceSetup.prepare].
  */
 fun Problem.sourceRoute(): ProblemPipeline = componentPlan(preferFinite = hasFiniteIntegerRanges()).theoryPipeline

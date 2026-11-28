@@ -86,7 +86,6 @@ internal fun FlatZincCompiler.emitSymmetricAllDifferent(c: FznConstraint) {
     factors.add(SymmetricAllDifferent(xs, indexOffset = 1))
 }
 
-/** Emit `regular(seq, Q, S, d, q0, F)`. */
 internal fun FlatZincCompiler.emitRegular(c: FznConstraint) {
     expectArity(c, 6)
     val seq = evalIntVarArray(c.args[0])
@@ -102,12 +101,11 @@ internal fun FlatZincCompiler.emitRegular(c: FznConstraint) {
     factors.add(Regular(seq, numStates, numSymbols, transitions, q0, accepting))
 }
 
-/** Emit `mdd(x, ...)` from FlatZinc's node/edge representation. */
 internal fun FlatZincCompiler.emitMdd(c: FznConstraint) {
     expectArity(c, 7)
     val seq = evalIntVarArray(c.args[0])
     val n = seq.size
-    val level = evalIntConstArray(c.args[2]) // level[node-1], 1-based, nodes 1..N
+    val level = evalIntConstArray(c.args[2]) // level(node − 1), nodes 1..N
     val from = evalIntConstArray(c.args[4]) // edge source node (1..N)
     val to = evalIntConstArray(c.args[6]) // edge target node (0=terminal, else 1..N)
 
@@ -432,7 +430,7 @@ internal fun FlatZincCompiler.emitDistribute(c: FznConstraint) {
     factors.add(GlobalCardinality(xs = base, cover = value, countVars = card))
 }
 
-/** Emit `count_eq(x, y, c)` for constant `y` through GCC. */
+// Through GCC, for a constant y.
 internal fun FlatZincCompiler.emitCountEq(c: FznConstraint) {
     expectArity(c, 3)
     val xs = evalIntVarArray(c.args[0])
@@ -459,7 +457,7 @@ internal fun FlatZincCompiler.emitCountEq(c: FznConstraint) {
     }
 }
 
-/** Emit `among(n, x, v)` through GCC counts plus a sum constraint. */
+// GCC counts plus a sum constraint.
 internal fun FlatZincCompiler.emitAmong(c: FznConstraint) {
     expectArity(c, 3)
     val n = resolveIntVar(c.args[0])

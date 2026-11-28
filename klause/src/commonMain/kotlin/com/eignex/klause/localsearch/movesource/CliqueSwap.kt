@@ -15,8 +15,8 @@ import com.eignex.klause.localsearch.MoveSink
  * violating state two separate flips would pass through; an over-full clique with two members on
  * yields a repair that turns both off.
  *
- * The cliques are recognised once per solve and cached, keyed by problem identity — recognising them
- * per [generate] call would dominate the pick cost. Up to [cap] cliques are sampled per call.
+ * The cliques are recognised once per problem, since recognising them per [generate] call would dominate
+ * the pick cost. Up to [cap] cliques are sampled per call.
  *
  * [Pool.ScoreOnly]: a coordinated 2-flip taken by the noise draw is a destructive perturbation;
  * score-picked it is the feasibility-preserving exchange the single-flip pool can't express.
@@ -35,8 +35,6 @@ class CliqueSwap(
     override val phase: Phase = Phase.Any
     override val pool: Pool = Pool.ScoreOnly
 
-    /** Per-solve cache of the non-trivial clique literals, keyed by problem identity so a reused
-     *  source recognises the cliques exactly once per problem. */
     private var cachedProblem: Problem? = null
     private var cachedCliques: Array<IntArray> = EMPTY_CLIQUES
 
@@ -66,10 +64,7 @@ class CliqueSwap(
         }
     }
 
-    /** Push one clique move for [lits] into [sink], returning whether a candidate was produced.
-     *  With one member on, a swap turns it off and a randomly chosen other member on; with two on,
-     *  a repair turns both off; with none on, there is nothing to exchange. Returns false for the
-     *  no-candidate and frozen-variable cases so the caller's budget tracks real candidates. */
+    // Returns whether a candidate was produced, so the caller's budget tracks real candidates.
     private fun proposeSwap(state: LocalSearchState, lits: IntArray, sink: MoveSink): Boolean {
         var onA = -1
         var onB = -1
@@ -85,16 +80,13 @@ class CliqueSwap(
         }
     }
 
-    /** Emit a swap that turns the on-member [onLit] off and a uniformly chosen other member on. */
     private fun emitSwap(state: LocalSearchState, lits: IntArray, onLit: Int, sink: MoveSink): Boolean {
         val target = lits[state.rng.nextInt(lits.size)]
         if (target == onLit) return false
         return emitFlips(state, Lit.variable(onLit), Lit.variable(target), sink)
     }
 
-    /** Build the two-flip compound, rejecting same-variable pairs (a self-cancelling no-op) and
-     *  frozen variables; the sink would drop the latter too, but checking here keeps a rejected pair
-     *  from spending the caller's budget. */
+    // The sink would drop frozen variables too, but checking here keeps a rejected pair off the budget.
     private fun emitFlips(state: LocalSearchState, varOff: Int, varOn: Int, sink: MoveSink): Boolean {
         if (varOff == varOn) return false
         if (state.assumptions.isFrozenBool(varOff) || state.assumptions.isFrozenBool(varOn)) return false

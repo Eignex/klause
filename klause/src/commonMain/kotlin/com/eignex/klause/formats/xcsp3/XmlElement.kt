@@ -14,14 +14,12 @@ class XmlElement(
     val children: List<XmlElement>,
     private val directText: String,
 ) {
-    /** Concatenated text under this element and its descendants. Cached because the tree is immutable
-     *  after parsing and recomputing would rebuild every descendant's text on each access. */
+    /** Concatenated text under this element and its descendants. */
     val textContent: String by lazy(LazyThreadSafetyMode.NONE) {
         if (children.isEmpty()) directText else directText + children.joinToString("") { it.textContent }
     }
 
-    /** Whether this element's own [directText] holds a `%` placeholder. Cached because `substituteParams`
-     *  runs once per `<args>` row on a shared group template, so the scan is paid once per node. */
+    // Cached because substituteParams runs once per `<args>` row on a shared group template.
     private val directTextHasPercent: Boolean by lazy(LazyThreadSafetyMode.NONE) { '%' in directText }
 
     /** Attribute [name], or empty string if absent. */
@@ -37,8 +35,7 @@ class XmlElement(
         tag,
         attributes,
         children.map { it.substituteParams(tokens, usedIndices) },
-        // A `%`-free text is reused verbatim, so a large template literal (e.g. an mdd `<transitions>` blob)
-        // is not rescanned per `<args>` row.
+        // A `%`-free text is reused verbatim, so a large template literal is not rescanned per row.
         if (!directTextHasPercent) directText else expandParams(directText, tokens, usedIndices),
     )
 
@@ -47,9 +44,7 @@ class XmlElement(
     fun explicitParamIndices(): Set<Int> = buildSet { collectExplicitParams(textContent, this) }
 }
 
-/** Substitute the group-template placeholders in [text]: `%i` → `tokens[i]`, `%i..%j` → the space-joined
- *  token range, `%...` → the tokens whose index is not in [usedIndices]. A lone `%` (not followed by
- *  digits or `...`) and an out-of-range `%i` are left verbatim. Hand-scanned — no regex per instantiation. */
+// A lone `%` and an out-of-range `%i` are left verbatim. Hand-scanned to avoid a regex per instantiation.
 private fun expandParams(text: String, tokens: List<String>, usedIndices: Set<Int>): String {
     val sb = StringBuilder(text.length)
     var i = 0
@@ -106,8 +101,7 @@ private fun appendJoined(sb: StringBuilder, indices: List<Int>, tokens: List<Str
     }
 }
 
-/** Collect every explicitly-referenced parameter index (`%i` / `%i..%j`) in [text] into [into]; a
- *  `%...` and a lone `%` reference nothing. */
+// A `%...` and a lone `%` reference nothing.
 private fun collectExplicitParams(text: String, into: MutableSet<Int>) {
     var i = 0
     val n = text.length
@@ -138,20 +132,14 @@ private fun collectExplicitParams(text: String, into: MutableSet<Int>) {
 /** Parse a single XML document, returning its root element. */
 fun parseXml(src: String): XmlElement = XmlReader(src).parseDocument()
 
-/**
- * Recursive-descent XML reader over a forward-only [CharReader]: it pulls characters through the reader
- * (`peek`/`advance`/`eof`), so a huge document is never held whole. [parseElement] materializes exactly
- * one bounded subtree (a var decl, one constraint, a group template, a single `<args>` row); the cursor
- * ([openRoot], [nextChildTag], [enterPeeked], [materializeChild]) walks the top level element by element
- * so the containers themselves are never materialized.
- */
+// Streams through a forward-only CharReader, so a huge document is never held whole. parseElement materializes
+// one bounded subtree (a var decl, a constraint, a group template, an `<args>` row); the cursor methods walk the
+// top level element by element so the containers themselves are never materialized.
 internal class XmlReader(private val reader: CharReader) {
     private val openElements = ArrayDeque<String>()
 
-    /** Parse an in-memory [String] — the path for tests, the DSL, and an already-decompressed blob. */
     constructor(src: String) : this(CharReader(StringCharSource(src)))
 
-    /** Wrap a streamed [source] directly. */
     constructor(source: CharSource) : this(CharReader(source))
 
     fun parseDocument(): XmlElement {
@@ -163,17 +151,15 @@ internal class XmlReader(private val reader: CharReader) {
         }
     }
 
-    /** Skip the prolog/comments/doctype and read the root element's start tag, leaving the cursor inside
-     *  it. The root's own tag and attributes are irrelevant to the top-level walk, so they are discarded. */
+    // Leaves the cursor inside the root; its tag and attributes are discarded.
     fun openRoot() {
         skipMisc()
         require(!reader.eof() && reader.peek() == '<'.code) { "expected root element" }
         require(enterPeeked()) { "root element must not be empty" }
     }
 
-    /** Advance to the next child of the currently open element: its tag name (cursor left at the child's
-     *  `<`, nothing past it consumed) if a child starts, or `null` — having consumed the closing tag — if
-     *  the current element ends. Whitespace, comments and CDATA between children are skipped. */
+    // The next child's tag name with the cursor left at its `<`, or null after consuming the open element's
+    // closing tag.
     fun nextChildTag(): String? {
         while (true) {
             skipWs()
@@ -203,12 +189,10 @@ internal class XmlReader(private val reader: CharReader) {
         }
     }
 
-    /** Materialize the child [nextChildTag] just peeked (cursor at its `<`) into a bounded subtree. */
     fun materializeChild(): XmlElement = parseElement()
 
-    /** Consume the start tag of the child [nextChildTag] just peeked (cursor at its `<`), leaving the
-     *  cursor inside it; the tag name and attributes are discarded. Returns false for a self-closing
-     *  (empty) element — already fully consumed — and true for one with a body. */
+    // Consumes the peeked child's start tag, leaving the cursor inside it. False for a self-closing element,
+    // which is then fully consumed.
     fun enterPeeked(onAttribute: ((String, String) -> Unit)? = null): Boolean {
         expect('<')
         val tag = readName()
@@ -322,8 +306,7 @@ internal class XmlReader(private val reader: CharReader) {
         return sb.toString()
     }
 
-    // The tag name of the child at the cursor (which sits on `<`), read via lookahead without consuming —
-    // so the subsequent [materializeChild]/[enterPeeked] still starts cleanly from the `<`.
+    // Lookahead only, so materializeChild/enterPeeked still start from the `<`.
     private fun peekTagName(): String {
         val sb = StringBuilder()
         var i = 1
@@ -359,13 +342,11 @@ internal class XmlReader(private val reader: CharReader) {
         while (!reader.eof() && reader.peek().toChar().isWhitespace()) reader.advance()
     }
 
-    // True if the next characters spell [lit] (lookahead only, cursor unmoved).
     private fun matches(lit: String): Boolean {
         for (i in lit.indices) if (reader.peek(i) != lit[i].code) return false
         return true
     }
 
-    // Advance until the cursor spells [lit], then consume it; used to skip over comments/PIs/doctype.
     private fun skipUntilAfter(lit: String) {
         while (!reader.eof()) {
             if (matches(lit)) {

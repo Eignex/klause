@@ -286,7 +286,6 @@ object FixedWorkSatMeasurement {
         }
     }
 
-    /** Wall, thread-CPU, process-CPU, allocation, collection and compilation deltas from construction. */
     internal class Meter {
         private val wall = System.nanoTime()
         private val thread = threadCpu()
@@ -351,10 +350,7 @@ object FixedWorkSatMeasurement {
         }
     }
 
-    /**
-     * Ordered pick/commit/conflict/restart/sweep events folded into a 128-bit digest, with power-of-two
-     * checkpoints and the first [rowLimit] rows written to [writer]. The digest covers every event.
-     */
+    // The digest covers every event; only the first rowLimit rows are written.
     internal class Trajectory(
         private val unit: FixedWorkUnit,
         private val limit: Long,

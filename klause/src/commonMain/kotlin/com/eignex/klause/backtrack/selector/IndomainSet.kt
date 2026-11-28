@@ -4,10 +4,6 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 
-/**
- * Allow-list value selection: tries only [allowedValues] (in order) intersected with the
- * current domain. Sparse-aware via the `in d` membership check.
- */
 internal class IndomainSet(private val allowedValues: LongArray) : ValueSelector {
 
     override fun fresh() = this

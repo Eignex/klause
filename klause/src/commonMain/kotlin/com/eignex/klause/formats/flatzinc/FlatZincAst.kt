@@ -1,7 +1,5 @@
 package com.eignex.klause.formats.flatzinc
 
-/** Internal AST from [FlatZincParser]. */
-
 internal sealed interface FznType {
     data object Bool : FznType
 
@@ -42,7 +40,7 @@ internal data class FznVarDecl(
     val isVar: Boolean,
     val annotations: List<FznAnnotation>,
     val value: FznExpr?,
-    /** Source position of the declaration (0 for a synthetic node), used to locate a compile error. */
+    // 0 for a synthetic node.
     val line: Int = 0,
     val col: Int = 0,
 )
@@ -51,7 +49,7 @@ internal data class FznConstraint(
     val name: String,
     val args: List<FznExpr>,
     val annotations: List<FznAnnotation>,
-    /** Source position of the constraint (0 for a synthetic rewrite), used to locate a compile error. */
+    // 0 for a synthetic rewrite.
     val line: Int = 0,
     val col: Int = 0,
 )

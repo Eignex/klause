@@ -2,11 +2,7 @@ package com.eignex.klause.bench.source
 
 import kotlin.math.abs
 
-/**
- * A mixed-integer linear model built in code and written as MPS, for corpora that ship their instances in a format
- * of their own (see [OrLibrary]). Rows are kept sparse, one term per (variable, coefficient), so a model with many
- * variables stays as small in memory as its MPS file.
- */
+// Rows are sparse, so a model with many variables stays as small in memory as its MPS file.
 internal class MipModel(private val name: String, private val maximize: Boolean = false) {
     private class Variable(
         val name: String,
@@ -21,14 +17,11 @@ internal class MipModel(private val name: String, private val maximize: Boolean 
     private val variables = ArrayList<Variable>()
     private val rows = ArrayList<Row>()
 
-    /** A 0-1 variable; returns its index for [row]. */
     fun binary(name: String, cost: Double = 0.0): Int = add(Variable(name, cost, 0.0, 1.0, integer = true))
 
-    /** A continuous variable in [lower, upper], unbounded above when [upper] is null. */
     fun continuous(name: String, cost: Double = 0.0, lower: Double = 0.0, upper: Double? = null): Int =
         add(Variable(name, cost, lower, upper, integer = false))
 
-    /** `Σ coefficient·variable` [sense] [rhs], with [sense] one of `L` (≤), `G` (≥) or `E` (=). */
     fun row(name: String, sense: Char, rhs: Double, terms: List<Pair<Int, Double>>) {
         require(sense in "LGE") { "row sense must be L, G or E, got $sense" }
         rows += Row(name, sense, rhs, terms)
@@ -41,8 +34,7 @@ internal class MipModel(private val name: String, private val maximize: Boolean 
         return variables.size - 1
     }
 
-    /** The model in free MPS: an `OBJSENSE` section for a maximisation, integer columns between `MARKER`s, and
-     *  every bound written out, so no reader's default for an unbounded integer applies. */
+    // Every bound is written out, so no reader's default for an unbounded integer applies.
     fun mps(): String = buildString {
         appendLine("NAME $name")
         if (maximize) appendLine("OBJSENSE\n    MAX")

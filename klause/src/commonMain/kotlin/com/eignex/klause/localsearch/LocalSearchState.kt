@@ -29,10 +29,8 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntSwapSet
 import kotlin.random.Random
 
-/** Initial weight for factors the model declared implied (redundant / symmetry-breaking). An
- *  order of magnitude below the 1.0 structural default: a model padded with hundreds of redundant
- *  rows then aggregates to roughly the weight of a handful of structural ones, so the early descent
- *  follows the real feasible region instead of chasing the implied bulk. */
+// Hundreds of implied rows then weigh about as much as a handful of structural ones, so early descent follows
+// the real feasible region.
 internal const val IMPLIED_FACTOR_INITIAL_WEIGHT: Double = 0.1
 
 // Real-set moves between scheduled re-summations of the rows over continuous columns.
@@ -86,8 +84,7 @@ class LocalSearchState private constructor(
     /** The problem being searched. */
     val problem: Problem get() = model.problem
 
-    /** The stable domains this search moves over — read by invariants for a variable's bounds. The
-     *  model's own, aliased rather than copied: local search reads these and never narrows them. */
+    /** Domains this search moves over, aliased from the model and never narrowed. */
     val rootDomains: Array<IntDomain> = model.domains
 
     /** The current variable assignment. */
@@ -96,19 +93,12 @@ class LocalSearchState private constructor(
     /** Invariant ids currently violated (degree > 0). */
     val violated: IntSwapSet = buffers.violated
 
-    /** Per-invariant graded violation degree (0 = satisfied), the source of truth for both
-     *  [violated]-set membership (`degree > 0`) and [cost] (`Σ factorDegree`). Maintained
-     *  from exact post-move degrees after updating invariant payloads, and recomputed from
-     *  [Invariant.violationDegree] at [recompute]. The graded sum gives CBLS a descent gradient on
-     *  tight arithmetic/global constraints rather than a flat count of violated invariants. */
+    /** Per-invariant graded violation degree, the source of [violated] membership (`degree > 0`) and [cost]. */
     val factorDegree: IntArray = buffers.factorDegree
     val intPayload: IntArray = buffers.intPayload
 
-    /** Per-factor `Long` scratch, the wide counterpart to [intPayload]. The weighted-sum
-     *  family ([Linear], [ReifiedLinear], `PseudoBoolean`, `ReifiedPseudoBoolean`) keeps its
-     *  running `Σ coeff·value` here so large coefficients / wide domains can't wrap a 32-bit
-     *  accumulator and silently corrupt `isViolated` / `violationDegree`. Clauses pack their two
-     *  watched literal indices into this slot. */
+    /** Per-factor `Long` scratch: running sums of the weighted-sum family ([Linear], [ReifiedLinear]) that a 32-bit
+     *  accumulator could wrap, and the two watched-literal indices of a clause. */
     val longPayload: LongArray = buffers.longPayload
     val refPayload: Array<Any?> = buffers.refPayload
 
@@ -159,9 +149,8 @@ class LocalSearchState private constructor(
     /** Implicit-solving setup: elected globals, disjoint seed set, owner map, implication graph. */
     val seeding: ImplicitSeeding = ImplicitSeeding(problem, projection)
 
-    /** Implicit-solving feasible init: seed every [ImplicitSeeding.implicitSeedFactors] global into a
-     *  satisfying configuration (skipping vars frozen by [assumptions]). Caller is responsible for the
-     *  subsequent [recompute]. */
+    /** Seeds every [ImplicitSeeding.implicitSeedFactors] global feasibly, skipping vars frozen by [assumptions];
+     *  the caller must [recompute] afterwards. */
     fun seedImplicitFeasible() = seeding.seedImplicitFeasible(this)
 
     /** Accepted-move step counter (the search clock); see [TabuBook.step]. */
@@ -188,43 +177,31 @@ class LocalSearchState private constructor(
         addAllBreakMake()
     }
 
-    /** Aggregated hard cost = `Σ factorDegree`, the graded total violation. `Long` because a
-     *  single tight arithmetic factor can carry a residual near [Int.MAX_VALUE] and the sum
-     *  across a large factor set would otherwise overflow. `cost == 0L` iff feasible. */
+    /** Aggregated hard cost `Σ factorDegree`, zero iff feasible; a `Long` so many large residuals cannot overflow. */
     var cost: Long = 0L
         internal set
 
-    /** Lowest [cost] observed since this state was constructed. Updated at the end of every
-     *  committed `apply(move)` and preserved across [restart], so the all-time minimum drives
-     *  aspiration decisions even when restart epochs go uphill. Used by
-     *  [com.eignex.klause.localsearch.AspirationCriterion.OrImprovesBestEver]. */
+    /** Lowest [cost] this state has seen, kept across [restart] so aspiration can use the all-time minimum. */
     var bestCostSeen: Long = Long.MAX_VALUE
         internal set
 
     internal var booleanRepairs: BooleanRepairClosure? = null
     internal var compoundTally: CompoundTally? = null
 
-    /** Soft cap for `compressViolation`: residuals at or below it
-     *  keep exact unit resolution, above it a log tail bounds how much one large-magnitude factor
-     *  dominates the cost sum. Set by the engine from [LocalSearchParams.violationSoftCap] once per
-     *  solve, before the first [recompute]; every graded factor shares this one cap. */
+    /** Soft cap for `compressViolation` shared by every graded factor; set once per solve before [recompute]. */
     var violationSoftCap: Int = DEFAULT_VIOLATION_SOFT_CAP
         internal set
 
-    /** Configuration-checking flag per Boolean variable. `true` means a neighboring variable has
-     *  been touched since this var was last flipped (or since restart), so it is eligible to re-flip;
-     *  `false` means re-flipping it would be a no-progress cycle. S. Cai, K. Su, "Local search for
-     *  Boolean Satisfiability with configuration checking and subscore", Artificial Intelligence 204,
-     *  2013, https://doi.org/10.1016/j.artint.2013.09.001. */
+    /** Configuration-checking flag per Boolean variable: true when a neighbour changed since its last flip, so
+     *  re-flipping it is no cycle. S. Cai, K. Su, "Local search for Boolean Satisfiability with configuration
+     *  checking and subscore", Artificial Intelligence 204, 2013, https://doi.org/10.1016/j.artint.2013.09.001. */
     val boolConfChange: BooleanArray = buffers.boolConfChange
 
     /** Configuration-Checking flag per integer variable. See [boolConfChange]. */
     val intConfChange: BooleanArray = buffers.intConfChange
 
-    // Which factors make their variables each other's neighbours for configuration checking: the model's own. The
-    // objective-bound overlay spans every objective variable, so marking through it would make every variable a
-    // neighbour of every other, which is no configuration checking at all, and cost a pass over the objective on
-    // every flip.
+    // Only the model's own factors make neighbours: the objective-bound overlay spans every objective variable, so
+    // it would make them all neighbours of each other and cost a pass over the objective per flip.
     private val confNeighbours = buffers.confNeighbours
 
     private val probe = LocalSearchProbe(this, buffers.probeTouched, buffers.probeWasViolated)
@@ -321,8 +298,6 @@ class LocalSearchState private constructor(
         // A fresh state has an empty activity epoch and configuration flags already set.
     }
 
-    /** Set the continuous columns to [sample]'s values when it carries one per column, else to their starting
-     *  values. */
     internal fun seedReals(sample: Sample) {
         val carried = sample.numRealVars == problem.numRealVars
         for (r in 0 until problem.numRealVars) {
@@ -330,7 +305,6 @@ class LocalSearchState private constructor(
         }
     }
 
-    // The value of real column [r] nearest zero within its bounds.
     private fun startingReal(r: Int): Double = 0.0.coerceIn(problem.realLower[r], problem.realUpper[r])
 
     private fun realFactorIds(): IntArray {
@@ -341,12 +315,8 @@ class LocalSearchState private constructor(
         return ids.toIntArray()
     }
 
-    /**
-     * Re-sum every row over a continuous column from scratch and reconcile its degree. Their sums are kept
-     * incrementally in floating point, so each move adds rounding; a scheduled refresh bounds that drift, and a
-     * refresh before a candidate is reported keeps a row the drift had pushed inside its tolerance from reading
-     * as satisfied.
-     */
+    /** Re-sums every row over a continuous column and reconciles its degree, bounding floating-point drift so a
+     *  drifted row cannot read as satisfied when a candidate is reported. */
     fun refreshRealRows() {
         realMovesSinceRefresh = 0
         for (fid in realFactors) {
@@ -424,12 +394,7 @@ class LocalSearchState private constructor(
         for (id in 0 until problem.numFactors) adjustBoolBreakMake(id, +1)
     }
 
-    /**
-     * Per-move one-way invariant index, set by the engine when enabled. After every applied move,
-     * [apply] re-evaluates the affected definitional cone in topological order through the same
-     * incremental primitives, so defined vars track their inputs and payload/break-make state stays
-     * maintained. Null = no propagation.
-     */
+    /** Definitional cone index; when set, [apply] re-evaluates the affected cone after every move. */
     var invariants: InvariantNetwork? = null
         set(value) {
             check(!probe.active && !moveActive) { "cannot replace definitions during a move" }
@@ -668,26 +633,11 @@ class LocalSearchState private constructor(
         }
     }
 
-    /**
-     * Break score fused with the per-move objective delta:
-     *   `breakScore(move).toDouble() + shapingLambda * objectiveDelta(move)`
-     * Reduces to `breakScore(move).toDouble()` when [ObjectiveShaping.shapingLambda] is zero,
-     * [ObjectiveShaping.objective] is null, or the objective supports no incremental delta, so non-shaping
-     * callers see identical behavior.
-     *
-     * Moves feeding definitions use a reversible probe. Other moves use coefficient lookup for
-     * [LinearObjective] or the caller-supplied [IncrementalObjective.deltaIfApplied]; repeated
-     * compound coordinates use a probe for their final linear delta. Other objective types
-     * contribute `0.0`.
-     */
+    /** `breakScore(move) + shapingLambda · objectiveDelta(move)`; just the break score when shaping is off or the
+     *  objective has no incremental delta, whether [LinearObjective] or [IncrementalObjective]. */
     fun shapedBreakScore(move: Move): Double = breakScore(move).toDouble() + shapedObjectiveDelta(move)
 
-    /**
-     * Lambda-multiplied objective delta for shaping any per-move score: `shapingLambda *
-     * objectiveDelta(move)`. Returns `0.0` when shaping is off (no objective, lambda = 0) or the
-     * objective supports no incremental delta. Strategies add this to a base metric to make it
-     * objective-aware.
-     */
+    /** `shapingLambda · objectiveDelta(move)`, or `0.0` when shaping is off or the delta is not incremental. */
     fun shapedObjectiveDelta(move: Move): Double {
         val obj = shaping.objective ?: return 0.0
         val lambda = shaping.shapingLambda
@@ -695,15 +645,8 @@ class LocalSearchState private constructor(
         return lambda * checkNotNull(objectiveDelta(obj, move))
     }
 
-    /**
-     * Raw per-move objective delta `evaluate(applyMove(current)) − evaluate(current)`, computed
-     * against the current assignment without committing the move. Definition inputs use a
-     * reversible probe; other moves return `null` for objectives with no incremental path,
-     * signalling the caller to fall back to `apply` + full [Objective.evaluate].
-     *
-     * Unlike [shapedObjectiveDelta], this is unscaled — the delta the optimize-side descent scores
-     * candidates by, paired with [netDelta] for the feasibility/cost side.
-     */
+    /** Unscaled objective change of [move] without committing it, or null when [obj] has no incremental path and the
+     *  caller must apply and [Objective.evaluate]. */
     fun objectiveDelta(obj: Objective, move: Move): Double? {
         check(!probe.active && !moveActive) { "local-search scoring cannot be nested in a move" }
         val scored = scoringView(obj)
@@ -791,22 +734,13 @@ class LocalSearchState private constructor(
     }
 
     /**
-     * Synthesize a value-driven move that sets [intVar] to [newValue] and coordinately flips all
-     * indicator bools of sibling **reified single-var equality** factors on the same int var. The
-     * channeling pattern: a course-period model encodes `course(i) = p` via N parallel
-     * `int_eq_reif(course(i), p, b_ip)` factors; a naive `IntSet` cascades into N indicator
-     * violations the engine chases one flip at a time, so this rolls the update into one Compound.
-     *
-     * Returns a plain [Move.IntSet] when no sibling indicators need updating, else a [Move.Compound].
-     * Indicator flips also carry unit equality channels over 0/1 integers to their matching value.
-     * Multi-var and inequality indicators are skipped by this neighborhood.
+     * Sets [intVar] to [newValue] together with the sibling updates each factor on it contributes, such as the
+     * indicator flips of reified single-var equalities, so the change is one move instead of a cascade of
+     * violations. Returns a plain [Move.IntSet] when no sibling needs updating.
      */
     fun synthesizeChannelingMove(intVar: Int, newValue: Long): Move {
         val cur = assignment.intValue(intVar)
         if (cur == newValue) return Move.IntSet(intVar, newValue)
-        // Each sibling factor mentioning intVar contributes its own consistency-preserving update
-        // (indicator flip / sum counter-shift) via Invariant.contributeChanneling; the sink folds them
-        // into one Compound and pins claimed vars so two siblings can't clobber the same target.
         val sink = ChannelingSink(intVar, newValue)
         for (fid in projection.intOccurrences[intVar]) {
             factors[fid].contributeChanneling(this, fid, intVar, cur, newValue, sink)
@@ -864,12 +798,8 @@ class LocalSearchState private constructor(
         )
     }
 
-    /**
-     * Weighted net change in violated-factor count for [move]: `Σ factorWeights[f] · Δviolated[f]`.
-     * Companion to [netDelta] for CBLS strategies that score against the per-factor weight vector.
-     * Reads from [FactorWeightBook.factorWeights], lazily-allocating if untouched — check
-     * [FactorWeightBook.allocated] first to avoid forcing the allocation on a probe.
-     */
+    /** `Σ factorWeights(f) · Δviolated(f)` for [move]. Allocates [FactorWeightBook.factorWeights] when untouched, so
+     *  a probe checks [FactorWeightBook.allocated] first. */
     fun weightedNetDelta(move: Move): Double {
         val w = weights.factorWeights
         if (feedsDefinitions(move)) return evaluateMove(move).weightedNetDelta
@@ -938,10 +868,7 @@ class LocalSearchState private constructor(
         return Move.Compound(parts + repairs)
     }
 
-    /** Shift [boolBreakCount]/[boolMakeCount] for every bool var of [factorId] by [sign]: a var whose
-     *  flip would break the factor (`deltaIfBoolFlipped > 0`) moves the break count, one whose flip
-     *  would make it (`< 0`) moves the make count. `sign = -1` retracts the factor's pre-move
-     *  contribution, `+1` re-adds it post-move. Inline so the hot apply path stays allocation-free. */
+    // sign -1 retracts the factor's pre-move contribution, +1 re-adds it post-move.
     @Suppress("NOTHING_TO_INLINE")
     private inline fun adjustBoolBreakMake(factorId: Int, sign: Int) {
         if (!boolScoresInitialized) return
@@ -956,13 +883,8 @@ class LocalSearchState private constructor(
         }
     }
 
-    /**
-     * Shared apply skeleton for the primitive moves: [retract] brute-force break/make over
-     * [touchedFactors], [commit] the assignment change, [refresh] each factor's payload and violation,
-     * then [settle] the break/make vectors. Closes with the conf-change and tabu/activity bookkeeping
-     * for [slot]. Each phase is a per-move-type method holding one loop, so C2 compiles them apart
-     * instead of recompiling the whole move on-stack for each loop it enters.
-     */
+    // Each phase is a per-move-type method holding one loop, so C2 compiles them apart instead of recompiling the
+    // whole move on-stack for each loop it enters.
     @Suppress("LongParameterList")
     private inline fun applyMove(
         touchedFactors: IntArray,
@@ -1127,8 +1049,6 @@ class LocalSearchState private constructor(
         }
     }
 
-    /** Walk every factor touching bool var `v`, call its `deltaIfBoolFlipped`, and hand the
-     *  (factorId, delta) pair to [action]. Inline so callers stay allocation-free. */
     internal inline fun forEachBoolFactorDelta(v: Int, action: (factorId: Int, delta: Int) -> Unit) {
         for (factorId in projection.boolOccurrences[v]) {
             checkScoringWork()
@@ -1136,8 +1056,6 @@ class LocalSearchState private constructor(
         }
     }
 
-    /** Same as [forEachBoolFactorDelta] but for an `IntSet` move on int var `v` with
-     *  target value [newValue]. */
     internal inline fun forEachIntFactorDelta(v: Int, newValue: Long, action: (factorId: Int, delta: Int) -> Unit) {
         for (factorId in projection.intOccurrences[v]) {
             checkScoringWork()
@@ -1145,7 +1063,6 @@ class LocalSearchState private constructor(
         }
     }
 
-    /** Same as [forEachBoolFactorDelta] but for a `RealSet` move on real var `v` with target [newValue]. */
     internal inline fun forEachRealFactorDelta(v: Int, newValue: Double, action: (factorId: Int, delta: Int) -> Unit) {
         for (factorId in projection.realOccurrences[v]) {
             checkScoringWork()
@@ -1153,8 +1070,7 @@ class LocalSearchState private constructor(
         }
     }
 
-    /** Pick a uniformly-random violated factor, ask it for repair-move suggestions, and return the
-     *  raw list. `null` when no factor is violated or the chosen factor proposed no moves. */
+    /** Repair moves of a uniformly random violated factor, or null when none is violated or it proposed none. */
     fun proposeMovesFromRandomViolated(): List<Move>? {
         if (violated.isEmpty()) return null
         moveSink.clear()
@@ -1255,14 +1171,8 @@ class LocalSearchState private constructor(
         if (newDegree > 0) violated.add(factorId) else violated.remove(factorId)
     }
 
-    /**
-     * Reconcile a single factor after an *external* change to its violation semantics that left the
-     * assignment — and thus the factor's payload — untouched: the objective-bound ratchet tightening its
-     * shared bound between moves. Mirrors [applyMove]'s per-factor break/make retract → [updateViolation]
-     * → re-add, so [cost], [factorDegree], [violated], and the break/make vectors stay exact without a
-     * full [recompute] over every factor. The factor must maintain break/make brute-force (no flip
-     * occurred, so there is no incremental update to drive) — true for the objective-bound factor.
-     */
+    // Reconciles one factor after an external change that left its payload untouched, such as the ratchet tightening
+    // its bound. No flip drives an incremental update, so the factor must maintain break/make brute-force.
     internal fun reevaluateFactor(factorId: Int) {
         require(!factors[factorId].maintainsBreakMakeIncrementally) {
             "reevaluateFactor expects a brute-force break/make factor (no flip to drive an incremental update)"

@@ -4,8 +4,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 
-/** Random feasibility-preserving swap: picks two distinct variables and swaps their values if
- *  both values lie in each other's domain. [isPresent] gates on optional presence by index. */
+// Swaps two variables' values when each lies in the other's root domain.
 internal inline fun proposeRandomSwaps(
     state: LocalSearchState,
     vars: IntArray,
@@ -34,12 +33,8 @@ internal inline fun proposeRandomSwaps(
     }
 }
 
-/** Random feasibility-preserving 3-cycle: picks three distinct variables with distinct values and
- *  rotates them (a←c, b←a, c←b) when each rotated value lies in its target's domain. Preserves the
- *  value multiset exactly as [proposeRandomSwaps] does, so it keeps an all-different / permutation
- *  factor feasible — but reaches assignments a single 2-swap cannot, which a pair of accepted swaps
- *  would otherwise have to discover in two separate improving steps. [isPresent] gates on optional
- *  presence by index. */
+// Rotates three distinct values (a←c, b←a, c←b). Like a swap it preserves the value multiset, keeping an
+// all-different factor feasible, but reaches in one step what would take two improving swaps.
 internal inline fun proposeRandomRotations(
     state: LocalSearchState,
     vars: IntArray,

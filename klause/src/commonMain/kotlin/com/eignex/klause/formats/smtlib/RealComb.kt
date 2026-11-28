@@ -2,11 +2,8 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.util.numbers.BigFraction
 
-/**
- * An exact rational linear combination over integer and LP-only real variables — the folded form of
- * a real-sorted SMT term. Coefficients stay [BigFraction]s until a row is emitted, where the least
- * common denominator scales them to exact integers.
- */
+// The folded form of a real-sorted term. Coefficients stay exact until a row is emitted, where the least common
+// denominator scales them to integers.
 internal class RealComb(
     intCoeffs: Map<Int, BigFraction>,
     realCoeffs: Map<Int, BigFraction>,
@@ -42,11 +39,7 @@ internal class RealComb(
     }
 }
 
-/**
- * Sum of [combs], with every element after the first negated when [negateTail] (the n-ary `-` fold).
- * One mutable accumulator instead of a per-operand map copy, so a wide sum costs linear work in its
- * operand count — the exact-rational twin of `sumIntCombs`.
- */
+// Negates every element after the first when [negateTail] (n-ary `-`). One accumulator keeps a wide sum linear.
 internal fun sumRealCombs(combs: List<RealComb>, negateTail: Boolean = false): RealComb {
     val ints = HashMap<Int, BigFraction>()
     val reals = HashMap<Int, BigFraction>()

@@ -100,15 +100,12 @@ internal class AtomRun {
     }
 
     internal companion object {
-        /** Below this the array shift is cheaper than the bookkeeping. */
+        // Below this the array shift is cheaper than the bookkeeping.
         const val MIN_PENDING = 8
     }
 }
 
-/**
- * Visit every atom id whose threshold lies in `[from, to]`, ascending. Walks the main run and the staging
- * buffer in lockstep so a scan never forces a merge — both are sorted, so the merge is free at read time.
- */
+// Walks the main run and the staging buffer in lockstep, so a scan never forces a merge.
 internal inline fun AtomRun.visitRange(from: Long, to: Long, action: (atomId: Int) -> Unit) {
     if (to < from) return
     var i = mainKeys.lowerBound(from)

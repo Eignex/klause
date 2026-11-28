@@ -15,12 +15,7 @@ import com.eignex.util.collections.IntHashSet
 import kotlin.math.abs
 import kotlin.random.Random
 
-/**
- * The "destroy" half of an ALNS / LNS iteration: returns the set of variables to *free*
- * for the repair phase. The complementary set stays pinned at the incumbent's values via
- * [com.eignex.klause.propagation.Assumptions]. Operators are expected to be stateless and
- * cheap; they're invoked once per ALNS iteration.
- */
+// Operators should be stateless and cheap; they run once per ALNS iteration.
 internal fun interface DestroyOperator {
     fun destroy(
         rng: Random,
@@ -41,7 +36,6 @@ internal fun interface DestroyOperator {
     ): FreedVars = destroy(rng, problem, incumbent, objective, fraction)
 
     companion object {
-        /** Free a uniformly-random subset of `fraction * totalVars` variables: the diversifying baseline. */
         val Random: DestroyOperator = DestroyOperator { rng, problem, _, _, fraction ->
             val totalVars = problem.numBoolVars + problem.numIntVars
             if (totalVars == 0) return@DestroyOperator FreedVars(emptyIntArray(), emptyIntArray())
@@ -50,9 +44,6 @@ internal fun interface DestroyOperator {
             split(ids, problem.numBoolVars)
         }
 
-        /** Free the `fraction * totalVars` variables that contribute the most to the current
-         *  objective, by `|coefficient * value|` — the variables most likely to move the
-         *  objective if re-optimised. */
         val WorstObjective: DestroyOperator = DestroyOperator { _, problem, incumbent, objective, fraction ->
             val totalVars = problem.numBoolVars + problem.numIntVars
             if (totalVars == 0) return@DestroyOperator FreedVars(emptyIntArray(), emptyIntArray())
@@ -73,16 +64,10 @@ internal fun interface DestroyOperator {
             split(indexed.take(k), problem.numBoolVars)
         }
 
-        /** Free a connected "blob" of variables via BFS through factor co-occurrence.
-         *  Starts from a random seed variable, hops to factors that contain it, then to
-         *  the other variables in those factors, until `fraction` of the variable pool
-         *  is reached. Captures the problem's coupling structure: re-optimising a
-         *  related cluster surfaces dependencies that a uniformly-random subset misses
-         *  (relatedness removal from P. Shaw, "Using Constraint Programming and Local Search Methods
-         *  to Solve Vehicle Routing Problems", CP 1998, https://doi.org/10.1007/3-540-49481-2_30).
-         *
-         *  When BFS exhausts a connected component before reaching the target size, it
-         *  re-seeds from a variable not yet freed. */
+        // Frees a connected cluster by BFS through factor co-occurrence, re-seeding when a component is
+        // exhausted, so coupled variables are re-optimised together (relatedness removal from P. Shaw, "Using
+        // Constraint Programming and Local Search Methods to Solve Vehicle Routing Problems", CP 1998,
+        // https://doi.org/10.1007/3-540-49481-2_30).
         val AdjacencyRelated: DestroyOperator = DestroyOperator { rng, problem, _, _, fraction ->
             val projection = LocalSearchProblem(problem)
             val totalVars = problem.numBoolVars + problem.numIntVars
@@ -130,9 +115,7 @@ internal fun interface DestroyOperator {
             split(freedIds, problem.numBoolVars)
         }
 
-        /** Free variables that participate in factors *currently violated by the incumbent*,
-         *  subsampled to `fraction` of the variables. A feasible incumbent violates nothing, so
-         *  the operator returns an empty `FreedVars`, which [Alns] scores as a rejected iteration. */
+        // A feasible incumbent frees nothing, which Alns scores as a rejected iteration.
         val CurrentlyViolated: DestroyOperator = DestroyOperator { rng, problem, incumbent, _, fraction ->
             val totalVars = problem.numBoolVars + problem.numIntVars
             if (totalVars == 0) return@DestroyOperator FreedVars(emptyIntArray(), emptyIntArray())
@@ -154,16 +137,8 @@ internal fun interface DestroyOperator {
             split(picked, problem.numBoolVars)
         }
 
-        /**
-         * Activity-biased: free variables that were touched most often in the inner
-         * solver's prior calls, read from a [LocalSearchSession]'s captured touch counts.
-         * Variables with the highest cumulative touch count are picked first — they are
-         * the ones the search has been working hardest on and most likely to benefit
-         * from re-optimisation in isolation.
-         *
-         * Falls back to [Random] when the session has no activity capture yet (first
-         * iteration) or when no session was provided.
-         */
+        // Frees the variables the inner search touched most; falls back to Random until the session has captured
+        // activity.
         fun activityBiased(session: LocalSearchSession?): DestroyOperator =
             DestroyOperator { rng, problem, incumbent, objective, fraction ->
                 val touches = session?.warmStateView?.activityTouches() ?: emptyIntArray()
@@ -183,17 +158,10 @@ internal fun interface DestroyOperator {
                 split(sorted, problem.numBoolVars)
             }
 
-        /** Default operator palette: random, worst-objective and adjacency-related. Callers can add
-         *  problem-specific operators (e.g. [CurrentlyViolated] when the incumbent may be infeasible,
-         *  or [activityBiased] when ALNS runs over a [LocalSearchSession] that accumulates recency). */
         val Defaults: List<DestroyOperator> = listOf(Random, WorstObjective, AdjacencyRelated)
 
-        /** Free every int var whose current value lies in a randomly-chosen contiguous
-         *  window `[t, t + windowSize)`. Targets scheduling-style problems (Cumulative,
-         *  Disjunctive, Sequence): tasks sharing a temporal slice get re-optimised
-         *  together, exposing peak-overlap repairs that uniform random destroy misses.
-         *  The window is sampled across the union of all int-var value ranges; vars
-         *  outside the window stay pinned. Bool vars in the incumbent are always pinned. */
+        // Frees int vars whose value lies in a random window, so scheduled tasks sharing a temporal slice are
+        // re-optimised together. Bool vars stay pinned.
         fun timeWindow(windowSize: Int): DestroyOperator = DestroyOperator { rng, problem, incumbent, _, fraction ->
             require(windowSize > 0) { "windowSize must be > 0, got $windowSize" }
             val n = problem.numIntVars
@@ -218,8 +186,7 @@ internal fun interface DestroyOperator {
                 val v = incumbent.intValue(i)
                 if (v in start until end) inWindow.add(i)
             }
-            // If the window picked an empty slice, fall back to a uniform random pick over
-            // int vars only (the time-window operator targets int-typed schedule positions).
+            // An empty window falls back to a uniform random pick over int vars.
             if (inWindow.size == 0) {
                 val cap = ((problem.numBoolVars + n) * fraction).toInt().coerceIn(1, n)
                 val all = IntArray(n) { it }.also { it.shuffle(rng) }
@@ -244,8 +211,6 @@ internal fun interface DestroyOperator {
     }
 }
 
-/** Variables freed by a [DestroyOperator]. Indices are in the underlying problem's space:
- *  `bools[i] ∈ [0, problem.numBoolVars)`, `ints[i] ∈ [0, problem.numIntVars)`. */
 internal data class FreedVars(val bools: IntArray, val ints: IntArray) {
     val isEmpty: Boolean get() = bools.isEmpty() && ints.isEmpty()
     override fun equals(other: Any?): Boolean = other is FreedVars &&

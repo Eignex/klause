@@ -10,22 +10,14 @@ import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.unaryMinus
 
-/**
- * One row of an exact integer matrix, held as its non-zero entries alone.
- *
- * The equality block of a real model is overwhelmingly empty — a few terms per row out of tens of
- * thousands of columns — so the dense form costs `rows · cols` big-integer slots for a matrix whose
- * content is linear in the number of terms. Every step of the echelon-Hermite chain reads rows through
- * this type instead, which is what lets the chain run at all on a model with six-figure column counts.
- *
- * [index] is strictly ascending and [value] is index-aligned; no stored value is zero.
- */
+// Sparse because equality blocks hold a few terms per row over many columns. [index] is strictly ascending, [value]
+// index-aligned, and no stored value is zero.
 internal class SparseIntRow(val index: IntArray, val value: Array<BigInt>) {
 
-    /** The lowest column the row mentions, or [Int.MAX_VALUE] when the row is zero. */
+    // [Int.MAX_VALUE] when the row is zero.
     val lead: Int get() = if (index.isEmpty()) Int.MAX_VALUE else index[0]
 
-    /** The highest column the row mentions — its pivot in a lower-triangular form — or -1 when zero. */
+    // The pivot in a lower-triangular form; -1 when zero.
     val trail: Int get() = if (index.isEmpty()) -1 else index[index.size - 1]
 
     val isZero: Boolean get() = index.isEmpty()
@@ -40,22 +32,14 @@ internal class SparseIntRow(val index: IntArray, val value: Array<BigInt>) {
     }
 }
 
-/** The row over [entries] `column -> coefficient`, dropping the zeros and sorting what is left. */
 internal fun sparseIntRow(entries: Map<Int, BigInt>): SparseIntRow {
     val kept = entries.entries.filter { !it.value.isZero() }.sortedBy { it.key }
     if (kept.isEmpty()) return SparseIntRow.Zero
     return SparseIntRow(IntArray(kept.size) { kept[it].key }, Array(kept.size) { kept[it].value })
 }
 
-/**
- * The unimodular `V` of `x = V·y`, stored column-major and sparse.
- *
- * `V` starts as the identity and is only ever touched by *column* operations, so a column no operation
- * reached still holds its single identity entry. Storing it column-major therefore costs one entry per
- * untouched column rather than a full row, and a column swap is a pointer exchange rather than a sweep
- * down the whole matrix. An untouched column is left null and materialised on first access, so a
- * transform over a hundred thousand columns of which a few thousand move costs only what moved.
- */
+// `V` starts as the identity and is touched only by column operations, so column-major storage makes a swap a
+// pointer exchange, and an untouched column stays null until first access so only moved columns cost anything.
 internal class UnimodularTransform(val size: Int) {
     private val columns = arrayOfNulls<MutableMap<Int, BigInt>>(size)
     private val operations = ArrayList<UnimodularColumnOperation>()
@@ -66,7 +50,6 @@ internal class UnimodularTransform(val size: Int) {
             columns[j] = it
         }
 
-    /** Entry `V(i, j)`. */
     operator fun get(i: Int, j: Int): BigInt = column(j)[i] ?: BIG_ZERO
 
     fun swap(x: Int, y: Int) {
@@ -84,7 +67,6 @@ internal class UnimodularTransform(val size: Int) {
         operations.add(UnimodularColumnOperation.Negate(j))
     }
 
-    /** `column(target) += factor · column(source)`. */
     fun addMultiple(target: Int, source: Int, factor: BigInt) {
         if (target == source || factor.isZero()) return
         val src = column(source)
@@ -96,7 +78,6 @@ internal class UnimodularTransform(val size: Int) {
         operations.add(UnimodularColumnOperation.AddMultiple(target, source, factor))
     }
 
-    /** The inverse unimodular map, suitable for expressing transformed integer coordinates in source ones. */
     fun inverse(): UnimodularTransform {
         val result = UnimodularTransform(size)
         for (operation in operations.asReversed()) {
@@ -113,7 +94,7 @@ internal class UnimodularTransform(val size: Int) {
         return result
     }
 
-    /** Visit every non-zero `V(row, col)` once, without materialising the untouched identity columns. */
+    // Does not materialise untouched identity columns.
     inline fun forEachEntry(action: (row: Int, col: Int, value: BigInt) -> Unit) {
         for (j in 0 until size) {
             val c = columnOrNull(j)
@@ -121,11 +102,9 @@ internal class UnimodularTransform(val size: Int) {
         }
     }
 
-    /** The stored column, or null where it is still the untouched identity column. */
     @PublishedApi
     internal fun columnOrNull(j: Int): Map<Int, BigInt>? = columns[j]
 
-    /** Stored non-zeros, counting an untouched identity column as the one entry it stands for. */
     val nonZeroCount: Int get() = (0 until size).sumOf { columns[it]?.size ?: 1 }
 }
 
@@ -137,18 +116,11 @@ private sealed interface UnimodularColumnOperation {
     data class AddMultiple(val target: Int, val source: Int, val factor: BigInt) : UnimodularColumnOperation
 }
 
-/**
- * An exact integer matrix carrying both a column view and a row view of the same entries.
- *
- * The Hermite reduction needs both: it searches a *row* for its smallest non-zero entry, and it acts by
- * *column* operations. Keeping only one view would make the other a full scan of the matrix per step,
- * which on a six-figure column count is the whole cost. Both views are updated by every operation, so
- * each costs the entries it actually changes and nothing more.
- */
+// Column and row views of the same entries: the Hermite reduction searches rows and acts by column operations, and
+// either alone would make the other a full scan per step.
 internal class SparseIntColumns(val rows: Int, val cols: Int, source: List<SparseIntRow>) {
     private val columns = arrayOfNulls<MutableMap<Int, BigInt>>(cols)
 
-    /** Per row, the columns it holds a non-zero in. */
     val rowSupport = Array(rows) { HashSet<Int>() }
 
     init {
@@ -194,7 +166,6 @@ internal class SparseIntColumns(val rows: Int, val cols: Int, source: List<Spars
         for (i in c.keys.toList()) c[i] = -c.getValue(i)
     }
 
-    /** `column(target) += factor · column(source)`. */
     fun addMultiple(target: Int, source: Int, factor: BigInt) {
         if (target == source || factor.isZero()) return
         val src = columns[source] ?: return
@@ -211,7 +182,6 @@ internal class SparseIntColumns(val rows: Int, val cols: Int, source: List<Spars
         }
     }
 
-    /** The rows of the matrix in their current form, each in ascending column order. */
     fun toRows(): List<SparseIntRow> = List(rows) { i ->
         val cs = rowSupport[i].toIntArray()
         cs.sort()

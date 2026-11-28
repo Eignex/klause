@@ -14,12 +14,8 @@ internal class BigRationalConflict(
 
 internal data class ExactSimplexBound(val column: Int, val upper: Boolean)
 
-/**
- * An arithmetic level for the exact simplex: a rational number type with exact operations. A
- * fixed-width level signals exhaustion by latching [overflowed] — its results are then void and the
- * caller escalates; the unbounded level never latches. [ofDouble] returns null for a value the
- * level cannot represent (non-finite always; out-of-range for a fixed-width level).
- */
+// A fixed-width level latches overflowed() on exhaustion, voiding its results so the caller escalates;
+// ofDouble returns null for a value the level cannot represent.
 internal interface FracOps<F> {
     val zero: F
     val one: F
@@ -49,7 +45,6 @@ internal interface FracOps<F> {
     fun isZero(a: F): Boolean = signum(a) == 0
 }
 
-/** The unbounded [BigFraction] level; never overflows. */
 internal object BigFracOps : FracOps<BigFraction> {
     override val zero: BigFraction = BigFraction.ZERO
     override val one: BigFraction = BigFraction.ONE
@@ -79,7 +74,6 @@ internal object BigFracOps : FracOps<BigFraction> {
     override fun isZero(a: BigFraction): Boolean = a.isZero
 }
 
-/** Engine-neutral normalized LP input consumed by the exact feasibility simplex. */
 internal interface ExactSimplexModel {
     val n: Int
     val m: Int
@@ -92,12 +86,7 @@ internal interface ExactSimplexModel {
     val probeClampedHi: BooleanArray
     val doubleView: ExactSimplexDoubleView?
 
-    /**
-     * Optional arbitrary-precision input view.  The ordinary LP engine provides either its compact
-     * integer columns or a double view; reduction kernels use this view when a source coefficient or
-     * bound does not fit either representation.  It deliberately lives at the exact-simplex boundary
-     * so callers do not have to smuggle big coefficients through a floating point relaxation.
-     */
+    // For coefficients or bounds that fit neither the compact integer columns nor the double view.
     val bigView: ExactSimplexBigView?
         get() = null
 
@@ -106,7 +95,6 @@ internal interface ExactSimplexModel {
     fun loShiftD(j: Int): Double
 }
 
-/** Double-precision normalized LP input used when the model contains real data. */
 internal interface ExactSimplexDoubleView {
     val colPtr: IntArray
     val rowIdx: IntArray
@@ -116,7 +104,6 @@ internal interface ExactSimplexDoubleView {
     val hasUpper: BooleanArray
 }
 
-/** Arbitrary-precision counterpart of [ExactSimplexDoubleView]. */
 internal class ExactSimplexBigView(
     val colPtr: IntArray,
     val rowIdx: IntArray,
@@ -125,7 +112,6 @@ internal class ExactSimplexBigView(
     val upper: List<BigFraction?>,
 )
 
-/** One exact `a*x <= rhs` row for the unshifted non-negative simplex form. */
 internal class ExactRationalInequality(
     val columns: IntArray,
     val coefficients: List<BigFraction>,
@@ -140,14 +126,11 @@ internal class ExactRationalInequality(
     }
 }
 
-/** One source row together with the finite lower activity that makes it double-bounded. */
 internal class ExactDoubleBoundedRow(val index: Int, val inequality: ExactRationalInequality, val lower: BigFraction)
 
-/**
- * Exact Double-Bounded Reduction split before its mixed-echelon/Hermite column transformation. M. Bromberger,
- * "A reduction from unbounded linear mixed arithmetic problems into bounded problems", IJCAR 2018,
- * https://doi.org/10.1007/978-3-319-94205-6_22.
- */
+// Double-Bounded Reduction split before its mixed-echelon/Hermite column transformation. M. Bromberger,
+// "A reduction from unbounded linear mixed arithmetic problems into bounded problems", IJCAR 2018,
+// https://doi.org/10.1007/978-3-319-94205-6_22.
 internal sealed interface ExactDoubleBoundedSplit {
     data object Infeasible : ExactDoubleBoundedSplit
 

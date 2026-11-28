@@ -19,32 +19,26 @@ import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.objective.LinearObjective
 
-/**
- * What an arm needs from a model to do anything its siblings do not. A curated pool builds an arm only on
- * a model that offers all of them, and gives the slot to the next arm in its order.
- */
+// What an arm needs from a model to do anything its siblings do not. A curated pool builds an arm only on
+// a model that offers all of them, and gives the slot to the next arm in its order.
 internal sealed interface ArmNeed {
     // A pure clausal model, whose propagation and explanations stay Boolean.
     data object Clausal : ArmNeed
 
-    /** An objective: the arm steers by it, so on a satisfaction model it is a copy of its base arm. */
+    // The arm steers by the objective, so on a satisfaction model it is a copy of its base arm.
     data object Objective : ArmNeed
 
     data object BooleanObjective : ArmNeed
 
     data object ExtensionalSupports : ArmNeed
 
-    /** An LP relaxation with some technique to enable at [emphasis] under the run's `--lp` ceiling; without
-     *  one the arm is a copy of the conflict-driven arm it is built on. */
+    // Some LP technique to enable at emphasis under the run's `--lp` ceiling; without one the arm is a copy
+    // of the conflict-driven arm it is built on.
     data class Relaxation(val emphasis: LpEmphasis) : ArmNeed
 }
 
-/**
- * The facts about one model that decide which arms are worth building on it: its [profile], and which LP techniques
- * it gives something to do. Each relaxation fact is computed at most once, and only when some arm asks for it.
- */
+// Each relaxation fact is computed at most once, and only when some arm asks for it.
 internal class ProblemFacts(
-    /** The model's classification. */
     val profile: ProblemProfile,
     val binaryIntegers: Boolean = false,
     val continuousObjective: Boolean = false,
@@ -58,7 +52,6 @@ internal class ProblemFacts(
 ) {
     private val relaxations = HashMap<LpEmphasis, Boolean>()
 
-    /** Whether the model offers [need]. */
     fun offers(need: ArmNeed): Boolean = when (need) {
         ArmNeed.Clausal -> profile.problemClass == ProblemClass.Sat
         ArmNeed.Objective -> profile.optimizing
@@ -68,7 +61,6 @@ internal class ProblemFacts(
         is ArmNeed.Relaxation -> relaxations.getOrPut(need.emphasis) { relaxation(need.emphasis) }
     }
 
-    /** Whether the model offers every one of [needs]. */
     fun offersAll(needs: Collection<ArmNeed>): Boolean = needs.all(::offers)
 
     fun eligibility(label: String, needs: Set<ArmNeed>): WorkerEligibility {
@@ -79,9 +71,7 @@ internal class ProblemFacts(
         }
     }
 
-    /** The two ways to learn a model's facts. */
     companion object {
-        /** The facts of [problem], classified as [profile], with the arms' LP capped under [lpCeiling]. */
         fun of(
             problem: BakedProblem,
             profile: ProblemProfile,
@@ -131,14 +121,12 @@ internal class ProblemFacts(
             )
         }
 
-        /** Facts for composing without a model: a [ProblemClass.FiniteCp] model of [kind] that offers every
-         *  relaxation, or one of [problemClass]. */
+        // Facts for composing without a model; every relaxation is offered.
         fun assumed(kind: Kind, problemClass: ProblemClass = ProblemClass.FiniteCp): ProblemFacts =
             ProblemFacts(ProblemProfile(problemClass, kind == Kind.COP, wide = false, scheduling = false)) { true }
     }
 }
 
-/** The [Kind] a solve with this profile runs as. */
 internal val ProblemProfile.kind: Kind get() = if (optimizing) Kind.COP else Kind.CSP
 
 internal val BakedProblem.continuousMajority: Boolean

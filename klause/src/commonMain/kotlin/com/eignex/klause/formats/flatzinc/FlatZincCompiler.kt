@@ -21,12 +21,11 @@ import com.eignex.util.io.CharReader
 import com.eignex.util.io.CharSource
 import com.eignex.util.io.StringCharSource
 
-/** Compile parsed FlatZinc AST into solver data structures. */
 internal class FlatZincCompiler(
     internal val model: FznModel,
     // Compatibility hint; source retention is independent of the requested search.
     internal val forLocalSearch: Boolean = false,
-    /** Default domain for unbounded `var int` declarations. */
+    // Default domain for unbounded `var int` declarations.
     unboundedIntLo: Long? = null,
     unboundedIntHi: Long? = null,
     exactFloats: Boolean = false,
@@ -138,8 +137,7 @@ internal class FlatZincCompiler(
         } else {
             BooleanArray(factors.size).also { mask -> impliedFactorIds.forEach { i -> mask[i] = true } }
         }
-        // A raw `Problem`; the SAC / failed-literal probing resolved from the presolve config runs later
-        // in the presolve lane via [RootBaker].
+        // Root probing from the presolve config runs later, in the presolve lane.
         val problem = Problem(
             settings = settings,
             semantics = sourceSemantics,
@@ -212,7 +210,6 @@ internal class FlatZincCompiler(
         recordEnumLabels(d)
     }
 
-    /** Bind scalar aliases and constant pins to an existing solver variable id. */
     internal fun aliasScalarVar(name: String, type: FznType, rhs: FznExpr) {
         when (type) {
             FznType.Bool -> boolVars[name] = Lit.variable(resolveBoolLit(rhs))
@@ -251,7 +248,6 @@ internal class FlatZincCompiler(
         }
     }
 
-    /** Preserve enum labels emitted as `klause_enum_labels([...])`. */
     internal fun recordEnumLabels(d: FznVarDecl) {
         val ann = d.annotations.firstOrNull { it.name == "klause_enum_labels" } ?: return
         if (ann.args.size != 1) failHere("klause_enum_labels: expected 1 array arg")
@@ -399,8 +395,8 @@ internal class FlatZincCompiler(
         return id
     }
 
-    /** FlatZinc has one identifier namespace. Rejecting duplicates prevents later lookup from
-     *  silently selecting a different solver variable than already-emitted factors reference. */
+    // FlatZinc has one identifier namespace: a duplicate would let a later lookup select a different solver
+    // variable than already-emitted factors reference.
     private fun ensureFreshName(name: String) {
         if (name in params || name in boolVars || name in intVars || name in floatVars ||
             name in arrays || name in setVarsByName
@@ -409,11 +405,9 @@ internal class FlatZincCompiler(
         }
     }
 
-    /** Post a trivially unsatisfiable constraint. A [Clause] cannot be empty (an empty clause would
-     *  encode `false`, but the factor rejects zero literals), so an exact contradiction is a fresh
-     *  Boolean pinned both ways. Use only for exact infeasibility (e.g. two constants that violate
-     *  their relation), never to paper over a value an approximate encoding cannot represent — that
-     *  must reject via [failHere] so the instance is not silently reported unsatisfiable. */
+    // A Clause rejects zero literals, so an exact contradiction is a fresh Boolean pinned both ways. Only for
+    // exact infeasibility: a value an approximate encoding cannot represent must reject via failHere, or the
+    // instance would be silently reported unsatisfiable.
     internal fun postFalseFactor() {
         val f = allocBool("__false_$numBoolVars")
         factors.add(Clause(intArrayOf(Lit.make(f, true))))
@@ -433,7 +427,6 @@ internal class FlatZincCompiler(
         return id
     }
 
-    /** Allocate int var with an explicit sparse domain. */
     internal fun allocIntSet(name: String, t: FznType.IntSet): Int {
         val sorted = t.values.distinct().sorted().toLongArray()
         if (sorted.isEmpty()) failHere("int variable `$name` has an empty domain")
@@ -442,7 +435,7 @@ internal class FlatZincCompiler(
         return id
     }
 
-    /** Materialize a set var as parallel indicator bools. */
+    // One indicator Boolean per universe element.
     internal fun allocSetVar(name: String, type: FznType.SetOfInt, initializer: FznExpr? = null) {
         val elements = universeElements(type.element, name)
         val indicatorIds = IntArray(elements.size) { i ->
@@ -574,7 +567,6 @@ internal class FlatZincCompiler(
         }
     }
 
-    /** Build output items from `output_var` / `output_array` annotations. */
     internal fun synthesizeOutputItems(): List<OutputItem>? {
         val items = ArrayList<OutputItem>()
         for (decl in model.varDecls) {
@@ -624,22 +616,20 @@ internal class FlatZincCompiler(
         else -> unsupportedHere("unsupported output item: ${e::class.simpleName}")
     }
 
-    // Source position of the declaration/constraint currently being compiled, so a semantic error
-    // (unsupported builtin, arity, domain) reports where it came from rather than `(at 0:0)`.
+    // Position of the declaration or constraint being compiled, so semantic errors report their origin.
     private var currentLine = 0
     private var currentCol = 0
 
     internal fun failHere(msg: String): Nothing = throw FlatZincParseException(msg, currentLine, currentCol)
 
-    /** Decline a well-formed construct klause does not support, at the current source position. */
+    // For well-formed constructs klause does not support; malformed input uses failHere.
     internal fun unsupportedHere(msg: String): Nothing = throw UnsupportedFlatZincException(
         msg,
         currentLine,
         currentCol,
     )
 
-    /** Require constraint [c] to carry exactly [n] arguments, failing with a [FlatZincParseException]
-     *  (not a bare `require`/index crash) when a malformed instance supplies the wrong arity. */
+    // A located parse error rather than an index crash on a malformed arity.
     internal fun expectArity(c: FznConstraint, n: Int) {
         if (c.args.size != n) failHere("`${c.name}` expects $n arguments, got ${c.args.size}")
     }
@@ -665,9 +655,7 @@ fun parseFlatZinc(
     semanticOverrides = semanticOverrides,
 )
 
-/** Parse and compile FlatZinc from a streamed [source], pulling one token at a time so the whole file
- *  and its token list are never held. The compiler stays whole-model (its float classification and
- *  `int2float` forward references need every constraint at once); only lexing/parsing are streamed.
+/** Parse and compile FlatZinc from a streamed [source] without holding the whole file or its token list.
  *  The [forLocalSearch] compatibility hint retains source constraints for either value. */
 fun parseFlatZinc(
     source: CharSource,

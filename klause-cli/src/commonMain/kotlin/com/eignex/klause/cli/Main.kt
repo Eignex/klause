@@ -11,32 +11,22 @@ import com.eignex.util.process.printErrorLine
 import com.eignex.util.process.processProperty
 import com.eignex.util.runtime.diagnostics.startHeapPeakSampler
 
-/*
- * CLI entry point: parse shared and mode flags, select a mode by --format or extension
- * (default MiniZinc), load a Solvable, then call SolveCore with the mode's output protocol.
- * Each invocation solves one instance.
- */
-
-/** Front-end registry, matched in order by `--format` name or file extension. MiniZinc is the fallback
- *  because MiniZinc invokes this binary with `.fzn` files and standard flags. */
+// Matched in order by `--format` name or file extension. MiniZinc is the fallback because MiniZinc
+// invokes this binary with `.fzn` files and standard flags.
 internal val MODES: List<CliMode> = listOf(MiniZincMode, Xcsp3Mode, SmtLibMode, DimacsMode, OpbMode, WcnfMode, MpsMode)
 
-/** Parse args once, select the front-end mode, load the instance and run the shared driver. */
+/** Solves one instance; the front-end is chosen by `--format`, else by file extension, else MiniZinc. */
 fun main(args: Array<String>) {
     val code = runCli(args)
     if (code != EXIT_OK) exitProcess(code)
 }
 
-/** Process exit codes: success returns without touching the exit path; a boundary error uses [EXIT_ERROR], and a
- *  verdict the solver itself refuted uses [EXIT_UNSOUND] so no harness mistakes it for a bad input. */
+// A verdict the solver itself refuted gets its own code so no harness mistakes it for a bad input.
 private const val EXIT_OK = 0
 private const val EXIT_ERROR = 2
 private const val EXIT_UNSOUND = 3
 
-/**
- * Runs the CLI and reports boundary errors as exit codes and stderr diagnostics.
- * The error boundary is observable without terminating the process.
- */
+// Returns the exit code instead of exiting, so the error boundary is testable.
 internal fun runCli(args: Array<String>): Int = try {
     run(args)
     EXIT_OK
@@ -47,9 +37,7 @@ internal fun runCli(args: Array<String>): Int = try {
     printErrorLine("klause-cli: ${e.message}")
     EXIT_ERROR
 } catch (e: FormatException) {
-    // A parser rejecting malformed/unsupported input is a user error, not a crash: its message
-    // already carries the `klause <format>: <message>` prefix, so surface it verbatim on stderr
-    // and exit with the CLI error code rather than leaking a stack trace.
+    // A user error, not a crash; the message already carries its `klause <format>:` prefix.
     printErrorLine(e.message.orEmpty())
     EXIT_ERROR
 } catch (e: MpsLoweringException) {
@@ -69,9 +57,8 @@ internal fun runCli(args: Array<String>): Int = try {
 
 private fun run(args: Array<String>) {
     val common = CommonOptions()
-    // One parse over the union of common + every mode's flags. Each mode's flags mutate that
-    // mode's own session; only the finally selected session is used, so mode flag names must be
-    // unique across modes.
+    // One parse over every mode's flags, each mutating its own session, so mode flag names must be unique
+    // across modes.
     val sessions = MODES.associateWith { it.newSession() }
     val specs = commonFlagSpecs(common) + sessions.values.flatMap { it.flags() }
     parseArgs(args, specs) { positional ->
@@ -79,8 +66,7 @@ private fun run(args: Array<String>) {
         common.inputPath = positional
     }
 
-    // `--help` / `--version` are informational: they print to stdout and return (exit 0) without
-    // needing an input file, and `--help` wins if both are present (GNU convention).
+    // `--help` wins over `--version` (GNU convention); neither needs an input file.
     if (common.showHelp) {
         println(helpText(specs))
         return
@@ -91,22 +77,18 @@ private fun run(args: Array<String>) {
     }
 
     val path = common.inputPath ?: usageError("no input file given\n$USAGE")
-    // Translate env vars / system properties into the central config and install it as the
-    // process-wide ambient config before any front-end loads or compiles. Done once here (not
-    // per-mode) so every front-end — MiniZinc, XCSP3, SMT-LIB — picks up the same env overrides.
+    // Installed once, before any front-end loads, so every front-end sees the same env overrides.
     common.config = try {
         installCliConfig()
     } catch (error: IllegalArgumentException) {
         usageError(error.message.orEmpty())
     }
-    // Anchor the `-t` budget once, before parsing/baking, so the bake and the solve share one
-    // deadline instead of each restarting the clock.
+    // Anchored before parsing so the bake and the solve share one deadline.
     common.deadlineAtMs = common.timeLimitMs?.let { nowMillis() + it }
     common.startDebugStatistics(processProperty("klause.debug") == "true")
     val mode = pickMode(common, path)
     val session = sessions.getValue(mode)
-    // Peak heap has to be watched from before the parse, since ingest is what the dry-run measures and
-    // the sampler cannot see backwards. Started only for that diagnostic, never on a solve path.
+    // The sampler cannot see backwards, so it starts before the parse; only for the dry-run diagnostic.
     if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) startHeapPeakSampler()
     common.resetInvocationStatistics()
     if (session.runCommands(path, common)) return
@@ -125,9 +107,6 @@ private const val USAGE =
     "usage: klause-cli [options] <file>\n" +
         "Try 'klause-cli --help' for the full option list."
 
-/** Long `--help` output (stdout). The option list is rendered from the live [specs] (so it can't
- *  drift from the real flags); the surrounding prose (formats, examples) reads the [MODES]
- *  registry, so a new front-end shows up automatically too. */
 private fun helpText(specs: List<FlagSpec>): String {
     val byExtension = MODES.joinToString(", ") { m -> ".${m.extensions.first()} → ${m.names.first()}" }
     return """
@@ -150,11 +129,9 @@ private fun helpText(specs: List<FlagSpec>): String {
     """.trimMargin()
 }
 
-/** Column where flag descriptions begin; the names column wraps onto its own line past it. */
+// A names column reaching past it wraps onto its own line.
 private const val HELP_DESC_COLUMN = 24
 
-/** Render the grouped option list from [specs]: one section per non-empty [FlagGroup] (in enum
- *  order). Specs with a `null` help are omitted. */
 private fun renderOptions(specs: List<FlagSpec>): String {
     val visible = specs.filter { it.help != null }
     return FlagGroup.entries.mapNotNull { group ->
@@ -163,8 +140,6 @@ private fun renderOptions(specs: List<FlagSpec>): String {
     }.joinToString("\n\n")
 }
 
-/** One `  -x, --long <label>   description (default: X)` line; an over-long names column wraps to
- *  its own line, and the `(default: …)` suffix is appended only when the spec carries one. */
 private fun renderOptionRow(spec: FlagSpec): String {
     val left = "  " + spec.names.joinToString(", ") + spec.valueLabel?.let { " <$it>" }.orEmpty()
     val pad = HELP_DESC_COLUMN - left.length
@@ -173,7 +148,6 @@ private fun renderOptionRow(spec: FlagSpec): String {
     return left + gap + spec.help + default
 }
 
-/** Select the mode: an explicit `--format` wins, else the file extension, else MiniZinc. */
 private fun pickMode(common: CommonOptions, path: String): CliMode {
     common.formatOverride?.let { fmt ->
         val f = fmt.lowercase()

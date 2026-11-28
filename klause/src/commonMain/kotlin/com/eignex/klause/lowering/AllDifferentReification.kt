@@ -44,19 +44,13 @@ internal fun allDifferentWindowSize(min: Long, max: Long): Int? {
     return (span + 1L).toInt()
 }
 
-/** The value window an [AllDifferent] indexes: its first value and how many it covers. */
 internal class AllDifferentWindow(
-    /** Lowest value any member can take. */
     val min: Long,
-    /** Count of values the global indexes, starting at [min]. */
     val size: Int,
 )
 
-/**
- * The value window [AllDifferent] indexes over [vars], or null when any side is open, the
- * window exceeds an `Int`, or there are fewer than two members. [lower] and [upper] return
- * null for unbounded sides. Callers use pairwise inequalities when no finite window is available.
- */
+// Null when any side is open, the window exceeds an `Int`, or there are fewer than two members; callers
+// then use pairwise inequalities.
 internal fun allDifferentWindow(vars: IntArray, lower: (Int) -> Long?, upper: (Int) -> Long?): AllDifferentWindow? {
     if (vars.size < 2) return null
     var min = Long.MAX_VALUE

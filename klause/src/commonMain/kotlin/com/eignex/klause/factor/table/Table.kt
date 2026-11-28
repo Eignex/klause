@@ -19,27 +19,19 @@ import com.eignex.util.arrays.argsortBy
 import com.eignex.util.collections.LongArrayList
 
 /**
- * `table_int(xs, tuples)` — the vector of `xs(i)` values must equal one of the rows of
- * [tuples]. The [tuples] array stores rows row-major: `tuples(i, j)` lives at
- * `tuples(i * arity + j)` in the flat representation, where `arity = xs.size`.
+ * The values of [xs] equal one row of [tuples], stored row-major: `tuples(i, j)` is at `tuples(i * arity + j)`.
  *
- * Propagation is STR2 simple tabular reduction: tighten each `xs(j)` to the union of `tuples(*, j)`
- * values restricted to rows whose every column is still domain-feasible.
- *
- * `table_bool` is supported via the same factor by channeling booleans to 0/1 ints upstream.
+ * Propagation is STR2 simple tabular reduction: each `xs(j)` is tightened to the column values of the rows
+ * whose every cell is still domain-feasible.
  */
 class Table private constructor(
     /** The variable ids forming each candidate tuple. */
     val xs: IntArray,
     /** Allowed tuples, row-major; length is a multiple of `xs.size`. */
     val tuples: LongArray,
-    /** Per-cell upper bound for a short-support table: cell `row * arity + col` accepts any value in
-     *  `[tuples(cell), hi(cell)]`, intersected with the variable's domain. A point cell has
-     *  `hi(cell) == tuples(cell)`; a `*` wildcard is the unbounded interval `[Long.MIN, Long.MAX]`.
-     *  `null` for a fully-ground table (every cell a point — the common case). */
+    /** Per-cell upper bound for a short-support table: a cell accepts `[tuples(cell), hi(cell)]`, and a `*`
+     *  wildcard is `[Long.MIN_VALUE, Long.MAX_VALUE]`. `null` for a ground table. */
     val hi: LongArray?,
-    /** The cached tuple-derived key fragment when copying from a factor over the *same* [tuples]
-     *  (a pure variable [remap]); `null` forces a fresh computation when the tuples differ. */
     cachedTupleKey: LongArray?,
 ) : Factor {
 
@@ -60,19 +52,15 @@ class Table private constructor(
         require(hi == null || hi.size == tuples.size) { "table: hi bounds must align with tuples" }
     }
 
-    /** Upper bound of the interval cell (row, col); equals its lower bound [tuples] for a point. */
     internal fun cellHi(row: Int, col: Int): Long = hi?.get(row * arity + col) ?: tuples[row * arity + col]
 
-    // The tuple-derived part of the key (arity, count, sorted tuple set) is invariant under a variable
-    // remap, so it is computed once and carried across remaps — keeping the expensive row sort out of
-    // symmetry refinement's per-round hot path. Cleared (recomputed) only when the tuples change.
+    // Invariant under a variable remap, so it is carried across remaps, keeping the row sort out of symmetry
+    // refinement's per-round hot path.
     private var cachedTupleKey: LongArray? = cachedTupleKey
 
     private fun tupleKey(): LongArray = cachedTupleKey ?: run {
-        // Rows are a set, so order-independence comes from sorting rows into a canonical order. Short
-        // tables tie-break equal-lower-bound rows by their upper bound so the key stays canonical, and
-        // interleave the upper-bound word after each lower bound so an interval cell can never collide
-        // with a point (a point has hi == lo). A ground table keeps the compact one-word-per-cell form.
+        // Rows are a set, so they are sorted. Short tables tie-break by upper bound and interleave it after each
+        // lower bound so an interval cell never collides with a point.
         val order = argsortBy(numTuples) { r1, r2 ->
             var c = 0
             var d = 0
@@ -83,10 +71,7 @@ class Table private constructor(
             }
             d
         }
-        // Fill the key fragment (arity, count, then the row-sorted tuple ints) straight into its backing
-        // array. The equivalent StructuralKeyBuilder form appends one element at a time, each with a
-        // capacity/grow check; a wide table's key is the dominant cost when presolve keys a table-heavy
-        // model, so the inner loop stays a flat array write.
+        // A flat array write: keying a wide table dominates presolve on table-heavy models.
         val perCell = if (hi == null) 1 else 2
         val words = LongArray(2 + numTuples * arity * perCell)
         words[0] = arity.toLong()
@@ -102,11 +87,8 @@ class Table private constructor(
         words
     }.also { cachedTupleKey = it }
 
-    // A remap keeps [tuples], so it carries the tuple key forward *if already computed* — but must not
-    // force it: an affine alias-fold (or any remap before the key is first needed) would otherwise pay the
-    // O(tuples) row sort on every table, which on a float-derived table over a wide scaled domain (a
-    // bucket-index table with one row per bucket) is seconds. Pass the cached value (possibly `null`); the
-    // remapped table computes it lazily, and identically, only when something actually reads the key.
+    // Carries the tuple key forward only if already computed: forcing it would pay the O(tuples) row sort on
+    // every remap, even when nothing reads the key.
     override fun remap(mapping: VarRemap): Factor = Table(
         mapping.ints(xs),
         tuples,
@@ -114,15 +96,10 @@ class Table private constructor(
         cachedTupleKey,
     )
 
-    // Affine substitution `x = scale·replacement + offset` rewrites every column holding x: a row's
-    // required value v for x means replacement = (v − offset) / scale, so rows where (v − offset) is
-    // not divisible by scale can never match and drop, and surviving rows store the replacement value.
-    // Representable for any non-zero scale (a shift, negation, or stride). Declines (null) only when no
-    // row survives — leaving the original table for propagation to refute.
+    // Rows where `(v − offset)` is not divisible by scale can never match and drop; survivors store
+    // `(v − offset) / scale`. Null when no row survives, leaving the table for propagation to refute.
     override fun substituteAffine(x: Int, scale: Int, offset: Int, replacement: Int): Factor? {
-        // A short table's interval/wildcard cells don't participate in the divisibility filter and
-        // would need bounds rewritten over surviving rows; decline (the affine fold just skips it)
-        // rather than carry that complexity into a rarely-hit presolve path.
+        // Interval and wildcard cells would need their bounds rewritten; not worth it on a rare path.
         if (hi != null) return null
         if (scale == 0 || x !in xs) return null
         val cols = xs.indices.filter { xs[it] == x }
@@ -140,10 +117,7 @@ class Table private constructor(
         return Table(newXs, newTuples)
     }
 
-    // Substitutability test without building the rewritten table: a row survives iff x's value is
-    // divisible (after the offset shift) in every column holding x, and the substitution succeeds iff any
-    // row survives. `any` early-exits on the first survivor and allocates nothing — the affine scan calls
-    // this per candidate check on a wide float-derived bucket table, where the full rewrite is O(tuples).
+    // Allocation-free and early-exiting: the affine scan calls this per candidate, where a rewrite is O(tuples).
     override fun canSubstituteAffine(x: Int, scale: Int, offset: Int, replacement: Int): Boolean {
         if (hi != null) return false
         if (scale == 0 || x !in xs) return false
@@ -151,9 +125,6 @@ class Table private constructor(
         return (0 until numTuples).any { r -> cols.all { c -> (tuples[r * arity + c] - offset) % scale == 0L } }
     }
 
-    // Column c ↔ xs[c], so xs order is kept (positional); rows are a set, so rows are sorted. Encodes
-    // the full var sequence and tuple set — collision-free up to variable identity. Only `ints(xs)`
-    // varies under a remap; the tuple part is the cached [tupleKey] fragment.
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.TABLE, structuralKeyWeight, ::buildKey)
 
     override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.TABLE, mapping, ::buildKey)
@@ -163,13 +134,10 @@ class Table private constructor(
         sink.constWords(tupleKey())
     }
 
-    /** Relabel every tuple entry: each column holds domain values of its variable, all in the
-     *  one value universe, so a single map relabels the whole table. */
     override fun remapValues(valueMap: (Long) -> Long): Factor {
         val h = hi ?: return Table(xs, LongArray(tuples.size) { valueMap(tuples[it]) })
 
-        // Interval bounds are real domain values and are relabelled; the unbounded wildcard sentinels
-        // (a `[MIN, MAX]` cell) are not domain values and pass through unchanged.
+        // Wildcard sentinels are not domain values and pass through unchanged.
         fun wild(i: Int) = tuples[i] == Long.MIN_VALUE && h[i] == Long.MAX_VALUE
         return Table(
             xs,
@@ -180,17 +148,11 @@ class Table private constructor(
 
     override val variables: VarList = SpanIntVars(xs)
 
-    // The key embeds the full sorted tuple set, so its cost is dominated by the flat tuple count, not
-    // the variable count — a wide table is far more expensive to key than its arity suggests.
+    // Keying cost is dominated by the flat tuple count, not the arity.
     override val structuralKeyWeight: Int get() = xs.size + tuples.size
 
-    /**
-     * Drop tuples no assignment can use — those with a cell outside its variable's current domain — a
-     * structural shrink the flat tuple set otherwise carries for the whole solve. A single survivor pins
-     * every variable (the table becomes redundant equalities); no survivor is left to the propagator to
-     * report. Ground tables only (a short-support table's ranges/wildcards need the propagator's cell
-     * logic), and capped by [REDUCE_TUPLE_CAP] so a giant table isn't rescanned each presolve round.
-     */
+    // Drops tuples with a cell outside its domain. A single survivor pins every variable; no survivor is left to
+    // the propagator to refute. Short-support cells need the propagator's cell logic, so only ground tables.
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
         if (hi != null || numTuples > REDUCE_TUPLE_CAP) return Unchanged
         var survivors: LongArrayList? = null
@@ -227,8 +189,7 @@ class Table private constructor(
     }
 
     private companion object {
-        /** Above this many tuples [structuralReduce] skips the dead-tuple scan, so a giant table is not
-         *  re-swept every presolve round. */
+        // A giant table is not re-swept every presolve round.
         const val REDUCE_TUPLE_CAP: Int = 4096
     }
 }

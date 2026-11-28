@@ -21,7 +21,6 @@ data class ConflictAnalysisStats(
     )
 }
 
-/** Mutable [ConflictAnalysisStats] accumulator. See [SolveStatsSink]. */
 internal class ConflictAnalysisStatsSink {
     val notApplicable: CountStat = CountStat()
     val nonAsserting: CountStat = CountStat()

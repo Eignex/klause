@@ -17,25 +17,16 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableIntIntMap
 
-/**
- * Shared relax-by-selector scaffolding for the core-guided MaxSAT drivers [CoreGuidedOptimizer]
- * (Fu-Malik with weight splitting), [TotalizerOptimizer] (cardinality / PB threshold chain) and
- * [CoreGuidedSearch]: selector-per-soft relaxer clauses `(origLit ∨ selector)`, core projection onto
- * softs, and recovery of a sample whose true cost matches the bound, kept in one place so the drivers
- * agree on all three.
- */
+// Shared by the core-guided drivers so they agree on relaxer clauses, core projection and cost recovery.
 internal object Oll {
 
-    /** One soft constraint: [lit] should be true; pay [weight] (positive) if it ends up
-     *  false. The shared cost vocabulary both drivers translate their inputs into. */
+    // [weight] is paid when [lit] ends up false.
     data class Soft(val lit: Int, val weight: Long = 1L) {
         init {
             require(weight > 0) { "Soft weight must be positive, was $weight" }
         }
     }
 
-    /** Base case shared by every driver: with no softs the cost is 0, so the answer is
-     *  just whether the hard constraints are satisfiable. */
     inline fun <R> solveHardOnly(
         base: BakedProblem,
         params: BacktrackParams,
@@ -48,29 +39,20 @@ internal object Oll {
         is SolveResult.Unknown -> onUnknown(r.reason)
     }
 
-    /** Relaxer clause `(origLit ∨ selector)`: assuming `selector = false` (the standard
-     *  initial assumption) pins `origLit` true; letting the selector float lets the soft be
-     *  relaxed. */
     fun relaxerClause(origLit: Int, selector: Int): Clause =
         Clause(intArrayOf(origLit, Lit.make(selector, positive = true)))
 
-    /** Project an assumption-[core] back to soft indices: the softs whose selector the core
-     *  pins to `false` (matching the "soft satisfied ⇒ selector assumed false" shape).
-     *  [selectorToSoft] maps each selector var id to its soft index. */
     fun projectCoreToSofts(core: Assumptions, selectorToSoft: MutableIntIntMap): IntArray {
         val out = IntArrayList()
         for (i in core.boolKeys.indices) {
             val softIdx = selectorToSoft.getOrDefault(core.boolKeys[i], -1)
             if (softIdx < 0) continue
-            // Only selectors the core pins to `false` correspond to a satisfied-soft
-            // assumption the core refuted.
+            // Only a selector pinned `false` is a satisfied-soft assumption the core refuted.
             if (!core.boolValues[i]) out.add(softIdx)
         }
         return out.toIntArray()
     }
 
-    /** True soft cost of [sample]: the summed weight of every soft in [softs] whose literal
-     *  the sample leaves unsatisfied. */
     fun softCost(sample: Sample, softs: List<Soft>): Long {
         var cost = 0L
         for (s in softs) {
@@ -79,22 +61,9 @@ internal object Oll {
         return cost
     }
 
-    /**
-     * Given a core-guided witness [sample] proved optimal at lower bound [lb], return a sample
-     * whose *true* soft cost equals [lb]. The core-guided relaxer machinery can hand
-     * back a witness whose true cost exceeds [lb] — a spent soft may be relaxed "for free"
-     * by a per-core blocker forced true for another core's sake, so the recovered
-     * assignment violates more softs than the reported bound. Callers that read the
-     * assignment (rather than only the cost) then see a non-optimal sample.
-     *
-     * If the witness already costs exactly [lb] it is returned unchanged. Otherwise this
-     * re-solves the hard problem under an explicit cap on the true cost,
-     * `Σ wᵢ·¬softLitᵢ ≤ lb`, which is feasible (lb is the proven optimum, so a cost-`lb`
-     * model exists) and forces any recovered sample to a cost of exactly [lb].
-     *
-     * Falls back to the original witness when the cost cap can't be represented as an
-     * [Int]-weight [PseudoBoolean] (a weight or [lb] exceeding [Int.MAX_VALUE]).
-     */
+    // A witness can cost more than the proven [lb]: a spent soft may be relaxed by a blocker forced true for another
+    // core. Such a witness is re-solved under the cap `Σ wᵢ·¬softLitᵢ ≤ lb`, falling back to it when the cap does
+    // not fit an Int-weight pseudo-Boolean.
     fun recoverOptimalSample(
         base: BakedProblem,
         softs: List<Soft>,

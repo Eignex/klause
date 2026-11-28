@@ -4,20 +4,12 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.LinearOp
 import com.eignex.util.collections.IntArrayList
 
-/**
- * Convex-hull LP relaxation: a selector column `y_t ∈ [0,1]` per allowed tuple with `Σ_t y_t = 1` and a
- * per-column channel `xs[j] = Σ_t tuple_t[j]·y_t` — the projection onto `xs` is exactly the convex hull
- * of the allowed tuples. A tuple's column exists when every entry is in the root box of its
- * variable and is pinned to 0 when any entry left the live domain. Large tables are skipped. Rows count
- * as [Contribution.HULL].
- *
- * A root box screens the tuples, so over a side the model leaves open an invented endpoint would drop
- * tuples the model allows and the one-hot rows would then refute them — declined there.
- */
+// One selector per allowed tuple, `Σ y(t) = 1`, and a channel per column: the projection onto `xs` is the
+// exact convex hull of the tuples. Root boxes screen the tuples, so an open-sided column is declined: an
+// invented endpoint would drop tuples the model allows.
 internal fun Table.emitLpRelaxation(builder: RelaxationBuilder) {
     if (!builder.hullEnabled()) return
-    // An interval/wildcard cell doesn't pin its variable for that tuple, so the per-tuple channel
-    // would be ill-defined; short tables skip the hull relaxation (propagation still enforces it).
+    // An interval or wildcard cell does not pin its variable, so the per-tuple channel is ill-defined.
     if (hi != null) return
     if (numTuples > MAX_TUPLES) return
     if (!builder.statesBothBounds(xs)) return
@@ -37,8 +29,7 @@ internal fun Table.emitLpRelaxation(builder: RelaxationBuilder) {
             if (v !in live[col]) liveFeasible = false
         }
         if (!rootFeasible) continue
-        // The selector is present while every entry stays in its column's live domain — the
-        // membership conjunction that lets the persistent relaxation re-bind this column.
+        // The membership conjunction lets the persistent relaxation re-bind this column.
         val presence = LongArray(arity * 2)
         for (col in 0 until arity) {
             presence[col * 2] = xs[col].toLong()
@@ -55,9 +46,8 @@ internal fun Table.emitLpRelaxation(builder: RelaxationBuilder) {
         rows.add(t)
     }
     val k = selCols.size
-    if (k == 0) return // no tuple feasible under the root boxes — leave it to propagation
+    if (k == 0) return
     builder.row(selCols.toIntArray(), LongArray(k) { 1L }, LinearOp.EQ, 1L, Contribution.HULL)
-    // xs[col] − Σ_t tuple_t[col]·y_t = 0 for each column.
     for (col in 0 until arity) {
         val cols = IntArray(k + 1)
         val vals = LongArray(k + 1)
@@ -90,5 +80,5 @@ internal suspend fun SequenceScope<Unit>.prepareLpHull(factor: Table, boxes: Roo
     return LpSizeEstimate(cols = numTuples.toLong(), rows = 1L + arity)
 }
 
-/** Tables with more than this many tuples are skipped — the selector columns would dominate. */
+// Larger tables are skipped: their selector columns would dominate the LP.
 private const val MAX_TUPLES: Int = 1024

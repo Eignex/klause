@@ -36,7 +36,7 @@ internal class MiniZincCompileFailure(
     val command: List<String>,
     val elapsedNs: Long,
     val sourceHashes: Map<String, String>,
-    /** Set when the compiler was killed after this many seconds instead of exiting on its own. */
+    // Set when the compiler was killed instead of exiting on its own.
     val timeoutSec: Int? = null,
 ) : IllegalArgumentException(
     if (timeoutSec != null) {
@@ -45,7 +45,7 @@ internal class MiniZincCompileFailure(
         "minizinc compile failed (exit $exitCode): ${diagnostic.take(4000)}"
     },
 ) {
-    /** The source-level reason the compiler rejected this model/data, or null for an infrastructure fault. */
+    // Null for an infrastructure fault.
     val incompatibility: String? = when {
         timeoutSec != null -> COMPILE_TIMEOUT
         infrastructure(exitCode, diagnostic) -> null
@@ -55,8 +55,7 @@ internal class MiniZincCompileFailure(
     companion object {
         const val COMPILE_TIMEOUT = "compile-timeout"
 
-        /** Faults of the environment rather than the source: the compiler died on a signal (crash or OOM kill),
-         *  ran out of memory, could not open a file, or could not load its solver configuration. */
+        // Environment faults: a signal (crash or OOM kill), out of memory, an unopenable file or solver configuration.
         fun infrastructure(exitCode: Int, diagnostic: String): Boolean =
             exitCode !in 1 until 128 || INFRASTRUCTURE.any { it in diagnostic }
 
@@ -67,7 +66,6 @@ internal class MiniZincCompileFailure(
             "Config exception",
         )
 
-        /** Best-effort reason for a source-level compile rejection; `compile-error` when no kind is recognised. */
         fun classify(diagnostic: String): String = when {
             "Error: type error:" in diagnostic -> "type-error"
             "Error: syntax error" in diagnostic -> "syntax-error"

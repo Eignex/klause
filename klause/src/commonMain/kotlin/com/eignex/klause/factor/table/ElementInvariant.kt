@@ -138,8 +138,6 @@ internal class ElementInvariant(
     }
 }
 
-/** Graded degree for hypothetical (idxVal, resultVal); [elemAt] supplies the selected
- *  element's value. */
 internal fun elementDegreeAt(
     idxVal: Long,
     resultVal: Long,

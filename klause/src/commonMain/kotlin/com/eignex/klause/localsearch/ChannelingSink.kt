@@ -7,11 +7,9 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.util.collections.IntHashSet
 
 /**
- * Accumulator that [Invariant.contributeChanneling] appends to while [LocalSearchState] synthesizes a
- * value-driven channeling move. Seeded with the driving `IntSet(intVar, newValue)` (already pinned),
- * it collects the coordinated sibling updates — indicator flips, sum counter-shifts — into the parts
- * of one [Move.Compound]. The pin set guards against two sibling factors proposing conflicting shifts
- * of the same int variable; the first to claim it wins.
+ * Collects the sibling updates [Invariant.contributeChanneling] adds to a value-driven channeling move, seeded with
+ * the driving `IntSet(intVar, newValue)`. The first contributor to pin an int variable owns it, so sibling factors
+ * cannot propose conflicting shifts.
  */
 class ChannelingSink internal constructor(intVar: Int, newValue: Long) {
     private val parts = ArrayList<Move>(INITIAL_PARTS)
@@ -23,8 +21,7 @@ class ChannelingSink internal constructor(intVar: Int, newValue: Long) {
         parts += Move.IntSet(intVar, newValue)
     }
 
-    /** True iff [intVar] is already claimed by the driving move or an earlier contribution, so a
-     *  contributor must not propose another change to it. */
+    /** True iff [intVar] is already claimed, so a contributor must not change it. */
     fun isPinned(intVar: Int): Boolean = intVar in pinned
 
     /** Claim [intVar] so no later contributor shifts it again. */
@@ -81,8 +78,6 @@ class ChannelingSink internal constructor(intVar: Int, newValue: Long) {
         return if (value in domain) value else null
     }
 
-    /** The synthesized move: the bare driving [Move.IntSet] when no contributor added anything, else a
-     *  [Move.Compound] of the driving set plus every contributed part. */
     internal fun toMove(): Move = if (parts.size == 1) parts[0] else Move.Compound(parts)
 
     private companion object {

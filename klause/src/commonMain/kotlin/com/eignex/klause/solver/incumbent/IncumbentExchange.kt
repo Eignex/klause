@@ -31,17 +31,11 @@ sealed interface Publication<out A, out V> {
  * candidates, the exchange verifies them, and a candidate that survives verification *and* strictly improves
  * the standing incumbent is installed under a fresh version.
  *
- * Lock-free — one compare-and-set swaps assignment, objective, and version together, so a reader can never
- * observe an objective that belongs to a different assignment, and a losing publisher is told it lost. That
- * makes it correct under the parallel executor's concurrent writers and free under the sequential one's
- * single writer, without either having to pick a locking discipline.
- *
- * The exchange holds the best only: nothing here retains a superseded incumbent, and [offer] is the only
- * way in.
+ * Lock-free: one compare-and-set swaps assignment, objective and version together, so a reader never sees an
+ * objective of a different assignment and a losing publisher is told it lost. Only the best is retained.
  */
 class IncumbentExchange<A, V>(
-    /** Strict improvement over the standing incumbent: `improves(candidate, standing)`. Must be irreflexive
-     *  and transitive, or the version sequence stops meaning "better". */
+    // `improves(candidate, standing)` must be irreflexive and transitive, or versions stop meaning "better".
     private val improves: (V, V) -> Boolean,
     private val verifier: CandidateVerifier<A, V> = CandidateVerifier.trusting(),
 ) : IncumbentSource<A, V> {

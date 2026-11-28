@@ -8,12 +8,6 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.util.io.openTextFile
 import com.eignex.util.io.useSource
 
-/**
- * XCSP3 front-end (`.xml` / `.xcsp` / `.xcsp3`). Emits the XCSP3 competition output protocol:
- * an `o <cost>` line per improving incumbent, a final `s SATISFIABLE` / `s OPTIMUM FOUND` /
- * `s UNSATISFIABLE` / `s UNKNOWN` status, and a `v <instantiation>` line with named values.
- * `-s` statistics are emitted as `c` comment lines.
- */
 internal object Xcsp3Mode : CliMode {
     override val names = listOf("xcsp3", "xcsp")
     override val extensions = listOf("xml", "xcsp", "xcsp3")
@@ -24,8 +18,7 @@ internal object Xcsp3Mode : CliMode {
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(xcsp3Semantics)
-            // Parsing only reads: the base bake runs as presolve step 0, bounded by the presolve deadline.
-            // The file is streamed into the parser so a huge instance is never fully resident.
+            // Parsing only reads; the base bake runs as presolve step 0, bounded by the presolve deadline.
             val parsed = openTextFile(path).useSource { source ->
                 Xcsp3.parse(source, common.config.problemSettings(), semanticOverrides = overrides)
             }
@@ -51,8 +44,6 @@ internal object Xcsp3Mode : CliMode {
     }
 }
 
-/** Render an XCSP3 competition `v <instantiation>` line: the declared variables (array cells
- *  as `id[i]`) in declaration order paired with their solution values. */
 internal fun renderInstantiation(names: Map<String, Int>, s: Sample): String =
     renderInstantiation(names) { s.intValue(it).toString() }
 
@@ -62,8 +53,6 @@ private fun renderInstantiation(names: Map<String, Int>, intValue: (Int) -> Stri
     return "v <instantiation> <list> $list </list> <values> $values </values> </instantiation>"
 }
 
-/** XCSP3 competition output protocol. Incumbent `o` costs stream live; the final `s` status
- *  and `v` instantiation are emitted together at completion, after the best solution is known. */
 internal class XcspOutput : BufferedBestOutput() {
     override val commentPrefix: String = "c"
     override val streamObjective: Boolean = true
@@ -75,7 +64,7 @@ internal class XcspOutput : BufferedBestOutput() {
         Verdict.UNKNOWN -> "s UNKNOWN"
     }
 
-    // Deliberately omits the clause-learning counters; XCSP comments track search shape only.
+    // XCSP comments track search shape only.
     override fun keepStat(key: String): Boolean = key !in XCSP_OMITTED_KEYS
 
     private companion object {

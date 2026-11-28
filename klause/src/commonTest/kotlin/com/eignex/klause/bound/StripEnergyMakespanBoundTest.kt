@@ -19,10 +19,8 @@ class StripEnergyMakespanBoundTest {
 
     private fun objectiveOf(n: Int): Int = 2 * n + 2
 
-    /**
-     * [n] additions of [duration] on a diffn whose lanes are `1..lanes`: starts `0 until n`, lanes
-     * `n until 2n`, the two last additions' ends `2n` and `2n + 1`, and the objective over those ends.
-     */
+    // Starts `0 until n`, lanes `n until 2n`, the last two additions' ends `2n` and `2n + 1`, and the objective
+    // over those ends.
     @Suppress("LongParameterList")
     private fun additions(
         n: Int,
@@ -52,7 +50,7 @@ class StripEnergyMakespanBoundTest {
         )
     }
 
-    /** Unit tasks `0 until n` on a cumulative, each with `objective − start ≥ 1`; the objective is `n`. */
+    // Unit tasks `0 until n`, each with `objective − start ≥ 1`; the objective is `n`.
     private fun cumulative(n: Int, capacity: Long, openCapacityAbove: Boolean = false): Problem {
         val factors = ArrayList<Factor>()
         val unit = LongArray(n) { 1L }

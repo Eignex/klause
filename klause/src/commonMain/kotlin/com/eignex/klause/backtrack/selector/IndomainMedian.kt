@@ -6,9 +6,8 @@ import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 
 /**
- * Median value (middle of the domain *by position*) first, then alternating outward
- * (`indomain_median`). `IntSpan.valueAt` is sparse-aware, so the median always lands on a
- * present value; differs from [IndomainMiddle] (mean of bounds) when the domain is skewed or holey.
+ * Median value (middle of the domain by position) first, then alternating outward (`indomain_median`).
+ * Differs from [IndomainMiddle] (mean of bounds) on skewed or holey domains.
  */
 object IndomainMedian : ValueSelector {
     override fun fresh() = this
@@ -18,8 +17,8 @@ object IndomainMedian : ValueSelector {
 
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
-            // A non-enumerable domain has no meaningful positional index; the bounds midpoint is the
-            // exact positional median for the shape that dominates there (a hole-free interval).
+            // A non-enumerable domain has no positional index; the bounds midpoint is the exact median of
+            // a hole-free interval.
             val median = if ((d.spanOrNull() == null)) boundsMidpoint(d) else d.values.valueAt(d.values.size / 2)
             centeredDomainValues(d, median)
         }

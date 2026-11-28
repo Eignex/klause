@@ -13,12 +13,10 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongArrayList
 
-/**
- * CP propagator for [Diffn]: a compulsory-part sweep over both axes for the constant-size case
- * (after N. Beldiceanu and M. Carlsson, "Sweep as a Generic Pruning Technique Applied to the
- * Non-overlapping Rectangles Constraint", CP 2001, https://doi.org/10.1007/3-540-45578-7_26), plus a
- * pairwise infeasibility check for the variable-size case.
- */
+// A compulsory-part sweep over both axes for the constant-size case
+// (after N. Beldiceanu and M. Carlsson, "Sweep as a Generic Pruning Technique Applied to the
+// Non-overlapping Rectangles Constraint", CP 2001, https://doi.org/10.1007/3-540-45578-7_26), plus a
+// pairwise infeasibility check for the variable-size case.
 internal class DiffnPropagator(
     val intVars: IntArray,
     private val xs: IntArray,
@@ -44,10 +42,8 @@ internal class DiffnPropagator(
             moved(payload[1], lower = payload[2] == 1, bound = bound)
         }.literals()
 
-    /**
-     * Rectangle origins and compulsory parts as of [atTrail] along one axis ([xAxis] primary), with the literals a
-     * reason over them collects.
-     */
+    // Rectangle origins and compulsory parts as of [atTrail] along one axis ([xAxis] primary), with the literals a
+    // reason over them collects.
     private inner class Region(val state: PropagationState, val atTrail: Int, val atLevel: Int, xAxis: Boolean) {
         private val pos = if (xAxis) xs else ys
         private val size = if (xAxis) widths else heights
@@ -65,11 +61,9 @@ internal class DiffnPropagator(
         private fun ge(v: Int, need: Long) = add(state.boundLiteral(v, true, need, atTrail, atLevel))
         private fun le(v: Int, need: Long) = add(state.boundLiteral(v, false, need, atTrail, atLevel))
 
-        /**
-         * Rectangle [i] can take no origin in primary columns [from]..[to]: every such placement, at every
-         * orthogonal origin it has, meets the compulsory part of another rectangle. Cite those parts that meet
-         * the region it would sweep, and [i]'s orthogonal range.
-         */
+        // Rectangle [i] can take no origin in primary columns [from]..[to]: every such placement, at every
+        // orthogonal origin it has, meets the compulsory part of another rectangle. Cite those parts that meet
+        // the region it would sweep, and [i]'s orthogonal range.
         fun blocked(i: Int, from: Long, to: Long) {
             val pLo = from
             val pHi = to + size[i] - 1
@@ -92,7 +86,7 @@ internal class DiffnPropagator(
             }
         }
 
-        /** [i]'s origin moved to [bound] ([lower]) past columns it could not take. */
+        // [i]'s origin moved to [bound] ([lower]) past columns it could not take.
         fun moved(i: Int, lower: Boolean, bound: Long) {
             if (lower) {
                 ge(pos[i], lo(pos[i]))
@@ -103,7 +97,7 @@ internal class DiffnPropagator(
             }
         }
 
-        /** [i] has no column left: every column of its range is blocked. */
+        // [i] has no column left: every column of its range is blocked.
         fun stuck(i: Int) {
             ge(pos[i], lo(pos[i]))
             le(pos[i], hi(pos[i]))
@@ -151,11 +145,9 @@ internal class DiffnPropagator(
         return collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
     }
 
-    /**
-     * Compulsory-part sweep (constant-size only). When any dimension is variable the size-dependent
-     * bound reasoning does not hold, so only the pairwise check runs: with the *minimum* possible sizes,
-     * if a pair must still overlap on both axes the constraint is infeasible; otherwise no pruning.
-     */
+    // Compulsory-part sweep (constant-size only). When any dimension is variable the size-dependent
+    // bound reasoning does not hold, so only the pairwise check runs: with the *minimum* possible sizes,
+    // if a pair must still overlap on both axes the constraint is infeasible; otherwise no pruning.
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         state.propagatorFailures.remove(this)
         if (varSize) return checkPairOverlaps(state)
@@ -170,12 +162,10 @@ internal class DiffnPropagator(
         return true
     }
 
-    /**
-     * Sweep the primary axis ([pos] / [size]) for every rectangle, tightening its origin to the
-     * first / last column admitting a collision-free orthogonal ([opos] / [osize]) position. A
-     * column's feasibility only changes at the entry / exit of another rectangle's compulsory part,
-     * so it is evaluated once per such breakpoint segment rather than per unit.
-     */
+    // Sweep the primary axis ([pos] / [size]) for every rectangle, tightening its origin to the
+    // first / last column admitting a collision-free orthogonal ([opos] / [osize]) position. A
+    // column's feasibility only changes at the entry / exit of another rectangle's compulsory part,
+    // so it is evaluated once per such breakpoint segment rather than per unit.
     @Suppress("ReturnCount", "NestedBlockDepth", "LongParameterList")
     private fun sweepAxis(
         state: PropagationState,
@@ -266,8 +256,8 @@ internal class DiffnPropagator(
         return true
     }
 
-    /** Whether rectangle [i]'s origin at primary column [x] leaves some orthogonal position clear of
-     *  every other rectangle's compulsory part. */
+    // Whether rectangle [i]'s origin at primary column [x] leaves some orthogonal position clear of
+    // every other rectangle's compulsory part.
     @Suppress("LongParameterList")
     private fun feasibleColumn(
         state: PropagationState,

@@ -37,7 +37,6 @@ internal fun Linear.emitLpRelaxation(
     for (row in linearRows) row.emitLpRelaxation(builder, projection, slack)
 }
 
-/** Emit a wide row as directionally-rounded double outer-relaxation rows. */
 internal fun LinearRow.emitWideLpRelaxation(builder: RelaxationBuilder) =
     emitWideOuterRows(builder, computeWideRounding(this))
 
@@ -62,14 +61,9 @@ private fun LinearRow.emitWideOuterRows(builder: RelaxationBuilder, rounded: Wid
     if (relation == LinearOp.EQ) emitWideOuterRow(builder, rounded, ge = true, split)
 }
 
-/**
- * Which side of zero the model confines each column to, or null when the row cannot be relaxed at all.
- *
- * A coefficient rounds outward on the side its column sits, so the direction is what the row's validity
- * rests on — and a column the model states nothing about on the relevant side has no direction. Such a
- * column would otherwise enter split over its root box, capping it at an endpoint the model never stated;
- * an outer relaxation has no weaker form to fall back on, so the row is declined instead.
- */
+// A coefficient rounds outward on the side of zero its column sits, so a column the model leaves open on
+// that side has no direction. Splitting it over its root box would cap it at an unstated endpoint, so the
+// row is declined (null).
 private fun LinearRow.splitColumns(builder: RelaxationBuilder): WideSplit? {
     val variables = intVars
     val nonNegative = BooleanArray(variables.size)
@@ -90,9 +84,7 @@ private fun LinearRow.splitColumns(builder: RelaxationBuilder): WideSplit? {
     return WideSplit(nonNegative, straddling, plusUpper, minusUpper)
 }
 
-/** Per column of a wide row: the side of zero the model confines it to, and the `x = x⁺ − x⁻` pair a
- *  straddling column is split into — the parts' upper bounds up front, their column handles once
- *  [seat] has created them. */
+// A straddling column is split as `x = x⁺ − x⁻`; the part handles exist only after [seat].
 private class WideSplit(
     private val nonNegative: BooleanArray,
     private val straddling: BooleanArray,
@@ -108,7 +100,6 @@ private class WideSplit(
 
     fun minusUpper(i: Int): Long = minusUpper[i]
 
-    /** Record the `x⁺` / `x⁻` column handles created for straddling column [i]. */
     fun seat(i: Int, plus: Int, minus: Int) {
         plusCol[i] = plus
         minusCol[i] = minus
@@ -120,7 +111,6 @@ private class WideSplit(
 
     fun isNonNegative(i: Int): Boolean = nonNegative[i]
 
-    /** Whether column [i]'s coefficient rounds down on a row read in direction [ge]. */
     fun roundsDown(i: Int, ge: Boolean): Boolean = nonNegative[i] != ge
 }
 

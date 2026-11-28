@@ -16,15 +16,8 @@ import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
-/**
- * A pass's incremental change to the working problem: factors to drop (by stable id), factors to
- * add, and the pass's directly-derived domain tightenings.
- *
- * [domains] carries the pass's own narrowings (a dual-fixed bound, an affine substitution's range) as
- * a full int-domain array, or `null` when the pass leaves domains alone. Tightenings that follow from
- * the kept and added factors are re-derived by re-propagation and need not appear here — listing only
- * what a pass *cannot* have the propagator rediscover keeps the delta minimal and the fixpoint intact.
- */
+// [domains] carries only the pass's own narrowings; tightenings the kept and added factors imply are
+// re-derived by propagation, which keeps the delta minimal.
 internal class PresolveDelta(
     val droppedIds: IntArray = emptyIntArray(),
     val addedFactors: List<Factor> = emptyList(),
@@ -35,27 +28,16 @@ internal class PresolveDelta(
 }
 
 /**
- * Int-variable occurrence index over a pass's live factor list, in `Factor.intVars` CSR layout: the
- * factors mentioning var `v` are the dense indices `flat[offsets(v) until offsets(v + 1)]`, ascending.
- * [PresolveSession] maintains the underlying stable-id lists incrementally and derives this dense view
- * once per firing.
+ * Integer-variable occurrence index over a pass's live factor list in CSR layout: the factors mentioning
+ * `v` are the dense indices `offsets(v) until offsets(v + 1)` of `flat`, ascending.
  */
 class SharedIntOccurrence internal constructor(internal val offsets: IntArray, internal val flat: IntArray)
 
-/**
- * Owns the persistent state of an incremental presolve run so the round engine never rebuilds a
- * `Problem` per firing pass. Holds the working factor set as a stable-id, append-only list (a
- * tombstoned slot becomes `null` and its id is never reused) and one persistent [PropagationState]
- * sized to the original variable count — valid for the whole run because presolve never renumbers
- * variables.
- *
- * A pass emits a [PresolveDelta]; [apply] drops/adds factors and pushes the pass's domain narrowings
- * into the live state, then re-propagates incrementally from just that delta via the existing
- * dirty-variable/watcher machinery. Because the propagators are monotone the greatest fixpoint is
- * unique, so this reaches the same tightened domains a from-scratch bake over the final factor set
- * would — no per-pass `computeBaked`. [materialize] builds the heavyweight solver `Problem` once at
- * the end, with the single renumber/remap.
- */
+// Persistent state of an incremental presolve run, so the round engine never rebuilds a `Problem` per
+// firing pass. Factors live in an append-only stable-id list (dropped slots become null, ids are never
+// reused), and one [PropagationState] serves the whole run because presolve never renumbers variables.
+// [apply] re-propagates from just the delta; the propagators are monotone, so this reaches the same
+// greatest fixpoint a from-scratch bake would. [materialize] builds the solver problem once at the end.
 internal class PresolveSession(
     private val base: BakedProblem,
     private val bakeConfig: BakeConfig = BakeConfig.NONE,
@@ -92,7 +74,6 @@ internal class PresolveSession(
         }
     }
 
-    /** Set once the base bake or a delta re-propagation derives a root contradiction. */
     var infeasible: Boolean = false
         private set
 
@@ -155,7 +136,7 @@ internal class PresolveSession(
         }
     }
 
-    /** Records [id] once per occurrence in [f]'s `Factor.intVars`, matching a from-scratch CSR rebuild. */
+    // Once per occurrence, matching a from-scratch CSR rebuild.
     private fun recordOccurrences(id: Int, f: Factor) {
         for (v in f.intVars) (intOcc[v] ?: IntArrayList(0).also { intOcc[v] = it }).add(id)
     }
@@ -172,37 +153,27 @@ internal class PresolveSession(
     // cannot be replayed (its ids name different factors afterwards), so its holder falls back to a full scan.
     private var reseedEpoch = 0
 
-    /** A read position into the change logs: the counts of adds and drops seen so far. A pass saves one
-     *  after each run and asks for the changes since it on the next, so a firing sees exactly the factors
-     *  other passes changed in between — including across rounds the pass itself was version-skipped. */
+    // A read position into the change logs. A pass saves one after each run, so its next firing sees exactly
+    // the factors other passes changed in between, even across rounds it was version-skipped.
     class ChangeMark internal constructor(internal val added: Int, internal val dropped: Int, internal val epoch: Int)
 
-    /** The current change-log position. */
     fun changeMark(): ChangeMark = ChangeMark(addedLog.size, droppedFactorLog.size, reseedEpoch)
 
-    /** Whether [mark] predates a reseed, so the changes since it can't be replayed and the holder must
-     *  rebuild from the full live set instead of applying an incremental delta. */
     fun markStale(mark: ChangeMark): Boolean = mark.epoch != reseedEpoch
 
-    /** Stable ids of the factors added since [mark], in application order. */
     fun addedIdsSince(mark: ChangeMark): IntArray = IntArray(addedLog.size - mark.added) { addedLog[mark.added + it] }
 
-    /** Stable ids of the occurrences dropped since [mark], in application order. */
     fun droppedIdsSince(mark: ChangeMark): IntArray =
         IntArray(droppedIdLog.size - mark.dropped) { droppedIdLog[mark.dropped + it] }
 
-    /** Stable occurrence ids parallel to the current [passInput] factor list. */
     fun passFactorIds(): IntArray {
         passInput()
         return liveIds
     }
 
-    /** The live factor at stable id [id], or `null` if it was tombstoned. */
     fun factorAt(id: Int): Factor? = factors[id]
 
-    /** Distinct integer variables mentioned by any factor added or dropped since [mark] — the variables
-     *  whose affine candidacy a re-run must re-examine (an untouched variable's factors are unchanged, so
-     *  its candidacy is unchanged since the previous run's fixpoint). */
+    // An untouched variable's factors are unchanged, so its affine candidacy is too.
     fun touchedIntVarsSince(mark: ChangeMark): IntArray {
         val vars = IntHashSet()
         for (i in mark.added until addedLog.size) {
@@ -233,31 +204,20 @@ internal class PresolveSession(
         return false
     }
 
-    /** Live (non-tombstoned) factors in stable-id order — the current working constraint set. */
     fun liveFactors(): List<Factor> = factors.filterNotNull()
 
-    /** Number of live factors. */
     var liveFactorCount: Int = base.factors.size
         private set
 
-    /** Cheap problem-complexity measure: live constraint count plus total int-domain span. Drives the
-     *  round engine's diminishing-returns abort. */
+    // Drives the round engine's diminishing-returns abort.
     fun complexity(): Long = problemComplexity(liveFactorCount, state.intDomains)
 
-    /** The current tightened domain of int var [v] on the persistent state. */
     fun intDomainOf(v: Int): IntDomain = state.intDomains[v]
 
-    /** Current value of bool var [v] on the persistent state, or `null` if still free. */
     fun boolValueOf(v: Int): Boolean? = state.boolValues[v]
 
-    /**
-     * The Booleans the state has fixed, as deductions for a problem built over the live factors.
-     *
-     * A fixing outlives the factors that derived it: a pass can drop every factor that reads a fixed
-     * Boolean while the state keeps its value, and a bake over the live factors alone would read it as
-     * free. Every problem the session builds carries these, as it carries the state's int domains, so a
-     * pass reasons over the same model its delta is propagated against.
-     */
+    // A fixing outlives the factors that derived it, so every problem the session builds carries the fixed
+    // Booleans, as it carries the int domains; a bake over the live factors alone would read them as free.
     private fun boolFixings(): PropagationResult {
         if (infeasible) return PropagationResult.Implied.EMPTY
         val keys = IntArrayList()
@@ -271,11 +231,7 @@ internal class PresolveSession(
         )
     }
 
-    /**
-     * Apply [delta] incrementally: tombstone dropped ids, append added factors, push the pass's domain
-     * narrowings, then re-propagate from just the delta. Returns `false` iff this proved infeasibility
-     * (a conflict on a pushed narrowing or during re-propagation); the session latches [infeasible].
-     */
+    // Returns false iff this proved infeasibility, which latches [infeasible].
     fun apply(delta: PresolveDelta): Boolean {
         if (!delta.isEmpty) inputDirty = true
         updateEntryUnits(delta.droppedIds, delta.addedFactors)
@@ -322,8 +278,7 @@ internal class PresolveSession(
         return ok
     }
 
-    /** Push the per-variable diff of [domains] against the live state through the state's mutation API so
-     *  dependent factors re-wake. Returns false on a conflict, null on interruption. */
+    // Returns false on a conflict, null on interruption.
     private fun pushDomainNarrowings(domains: Array<IntDomain>?): Boolean? {
         if (domains == null) return true
         for (v in domains.indices) {
@@ -340,7 +295,7 @@ internal class PresolveSession(
         return true
     }
 
-    /** Remove current members absent from [target]. Returns false on conflict, null on interruption. */
+    // Returns false on conflict, null on interruption.
     private fun pushInteriorHoles(v: Int, target: IntDomain): Boolean? {
         val current = state.intDomains[v]
         if (unchangedNarrowing(current, target)) return true
@@ -368,12 +323,8 @@ internal class PresolveSession(
         current === target || (current.min == target.min && current.max == target.max &&
             current.holeCount != Long.MAX_VALUE && current.holeCount == target.holeCount)
 
-    /**
-     * A cheap [BakedProblem] for a pass to read: the live factors and the state's current folded domains,
-     * built already-folded so it never bakes or inverts occurrences. The passes read only `factors` and
-     * `intDomains`, so nothing deferred is forced. Records [liveIds] parallel to the returned factor list
-     * so the next [applyDelta] maps the delta's factor indices back to stable ids.
-     */
+    // Built already-folded so it never bakes; passes read only `factors` and `intDomains`. Records [liveIds]
+    // so the next [applyDelta] maps delta indices back to stable ids.
     fun passInput(): BakedProblem {
         cachedInput?.let { if (!inputDirty) return it }
         val live = ArrayList<Factor>(factors.size)
@@ -401,17 +352,13 @@ internal class PresolveSession(
         return input
     }
 
-    /** The int-variable occurrence index over the factor list [passInput] last returned. Derived lazily,
-     *  so passes that never read it pay no O(occurrences) rebuild. Call only after [passInput] (it fixes
-     *  the [liveIds] the dense view is keyed against). */
+    // Call only after [passInput], which fixes the [liveIds] this view is keyed against.
     fun passOccurrence(): SharedIntOccurrence {
         rebuildOccViewIfDirty()
         return requireNotNull(occView)
     }
 
-    /** Derive the dense [SharedIntOccurrence] over the current [liveIds] from the stable-id [intOcc]
-     *  lists when the factor set changed. Ascending stable id maps to ascending dense index, so a var's
-     *  factors come out in the order a from-scratch CSR over `factors` would produce. */
+    // Ascending stable id maps to ascending dense index, matching a from-scratch CSR.
     private fun rebuildOccViewIfDirty() {
         if (!occDirty && occView != null) return
         val denseOf = IntArray(factors.size) { -1 }
@@ -436,11 +383,7 @@ internal class PresolveSession(
         occDirty = false
     }
 
-    /**
-     * Fold a pass's [PassDelta] into the session. Its [PassDelta.droppedIndices] index the factor list
-     * [passInput] last returned, so they are mapped through [liveIds] to stable ids before [apply] (or
-     * [reseedFromDelta] for a widening delta). Returns `false` iff this proved infeasibility.
-     */
+    // Returns false iff this proved infeasibility.
     fun applyDelta(delta: PassDelta): Boolean {
         val stableDropped = IntArray(delta.droppedIndices.size) { liveIds[delta.droppedIndices[it]] }
         // A domain *widen* (dup-columns' aggregate variable) can't be reached by monotone re-propagation,
@@ -454,8 +397,7 @@ internal class PresolveSession(
         return apply(PresolveDelta(stableDropped, delta.addedFactors, delta.domains))
     }
 
-    /** Whether [domains] widens any variable past the live state — a value the state currently excludes
-     *  becomes allowed. Monotone re-propagation only narrows, so a widen needs a [reseedFromDelta] instead. */
+    // Monotone re-propagation only narrows, so a widen needs [reseedFromDelta].
     private fun widensAnyDomain(domains: Array<IntDomain>): Boolean {
         for (v in 0 until base.numIntVars) {
             val cur = state.intDomains[v]
@@ -465,9 +407,8 @@ internal class PresolveSession(
         return false
     }
 
-    /** Rebuild the persistent state over the complete delta domains. A widening runs an eager bake;
-     *  an interrupted installation adopts the sound target restrictions without another bake.
-     *  The output factors are the live factors minus [stableDropped], followed by [added]. */
+    // A widening runs an eager bake; an interrupted installation adopts the sound target restrictions
+    // without another bake.
     private fun reseedFromDelta(
         stableDropped: IntArray,
         added: List<Factor>,
@@ -524,18 +465,13 @@ internal class PresolveSession(
         return true
     }
 
-    /** Capture the live domains as the last-feasible snapshot, taken before a mutation's narrowings so
-     *  that if the mutation proves infeasible the reported domains are the pre-conflict ones. */
+    // Taken before a mutation's narrowings, so an infeasible mutation reports the pre-conflict domains.
     private fun snapshotFeasibleDomains() {
         lastFeasibleDomains = Array(base.numIntVars) { state.intDomains[it] }
     }
 
-    /** Materialize the final solver problem once: the live factors and the tightened int domains. On
-     *  infeasibility the pre-conflict [lastFeasibleDomains] are used; otherwise the state's folded domains.
-     *
-     *  With no root-bake probing enabled the result carries the established domains, Boolean fixings
-     *  and infeasibility without another root bake. Probing requires an eager rebuild over the final
-     *  factor set (a [RootBaker.reseed] the already-folded view would skip), unless already infeasible. */
+    // On infeasibility uses [lastFeasibleDomains]. Probing requires an eager rebuild over the final factor
+    // set ([RootBaker.reseed] skips an already-folded view), unless already infeasible.
     fun materialize(): BakedProblem {
         val domains = if (infeasible) lastFeasibleDomains else Array(base.numIntVars) { state.intDomains[it] }
         if (bakeConfig.anyEnabled && !infeasible) {

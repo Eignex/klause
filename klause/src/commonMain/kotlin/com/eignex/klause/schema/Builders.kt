@@ -88,15 +88,13 @@ fun ifThenElse(cond: BoolTerm, then: IntTerm, otherwise: Int): IntExpr = ifThenE
 fun ifThenElse(cond: BoolTerm, then: Int, otherwise: Int): IntExpr =
     ifThenElse(cond, IntLit(then), IntLit(otherwise))
 
-/** `items[index]` — array element selection (items must be non-empty). */
+/** The element of non-empty [items] at [index]. */
 fun element(index: IntTerm, items: List<IntTerm>): IntExpr {
     require(items.isNotEmpty()) { "element(): items must not be empty" }
     return IntElement(index.toIntExpr(), items.map { it.toIntExpr() })
 }
 
-/**
- * N-ary XOR. Evaluates to true iff an odd number of children are true.
- */
+/** N-ary XOR: true iff an odd number of [children] are true. */
 fun xor(vararg children: BoolTerm): BoolExpr {
     require(children.isNotEmpty()) { "xor: need at least one child" }
     return XorExpr(children.map { it.toExpr() })
@@ -163,11 +161,7 @@ fun cumulative(starts: List<IntTerm>, durations: List<IntTerm>, demands: List<In
         capacity.toIntExpr(),
     )
 
-/**
- * Hamiltonian-cycle constraint on a successor array. Default `valueOffset = 0` matches
- * klause's native 0-indexed convention. Pass `valueOffset = 1` to match MiniZinc/FlatZinc
- * 1-indexed inputs.
- */
+/** Hamiltonian cycle on a successor array whose node numbering starts at [valueOffset]. */
 fun circuit(succ: List<IntTerm>, valueOffset: Int = 0): BoolExpr {
     require(succ.size >= 2) { "circuit(): need at least two nodes" }
     return CircuitExpr(succ.map { it.toIntExpr() }, valueOffset)
@@ -265,8 +259,7 @@ fun allDifferentOpt(terms: List<IntTerm>, presents: List<BoolTerm>): BoolExpr {
     )
 }
 
-/** Cumulative with presence-gated tasks. Absent tasks contribute zero energy and don't
- *  appear in the mandatory profile or edge-finding's Θ-tree. */
+/** Cumulative with presence-gated tasks; absent tasks consume no resource. */
 fun cumulativeOpt(
     starts: List<IntTerm>,
     durations: List<Int>,
@@ -298,7 +291,7 @@ fun disjunctiveOpt(starts: List<IntTerm>, durations: List<Int>, presents: List<B
     )
 }
 
-/** Number of distinct values among the presence-gated subset of xs. */
+/** [n] relates by [mode] to the number of distinct values among the present entries of [xs]. */
 fun nValueOpt(n: IntTerm, xs: List<IntTerm>, presents: List<BoolTerm>, mode: NValueMode = NValueMode.EQ): BoolExpr {
     require(xs.isNotEmpty()) { "nValueOpt: xs must be non-empty" }
     require(presents.size == xs.size) { "nValueOpt: presents must match xs arity" }
@@ -423,10 +416,7 @@ fun costMdd(
     cost = cost.toIntExpr(),
 )
 
-/**
- * Channel an integer variable to a list of Boolean indicators: `bools[i] iff (intVar = offset+i)`
- * for every index `i`. Useful for switching between an integer and a one-hot Boolean encoding.
- */
+/** One-hot channel: `bools(i) ⇔ intVar = offset + i` for every index `i`. */
 fun channel(intVar: IntTerm, bools: List<BoolTerm>, offset: Int = 0): BoolExpr {
     require(bools.isNotEmpty()) { "channel(): need at least one indicator" }
     val intExpr = intVar.toIntExpr()
@@ -439,8 +429,7 @@ fun channel(intVar: IntTerm, bools: List<BoolTerm>, offset: Int = 0): BoolExpr {
 /** All of [xs] take pairwise-distinct values (with a pigeonhole UNSAT guard on bare handles). */
 fun allDifferent(vararg xs: IntTerm): BoolExpr {
     require(xs.size >= 2) { "allDifferent(): need at least two terms" }
-    // Pigeonhole guard: if all operands are bare schema handles, check that the union of their
-    // domains is large enough to host one distinct value per term.
+    // With only bare handles, fail fast when the union of their domains cannot host every term.
     val handles = xs.mapNotNull { it as? IntHandle }
     if (handles.size == xs.size) {
         val unionSize = unionDomainSize(handles.map { it.min to it.max })

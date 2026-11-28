@@ -12,34 +12,22 @@ import kotlin.math.abs
 import kotlin.math.round
 import kotlin.math.sqrt
 
-/** A basic LP value within this of an integer carries no Gomory cut. */
+// A basic LP value within this of an integer carries no Gomory cut.
 private const val TABLEAU_FRAC_TOL = 1e-6
 
-/** Minimum normalized violation at the LP point for a tableau cut to be worth emitting. */
 private const val TABLEAU_MIN_VIOLATION = 1e-4
 
-/** Cap on the distinct divisors tried per fractional row (highest-magnitude coefficients first). */
 private const val MAX_DIVISORS = 32
 
-/**
- * Gomory / MIR tableau cuts via integer-multiplier row aggregation, in 128-bit integer arithmetic.
- *
- * For each basic structural variable with a fractional LP value, the float tableau row `ρ = B⁻ᵀeᵢ` is
- * rounded to integer multipliers at a power-of-two scale ([roundDuals]). Aggregating the original
- * problem rows with those multipliers gives one exact, valid integer constraint
- * `Σₖ gₖ zₖ + Σ_{≤-row r} w_r s_r = H` over the shifted structural columns `zₖ ∈ [0, uₖ]` and the
- * non-negative `≤`-row slacks `s_r` (valid for any integer multipliers, since the rows are
- * equalities in slack form). A super-additive rounding function `f` — `⌊·/d⌋` for Chvátal–Gomory, the
- * mixed-integer-rounding function for [mir] — yields the valid inequality `Σ f(gₖ) zₖ + Σ f(w_r) s_r ≤
- * f(H)`; back-substituting `s_r = rhs_r − Σₖ A_{rk} zₖ` (exact, an equality) expresses it over the
- * structural columns alone. The divisor `d` is searched for the one whose cut is most violated at the
- * LP point. Every step is integer / [Int128]; an overflow or a non-violated result drops that
- * candidate, so the returned cuts are always rigorously valid.
- *
- * Gomory, "Outline of an algorithm for integer solutions to linear programs", Bull. AMS 64, 1958,
- * https://doi.org/10.1090/S0002-9904-1958-10224-4; MIR after Marchand and Wolsey, "Aggregation and mixed
- * integer rounding to solve MIPs", Oper. Res. 49(3), 2001, https://doi.org/10.1287/opre.49.3.363.11211.
- */
+// For each fractional basic structural variable, the float tableau row ρ = B⁻ᵀeᵢ is rounded to integer multipliers
+// at a power-of-two scale ([roundDuals]). Aggregating the original rows with them gives an exact integer equality
+// Σₖ gₖ zₖ + Σ_{≤-row r} w_r s_r = H over shifted columns zₖ ∈ [0, uₖ] and nonnegative ≤-row slacks s_r. A
+// super-additive f (⌊·/d⌋ for Chvátal–Gomory, the MIR function for [mir]) gives Σ f(gₖ) zₖ + Σ f(w_r) s_r ≤ f(H);
+// substituting s_r = rhs_r − Σₖ A_{rk} zₖ leaves only structural columns. The divisor d maximizing violation wins.
+// Every step is exact in [Int128]; an overflow or a non-violated result drops the candidate, so cuts are valid.
+// Gomory, "Outline of an algorithm for integer solutions to linear programs", Bull. AMS 64, 1958,
+// https://doi.org/10.1090/S0002-9904-1958-10224-4; MIR after Marchand and Wolsey, "Aggregation and mixed
+// integer rounding to solve MIPs", Oper. Res. 49(3), 2001, https://doi.org/10.1287/opre.49.3.363.11211.
 @Suppress("CyclomaticComplexMethod", "LongMethod", "NestedBlockDepth")
 internal fun integerTableauCuts(
     model: LpModel,
@@ -165,15 +153,14 @@ private class IntegerTableauInput(
     }
 }
 
-/** Aggregated coefficient `gₖ = Σ_r w_r·A_{rk}` of structural column [k] (exact, [Int128]). */
+// gₖ = Σ_r w_r·A_{rk}.
 private fun aggregatedColumn(input: IntegerTableauInput, w: LongArray, k: Int): Int128 {
     val g = Int128()
     input.forEachCoefficient(k) { r, a -> g.addProduct(w[r], a) }
     return g
 }
 
-/** `⌊ H/d ⌋`-shaped super-additive transform of [a] under divisor [d] with remainder [f0]: `⌊a/d⌋` for
- *  Chvátal–Gomory, `(d−f0)·⌊a/d⌋ + max(0, (a mod d) − f0)` (scaled MIR) when [mir]. Null on overflow. */
+// ⌊a/d⌋ for Chvátal–Gomory, (d−f0)·⌊a/d⌋ + max(0, (a mod d) − f0) (scaled MIR) when [mir]. Null on overflow.
 private fun superAdditive(a: Int128, d: Long, f0: Long, mir: Boolean): Long? {
     val floor = a.floorDivPositive(d) ?: return null
     if (!mir) return floor
@@ -187,7 +174,6 @@ private fun superAdditive(a: Int128, d: Long, f0: Long, mir: Boolean): Long? {
     return if (t.fitsLong()) t.toLong() else null
 }
 
-/** Build the most-violated valid cut over all candidate divisors for the aggregation [w], or null. */
 @Suppress("LongMethod", "ReturnCount")
 private fun bestRoundedCut(
     input: IntegerTableauInput,
@@ -305,8 +291,7 @@ private fun bestRoundedCut(
     return best
 }
 
-/** Turn the `≤` cut `Σ vals_k·z_k ≤ rhsLe` (shifted columns) into klause's `Σ a_k·x_k ≥ b` form,
- *  unshifting `z_k = x_k − lo_k` and gcd-reducing; null if a coefficient or the rhs overflows `Long`. */
+// Unshifts z_k = x_k − lo_k, negates into ≥ form and gcd-reduces; null when a coefficient or the rhs overflows Long.
 private fun emitGeCut(
     input: IntegerTableauInput,
     cols: IntArrayList,
@@ -344,7 +329,7 @@ private fun emitGeCut(
         slack = roundingCutSlack(provenance))
 }
 
-/** `⌈ a / b ⌉` for `b > 0`. */
+// b > 0.
 private fun ceilDiv(a: Long, b: Long): Long {
     val q = a / b
     val r = a % b

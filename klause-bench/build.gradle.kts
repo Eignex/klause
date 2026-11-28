@@ -11,7 +11,6 @@ plugins {
 
 eignexBuild { jvmToolchain.set(25) }
 
-// Internal tooling module: use the build conventions but never publish.
 eignexPublish {
     publish.set(false)
 }
@@ -82,14 +81,13 @@ dependencies {
     implementation(project(":klause"))
     implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.21")
     testImplementation("org.junit.jupiter:junit-jupiter")
-    // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to read them.
+    // SolveStats exposes kumulant summary types.
     implementation("com.eignex:kumulant:0.3.4-20261116.231003-146")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     implementation("org.tukaani:xz:1.12")
     implementation("org.apache.commons:commons-compress:1.28.0")
     implementation("com.github.luben:zstd-jni:1.5.7-24")
-    // runBlocking + Flow.collect bridge for the suspend Portfolio API in the anytime metric.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 }
 
@@ -130,8 +128,7 @@ tasks.named<Test>("test") {
     systemProperty("klause.bench.cliHarness", cliHarnessDirectory.get().asFile.absolutePath)
 }
 
-/** Forward `-Dklause.*` props into the JavaExec child JVM so callers can tune any bench knob
- *  from the gradle invocation. doFirst keeps the property snapshot config-cache safe. */
+// Forwards `-Dklause.*` props to the child JVM; doFirst keeps the property snapshot config-cache safe.
 fun JavaExec.forwardBenchProps() {
     doFirst {
         for ((k, v) in System.getProperties()) {
@@ -141,7 +138,7 @@ fun JavaExec.forwardBenchProps() {
     }
 }
 
-/** Runs a bench command from the source tree: `./gradlew :klause-bench:bench --args="select suite=…"`. */
+// Runs a bench command from the source tree: `./gradlew :klause-bench:bench --args="select suite=…"`.
 tasks.register<JavaExec>("bench") {
     group = "bench"
     description = "Run a bench command. Use --args=\"help\" to list them."

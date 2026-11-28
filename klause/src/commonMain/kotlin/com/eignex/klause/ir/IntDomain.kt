@@ -4,19 +4,17 @@ import com.eignex.klause.ir.intdomain.AbstractIntDomain
 import com.eignex.klause.ir.intdomain.ContiguousDomain
 import kotlin.random.Random
 
-/** Primitive-`Long` visitor for the `IntDomain` iteration methods. A `fun interface` (not
- *  `(Long) -> Unit`) so each value is passed as a primitive `long` with no boxing on the per-value
- *  propagation hot paths; lambdas convert at the call site via SAM conversion. */
+/** Primitive-`Long` visitor for the `IntDomain` iteration methods; a `fun interface` rather than
+ *  `(Long) -> Unit` so values are not boxed on propagation hot paths. */
 fun interface IntConsumer {
     /** Receive one domain [value] from an `IntDomain` iteration. */
     fun accept(value: Long)
 }
 
 /**
- * Integer-variable domain: conceptually a finite set of integers. Physically it is one of a small,
- * fixed family of concrete representations (in `com.eignex.klause.ir.intdomain`), each chosen at
- * construction so storage and the hot membership / iteration paths stay compact regardless of how
- * wide the declared span is:
+ * Integer-variable domain: a finite set of integers, stored as one of a fixed family of
+ * representations chosen at construction so storage and the hot paths stay compact however wide the
+ * declared span is:
  *
  *  - [com.eignex.klause.ir.intdomain.ContiguousDomain] — `(min..max)` with no holes; everything
  *    is O(1).
@@ -24,26 +22,16 @@ fun interface IntConsumer {
  *    (`<=` [DomainStorageSettings.bitsetThreshold]); membership is an O(1) bit test
  *    at any density.
  *  - [com.eignex.klause.ir.intdomain.RunsDomain] — a sorted list of disjoint present runs;
- *    membership O(log runs), storage O(runs). The wide-span rep for relatively few runs (few holes,
- *    or clustered survivors).
+ *    membership O(log runs), storage O(runs).
  *  - [com.eignex.klause.ir.intdomain.SurvivorsDomain] — the sorted present values; membership
- *    O(log survivors), storage O(survivors). The escape for scattered survivor sets and the
- *    alternating "comb", where a run list would cost ~2 ints per survivor.
+ *    O(log survivors), storage O(survivors), for scattered survivors where a run list would cost
+ *    ~2 ints per survivor.
  *
- * The run and survivor reps together keep both storage and the hot paths **independent of the
- * declared span**: a "sorted hole list" (complement) rep degenerates to O(span) storage and
- * cache-thrashing binary searches once a wide domain is carved down to a small reachable set —
- * a pathological throughput cliff. Between them every wide shape stays O(min(holes, survivors)).
+ * Between them every wide shape stays O(min(holes, survivors)), independent of the declared span.
  *
- * **Representation choice** — construct via the factories (`IntDomain(min, max)` for the contiguous
- * case; the internal `intDomainFrom*` factories pick the wide rep): a single run ⇒ contiguous; span
- * `<=` [DomainStorageSettings.bitsetThreshold] ⇒ bitset; otherwise the run list when
- * it is at least as compact as the survivor list (`2·runs <= survivors`); a bitset when no larger than
- * the survivor list (`2·words <= survivors`); else the survivor list.
- * Domains are immutable, so every mutation returns a fresh value and re-picks — no flip-flop cost.
- *
- * Callers depend only on this interface and `IntDomain(min, max)`; the concrete reps are an
- * implementation detail.
+ * A single run is contiguous; span `<=` [DomainStorageSettings.bitsetThreshold] is a bitset; otherwise
+ * the run list when `2·runs <= survivors`, a bitset when `2·words <= survivors`, else the survivor list.
+ * Domains are immutable, so every mutation returns a fresh value and re-picks the representation.
  */
 interface IntDomain {
     /** Inclusive lower bound; always an in-domain value. May exceed 32-bit range. */
@@ -52,10 +40,8 @@ interface IntDomain {
     /** Inclusive upper bound; always an in-domain value. May exceed 32-bit range. */
     val max: Long
 
-    /** Number of interior holes: values strictly between [min] and [max] that are absent. O(1) or
-     *  O(runs) and span-independent — it never walks the gap value by value. Zero for a contiguous
-     *  domain; saturates at [Long.MAX_VALUE]. The dual of the value count, for
-     *  callers deciding whether iterating holes or members is cheaper. */
+    /** Number of absent values strictly between [min] and [max], saturating at [Long.MAX_VALUE].
+     *  O(1) or O(runs); it never walks the gap value by value. */
     val holeCount: Long
 
     /** True iff [value] lies in the domain. */
@@ -69,8 +55,7 @@ interface IntDomain {
      * Return a domain with every value in [values] excluded, `this` if none are present
      * (idempotent), or `null` when excluding them all would empty the domain. [values] must be
      * sorted ascending and distinct; entries outside `min..max` or already absent are ignored.
-     * Merges in a single pass keeping survivors — O(present + values), span-independent for the
-     * wide reps. Only the value *set* is contractual; the resulting rep is an implementation detail.
+     * O(present + values), span-independent for the wide reps.
      */
     fun excludeValues(values: LongArray): IntDomain?
 
@@ -84,8 +69,7 @@ interface IntDomain {
 
     /**
      * Inverse of an interior [excludeValue]: put [value] (strictly inside `min..max` and currently
-     * absent) back into the domain. Exists for the undo journal — an interior carve is journaled as
-     * the carved value alone instead of a full prior-domain snapshot.
+     * absent) back into the domain, so the undo journal records an interior carve as the value alone.
      */
     fun includeInteriorValue(value: Long): IntDomain
 
@@ -98,11 +82,8 @@ interface IntDomain {
     fun spanOrNull(maxValues: Long = Int.MAX_VALUE.toLong()): IntSpan?
 
     /**
-     * This domain's values, or a failure when it has too many to enumerate.
-     *
-     * For a caller whose constraint only makes sense over an enumerable domain — a table, a value
-     * graph, an all-different — so the requirement is stated once at the top of the operation rather
-     * than re-derived per access. Prefer [spanOrNull] wherever declining is a real option.
+     * This domain's values, or a failure when it has too many to enumerate. Prefer [spanOrNull]
+     * wherever declining is a real option.
      */
     fun span(): IntSpan = spanOrNull() ?: error("domain [$min, $max] holds too many values to enumerate")
 
@@ -110,11 +91,8 @@ interface IntDomain {
     val isFixed: Boolean get() = min == max
 
     /**
-     * Number of present values, saturating at [Long.MAX_VALUE] when a `Long` cannot count them.
-     *
-     * A magnitude, not an enumeration: exact for enumerable survivor sets regardless of span.
-     * It also answers for wider domains where [spanOrNull] declines. Callers ordering domains by size, or
-     * comparing two domains' value counts, want this rather than a span they cannot obtain.
+     * Number of present values, saturating at [Long.MAX_VALUE] when a `Long` cannot count them. Answers
+     * also where [spanOrNull] declines.
      */
     val valueCount: Long get() {
         val span = max - min
@@ -128,13 +106,12 @@ interface IntDomain {
      *  No-op for a contiguous domain. */
     fun forEachHole(action: IntConsumer)
 
-    /** Invoke [action] for each value in `[lo, hi]` carved *out* of the domain (an interior hole),
-     *  ascending, clamped to `[min, max]`. Span-independent for the wide reps — it walks the
-     *  runs / survivors crossed, not every integer in the range. */
+    /** Invoke [action] for each interior hole in `[lo, hi]`, ascending, clamped to `[min, max]`.
+     *  Walks only the runs or survivors crossed, not every integer in the range. */
     fun forEachHoleInRange(lo: Long, hi: Long, action: IntConsumer)
 
     /** Nearest in-domain value to [value]: clamps to the bounds, then snaps an interior hole to the
-     *  closest present value (ties toward the smaller). Identity on the contiguous fast path. */
+     *  closest present value (ties toward the smaller). */
     fun clamp(value: Long): Long = when {
         value <= min -> min
 
@@ -191,8 +168,7 @@ interface IntDomain {
         return ans
     }
 
-    /** Factory for `IntDomain`; the bitset/wide-rep cutoff is
-     *  [DomainStorageSettings.bitsetThreshold]. */
+    /** Factory for `IntDomain`. */
     companion object {
         /** Construct the contiguous domain `(min..max)`. */
         operator fun invoke(
@@ -203,17 +179,9 @@ interface IntDomain {
     }
 }
 
-/**
- * The values of a domain whose constraint only holds over an enumerable one — a table, a value graph,
- * an all-different. Fails loudly on a domain too wide to walk. A caller that can decline instead should
- * ask `IntDomain.spanOrNull`.
- */
+/** The values of an enumerable domain; fails on one too wide to walk. Callers that can decline use `spanOrNull`. */
 val IntDomain.values: IntSpan get() = span()
 
-/**
- * Smallest in-domain value at or above [value], or null when [value] exceeds [IntDomain.max]. An interior
- * hole rounds up to the next present value, located without walking the gap.
- */
 internal fun IntDomain.ceilingOrNull(value: Long): Long? = when {
     value <= min -> min
     value > max -> null
@@ -221,10 +189,6 @@ internal fun IntDomain.ceilingOrNull(value: Long): Long? = when {
     else -> higher(value)
 }
 
-/**
- * Largest in-domain value at or below [value], or null when [value] is below [IntDomain.min]. An interior
- * hole rounds down to the previous present value, located without walking the gap.
- */
 internal fun IntDomain.floorOrNull(value: Long): Long? = when {
     value >= max -> max
     value < min -> null
@@ -235,10 +199,8 @@ internal fun IntDomain.floorOrNull(value: Long): Long? = when {
 /**
  * A uniformly random value of the domain, never a hole.
  *
- * Indexes the values when they can be indexed. A wider domain has no index space that reaches past
- * its first 2^31 values, so it is sampled over the bounds and snapped to the nearest present value
- * instead — approximately uniform rather than exactly so, which is what a randomized restart or an
- * initial assignment wants from a domain it cannot enumerate.
+ * A domain too wide to index is sampled over the bounds and snapped to the nearest present value, so
+ * it is only approximately uniform.
  */
 fun IntDomain.randomValue(rng: Random): Long {
     val indexable = spanOrNull()
@@ -251,11 +213,9 @@ fun IntDomain.randomValue(rng: Random): Long {
 /**
  * The values of an `IntDomain`, in ascending order, when there are few enough of them to index.
  *
- * Separate from `IntDomain` on purpose. A domain knows its bounds and its holes however wide it is,
- * while enumeration is only meaningful when the present values can be addressed by an `Int` index —
- * so a caller that walks values must obtain this first and handle its absence, rather than checking a
- * predicate and hoping. Obtained from `IntDomain.spanOrNull`; the domain returns itself, so holding a
- * span allocates nothing and keeps the packed representation.
+ * Separate from `IntDomain` because enumeration is only meaningful when the present values fit an
+ * `Int` index, so a caller that walks values must obtain this first and handle its absence. Obtained
+ * from `IntDomain.spanOrNull`; the domain returns itself, so holding a span allocates nothing.
  */
 interface IntSpan {
     /** Number of values, exact. */

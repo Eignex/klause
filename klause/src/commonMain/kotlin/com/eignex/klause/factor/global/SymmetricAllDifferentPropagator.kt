@@ -5,7 +5,6 @@ import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 
-/** CP propagation logic for `symmetric_all_different`. */
 internal class SymmetricAllDifferentPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,
@@ -13,8 +12,7 @@ internal class SymmetricAllDifferentPropagator(
     private val indexOffset: Int,
 ) : Propagator {
 
-    // Reads only bounds: an interior hole moves no bound and fixes nothing (fixing collapses both bounds),
-    // so interior `VALUE_REMOVED` wakes are skipped.
+    // Reads only bounds, so interior value removals need no wake.
     override val initialIntEventWatches: IntArray = run {
         val distinct = intVars.toHashSet()
         val out = IntArray(distinct.size * 2)

@@ -17,8 +17,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 /**
  * `auxBoolVar ↔ ([min] ≤ #true [literals] ≤ [max])`. Created by the compiler when a
  * [com.eignex.klause.model.CardinalityExpr] / `AtMost` / `AtLeast` appears non-top-level so the
- * Tseitin lowering can treat its truth as a Boolean literal. Payload at `longPayload(factorId)`
- * is the count of true literals, mirrored from `Cardinality`.
+ * Tseitin lowering can treat its truth as a Boolean literal.
  */
 class ReifiedCardinality(override val auxBoolVar: Int, val literals: IntArray, val min: Int, val max: Int) :
     ReifiedFactor {

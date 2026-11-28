@@ -23,17 +23,8 @@ import com.eignex.util.numbers.CheckedLongOverflowException
 import kotlin.math.ceil
 import kotlin.math.floor
 
-/**
- * Objective shaving: raise the proven lower bound on an ascending
- * (minimized) [objectiveVar] by probing. Assume `objectiveVar ≤ v` in a fresh root session and, if the
- * sound propagation + LP relaxation proves that infeasible — `pruneNode` run with an *infinite*
- * incumbent, so it fires only on a genuine (Farkas-certified / propagation) infeasibility, never on
- * bound dominance — conclude `objectiveVar ≥ v + 1` and step `v` up. Returns the improved bound (the
- * largest `v + 1` proven), or null when nothing shaves or the objective is not a single ascending
- * variable. **Sound:** every raise is backed by a proof that all lower values are infeasible; the caller
- * tightens the search's objective lower bound to the returned value. Bounded by [SHAVE_MAX_ITERS] and
- * [token].
- */
+// Probes use `pruneNode` at an infinite incumbent, so they fire only on genuine infeasibility, never on
+// bound dominance. Returns the largest proven `v + 1`, or null when nothing shaves.
 internal fun LpEngine.shaveObjectiveLb(objectiveVar: Int, ascending: Boolean, token: ExecutionControl): Long? {
     if (!ascending || objectiveVar < 0 || lpRelaxer == null) return null
     val root = PropagationSession(problem)
@@ -44,8 +35,6 @@ internal fun LpEngine.shaveObjectiveLb(objectiveVar: Int, ascending: Boolean, to
     while (iters++ < SHAVE_MAX_ITERS && !token()) {
         val s = PropagationSession(problem)
         if (s.isUnsatAtRoot) break
-        // objectiveVar ≤ candidate infeasible (propagation Unsat, or LP infeasible at an infinite bound)
-        // ⇒ every solution has objectiveVar ≥ candidate + 1.
         val infeasible = s.implyIntAtMost(objectiveVar, candidate) is PropagationResult.Unsat ||
             pruneNode(s, Double.POSITIVE_INFINITY, objectiveVar, ascending)
         if (!infeasible) break
@@ -55,17 +44,9 @@ internal fun LpEngine.shaveObjectiveLb(objectiveVar: Int, ascending: Boolean, to
     return improved
 }
 
-/** A proven-tighter domain for an integer variable from variable shaving: `varId ∈ [lo, hi]`. */
 internal class ShavedBound(val varId: Int, val lo: Long, val hi: Long)
 
-/**
- * Variable shaving: tighten integer variables' domain bounds
- * by probing. For each variable assume `v ≤ lo` (resp. `v ≥ hi`) and, if the sound propagation + LP
- * relaxation proves that infeasible (`pruneNode` at an *infinite* incumbent, firing only on genuine
- * infeasibility), raise `lo` (lower `hi`). Returns the variables whose declared bounds shaved inward,
- * for the caller to apply to the root. **Sound:** each tightening is backed by a proof that the
- * shaved-off values are infeasible. Bounded by [SHAVE_MAX_ITERS] total probes across all variables.
- */
+// Same probe as shaveObjectiveLb per variable side; SHAVE_MAX_ITERS bounds the total across variables.
 internal fun LpEngine.shaveVariableBounds(token: ExecutionControl): List<ShavedBound> {
     if (lpRelaxer == null) return emptyList()
     val root = PropagationSession(problem, token)
@@ -94,22 +75,11 @@ internal fun LpEngine.shaveVariableBounds(token: ExecutionControl): List<ShavedB
 }
 
 /**
- * Factor indices of [Linear] `≤`, `≥` and `=` constraints the LP relaxation proves redundant — implied by
- * the *other* constraints, so dropping them preserves the solution set. For a candidate `a·x ≤ b`, the
- * relaxation of the others (a fresh problem omitting this one and any already dropped) is maximised over
- * `a·x`; a *safe upper bound* on that maximum at or below `b` certifies redundancy (Neumaier and
- * Shcherbina, "Safe bounds in linear and mixed-integer linear programming", Math. Program. 2004,
- * https://doi.org/10.1007/s10107-003-0433-3). `≥` uses the safe minimum, and `=` needs both. The safe
- * bound over-estimates the true maximum, so `≤ b` guarantees no feasible point can violate the constraint
- * — sound; a too-loose bound only misses a removal, never makes a wrong one. Sound regardless of the
- * folded domains: the harvested problem keeps them (shaving only tightens), so a dropped row's effect
- * persists in the bounds. Sequential: each drop is judged against the constraints still kept, so two
- * mutually-implied constraints are never both removed (implication is transitive). Bounded by
- * [SHAVE_MAX_ITERS] and [token].
- *
- * The maximisation uses the primal pass ([LpSolver.solvePrimal], phase-1 included): the dual simplex
- * cannot optimise this `−a·x` objective (it leaves the dual-feasible start, so [LpSolver.solve]
- * returns the trivial point). A failed/unbounded primal solve just keeps the constraint.
+ * A candidate `a·x ≤ b` is redundant when a safe upper bound on `a·x` over the constraints still kept is at
+ * most `b` (Neumaier and Shcherbina, "Safe bounds in linear and mixed-integer linear programming", Math.
+ * Program. 2004, https://doi.org/10.1007/s10107-003-0433-3); `≥` uses the safe minimum and `=` needs both.
+ * Judging each drop against the kept constraints means two mutually implied rows are never both removed.
+ * The maximisation needs the primal pass ([LpSolver.solvePrimal]); the dual simplex cannot optimise it.
  */
 internal fun LpEngine.redundantConstraints(token: ExecutionControl): List<Int> {
     if (lpRelaxer == null) return emptyList()
@@ -122,10 +92,8 @@ internal fun LpEngine.redundantConstraints(token: ExecutionControl): List<Int> {
         val row = f.integerConstants ?: continue
         probes++
         val kept = problem.factors.filterIndexed { idx, _ -> idx != i && !removed.contains(idx) }
-        // The probe keeps this model's columns and states only which rows it carries, so it goes through
-        // the source rewrite: restating the integer boxes alone drops the LP-only continuous namespace,
-        // and a kept row addressing a real column then has no column to address. The declared value sets
-        // and open-side marks ride along for the same reason — nothing here is entitled to change them.
+        // The source rewrite keeps the real columns, declared value sets and open-side marks that a kept
+        // row may address; restating the integer boxes alone would drop them.
         val others = problem.withFactors(kept.toTypedArray())
         val a = LongArray(problem.numIntVars)
         for (k in f.vars.indices) a[f.vars[k]] += row.coeff(k)
@@ -145,15 +113,9 @@ internal fun LpEngine.redundantConstraints(token: ExecutionControl): List<Int> {
     return removed.toIntArray().also(IntArray::sort).toList()
 }
 
-/**
- * Linear equalities the LP proves implied — a two-term difference `±(x − y)` pinned by the relaxation to
- * a single integer `c`. Returns them as [Linear] `= c` factors for the affine-elimination pass to fold
- * out (substituting `x` for `y + c`), shrinking the variable space, not just the constraint set. Sound:
- * the safe min/max bracket every integer-feasible value, so a single integer inside them means every
- * integer-feasible point shares that value. Candidates are existing two-term unit-difference rows (so
- * the pair is already coupled — no `O(n²)` pair scan); each pair is probed once. Bounded by
- * [SHAVE_MAX_ITERS] and [token].
- */
+// Two-term unit differences `±(x − y)` whose safe min/max bracket holds exactly one integer `c`, returned as
+// `= c` rows for affine elimination. Candidates are existing unit-difference rows, avoiding an O(n²) pair
+// scan.
 internal fun LpEngine.impliedEqualities(token: ExecutionControl): List<Linear> {
     if (lpRelaxer == null) return emptyList()
     val out = ArrayList<Linear>()
@@ -165,7 +127,7 @@ internal fun LpEngine.impliedEqualities(token: ExecutionControl): List<Linear> {
         val row = f.integerConstants ?: continue
         val c0 = row.coeff(0)
         val c1 = row.coeff(1)
-        if (!((c0 == 1L && c1 == -1L) || (c0 == -1L && c1 == 1L))) continue // a unit difference ±(v0 − v1)
+        if (!((c0 == 1L && c1 == -1L) || (c0 == -1L && c1 == 1L))) continue
         val v0 = f.vars[0]
         val v1 = f.vars[1]
         if (v0 == v1 || !probed.add((minOf(v0, v1).toLong() shl Int.SIZE_BITS) or maxOf(v0, v1).toLong())) continue
@@ -175,7 +137,6 @@ internal fun LpEngine.impliedEqualities(token: ExecutionControl): List<Linear> {
         e[v1] = c1
         val lo = safeMin(problem, e, token) ?: continue
         val hi = safeMax(problem, e, token) ?: continue
-        // The difference is an integer in [lo, hi]; when exactly one integer fits, it is pinned to it.
         val cLo = ceil(lo - EQ_PIN_TOL)
         if (cLo != floor(hi + EQ_PIN_TOL) || !cLo.isFinite()) continue
         out.add(Linear(longArrayOf(c0, c1), intArrayOf(v0, v1), LinearOp.EQ, cLo.toLong()))
@@ -183,10 +144,7 @@ internal fun LpEngine.impliedEqualities(token: ExecutionControl): List<Linear> {
     return out
 }
 
-/** Lower bound on `min(coeffs·x)` over [prob]'s base relaxation ([objectiveLowerBound]), or null when it is
- *  empty / infeasible / unbounded / fails. Uses
- *  the primal pass: the dual simplex cannot optimise an arbitrary objective (it leaves its dual-feasible
- *  start). */
+// Uses the primal pass: the dual simplex cannot optimise an arbitrary objective from its dual-feasible start.
 private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: ExecutionControl): Double? {
     val selected = projections?.forEngineView(prob)
     val session = PropagationSession(if (selected == null) PropagationProblem(prob)
@@ -216,13 +174,10 @@ private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: ExecutionC
     return lower + relaxation.objectiveConstant.toDouble()
 }
 
-/** Safe upper bound on `max(coeffs·x)` over [prob] — `max(c·x) = −min(−c·x)`, so [safeMin] of the negated
- *  objective negated back. Null on the same failure cases. */
 private fun LpEngine.safeMax(prob: Problem, coeffs: LongArray, token: ExecutionControl): Double? =
     safeMin(prob, LongArray(coeffs.size) { -coeffs[it] }, token)?.let { -it }
 
-/** Safe lower bound on `min(coeffs·x)` built straight from the *declared* domains ([RootDomains]) with no
- *  [PropagationSession] bake — the no-bake analog of [safeMin], for pre-bake OBBT on wide domains. */
+// Builds from the declared domains without the O(span) bake, for pre-bake OBBT on wide domains.
 private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: ExecutionControl): Double? {
     val relaxation = try {
         primalRelaxer(LinearObjective(intCoefficients = coeffs)).build(RootDomains(problem), cancellation = token)
@@ -249,20 +204,11 @@ private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: ExecutionControl): 
     return lower + relaxation.objectiveConstant.toDouble()
 }
 
-/** Safe upper bound on `max(coeffs·x)` over the declared domains — `max = −min(−·)`. See [safeMinNoBake]. */
 private fun LpEngine.safeMaxNoBake(coeffs: LongArray, token: ExecutionControl): Double? =
     safeMinNoBake(LongArray(coeffs.size) { -coeffs[it] }, token)?.let { -it }
 
-/**
- * Optimisation-based bound tightening with no bake: for each integer variable, the safe LP min / max of
- * the variable over the root relaxation built from the declared domains ([RootDomains]) tightens its
- * `[lo, hi]`. One LP solve per bound yields the tightened value *regardless of the domain span* — unlike
- * [shaveVariableBounds]'s unit-step SAC (which shaves at most [SHAVE_MAX_ITERS] units in total), so it
- * collapses in one solve a wide clamped domain the root bake would otherwise grind down one step per
- * round (O(span)). **Sound:** the safe bound over/under-estimates the LP's optimum over the integer
- * points, so no feasible value is removed. Bounded by [OBBT_MAX_VARS] variables, spent on the widest
- * domains first — see [widestFirst].
- */
+// Optimisation-based bound tightening from the declared domains: one LP solve per bound, independent of
+// the domain span, where the root bake would grind a wide domain down one step per round.
 internal fun LpEngine.rootLpBoundsNoBake(token: ExecutionControl, minimumSpan: Long = 0L): List<ShavedBound> {
     if (lpRelaxer == null || token()) return emptyList()
     val n = problem.numIntVars
@@ -276,19 +222,14 @@ internal fun LpEngine.rootLpBoundsNoBake(token: ExecutionControl, minimumSpan: L
         val coeffs = LongArray(n).also { it[v] = 1L }
         val lo = safeMinNoBake(coeffs, token)?.let { ceil(it - EQ_PIN_TOL).toLong() }?.coerceAtLeast(d.min) ?: d.min
         val hi = safeMaxNoBake(coeffs, token)?.let { floor(it + EQ_PIN_TOL).toLong() }?.coerceAtMost(d.max) ?: d.max
-        // `lo > hi` would mean an empty domain (root-infeasible); that verdict is [rootLpInfeasibleNoBake]'s
-        // to make, so skip rather than emit a contradictory bound here.
+        // An empty domain is rootLpInfeasibleNoBake's verdict to make.
         if (lo <= hi && (lo > d.min || hi < d.max)) out.add(ShavedBound(v, lo, hi))
     }
     return out
 }
 
-/**
- * The free integer variables, widest declared domain first, so [rootLpBoundsNoBake]'s [OBBT_MAX_VARS]
- * solves land where a bound is worth proving. Index order spends the whole allowance on whichever
- * variables happen to come first, which on a model whose open columns sit late is every variable but
- * the ones OBBT exists for. A domain that overflows [Long] sorts first — it is the most open there is.
- */
+// Widest first, so the capped OBBT solves land where a bound is worth proving rather than on whichever
+// variables come first. A domain whose width overflows Long sorts first.
 private fun LpEngine.widestFirst(n: Int, minimumSpan: Long): List<Int> {
     val width = LongArray(n) { v ->
         val d = problem.rootDomainOf(v)
@@ -298,10 +239,7 @@ private fun LpEngine.widestFirst(n: Int, minimumSpan: Long): List<Int> {
     return (0 until n).filter { width[it] > minimumSpan }.sortedByDescending { width[it] }
 }
 
-/** Whether the root relaxation is provably infeasible — the LP relaxation has no real point at an
- *  infinite incumbent, so `pruneNode` fires only on a genuine, certified infeasibility (the same sound
- *  oracle [shaveVariableBounds] leans on). A true result proves the whole problem has no solution. Bake
- *  propagation already reports its own infeasibility, so a root already Unsat is left to that path. */
+// A root already Unsat under propagation is left to the bake's own report.
 internal fun LpEngine.rootInfeasible(token: ExecutionControl): Boolean {
     if (lpRelaxer == null || token()) return false
     val s = PropagationSession(problem)
@@ -309,19 +247,14 @@ internal fun LpEngine.rootInfeasible(token: ExecutionControl): Boolean {
     return pruneNode(s, Double.POSITIVE_INFINITY, -1, true)
 }
 
-/** Whether the root relaxation is Farkas-certifiably infeasible over the problem's *declared* domains,
- *  built straight from those domains ([RootDomains]) so it never runs the O(domain span) bake fixpoint a
- *  [PropagationSession] pays on construction — unlike [rootInfeasible], which builds one (and, by design,
- *  defers to propagation whenever propagation already proves the root Unsat). A certified-infeasible
- *  relaxation contains every integer solution, so a true result proves the problem infeasible over its
- *  domains: the same verdict the root bake would grind out, reached in one LP solve. */
+// Built from the declared domains, so it skips the O(span) bake a PropagationSession runs on construction.
 internal fun LpEngine.rootLpInfeasibleNoBake(token: ExecutionControl): Boolean {
     val relaxer = lpRelaxer ?: return false
     if (token()) return false
     val model = try {
         relaxer.build(RootDomains(problem), cancellation = token).model
     } catch (_: CheckedLongOverflowException) {
-        return false // a relaxation the row arithmetic cannot express yields no verdict, never a crash
+        return false
     } catch (_: LpAssemblyCancelled) {
         return false
     }
@@ -333,8 +266,7 @@ internal fun LpEngine.rootLpInfeasibleNoBake(token: ExecutionControl): Boolean {
         pricing = pricingOptions,
     )
     return simplex.use {
-        // A non-null solve is a feasible optimum; null is infeasible or an inconclusive failure. Only a
-        // dual-unbounded ray that survives Farkas checking proves infeasibility.
+        // Only a dual-unbounded ray that survives Farkas checking proves infeasibility.
         val result = try {
             simplex.solve()
         } finally {
@@ -350,16 +282,11 @@ internal fun LpEngine.rootLpInfeasibleNoBake(token: ExecutionControl): Boolean {
     }
 }
 
-/** The built root relaxation's columns, rows and nonzeros, plus a per-solve cost proxy. */
 internal class RootRelaxationSize(val cols: Int, val rows: Int, val nnz: Int) {
-    /** A sparse revised-simplex solve runs ~`O(rows)` iterations, each touching ~`nnz`, over a tableau of
-     *  ~`rows·(cols + rows)`; the harvest pays one such solve per shave / redundancy probe (up to
-     *  [SHAVE_MAX_ITERS] of each), so this proxy is what its total cost scales with. */
+    // Per-solve cost proxy the harvest's probe total scales with.
     val cost: Long get() = rows.toLong() * (cols + rows) + nnz
 }
 
-/** Size of [LpEngine]'s root relaxation, or null when none is built / the root is already infeasible /
- *  the build overflows. Gates the harvest's per-candidate probes on the real LP dimensions. */
 internal fun LpEngine.rootRelaxationSize(): RootRelaxationSize? {
     val relaxer = lpRelaxer ?: return null
     val session = PropagationSession(problem)
@@ -374,9 +301,6 @@ internal fun LpEngine.rootRelaxationSize(): RootRelaxationSize? {
     return RootRelaxationSize(model.n, model.m, model.csc.colPtr[model.n])
 }
 
-/** Whether a fresh root with `v ≤ bound` (or `v ≥ bound` when not [atMost]) is provably infeasible —
- *  propagation Unsat, or an LP infeasibility at an infinite incumbent (so `pruneNode` fires only on a
- *  genuine infeasibility). Sound: a true result proves every solution lies strictly past [bound]. */
 private fun LpEngine.infeasibleUnder(v: Int, bound: Long, atMost: Boolean, token: ExecutionControl): Boolean {
     val s = PropagationSession(problem, token)
     if (s.isUnsatAtRoot || s.fixpointCancelled || token()) return false
@@ -384,13 +308,11 @@ private fun LpEngine.infeasibleUnder(v: Int, bound: Long, atMost: Boolean, token
     return assumed is PropagationResult.Unsat || pruneNode(s, Double.POSITIVE_INFINITY, -1, true)
 }
 
-/** Probe cap for each shaving, redundancy and implied-equality pass (each probe is one propagation or LP
- *  solve). */
+// Probe cap for each shaving, redundancy and implied-equality pass.
 private const val SHAVE_MAX_ITERS = 64
 
-/** Max integer variables the no-bake OBBT ([rootLpBoundsNoBake]) tightens — two LP solves each. Caps the
- *  pre-bake cost on wide models; the root bake and the in-loop harvest cover the rest. */
+// Caps pre-bake OBBT cost (two LP solves per variable); the root bake and harvest cover the rest.
 private const val OBBT_MAX_VARS = 64
 
-/** Slack on the safe min/max bracket when counting integers inside it — widening it only drops removals. */
+// Widening this slack only drops removals.
 private const val EQ_PIN_TOL = 1e-6

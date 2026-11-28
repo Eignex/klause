@@ -3,19 +3,9 @@ package com.eignex.klause.factor.arithmetic.internals
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationState
 
-/**
- * The reification protocol shared by the reified arithmetic propagators (linear, pseudo-Boolean,
- * cardinality): once the relation's reachable range is known, the aux indicator is forced true when
- * the relation always holds and false when it never can; otherwise, if the aux is already assigned,
- * its polarity selects which body propagation runs.
- *
- * [alwaysHolds]/[neverHolds] are the relation's decidedness on the current range. [pinAntecedent]
- * supplies the reason for pinning the aux (same reason either way). [extraPin] handles a
- * relation-specific early pin (e.g. a single-term equality whose target is unreachable inside
- * the bound interval); it returns the pin's result, or null when it does not apply. [propagateTrue]
- * and [propagateFalse] run the body under the assigned aux, receiving the aux pin as their extra
- * antecedent.
- */
+// Pins the aux when the relation always or never holds on the current range; otherwise an assigned aux selects
+// the body propagation, which receives the aux pin as its extra antecedent. [extraPin] is a relation-specific
+// early pin returning its result, or null when it does not apply.
 internal inline fun PropagationState.reifiedAuxTail(
     auxBoolVar: Int,
     alwaysHolds: Boolean,

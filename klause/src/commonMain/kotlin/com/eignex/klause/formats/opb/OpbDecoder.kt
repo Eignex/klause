@@ -44,7 +44,6 @@ data class OpbProblem(
 /** Raised when a parsed OPB document cannot be represented by the lowering. */
 class OpbLoweringException(msg: String) : IllegalArgumentException("OPB: $msg")
 
-/** Decodes an OPB syntax document into solver data. */
 internal object OpbDecoder {
 
     fun decode(

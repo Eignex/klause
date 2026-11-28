@@ -2,17 +2,7 @@ package com.eignex.klause.bench.catalog
 
 import com.eignex.klause.bench.source.OrLibrary
 
-/**
- * On-demand corpus declarations consumed by `source.CorpusFetcher`, including attribution
- * and storage rationale.
- */
 internal object ExternalCollections {
-    /**
-     * MiniZinc Challenge archive with year directories containing problem families.
-     * `mzn-bench` selects across years through
-     * [com.eignex.klause.bench.source.CorpusSelection.Layout.MznChallengeAllYears].
-     * Recent submissions carry MIT licensing; each collection retains its attribution.
-     */
     val minizincChallenge = ExternalCollection(
         id = "mzn-challenge",
         url = "https://github.com/MiniZinc/mzn-challenge.git",
@@ -63,12 +53,7 @@ internal object ExternalCollections {
 
     val all = listOf(minizincChallenge, libminizincTests, hakank, satlibUf20, satlibUuf50)
 
-    // XCSP3 competition library (instance archives, xcsp.org / CRIL).
-    // Instances ship as individually `.xml.lzma`-compressed files inside each zip, decompressed
-    // on fetch. Per-year full archives cover 2017–2019 (no
-    // competition in 2020–2021); the 2022–2025 range is taken from the two curated main-track
-    // aggregates published at xcsp.org/instances (COP22to25, CSP22to25) rather than the
-    // overlapping per-year archives — same range, deduplicated to the CSP/COP tracks klause targets.
+    // 2022-2025 come from the curated main-track aggregates instead of the overlapping per-year archives.
     private fun xcsp(year: Int, mb: Int) = ExternalCollection(
         id = "xcsp3-$year",
         url = "https://www.cril.univ-artois.fr/~lecoutre/compets/instancesXCSP${year % 100}.zip",
@@ -77,8 +62,6 @@ internal object ExternalCollections {
         fetch = FetchMethod.Zip,
     )
 
-    /** A curated main-track aggregate spanning the 2022–2025 competitions, published at
-     *  xcsp.org/instances: `COP22to25` (1000 COP instances) and `CSP22to25` (800 CSP). */
     private fun xcspAggregate(track: String, count: Int) = ExternalCollection(
         id = "xcsp3-${track.lowercase()}-22to25",
         url = "https://www.cril.univ-artois.fr/~lecoutre/compets/${track}22to25.zip",
@@ -87,8 +70,6 @@ internal object ExternalCollections {
         fetch = FetchMethod.Zip,
     )
 
-    /** The curated 2022–2025 main-track aggregates: the `xcsp3-cop`/`xcsp3-csp` dynamic suites select
-     *  from these (each ships as `COP22to25/`/`CSP22to25/` dirs of `*.xml.lzma`, decompressed on fetch). */
     val xcsp3Cop = xcspAggregate("COP", 1000)
     val xcsp3Csp = xcspAggregate("CSP", 800)
     val xcsp3Competition = listOf(
@@ -99,7 +80,6 @@ internal object ExternalCollections {
         xcsp3Csp,
     )
 
-    /** Per-logic `.tar.zst` archives from SMT-LIB non-incremental Zenodo record 15493090. */
     private fun smtlibLogic(logic: String) = "https://zenodo.org/records/15493090/files/$logic.tar.zst?download=1"
 
     val smtlibGround: Map<String, ExternalCollection> = listOf(
@@ -118,8 +98,6 @@ internal object ExternalCollections {
         )
     }
 
-    /** SMT-LIB QF_LIA non-incremental benchmark set, extracting to `.smt2` files under
-     *  `non-incremental/QF_LIA/<family>/`. */
     val smtlibQfLia = ExternalCollection(
         id = "smtlib-qf_lia",
         url = smtlibLogic("QF_LIA"),
@@ -128,7 +106,6 @@ internal object ExternalCollections {
         fetch = FetchMethod.TarballZst,
     )
 
-    /** SMT-LIB QF_LRA non-incremental benchmark set, same Zenodo release as [smtlibQfLia]. */
     val smtlibQfLra = ExternalCollection(
         id = "smtlib-qf_lra",
         url = smtlibLogic("QF_LRA"),
@@ -146,7 +123,6 @@ internal object ExternalCollections {
         fetch = FetchMethod.TarballZst,
     )
 
-    /** SMT-LIB QF_LIRA non-incremental benchmark set, same Zenodo release as [smtlibQfLia]. */
     val smtlibQfLira = ExternalCollection(
         id = "smtlib-qf_lira",
         url = smtlibLogic("QF_LIRA"),
@@ -155,9 +131,6 @@ internal object ExternalCollections {
         fetch = FetchMethod.TarballZst,
     )
 
-    /** SMT-LIB QF_IDL non-incremental benchmark set, same Zenodo release as [smtlibQfLia]. A difference
-     *  constraint `x − y ⋈ c` bounds neither of its variables, so a system built only from them can leave
-     *  every integer domain open — the shape the deferred bounding has to invent a search box for. */
     val smtlibQfIdl = ExternalCollection(
         id = "smtlib-qf_idl",
         url = smtlibLogic("QF_IDL"),
@@ -166,9 +139,6 @@ internal object ExternalCollections {
         fetch = FetchMethod.TarballZst,
     )
 
-    /** SMT-LIB QF_RDL non-incremental benchmark set, same Zenodo release as [smtlibQfLia]. The real
-     *  counterpart of [smtlibQfIdl]: its variables are continuous, so they are LP-only columns and never
-     *  meet the integer search box at all. Small, so it is the cheap one to sweep. */
     val smtlibQfRdl = ExternalCollection(
         id = "smtlib-qf_rdl",
         url = smtlibLogic("QF_RDL"),
@@ -177,8 +147,6 @@ internal object ExternalCollections {
         fetch = FetchMethod.TarballZst,
     )
 
-    /** SATLIB random-3SAT phase-transition ladder: `uf<V>-<C>` (SAT) and `uuf<V>-<C>` (UNSAT),
-     *  V = 50…250. Each is a 1000-instance family fetched on demand; flat `*.cnf` inside. */
     private fun satlibRnd(name: String) = ExternalCollection(
         id = "satlib-$name",
         url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/$name.tar.gz",
@@ -187,10 +155,6 @@ internal object ExternalCollections {
         fetch = FetchMethod.Tarball,
     )
 
-    /** SATLIB "classic" structured DIMACS families — small, hand-picked benchmarks each with a
-     *  distinct structure (artificial random-3SAT, variable-length random, DUBOIS xor-chains, parity
-     *  learning, inductive inference, pigeonhole, all-interval series). Each ships as a flat `*.cnf`
-     *  tarball; the `dimacs-classic` suite selects them all as a diverse, klause-scale Boolean set. */
     private fun satlibClassic(id: String, path: String) = ExternalCollection(
         id = "satlib-$id",
         url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/$path",
@@ -199,9 +163,7 @@ internal object ExternalCollections {
         fetch = FetchMethod.Tarball,
     )
 
-    /** The classic families paired with a coarse SAT/UNSAT label (DUBOIS and pigeonhole are wholly
-     *  UNSAT, the rest predominantly SAT); the clasp oracle decides each instance's true verdict, so
-     *  the label is only the suite's category metadata. */
+    // The category is coarse suite metadata; the reference oracle decides each instance verdict.
     val dimacsClassic: List<Pair<ExternalCollection, Category>> = listOf(
         satlibClassic("aim", "DIMACS/AIM/aim.tar.gz") to Category.SAT,
         satlibClassic("jnh", "DIMACS/JNH/jnh.tar.gz") to Category.SAT,
@@ -212,9 +174,7 @@ internal object ExternalCollections {
         satlibClassic("ais", "AIS/ais.tar.gz") to Category.SAT,
     )
 
-    /** The `satcomp-compact-v1` instances ([SatCompCompact]), each fetched from the Global Benchmark Database by its
-     *  content hash and checked against it. The collection id carries the version, so a redrawn list is fetched and
-     *  referenced afresh rather than mixed into this one's cache, corpus pack and reference rows. */
+    // The id carries the version, so a redrawn list never mixes into this cache, corpus pack or reference rows.
     val satcompCompact = ExternalCollection(
         id = "satcomp-compact-v1",
         url = "https://benchmark-database.de",
@@ -237,8 +197,6 @@ internal object ExternalCollections {
         fetch = FetchMethod.Tar,
     )
 
-    /** PB'25 selected-benchmark set: `.opb.xz` under `PB25/normalized-PB25`. Unlike [pbComp2024] it has no WBO
-     *  track. */
     val pbComp2025 = ExternalCollection(
         id = "pb-comp-2025",
         url = "https://www.cril.univ-artois.fr/PB25/benchs/selected-PB25.tar",
@@ -247,10 +205,7 @@ internal object ExternalCollections {
         fetch = FetchMethod.Tar,
     )
 
-    /** PB'07 evaluation "other" benchmarks: 487 native (crafted, not MIP-translated) pseudo-Boolean
-     *  instances across the competition categories (optimization/decision, small/big integer, linear
-     *  and non-linear), each a `.opb.bz2` under `normalized-PB07/`. Standard OPB headers, klause-scale.
-     *  (The archive lists 598, but 111 long factor-mod paths exceed the ustar 100-char name limit.) */
+    // The archive lists 598 instances, but 111 paths exceed the ustar 100-char name limit.
     val pb07Other = ExternalCollection(
         id = "pb07-other",
         url = "http://www.cril.univ-artois.fr/PB07/benchs/PB07-OTHER.tar",
@@ -317,7 +272,6 @@ internal object ExternalCollections {
         extensionless = "NAME" to "mps",
     )
 
-    /** OR-Library classes converted to MPS on fetch (see [OrLibrary]), each with the files it is read from. */
     val orLibrary: List<ExternalCollection> = listOf(
         orLibrary(
             "scp",
@@ -373,13 +327,11 @@ internal object ExternalCollections {
         ),
     )
 
-    /** Every SATLIB collection with the category its instances share: the structured families, then the random-3SAT
-     *  sets, uf20 and the ladder's rungs. */
     val satlib: List<Pair<ExternalCollection, Category>> get() =
         dimacsClassic + (satlibUf20 to Category.SAT) +
             satlibLadder.map { (name, col) -> col to if (name.startsWith("uf")) Category.SAT else Category.UNSAT }
 
-    /** Ordered rungs (low→high vars) of the SAT and UNSAT ladders, keyed by family name. */
+    // Ordered by variable count.
     val satlibLadder: Map<String, ExternalCollection> = listOf(
         "uf50-218", "uf75-325", "uf100-430", "uf125-538", "uf150-645",
         "uf175-753", "uf200-860", "uf225-960", "uf250-1065",

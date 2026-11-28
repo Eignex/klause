@@ -56,7 +56,6 @@ internal inline fun reifiedDegree(aux: Boolean, holds: Boolean, violatedDegree: 
 
 internal class CoalescedTerms(val vars: IntArray, val coeffs: LongArray)
 
-// Callers whose coefficients can pass the Int range (SMT cut lemmas, dense affine folds) use the LongArray form.
 internal fun coalesceLinearTerms(vars: IntArray, coeffs: IntArray): CoalescedTerms =
     coalesceLinearTerms(vars, LongArray(coeffs.size) { coeffs[it].toLong() })
 
@@ -316,10 +315,7 @@ internal fun pbFalseFormAntecedents(
     return if (buf.isEmpty()) null else buf.toIntArray()
 }
 
-/** Per-literal contribution ranges for a weighted-Boolean sum: [litLo]/[litHi] are each literal's
- *  `[min, max]` contribution (0 or `w` for a determined literal, `[min(0,w), max(0,w)]` for a free
- *  one), and [sumLo]/[sumHi] are their totals. The accumulation the `≤/≥/=` and `≠` PB propagators
- *  share before their op-specific feasibility tests. */
+// A determined literal contributes 0 or `w`; a free one ranges over `[min(0, w), max(0, w)]`.
 internal class PbRanges(val litLo: LongArray, val litHi: LongArray, val sumLo: Long, val sumHi: Long)
 
 internal fun pbLitRanges(state: PropagationState, weights: LongArray, literals: IntArray): PbRanges {

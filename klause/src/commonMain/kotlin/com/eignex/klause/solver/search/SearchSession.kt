@@ -5,12 +5,9 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryObservation
 
 /**
- * Shared trailed coordination for finite-domain and theory components.
- *
- * This class deliberately has no dependency on [com.eignex.klause.propagation.PropagationSession].
- * The finite CP path participates through a component adapter; theories keep their own state and never
- * observe finite domains. Components that retain residual state provide their splits through
- * [SearchBrancher], so the session also owns generic finite and hybrid tree traversal.
+ * Shared trailed coordination for finite-domain and theory components. Finite CP participates through a
+ * component adapter; theories never observe finite domains. Components with residual state split
+ * through [SearchBrancher].
  */
 class SearchSession(
     private val components: List<SearchComponent>,
@@ -171,13 +168,8 @@ class SearchSession(
         else -> publish(decision)
     }
 
-    /**
-     * Import a consequence that [source] has already applied to its native state.
-     *
-     * Native components use this outside their normal callback (for example after asserting a learned
-     * clause at an existing level). The source is excluded from the pending delivery, preventing a
-     * second native pin from creating an extra private decision level.
-     */
+    // Imports a consequence the source already applied natively. The source is excluded from delivery so a
+    // second native pin cannot create an extra private decision level.
     internal fun publishFrom(
         source: SearchComponent,
         decision: SearchDecision,
@@ -396,12 +388,6 @@ class SearchSession(
         return propagate()
     }
 
-    /**
-     * Report every Boolean variable a retraction frees to [listener], or to nobody when it is null.
-     *
-     * A branching that indexes only the unassigned variables needs the freeing signal to re-offer them;
-     * one that rescans the assignment on every pick does not, and pays nothing for this.
-     */
     internal fun observeUnassignments(listener: SearchUnassignListener?) {
         unassignListener = listener
     }
@@ -485,23 +471,15 @@ class SearchSession(
         return resolver to resolver.resolveConflict(this)
     }
 
-    /** Whether the latest conflict prefers its component-owned analyzer. */
     internal val hasNativeConflictResolver: Boolean
         get() = conflictResolver?.prefersNativeConflictAnalysis == true
 
-    /** Whether the component that produced the latest conflict keeps that explanation itself. */
     internal val explanationIsOwnedElsewhere: Boolean
         get() = conflictOwner?.retainsOwnExplanations == true
 
-    /**
-     * Resolve a falsified clause-form component explanation to a shared first-UIP consequence.
-     *
-     * Components use this for certificates such as a guarded difference-logic negative cycle. The
-     * analyzer resolves latest implied literals at the conflict level through their trailed reasons
-     * until one first-UIP literal remains. Retracting to the second-highest level then makes that
-     * literal unit (Zhang, Madigan, Moskewicz and Malik, "Efficient Conflict Driven Learning in a
-     * Boolean Satisfiability Solver", ICCAD 2001, https://doi.org/10.1109/ICCAD.2001.968634).
-     */
+    // First-UIP analysis of a falsified component explanation (Zhang, Madigan, Moskewicz and Malik,
+    // "Efficient Conflict Driven Learning in a Boolean Satisfiability Solver", ICCAD 2001,
+    // https://doi.org/10.1109/ICCAD.2001.968634).
     internal fun explainedConflict(explanation: SearchExplanation?): SearchConflictResolution? {
         var clause = namedExplanation(explanation)?.literals?.toList() ?: return null
         if (clause.isEmpty()) return SearchConflictResolution.Exhausted
@@ -527,14 +505,8 @@ class SearchSession(
         }
     }
 
-    /**
-     * Retain a conflict that resolution could not make asserting, and leave the traversal to backtrack.
-     *
-     * The clause is a resolvent of valid clauses, so it holds under the root problem whether or not one
-     * literal of it remains at the conflict level. Keeping it is what makes every conflict inform the
-     * rest of the search; the caller still backtracks chronologically, which cannot loop the way a
-     * non-asserting backjump would.
-     */
+    // A non-asserting resolvent still holds under the root, so it is kept; the caller backtracks
+    // chronologically, which cannot loop the way a non-asserting backjump would.
     private fun retainUnasserting(clause: List<Int>): SearchConflictResolution {
         learning.onConflict(asserting = false)
         learn(SearchExplanation(clause.toIntArray()))
@@ -559,11 +531,7 @@ class SearchSession(
         return null
     }
 
-    /**
-     * Reason for the current assignment of [variable], asking its publisher when the session holds
-     * none. A component-supplied clause is retained, so a second resolution through the same literal
-     * does not rebuild it.
-     */
+    // A component-supplied reason is retained so a second resolution through the literal does not rebuild it.
     private fun reasonOf(variable: Int, implied: Int): SearchExplanation? {
         trail.reasonFor(variable)?.let { return it }
         val published = namedExplanation(trail.publisherOf(variable)?.reasonFor(implied)) ?: return null
@@ -638,11 +606,8 @@ class SearchSession(
     }
 
     /**
-     * Discard root publications after an owner has rebuilt its native root outside this session.
-     *
-     * Reseeding CP changes the facts at its post-seed root without changing the shared decision level.
-     * The CP adapter calls this boundary before publishing the rebuilt root, so no fact from a previous
-     * assumption set can leak into the next component run.
+     * Discard root publications after an owner has rebuilt its native root outside this session, so no
+     * fact from a previous assumption set leaks into the next run.
      */
     fun resetRootFacts() {
         require(atoms == null) { "registered source atoms require a fresh session when rebuilding the root" }
@@ -651,12 +616,7 @@ class SearchSession(
         learning.onRootReset()
     }
 
-    /**
-     * Verdict surface for callers that use only Boolean decisions.
-     *
-     * The traversal itself is [solve], so Boolean, finite, hybrid, and theory-only configurations share
-     * one engine and one restart/budget lifecycle.
-     */
+    /** Verdict surface over [solve] for callers that use only Boolean decisions. */
     fun solveBoolean(numBoolVars: Int): BooleanSearchResult = when (val result = solve(numBoolVars)) {
         is SearchResult.Satisfied -> BooleanSearchResult.Satisfied(result.model)
         SearchResult.Exhausted -> BooleanSearchResult.Exhausted
@@ -666,15 +626,9 @@ class SearchSession(
     /**
      * Drive Boolean and component-provided decisions through one shared search loop.
      *
-     * Boolean variables are split first. Once they are assigned, a [SearchBrancher] may split its
-     * remaining local state.
-     * A component with no branch is expected to decide its residual in [SearchComponent.check].
-     *
-     * [candidateHints] steer which side of a Boolean split is tried first and nothing else, so the
-     * verdict is the one this traversal would have reached without them.
-     *
-     * [booleanBranching] chooses which Boolean is split. A heuristic one also observes the traversal,
-     * so it is passed as [observer] as well.
+     * Boolean variables are split first, then a [SearchBrancher] may split its remaining local state. A
+     * component with no branch decides its residual in [SearchComponent.check]. [candidateHints] only
+     * order the sides of a Boolean split. A heuristic [booleanBranching] is also passed as [observer].
      */
     fun solve(
         numBoolVars: Int,
@@ -793,7 +747,6 @@ class SearchSession(
         )
     }
 
-    /** Open a run from one mode-specific [SearchTraversalPolicy]. */
     internal fun openRun(numBoolVars: Int, policy: SearchTraversalPolicy): SearchRun = openRun(
         numBoolVars = numBoolVars,
         params = policy.solveParams,
@@ -833,10 +786,9 @@ class SearchSession(
     /** Number of sound clause-form explanations retained by the shared Boolean engine. */
     val learnedClauseCount: Int get() = learning.size
 
-    /** Distinct learned clauses with a literal block distance of at most two: the short, reusable ones. */
+    // Distinct learned clauses with literal block distance at most two.
     internal val glueClauseCount: Long get() = learning.glueClauses
 
-    /** Booleans assigned at the root, however deep the search stands: progress no later search undoes. */
     internal val rootFixedCount: Int get() = trail.rootFixedCount
 
     internal fun learnedLifecycle(): Map<String, Long> = learning.lifecycle.snapshot()
@@ -900,12 +852,6 @@ class SearchSession(
         return result
     }
 
-    /**
-     * Propagate the learned database from its watch index.
-     *
-     * Newly attached clauses are examined once, unit clauses are re-examined after a retraction, and
-     * every other clause is visited only when one of its two watched literals is falsified.
-     */
     private fun propagateLearnedClauses(): ComponentResult {
         conflictOwner = null
         if (learnedDbParams.softLimitBytes != null) {
