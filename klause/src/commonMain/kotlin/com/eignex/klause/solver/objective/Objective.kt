@@ -43,7 +43,7 @@ interface IncrementalObjective : Objective {
  * `Σ boolWeights(b) · bool(b) + Σ intCoefficients(i) · int(i) + Σ realCoefficients(r) · real(r) + constant`,
  * minimized. Integer coefficients let branch-and-bound bound and cut off in exact [Long] arithmetic.
  * [boolWeights] and [intCoefficients] index by original-problem variable id. Coefficient buffers are
- * copied at construction and on export.
+ * copied at construction and on export. [constant] is added to every value.
  */
 class LinearObjective(
     boolWeights: LongArray = emptyLongArray(),

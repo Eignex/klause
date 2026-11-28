@@ -21,7 +21,7 @@ import com.eignex.util.collections.IntHashSet
 import kotlin.concurrent.Volatile
 
 /**
- * Disjunction of Boolean literals.
+ * Disjunction of Boolean [literals].
  *
  * Local search scores it with two watched literals (Moskewicz et al., "Chaff: engineering an
  * efficient SAT solver", DAC 2001, https://doi.org/10.1145/378239.379017).
