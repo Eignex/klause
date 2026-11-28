@@ -567,8 +567,8 @@ approximation never replaces their authority.
 
 Optimization emits `; objective=<value>` for each published incumbent and
 `; optimizationStatus=<status>` at completion (the verdict, such as `optimal`,
-`best-found` or `unbounded`), without needing `-s`; `sat` alone never claims optimality. Incumbents stream as they
-are accepted, each with its complete model. Exact objectives print as
+`best-found` or `unbounded`), without needing `-s`; `sat` alone never claims
+optimality. Incumbents stream as they are accepted, each with its complete model. Exact objectives print as
 arbitrary-precision integers or reduced `numerator/denominator` text. Linear
 integer optimization uses the complete theory route when its objective range
 exceeds binary64's consecutive integers.

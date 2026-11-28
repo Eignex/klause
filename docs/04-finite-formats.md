@@ -338,8 +338,9 @@ without an admitted strategy returns undecided.
 
 Supported float operations retain exact relations: strict and reified comparisons,
 `RealAbs`, `RealArrayMinMax`, constant-array `RealElement`, constant scaling,
-products and division, a product with a nonzero divisor. Finite float choices become `RealFiniteDomain` memberships, products with
-a finite operand keep `ContinuousProduct` with the declared values, and
+products and division, a product with a nonzero divisor. Finite float choices
+become `RealFiniteDomain` memberships, products with a finite operand keep
+`ContinuousProduct` with the declared values, and
 unrestricted products go to [polynomial completion](19-nonlinear-arithmetic.md#polynomial-real-arithmetic). Linear
 consumers install alternatives privately; an LP relaxation alone never establishes
 membership or a product.

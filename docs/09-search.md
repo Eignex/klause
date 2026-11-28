@@ -653,9 +653,9 @@ The finite difference system is posted after presolve only when its fragment has
 guarded edge and an edge between two unfixed root integer columns; edges to fixed
 columns act as unary bounds. Finite preparation can also append a redundant
 difference system over exact real rows and real table selections, whose vertices
-are private arithmetic coordinates rather than finite real domains. Source guards and table index atoms enter
-the graph directly, so a contradictory selection is excluded before all discrete
-columns are fixed. A consistent graph supplies no model; all original factors and
+are private arithmetic coordinates rather than finite real domains. Source guards
+and table index atoms enter the graph directly, so a contradictory selection is
+excluded before all discrete columns are fixed. A consistent graph supplies no model; all original factors and
 source checks remain. See
 [finite real propagation](17-theories.md#finite-real-propagation).
 
