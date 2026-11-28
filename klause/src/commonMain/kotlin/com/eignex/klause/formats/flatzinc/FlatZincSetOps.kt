@@ -218,6 +218,16 @@ internal fun FlatZincCompiler.emitSetIntersect(c: FznConstraint) {
             factors.add(Clause(intArrayOf(Lit.make(uBit, false))))
         }
     }
+    for (i in s.elements.indices) {
+        val element = s.elements[i]
+        if (u.layout.indexOf(element) >= 0) continue
+        val tIdx = t.layout.indexOf(element)
+        if (tIdx >= 0) {
+            val sBit = s.indicatorBoolIds[i]
+            val tBit = t.indicatorBoolIds[tIdx]
+            factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(tBit, false))))
+        }
+    }
 }
 
 private fun FlatZincCompiler.emitIntersectUImpliesInputs(uBit: Int, sBit: Int, tBit: Int) {
