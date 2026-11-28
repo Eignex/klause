@@ -10,14 +10,17 @@ object CliStartupProfile {
     private const val MAIN = "com.eignex.klause.cli.MainKt"
     private const val CLI = "com.eignex.klause.cli"
     private const val PIPELINE = "com.eignex.klause.solver.pipeline"
+    private const val KOBLAS_BACKEND = "com.eignex.koblas.internal.jvm.JvmBackend"
     private val runtime = listOf("-Xmx2048m", "-XX:ActiveProcessorCount=1", "-XX:+UseSerialGC")
     private val methods = listOf(
-        "$MAIN::run", "$CLI.PlatformKt::installCliConfig", "$CLI.CliModeKt::parseArgs",
+        "$MAIN::<clinit>", "$MAIN::run", "$CLI.PlatformKt::installCliConfig", "$CLI.CliModeKt::parseArgs",
         "$CLI.DimacsMode\$Session::load", "$CLI.MpsMode\$Session::load", "$CLI.SmtLibMode\$Session::runCommands",
+        "$CLI.SmtLibMode\$Session::loadSource", "$CLI.CliLogKt::cliLogger",
         "$CLI.SolveCore::solve", "$PIPELINE.SourceSetup::selectRoute", "$PIPELINE.SourceExecutionKt::execute",
         "$PIPELINE.FinitePipeline::prepare", "$PIPELINE.NativeSourceExecutionKt::executeNativeSource",
         "com.eignex.klause.arithmetic.quadratic.QuadraticCandidates::proposeActiveRows",
-        "com.eignex.koblas.engine.BuiltinEngines::getSimd",
+        "com.eignex.koblas.Koblas__KoblasEngineKt::<clinit>", "$KOBLAS_BACKEND::getDefault",
+        "$KOBLAS_BACKEND::getSimd", "$KOBLAS_BACKEND::open",
     )
 
     /** Pass a repeat count and one or more vendored fixture paths relative to the repository. */
@@ -38,7 +41,9 @@ object CliStartupProfile {
         require("-XX:TieredStopAtLevel=1" in defaults) { launcherDefaults }
         val java = File(System.getProperty("java.home"), "bin/java").absolutePath
         val helper = File(javaClass.protectionDomain.codeSource.location.toURI()).canonicalPath
-        val classpath = dist.resolve("lib/*").absolutePath + File.pathSeparator + helper
+        val launcherClasspath = script.useLines { lines -> lines.first { it.startsWith("CLASSPATH=") } }
+            .substringAfter('=').replace("\$APP_HOME", dist.absolutePath)
+        val classpath = launcherClasspath + File.pathSeparator + helper
         val launcher = listOf(script.absolutePath)
 
         for (iteration in 1..repeats) {
@@ -62,13 +67,15 @@ object CliStartupProfile {
                 check(expected.contentEquals(directory.resolve("fresh-$iteration.out").readBytes())) { input }
                 check(expected.contentEquals(directory.resolve("warm-$iteration.out").readBytes())) { input }
             }
-            val phaseRecording = "-XX:StartFlightRecording=filename=${directory.resolve("phases.jfr")}," +
+            val recording = directory.resolve("phases.jfr")
+            val phaseRecording = "-XX:StartFlightRecording=filename=$recording," +
                 "settings=profile,jdk.Compilation#threshold=0ms,jdk.ClassLoad#enabled=true," +
                 "jdk.ClassLoad#threshold=0ms,jdk.ExecutionSample#period=1ms,jdk.MethodTrace#enabled=true," +
                 "jdk.MethodTrace#threshold=0ms,jdk.MethodTrace#stackTrace=false," +
                 "jdk.MethodTrace#filter=${methods.joinToString(";")},dumponexit=true"
             runProcess(launcher + options, runtime + listOf("-Xlog:jfr+startup=off", phaseRecording),
                 root, directory.resolve("phases"))
+            check(recording.length() > 0) { "Missing phase recording: $recording" }
             val classLog = "-Xlog:class+init=info,class+load=info:file=${directory.resolve("classes.log")}:" +
                 "uptimenanos,tid,tags"
             runProcess(launcher + options, runtime + classLog, root, directory.resolve("classes"))
@@ -107,7 +114,11 @@ object CliStartupProfile {
             .redirectOutput(File("$artifact.out")).redirectError(File("$artifact.err"))
             .apply {
                 environment()["KLAUSE_DEBUG"] = "false"
-                val arguments = File("$artifact.args").apply { writeText(options.joinToString("\n", postfix = "\n")) }
+                val arguments = File("$artifact.args").apply {
+                    writeText(options.joinToString("\n", postfix = "\n") {
+                        "\"${it.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+                    })
+                }
                 environment()["KLAUSE_CLI_OPTS"] = "@${arguments.absolutePath}"
                 environment().remove("JAVA_OPTS")
                 environment().remove("JDK_JAVA_OPTIONS")
