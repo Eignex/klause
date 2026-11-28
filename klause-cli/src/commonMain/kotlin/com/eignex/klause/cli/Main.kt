@@ -95,12 +95,12 @@ private fun run(args: Array<String>) {
     } catch (error: IllegalArgumentException) {
         usageError(error.message.orEmpty())
     }
+    val mode = pickMode(common, path)
+    val session = flagSessions[mode] ?: mode.newSession()
     // Anchor the `-t` budget once, before parsing/baking, so the bake and the solve share one
     // deadline instead of each restarting the clock.
     common.deadlineAtMs = common.timeLimitMs?.let { nowMillis() + it }
     common.startDebugStatistics(processProperty("klause.debug") == "true")
-    val mode = pickMode(common, path)
-    val session = flagSessions[mode] ?: mode.newSession()
     // Peak heap has to be watched from before the parse, since ingest is what the dry-run measures and
     // the sampler cannot see backwards. Started only for that diagnostic, never on a solve path.
     if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) startHeapPeakSampler()
