@@ -115,8 +115,9 @@ objects for primitives. Each declares a **phase** and a **pool**:
 | `stall-kick` | One flattened perturbation from a random walk over the variable–factor graph |
 | `unused-values` | Opt-in owner moves of a satisfied implicitly seeded plain AllDifferent onto unused values |
 
-The opt-in `extended-*` variants of `violated`, `structured` and `elected` draw
-richer moves that cost more to generate and are not always net-positive, such as a
+The opt-in `extended-repairs`, `extended-structured` and `extended-elected` variants
+of `violated`, `structured` and `elected` draw richer moves that cost more to
+generate and are not always net-positive, such as a
 Circuit 2-opt reversal, an AllDifferent 3-cycle or a DP-optimal accepting run for
 Regular. Default arms never pay for them. Each
 configured source carries a per-pick candidate cap and an enable gate. The reserved
