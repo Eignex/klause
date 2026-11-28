@@ -172,6 +172,7 @@ internal class LinearAuthority(
             val installed = prepared.installedCuts.count { it >= family.ordinaryCuts }
             pointPolicy?.observe("DenseFiniteInstalledSelected", installed.toLong())
             if (installed == 0) pointPolicy?.observe("DenseFiniteEmptySelection")
+            var projection: RootCutCoverProjection? = null
             for (id in family.ordinaryCuts until rows.size) {
                 cutCost(1L, 0L)
                 if (cancellation() || budget.funding?.paused == true) break
@@ -180,6 +181,13 @@ internal class LinearAuthority(
                 pointPolicy?.observe("DenseFiniteSelectedScanned")
                 if (cut.mixed) {
                     pointPolicy?.observe("DenseFiniteSelectedMixed")
+                    val owner = projection ?: RootCutCoverProjection(prepared,
+                        ExecutionControl { cancellation() || budget.funding?.paused == true }, ::cutCost,
+                        { stage, count -> pointPolicy?.observe(stage, count) }).also { projection = it }
+                    val projected = owner.project(cut) ?: continue
+                    pointPolicy?.observe("DenseFiniteSelectedOffered")
+                    result += projected
+                    if (result.size == 2) break
                     continue
                 }
                 val width = cut.inequality.supportSize

@@ -1,9 +1,13 @@
 package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.lp.engine.CutFamily
+import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceEvidence
+import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 
 internal class LinearAuthorityCutConflict(val proof: SourceDerivation, val family: CutFamily)
@@ -60,6 +64,96 @@ internal fun LinearAuthorityQuery.selectedCutConflict(
     } catch (stop: AggregateStop) {
         observe("SelectedCutBound${stop.reason}", 1L)
         null
+    }
+}
+
+internal class RootCutCoverProjection(
+    query: LinearAuthorityQuery,
+    cancellation: ExecutionControl,
+    onCost: (Long, Long) -> Unit,
+    private val observe: (String, Long) -> Unit,
+) {
+    private val meter = AggregateMeter(LinearAuthorityAggregateLimits(), cancellation) { stage, amount ->
+        if (stage == "AggregateWork") {
+            onCost(amount, 0L)
+            observe("DenseFiniteProjectionWork", amount)
+        } else {
+            onCost(0L, amount)
+            observe("DenseFiniteProjectionAllocation", amount)
+        }
+    }
+    private val sides = CutConflictSides(query, meter, observe)
+    private val scope = query.context.scope
+    private var collected = false
+    private var stopped = false
+
+    fun project(cut: LinearAuthorityCut): SourceEvidence? {
+        if (stopped) return null
+        observe("DenseFiniteProjectionAttempts", 1L)
+        return try {
+            projectFunded(cut)
+        } catch (stop: AggregateStop) {
+            observe("DenseFiniteProjection" + stop.reason, 1L)
+            if (stop.reason != "ScalarLimit") stopped = true
+            null
+        }
+    }
+
+    private fun projectFunded(cut: LinearAuthorityCut): SourceEvidence? {
+        val row = cut.inequality
+        meter.reserve(1L + row.supportSize, 256L + row.supportSize * 160L)
+        val activity = row.coefficients
+        val integers = activity.entries.filter { it.key.kind == SourceCoordinate.Kind.Integer }
+        if (integers.isEmpty()) return null
+        // The strongest binary extremes maximize the chance of a short cover.
+        val retaining = if (integers.size <= 8) integers else integers.sortedWith { left, right ->
+            val leftSize = if (left.value < BigFraction.ZERO) left.value.negated() else left.value
+            val rightSize = if (right.value < BigFraction.ZERO) right.value.negated() else right.value
+            meter.arithmetic(leftSize, rightSize)
+            rightSize.compareTo(leftSize)
+        }.take(8)
+        val coefficients = retaining.associate { it.key to meter.number(it.value) }
+        if (!collected) {
+            sides.collect()
+            collected = true
+        }
+        var rhs = meter.number(row.rhs)
+        var strict = row.strict
+        val terms = arrayListOf(SourceDerivation.Combination.Term(BigFraction.ONE, cut.derivation))
+        for ((coordinate, coefficient) in activity) {
+            if (coordinate in coefficients) continue
+            meter.number(coefficient)
+            val side = sides.opposite(coordinate, needsLower = coefficient > BigFraction.ZERO)
+            if (side == null) {
+                observe("DenseFiniteProjectionMissing" + coordinate.kind + "Side", 1L)
+                return null
+            }
+            val weight = meter.multiply(coefficient.negated(), meter.number(side.coefficient.reciprocal()))
+            rhs = meter.add(rhs, meter.multiply(weight, side.rhs))
+            strict = strict || side.strict
+            terms += SourceDerivation.Combination.Term(weight, side.proof)
+        }
+        var extreme = BigFraction.ZERO
+        for (coefficient in coefficients.values) {
+            if (coefficient > BigFraction.ZERO) extreme = meter.add(extreme, coefficient)
+        }
+        meter.arithmetic(extreme, rhs)
+        if (extreme < rhs || (!strict && extreme == rhs)) {
+            observe("DenseFiniteProjectionNoCover", 1L)
+            return null
+        }
+        val scale = integerScale(coefficients.values, meter, { _, _ -> })
+        val normalized = coefficients.mapValues { (_, value) -> meter.multiply(value, scale) }
+        val scaledRhs = meter.multiply(rhs, scale)
+        val rounded = meter.number(if (strict) {
+            BigFraction.of(scaledRhs.ceilInteger(), BIG_ONE) - BigFraction.ONE
+        } else BigFraction.of(scaledRhs.negated().ceilInteger(), BIG_ONE).negated())
+        val combination = SourceDerivation.Combination(terms)
+        val scaled = if (scale == BigFraction.ONE) combination else SourceDerivation.Combination(
+            listOf(SourceDerivation.Combination.Term(scale, combination)))
+        val consequence = SourceClaim.Consequence(SourceInequality(normalized, rounded))
+        observe("DenseFiniteProjectionCovered", 1L)
+        return SourceEvidence(scope, consequence, SourceDerivation.IntegerRounding(scaled))
     }
 }
 
