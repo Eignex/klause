@@ -1,0 +1,14 @@
+{
+  "main": "com.eignex.klause.bench.lab.CliWarmAdapterKt",
+  "classpath": ["klause-bench/build/install/klause-bench/lib/*"],
+  "buildTasks": [":klause-cli:installJvmDist", ":klause-bench:installDist"],
+  "jvmArgs": ["-Xmx512m", "-XX:ActiveProcessorCount=1"],
+  "runtime": {
+    "java": 25,
+    "tools": ["time"],
+    "environment": {},
+    "requiredTags": ["platform:linux", "arch:x86_64"]
+  },
+  "sourceHistory": "snapshot",
+  "workspaceInputs": ["klause-cli/build/install", "klause-bench/build/install", "klause-bench/smoke-corpus"]
+}
