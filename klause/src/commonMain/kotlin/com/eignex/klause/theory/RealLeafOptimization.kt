@@ -25,6 +25,7 @@ import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpExactOptimization
 import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpRefinementLimits
 import com.eignex.klause.lp.engine.LpRefinementRequest
 import com.eignex.klause.lp.engine.LpScopedSolver
@@ -350,7 +351,8 @@ internal class RealLeafOptimization(
         val activeNs = limits.maxTimeNs?.let { (it - exactTimeNs).coerceAtLeast(0L) }
         val token = activeNs?.let { cancellation or ExecutionControl.until(started + it.nanoseconds) } ?: cancellation
         val certified = try {
-            proposeAndCheck(lp, token)
+            // Numerical and proof metrics also settle failed work, so the backend must not debit the caller directly.
+            proposeAndCheck(lp, token.withAccounting(ExecutionControl.Never))
         } finally {
             exactTimeNs = saturatedAdd(exactTimeNs, started.elapsedNow().inWholeNanoseconds)
         }
@@ -377,14 +379,18 @@ internal class RealLeafOptimization(
             state, token, context, workLimit = remainingWork, iterationLimit = iterationLimit,
             preparationAllocationLimit = funding.remainingAllocation,
         ).use { solver ->
+            val ready = try {
+                solver.prepare(token)
+            } finally {
+                val prepared = solver.metrics
+                chargeCell(prepared.measuredPreparationWork, prepared.preparationAllocation)
+            }
+            if (!ready || remainingWork == 0L || funding.remainingAllocation == 0L || token()) return@use null
             val proposal = try {
-                solver.solveFloat(token = token)
+                solver.solveFloat(token = token, allowance = LpFloatAllowance(remainingWork, iterationLimit))
             } finally {
                 val used = solver.lastMetrics
-                val prepared = solver.metrics
-                val setup = (prepared.preparationWork - prepared.reservedConstructionWork).coerceAtLeast(0L)
-                chargeCell(saturatedAdd(saturatedAdd(used.workOps, used.preparationOps),
-                    saturatedAdd(setup, prepared.constructionWork)), prepared.preparationAllocation)
+                chargeCell(saturatedAdd(used.workOps, used.preparationOps), 0L)
                 chargePivots(used.pivots)
             }
             if (proposal == null || token() || remainingWork == 0L || funding.remainingAllocation == 0L ||

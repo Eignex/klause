@@ -275,18 +275,28 @@ private class RefinementRun(
         firstAllowance: LpFloatAllowance,
         first: Boolean,
     ): Pair<LpSolver, FloatLpResult?>? {
-        val before = scope.metrics
         val allowance = if (first) firstAllowance else meter.allowance(false)
         scope.restrictPreparation(LpCertificationGrant(meter.remainingWork, meter.remainingAllocation))
+        val beforeSetup = scope.metrics.owners
+        val beforeWork = meter.spentWork
+        val prepared = try {
+            scope.prepareFloat(allowance.work)
+        } finally {
+            chargePreparation(beforeSetup, scope.metrics.owners)
+        }
+        if (!prepared) return null
+        val remaining = minOf(allowance.work - (meter.spentWork - beforeWork), meter.remainingWork)
+        if (remaining <= 0L) meter.stop(LpRefinementDecline.WORK)
+        val before = scope.metrics
         return try {
-            scope.solveFloat(warm, if (warm != null) null else allowance)
+            scope.solveFloat(warm, allowance.copy(work = remaining))
         } finally {
             val after = scope.metrics
-            val preparation = after.owners.preparationWork - before.owners.preparationWork
+            val preparation = after.solves.preparationOps - before.solves.preparationOps
             val work = after.solves.workOps - before.solves.workOps
             val pivots = after.solves.pivots - before.solves.pivots
-            meter.completed(saturatedAdd(preparation, work),
-                after.owners.preparationAllocation - before.owners.preparationAllocation, pivots)
+            chargePreparation(before.owners, after.owners)
+            meter.completed(saturatedAdd(preparation, work), pivots = pivots)
             meter.metrics = meter.metrics.copy(
                 floatWork = saturatedAdd(meter.metrics.floatWork, work),
                 preparationWork = saturatedAdd(meter.metrics.preparationWork, preparation),
@@ -304,11 +314,14 @@ private class RefinementRun(
         return try {
             scope.replaceState(working)
         } finally {
-            val after = scope.metrics.owners
-            val work = after.preparationWork - before.preparationWork
-            meter.completed(work, after.preparationAllocation - before.preparationAllocation)
-            meter.metrics = meter.metrics.copy(preparationWork = saturatedAdd(meter.metrics.preparationWork, work))
+            chargePreparation(before, scope.metrics.owners)
         }
+    }
+
+    private fun chargePreparation(before: LpScopedMetrics, after: LpScopedMetrics) {
+        val work = after.measuredPreparationWork - before.measuredPreparationWork
+        meter.completed(work, after.preparationAllocation - before.preparationAllocation)
+        meter.metrics = meter.metrics.copy(preparationWork = saturatedAdd(meter.metrics.preparationWork, work))
     }
 
     private fun <T> withChild(

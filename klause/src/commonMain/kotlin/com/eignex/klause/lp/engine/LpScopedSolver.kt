@@ -385,7 +385,6 @@ internal class LpScopedSolver(
         token: ExecutionControl = cancellation,
         allowance: LpFloatAllowance? = null,
     ): Pair<LpSolver, FloatLpResult?>? {
-        require(warm == null || allowance == null) { "an explicit allowance requires retained factors" }
         requireAvailable()
         discardFloatProgress()
         lastResult = null
@@ -404,9 +403,12 @@ internal class LpScopedSolver(
                     LpFloatAllowance(workLimit, iterationLimit)
                 } else null
                 observeFloatQuery(current, current === previous, queryAllowance, token, LpQueryRoute.SCOPED_FLOAT)
-                (if (warm == null) current.resolveBounds(
-                    queryAllowance,
-                ) else current.solve(warm)).also {
+                when {
+                    warm == null -> current.resolveBounds(queryAllowance)
+                    allowance != null && current is PersistentLpSolver ->
+                        current.withFloatAllowance(allowance) { current.solve(warm) }
+                    else -> current.solve(warm)
+                }.also {
                     lastFloatTermination = current.lastTermination
                 }
             } catch (primary: Throwable) {
@@ -569,21 +571,29 @@ internal class LpScopedSolver(
 
     private fun adoptNumerical(next: LpExactState, token: ExecutionControl): Boolean {
         val current = solver ?: return !token.pollStop()
-        if (next !== state && (preparationAllocationLimit != Long.MAX_VALUE || preparationWorkLimit != Long.MAX_VALUE)) {
+        val funded = preparationAllocationLimit != Long.MAX_VALUE || preparationWorkLimit != Long.MAX_VALUE
+        if (next !== state && funded) {
             val projection = LpProjectionMeter(
                 workLimit = (preparationWorkLimit - preparationWork).coerceAtLeast(0L),
                 allocationLimit = (preparationAllocationLimit - preparationAllocation).coerceAtLeast(0L),
                 cancellation = token,
             )
+            var constructionBound = 0L
             try {
-                if (next.ownerWorkingModel(projection) == null) return false
+                val model = next.ownerWorkingModel(projection) ?: return false
                 projection.reserveVectors(next.model)
+                val bound = LpScalingView.constructionWorkBound(model)
+                projection.reserve(bound, 0L, matrix = true)
+                constructionBound = bound
                 return current.adopt(next, token)
             } catch (_: LpProjectionStop) {
                 return false
             } finally {
                 preparationWork = saturatedAdd(preparationWork, projection.work)
                 preparationAllocation = saturatedAdd(preparationAllocation, projection.allocation)
+                reservedConstructionWork = saturatedAdd(reservedConstructionWork, constructionBound)
+                constructionWork = saturatedAdd(constructionWork,
+                    (current as? PersistentLpSolver)?.takePendingPreparationWork() ?: 0L)
             }
         }
         if (next.canProjectWorkingModel(token)) return current.adopt(next, token)

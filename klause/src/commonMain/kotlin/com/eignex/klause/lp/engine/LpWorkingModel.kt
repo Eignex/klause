@@ -51,8 +51,7 @@ internal data class LpWorkingMetrics(
     val measuredWork: Long get() = saturatedSum(
         solves.workOps,
         solves.preparationOps,
-        (owners.preparationWork - owners.reservedConstructionWork).coerceAtLeast(0L),
-        owners.constructionWork,
+        owners.measuredPreparationWork,
         basisWork,
         continuationWork,
         certificationWork,
@@ -83,6 +82,7 @@ internal class LpWorkingScope internal constructor(
     val state: LpExactState get() = model.state
     val lastFloatTermination: LpFloatTermination? get() = owner.lastFloatTermination
     fun restrictPreparation(grant: LpCertificationGrant) = owner.restrictPreparation(grant)
+    fun prepareFloat(work: Long): Boolean = owner.prepare(cancellation, work)
     val metrics: LpWorkingMetrics get() = LpWorkingMetrics(
         attempts,
         solves,

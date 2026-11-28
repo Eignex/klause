@@ -317,9 +317,13 @@ internal class ReconstructionAuthority private constructor(
             meter.step()
             chargePremises(source?.row(i)?.premises)
         }
-        costs = List(size) { meter.fraction(source?.objective?.cost(it)?.value ?: requireNotNull(floating).exactCost(it)) }
+        costs = List(size) {
+            meter.fraction(source?.objective?.cost(it)?.value ?: requireNotNull(floating).exactCost(it))
+        }
         rhs = List(m) { meter.fraction(source?.rhs(it)?.value ?: requireNotNull(floating).exactRhs(it)) }
-        origins = List(n) { meter.fraction(source?.column(it)?.origin?.value ?: requireNotNull(floating).exactShift(it)) }
+        origins = List(n) {
+            meter.fraction(source?.column(it)?.origin?.value ?: requireNotNull(floating).exactShift(it))
+        }
         constant = meter.fraction(source?.objective?.constant?.value ?: requireNotNull(floating).exactConstant())
         scale = meter.fraction(source?.objective?.scale?.value ?: BigFraction.ONE)
         external = meter.fraction(source?.objective?.externalConstant?.value ?: BigFraction.ZERO)

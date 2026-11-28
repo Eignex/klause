@@ -184,7 +184,8 @@ class RealLeafOptimizationTest {
         val results = BacktrackSolver(oppositeMagnitudes.bake(), context).improvements(objective, params).toList()
 
         assertEquals(listOf(0.0, 0.0), results.map { it.objectiveValue })
-        assertEquals(TerminationReason.RepresentationDeclined, assertIs<MinimizeResult.BestFound>(results.last()).reason)
+        val terminal = assertIs<MinimizeResult.BestFound>(results.last())
+        assertEquals(TerminationReason.RepresentationDeclined, terminal.reason)
     }
 
     @Test
