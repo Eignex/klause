@@ -114,6 +114,7 @@ internal object SolveMetric {
         val timestamp = Instant.now().toString()
         val sha = timings.measure("harnessGitIdentityMs") { Reports.readGitSha() }
         val name = Reports.fileStem(ref.name)
+        val stdoutFile = File(outDir, "$name.out")
         val (rec, raw) = runCatching {
             timings.measure("harnessModelResolveMs") {
                 SourcePreparationCapture.measure("model-resolve") { Runners.resolve(ref, settings.exact) }
@@ -132,7 +133,8 @@ internal object SolveMetric {
                         }
                     }
                 }
-                solve(entry, settings, budget, timestamp, sha, timings = timings)
+                solve(entry, settings.copy(stdoutFile = settings.stdoutFile ?: stdoutFile), budget, timestamp, sha,
+                    timings = timings)
             },
             { failure ->
                 if (failure is MiniZincCompileFailure) {
@@ -148,7 +150,7 @@ internal object SolveMetric {
                 } to null
             },
         )
-        raw?.let { File(outDir, "$name.out").writeText(it) }
+        raw?.copyTo(stdoutFile)
         // Excludes serialization and writing of the timing record itself.
         timings.finish("harnessSolveOneMs", started)
         val retained = rec.copy(stats = rec.stats + timings.stats())
@@ -218,7 +220,7 @@ internal object SolveMetric {
             SolverInvocation::run,
         modelOutput: (ProblemRef, String) -> String = MiniZincRunner()::modelOutput,
         timings: HarnessTimings = HarnessTimings(),
-    ): Pair<SolveRecord, String?> {
+    ): Pair<SolveRecord, SolverOutput?> {
         val started = timings.start()
         val optimize = timings.measure("harnessObjectiveMs") {
             SourcePreparationCapture.measure("model-objective") { entry.optimizes }
@@ -250,7 +252,7 @@ internal object SolveMetric {
                 null to mapOf("finalWitnessUnavailable" to unavailable)
             } else if (r.feasible == true) {
                 timings.measure("harnessWitnessMs") {
-                    witness(entry.ref, r.rawOutput) { ref, raw ->
+                    witness(entry.ref, r.stdout) { ref, raw ->
                         timings.measure("harnessOutputMappingMs") { modelOutput(ref, raw) }
                     }
                 }
@@ -264,7 +266,7 @@ internal object SolveMetric {
                     sourceHashes = sourceHashes,
                     finalWitness = witness,
                 )
-            } to r.rawOutput
+            } to r.stdout
         }.getOrElse { failure ->
             val invocation = (failure as? SolverInvocation.Failure)?.result
             val failed = if (failure is MiniZincIdentityFailure) {
@@ -282,7 +284,7 @@ internal object SolveMetric {
                     buildFingerprint = provenance?.fingerprint,
                 )
             println("?? [${entry.name}] $kind ERROR: ${record.stats["errorMessage"] ?: record.stats["errorClass"]}")
-            record to invocation?.rawOutput
+            record to invocation?.stdout
         }
         timings.finish("harnessSolveMs", started)
         return result.first.copy(stats = result.first.stats + timings.stats()) to result.second
@@ -294,7 +296,7 @@ internal object SolveMetric {
      *  FlatZinc-level text (`flatzinc`), with why under `stats.finalWitnessMappingError`. */
     private fun witness(
         ref: ProblemRef,
-        raw: String,
+        raw: SolverOutput,
         modelOutput: (ProblemRef, String) -> String,
     ): Pair<String?, Map<String, String>> {
         if (ref.format != Format.MINIZINC) {

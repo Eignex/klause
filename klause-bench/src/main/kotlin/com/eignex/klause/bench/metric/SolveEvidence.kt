@@ -4,13 +4,16 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
+import java.io.BufferedReader
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.nio.CharBuffer
 import java.security.MessageDigest
 import java.util.Locale
 
 /** How a record's claims were judged: the solver's own report, unchecked by the bench. */
 internal const val REPORTED_RESULT_POLICY = "reported-result-v1"
+internal const val MINIZINC_SOLUTION_SEPARATOR = "----------"
 
 internal object SolveEvidence {
     private const val MAX_WITNESS_CHARS = 8 * 1024 * 1024
@@ -77,16 +80,23 @@ internal object SolveEvidence {
         raw: String,
         maxChars: Int = MAX_WITNESS_CHARS,
         modelOutput: ((String) -> String)? = null,
+    ): String? = finalWitness(format, SolverOutput.Text(raw), maxChars, modelOutput)
+
+    fun finalWitness(
+        format: Format,
+        raw: SolverOutput,
+        maxChars: Int = MAX_WITNESS_CHARS,
+        modelOutput: ((String) -> String)? = null,
     ): String? {
         val witness = when (format) {
             Format.MINIZINC -> miniZincWitness(raw, modelOutput)
 
             Format.SMTLIB -> finalSmtModel(raw, maxChars)
 
-            Format.XCSP3 -> xcspInstantiation(raw)?.let { "v $it" }
+            Format.XCSP3 -> raw.reader().useLines(::xcspInstantiation)?.let { "v $it" }
 
             Format.OPB, Format.DIMACS, Format.WCNF, Format.MPS ->
-                raw.lineSequence().lastOrNull { it == "v" || it.startsWith("v ") }
+                raw.reader().useLines { lines -> lines.lastOrNull { it == "v" || it.startsWith("v ") } }
 
             else -> null
         }
@@ -94,40 +104,68 @@ internal object SolveEvidence {
     }
 
     /** The assignments of the last complete DZN solution in [raw], from its first assignment line on. */
-    fun miniZincSolution(raw: String): String? {
-        val complete = raw.split("----------").dropLast(1).lastOrNull() ?: return null
-        val lines = complete.lineSequence().filter { line ->
-            val trimmed = line.trim()
-            trimmed.isNotEmpty() && !trimmed.startsWith('%') && !trimmed.startsWith("=====")
-        }.toList()
-        val start = lines.indexOfFirst { ASSIGNMENT.containsMatchIn(it) }
-        return if (start < 0) null else lines.drop(start).joinToString("\n")
+    fun miniZincSolution(raw: String): String? = miniZincFrame(SolverOutput.Text(raw))?.assignments
+
+    private data class MiniZincFrame(val assignments: String?, val comments: String, val exactCoordinates: Boolean)
+
+    private fun miniZincFrame(raw: SolverOutput): MiniZincFrame? {
+        // Retain the line range of the last complete frame, even if the writer stopped inside the next one.
+        var frameStart = 0L
+        var frameEnd = -1L
+        var nextStart = 0L
+        raw.reader().useLines { lines ->
+            var position = 0L
+            for (line in lines) {
+                if (line.trim() == MINIZINC_SOLUTION_SEPARATOR) {
+                    frameStart = nextStart
+                    frameEnd = position
+                    nextStart = position + 1
+                }
+                position++
+            }
+        }
+        if (frameEnd < 0) return null
+        val assignments = StringBuilder()
+        val comments = StringBuilder()
+        var exactCoordinates = false
+        raw.reader().useLines { lines ->
+            var position = 0L
+            for (line in lines) {
+                if (position >= frameEnd) break
+                if (position++ < frameStart) continue
+                val trimmed = line.trim()
+                val exact = line.startsWith("% klause-exact: ") || line.startsWith("% klause-coordinate: ")
+                if (exact || line.startsWith("% klause-float-") || line.startsWith("% klause-assignment")) {
+                    comments.appendLine(line)
+                    exactCoordinates = exactCoordinates || exact
+                }
+                if (trimmed.isNotEmpty() && !trimmed.startsWith('%') && !trimmed.startsWith("=====") &&
+                    (assignments.isNotEmpty() || ASSIGNMENT.containsMatchIn(line))
+                ) {
+                    assignments.appendLine(line)
+                }
+            }
+        }
+        if (assignments.isNotEmpty()) assignments.setLength(assignments.length - 1)
+        if (comments.isNotEmpty()) comments.setLength(comments.length - 1)
+        return MiniZincFrame(assignments.toString().ifEmpty { null }, comments.toString(), exactCoordinates)
     }
 
     /** The last complete DZN solution, mapped by [modelOutput] when given, with the `% klause-exact:`,
      *  `% klause-coordinate:` and `% klause-float-` lines of that solution appended; an exact-coordinate-only
      *  solution keeps those lines alone. */
-    private fun miniZincWitness(raw: String, modelOutput: ((String) -> String)?): String? = (
-        miniZincSolution(raw)?.let { modelOutput?.invoke(it) ?: it }
-            ?: if (exactCoordinates(raw) != null) "" else null
-        )?.let { candidate ->
-        val comments = raw.split("----------").dropLast(1).lastOrNull()
-            ?.lineSequence()?.filter {
-                it.startsWith("% klause-exact: ") || it.startsWith("% klause-coordinate: ") ||
-                    it.startsWith("% klause-float-") || it.startsWith("% klause-assignment")
-            }?.joinToString("\n").orEmpty()
-        if (comments.isEmpty()) candidate else candidate + "\n" + comments
+    private fun miniZincWitness(raw: SolverOutput, modelOutput: ((String) -> String)?): String? {
+        val frame = miniZincFrame(raw) ?: return null
+        val candidate = frame.assignments?.let { modelOutput?.invoke(it) ?: it }
+            ?: if (frame.exactCoordinates) "" else return null
+        return if (frame.comments.isEmpty()) candidate else candidate + "\n" + frame.comments
     }
 
-    private fun exactCoordinates(raw: String): String? = raw.split("----------").dropLast(1).lastOrNull()
-        ?.lineSequence()?.filter { it.startsWith("% klause-exact: ") || it.startsWith("% klause-coordinate: ") }
-        ?.map { it.substringAfter(": ") }?.toList()?.takeIf { it.isNotEmpty() }?.joinToString("\n")
-
     /** The last complete XCSP3 `<instantiation>` of the `v ` lines, without their prefix. */
-    private fun xcspInstantiation(raw: String): String? {
+    private fun xcspInstantiation(lines: Sequence<String>): String? {
         var candidate: StringBuilder? = null
         var witness: String? = null
-        for (line in raw.lineSequence().filter { it.startsWith("v ") }.map { it.removePrefix("v ") }) {
+        for (line in lines.filter { it.startsWith("v ") }.map { it.removePrefix("v ") }) {
             if (line.trimStart().startsWith("<instantiation")) candidate = StringBuilder()
             val current = candidate ?: continue
             if (current.isNotEmpty()) current.append('\n')
@@ -140,22 +178,46 @@ internal object SolveEvidence {
         return witness
     }
 
-    private fun finalSmtModel(raw: String, maxChars: Int): String? {
-        var witnessStart = -1
-        var witnessEnd = 0
+    private fun finalSmtModel(raw: SolverOutput, maxChars: Int): String? {
+        var witnessStart = -1L
+        var witnessEnd = 0L
         var sat = false
         val scanner = SmtResponseScanner(status = { status ->
             sat = status == "sat"
-            witnessStart = -1
+            witnessStart = -1L
         }, model = { start, end ->
             if (sat) {
-                witnessStart = if (end - start <= maxChars) start else -1
+                witnessStart = if (end - start <= maxChars) start else -1L
                 witnessEnd = end
             }
         })
-        scanner.feed(raw)
+        val buffer = CharArray(8192)
+        raw.reader().use { reader ->
+            while (true) {
+                val count = reader.read(buffer)
+                if (count < 0) break
+                scanner.feed(CharBuffer.wrap(buffer, 0, count))
+            }
+        }
         scanner.finish()
         if (witnessStart < 0) return null
-        return raw.substring(witnessStart, witnessEnd)
+        return raw.reader().use { reader -> reader.readRange(witnessStart, (witnessEnd - witnessStart).toInt()) }
+    }
+
+    private fun BufferedReader.readRange(start: Long, length: Int): String? {
+        var remaining = start
+        while (remaining > 0) {
+            val skipped = skip(remaining)
+            if (skipped == 0L) return null
+            remaining -= skipped
+        }
+        val chars = CharArray(length)
+        var offset = 0
+        while (offset < length) {
+            val count = read(chars, offset, length - offset)
+            if (count < 0) return null
+            offset += count
+        }
+        return chars.concatToString()
     }
 }

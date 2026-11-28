@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.lab
 
 import com.eignex.klause.bench.metric.SolverInvocation
+import com.eignex.klause.bench.metric.SolverOutput
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
@@ -37,7 +38,7 @@ class LpLibraryAdapterTest {
                 val encoded = arguments.single { it.startsWith("source64=") }.substringAfter('=')
                 observed = Base64.getDecoder().decode(encoded).toString(Charsets.UTF_8)
                 SolverInvocation.Result(null, null, null, proven = false,
-                    stats = emptyMap(), rawOutput = "", command = "fixture")
+                    stats = emptyMap(), stdout = SolverOutput.Text(""), command = "fixture")
             }
 
             assertEquals(body, observed)

@@ -38,7 +38,7 @@ class SolveMetricTest {
                         stats = if (kind == "unsupported")
                             mapOf("smtModelRequest" to "unsupported", "smtModelRequestReason" to "conflicting option")
                         else mapOf("smtQueryResponses" to "2"),
-                        rawOutput = "sat\n(\n)\n", command = "fixture")
+                        stdout = SolverOutput.Text("sat\n(\n)\n"), command = "fixture")
                 })
 
             assertEquals(true, record.feasible)
@@ -66,7 +66,7 @@ class SolveMetricTest {
                 SolverInvocation.Result(
                     true, null, null, proven = false,
                     stats = text?.let { mapOf("numericalSemantics" to it) }.orEmpty(),
-                    rawOutput = "v X=1\n", command = "cli",
+                    stdout = SolverOutput.Text("v X=1\n"), command = "cli",
                 )
             },
         )
@@ -88,7 +88,7 @@ class SolveMetricTest {
                 SolverInvocation.Result(
                     null, null, null, proven = false,
                     stats = reported.takeIf { it.isNotEmpty() }?.let { mapOf("floatApproximation" to it) }.orEmpty(),
-                    rawOutput = "", command = "cli",
+                    stdout = SolverOutput.Text(""), command = "cli",
                 )
             },
         )
@@ -113,7 +113,7 @@ class SolveMetricTest {
                     true, 10.0, null, proven = true,
                     stats = mapOf("optimalityTolerance" to tolerance, "optimizationStatus" to status,
                         "objectiveBound" to "9.999"),
-                    rawOutput = "v X=1\n", command = "cli",
+                    stdout = SolverOutput.Text("v X=1\n"), command = "cli",
                 )
             },
         )
@@ -146,7 +146,7 @@ class SolveMetricTest {
             "larger", exactObjective = "27021597764222978/3", elapsedMs = 10, processElapsedMs = 110,
         )
         val result = SolverInvocation.Result(
-            true, null, null, proven = false, stats = emptyMap(), rawOutput = "", command = "cli",
+            true, null, null, proven = false, stats = emptyMap(), stdout = SolverOutput.Text(""), command = "cli",
             attribution = listOf(larger, smaller),
         )
 
@@ -233,7 +233,7 @@ class SolveMetricTest {
             installedBuild = { null },
             invoke = { _, _, _, _ ->
                 SolverInvocation.Result(
-                    null, null, null, proven = false, stats = emptyMap(), rawOutput = "",
+                    null, null, null, proven = false, stats = emptyMap(), stdout = SolverOutput.Text(""),
                     command = "cli", stderr = DIAGNOSTICS, stderrComplete = true,
                 )
             },
@@ -248,7 +248,7 @@ class SolveMetricTest {
         val capture = StderrCapture("diagnostic\n".byteInputStream()).start().await(100, processKilled = false)
         val invocation = SolverInvocation.Result(
             null, null, null, proven = false,
-            stats = mapOf("exit" to "7"), rawOutput = "partial\n", command = "fake",
+            stats = mapOf("exit" to "7"), stdout = SolverOutput.Text("partial\n"), command = "fake",
             stderr = capture.text, stderrComplete = capture.complete, stderrCapture = capture.status,
             compiledInputHashes = mapOf("flatzinc" to "retained-input"),
         )
@@ -268,7 +268,7 @@ class SolveMetricTest {
         assertEquals(invocation.stderrCapture, result.stderrCapture)
         assertEquals(invocation.compiledInputHashes, result.compiledInputHashes)
         assertEquals(invocation.stderr, result.stderr)
-        assertEquals("partial\n", raw)
+        assertEquals(SolverOutput.Text("partial\n"), raw)
     }
 
     @Test
@@ -291,7 +291,7 @@ class SolveMetricTest {
                     1,
                     proven = true,
                     stats = emptyMap(),
-                    rawOutput = "o 1/8\nv I=0 X=1/10\n",
+                    stdout = SolverOutput.Text("o 1/8\nv I=0 X=1/10\n"),
                     command = "cli",
                     exactObjective = "1/8",
                 )
@@ -315,7 +315,7 @@ class SolveMetricTest {
         val budget = Budget(10000)
         val invocation = SolverInvocation.Result(
             true, null, null, proven = false,
-            stats = mapOf("sourceInvocationMs" to "7"), rawOutput = "v X=1\n", command = "cli", elapsedMs = 7,
+            stats = mapOf("sourceInvocationMs" to "7"), stdout = SolverOutput.Text("v X=1\n"), command = "cli", elapsedMs = 7,
         )
 
         val (record, raw) = SolveMetric.solve(
@@ -340,7 +340,7 @@ class SolveMetricTest {
         assertEquals("7", record.stats["sourceInvocationMs"])
         assertEquals(7L, record.elapsedMs)
         assertEquals(10000L, record.budgetMs)
-        assertEquals(invocation.rawOutput, raw)
+        assertEquals(invocation.stdout, raw)
         assertEquals(fails, "errorClass" in record.stats)
     }
 

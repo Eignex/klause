@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.metric
 
+import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.report.Reports
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
@@ -20,6 +21,24 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SolverInvocationCaptureTest {
+    @Test
+    fun `a partial MiniZinc frame leaves the captured incumbent intact`() {
+        val directory = Files.createTempDirectory("cli-stdout-").toFile()
+        val complete = "x = 2;\n_objective = 2;\n----------\n"
+        val stdout = complete + "x = 1;\n_objective = 1;\n"
+        try {
+            val result = SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.MINIZINC,
+                captureDirectory = directory,
+                startProcess = { SolverInvocationFakeProcess("".byteInputStream(), stdout = stdout, exit = 7) })
+
+            assertEquals("2", result.exactObjective)
+            assertEquals("x = 2;\n_objective = 2;", SolveEvidence.finalWitness(Format.MINIZINC, result.stdout))
+            assertEquals(stdout, directory.resolve("cli.stdout").readText())
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
     @Test
     fun `a failed process retains its complete stdout and stderr artifacts`() {
         val directory = Files.createTempDirectory("cli-capture-").toFile()
