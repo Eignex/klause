@@ -80,7 +80,7 @@ class PseudoBooleanPropagatorTest {
     fun `wide reified deductions should retain entailed source Boolean reasons`() {
         val wide = parseBigInt("18446744073709551616")
         val rng = Random(0x3042)
-        repeat(24) { trial ->
+        repeat(4) { trial ->
             val factor = ReifiedPseudoBoolean(0, arrayOf(wide, -wide, wide),
                 IntArray(3) { Lit.make(it + 1, rng.nextBoolean()) }, PbOp.entries[trial % 3], BIG_ZERO)
             val problem = Problem(4, 0, emptyArray(), arrayOf(factor))

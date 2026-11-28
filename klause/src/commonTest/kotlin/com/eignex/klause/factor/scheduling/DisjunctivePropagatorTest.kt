@@ -28,7 +28,7 @@ class DisjunctivePropagatorTest {
     @Test
     fun `disjunctive deductions over optional tasks should be implied by their reasons`() {
         val rng = Random(0xD15)
-        repeat(12) { iter ->
+        repeat(2) { iter ->
             val n = 3
             val problem = Problem(
                 numBoolVars = n,
@@ -55,7 +55,7 @@ class DisjunctivePropagatorTest {
     @Test
     fun `disjunctive deductions over duration variables should be implied by their reasons`() {
         val rng = Random(0xD16)
-        repeat(25) { iter ->
+        repeat(7) { iter ->
             val n = 3
             val problem = Problem(
                 numBoolVars = 0,

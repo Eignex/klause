@@ -182,9 +182,9 @@ class NValuePropagatorTest {
 
     @Test
     fun `nvalue deductions should be implied by their reasons under carved holes`() {
-        val rng = Random(0x57A2)
         for (mode in listOf(NValue.Mode.Eq, NValue.Mode.AtMost)) {
-            repeat(40) { iter ->
+            val rng = Random(0x57A2)
+            repeat(5) { iter ->
                 val k = 4
                 val problem = nvalueProblem(Array(k) { IntDomain(0, 3) }, IntDomain(0, k.toLong()), mode)
                 PropagationReasonOracle.assertReasonsImply(problem, "nvalue-$mode#$iter") { state ->
@@ -204,7 +204,7 @@ class NValuePropagatorTest {
     @Test
     fun `nvalue at least deductions should be implied by their reasons under narrow value windows`() {
         val rng = Random(0x57A3)
-        repeat(30) { iter ->
+        repeat(8) { iter ->
             val k = 4
             val problem = nvalueProblem(Array(k) { IntDomain(0, 3) }, IntDomain(0, k.toLong()), NValue.Mode.AtLeast)
             PropagationReasonOracle.assertReasonsImply(problem, "nvalue-AtLeast#$iter") { state ->

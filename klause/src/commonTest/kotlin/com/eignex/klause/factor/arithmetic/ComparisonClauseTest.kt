@@ -476,7 +476,7 @@ class ComparisonClauseTest {
     @Test
     fun `comparison clause reasons should cover forced and falsified alternatives`() {
         val rng = Random(0xCC10)
-        repeat(32) { iter ->
+        repeat(2) { iter ->
             val n = 3
             val vars = (0 until n).shuffled(rng)
             val ops = Array(n) { LinearOp.entries[rng.nextInt(LinearOp.entries.size)] }

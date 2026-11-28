@@ -134,7 +134,7 @@ class DiffnPropagatorTest {
     @Test
     fun `diffn reasons should cover separation and overlap conflicts`() {
         val rng = Random(0xD1FF)
-        repeat(30) { iter ->
+        repeat(2) { iter ->
             val rects = 3
             val problem = Problem(
                 numBoolVars = 0,

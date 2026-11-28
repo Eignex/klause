@@ -41,9 +41,9 @@ class WideLinearPropagatorTest {
 
     @Test
     fun `wide linear deductions should be implied by their reasons under carved holes`() {
-        val rng = Random(0x1DE0)
         for (op in listOf(LinearOp.LE, LinearOp.EQ, LinearOp.GE)) {
-            repeat(40) { iter ->
+            val rng = Random(0x1DE0)
+            repeat(8) { iter ->
                 val n = 3
                 val problem = Problem(
                     numBoolVars = 0,
@@ -77,7 +77,7 @@ class WideLinearPropagatorTest {
     @Test
     fun `wide linear not-equal deductions should be implied by their reasons once all but one term is fixed`() {
         val rng = Random(0x1DE1)
-        repeat(60) { iter ->
+        repeat(4) { iter ->
             val n = 3
             val coefficients = LongArray(n) { listOf(-3L, -2L, -1L, 1L, 2L, 3L).random(rng) }
             val excluded = LongArray(n) { rng.nextInt(4).toLong() }

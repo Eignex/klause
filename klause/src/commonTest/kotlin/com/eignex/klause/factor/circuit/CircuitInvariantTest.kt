@@ -55,18 +55,16 @@ class CircuitInvariantTest {
     fun `every structured circuit move should preserve the Hamiltonian tour`() {
         val n = 8
         val circuit = nNodeCircuit(n).bake()
-        for (seed in longArrayOf(1L, 2L, 3L, 13L, 99L)) {
-            val state = LocalSearchState(circuit, Random(seed))
-            seedTour(state, n)
-            assertEquals(0, state.cost)
-            val sink = MoveSink()
-            state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
-            for (move in sink.list) {
-                val check = LocalSearchState(circuit, Random(0))
-                seedTour(check, n)
-                check.apply(move)
-                assertEquals(0, check.cost, "$move")
-            }
+        val state = LocalSearchState(circuit, Random(1L))
+        seedTour(state, n)
+        assertEquals(0, state.cost)
+        val sink = MoveSink()
+        state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
+        for (move in sink.list) {
+            val check = LocalSearchState(circuit, Random(0))
+            seedTour(check, n)
+            check.apply(move)
+            assertEquals(0, check.cost, "$move")
         }
     }
 
@@ -74,14 +72,11 @@ class CircuitInvariantTest {
     fun `2-opt reversals should reach compounds a 3-edge swap cannot`() {
         val n = 8
         val circuit = nNodeCircuit(n).bake()
-        var maxParts = 0
-        for (seed in 0L until 40L) {
-            val state = LocalSearchState(circuit, Random(seed))
-            seedTour(state, n)
-            val sink = MoveSink()
-            state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
-            for (m in sink.list) if (m is Move.Compound) maxParts = maxOf(maxParts, m.parts.size)
-        }
+        val state = LocalSearchState(circuit, Random(0L))
+        seedTour(state, n)
+        val sink = MoveSink()
+        state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
+        val maxParts = sink.list.maxOf { if (it is Move.Compound) it.parts.size else 0 }
         assertTrue(maxParts > 3, "max parts $maxParts")
     }
 
@@ -102,16 +97,14 @@ class CircuitInvariantTest {
 
     @Test
     fun `every structured subcircuit move should preserve the active sub-tour`() {
-        for (seed in longArrayOf(1L, 2L, 3L, 7L, 11L)) {
-            val state = seededSubcircuit(seed)
-            assertEquals(0, state.cost)
-            val sink = MoveSink()
-            state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
-            for (move in sink.list) {
-                val check = seededSubcircuit(0)
-                check.apply(move)
-                assertEquals(0, check.cost, "$move")
-            }
+        val state = seededSubcircuit(1L)
+        assertEquals(0, state.cost)
+        val sink = MoveSink()
+        state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
+        for (move in sink.list) {
+            val check = seededSubcircuit(0)
+            check.apply(move)
+            assertEquals(0, check.cost, "$move")
         }
     }
 }

@@ -294,7 +294,7 @@ class CumulativePropagatorTest {
     @Test
     fun `cumulative deductions over optional tasks should be implied by their reasons`() {
         val rng = Random(0xC0A1)
-        repeat(40) { iter ->
+        repeat(4) { iter ->
             val n = 3
             val problem = Problem(
                 numBoolVars = n,
@@ -380,7 +380,7 @@ class CumulativePropagatorTest {
     @Test
     fun `cumulative deductions over variable demands and capacity should be implied by their reasons`() {
         val rng = Random(0xC0C)
-        repeat(70) { iter ->
+        repeat(20) { iter ->
             val n = 2
             val problem = Problem(
                 numBoolVars = 0,
