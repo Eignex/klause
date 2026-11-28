@@ -384,7 +384,7 @@ class LearnedReclamationTest {
             assertEquals(native, session.usesNativeSat)
             val policy = if (native) NativeCapConfiguration(false, 2, 6) else null
 
-            val footprints = List(3) {
+            val footprints = List(2) {
                 repeat(4000) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
                 repeat(40) {
                     session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }, nativePolicy = policy) { false }

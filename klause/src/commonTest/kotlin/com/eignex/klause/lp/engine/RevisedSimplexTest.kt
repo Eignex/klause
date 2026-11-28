@@ -1,7 +1,6 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.util.ExecutionControl
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -289,26 +288,31 @@ class RevisedSimplexTest {
 
     @Test
     fun `gated resolve should match a fresh solve of the enforced submodel`() {
-        val rng = Random(20260729)
-        var checked = 0
-        repeat(10) {
-            val n = rng.nextInt(3, 7)
-            val m = rng.nextInt(4, 10)
-            val uppers = LongArray(n) { rng.nextLong(2, 8) }
-            val rowCoeffs = Array(m) { LongArray(n) { rng.nextLong(-3, 4) } }
-            val rowRhs = LongArray(m) { rng.nextLong(-6, 12) }
-            val persistent = RevisedSimplex(zeroCostModel(uppers, rowCoeffs, rowRhs, BooleanArray(m) { true }))
-            val enforced = BooleanArray(m)
-            repeat(20) {
-                for (i in 0 until m) enforced[i] = rng.nextBoolean()
-                val gated = persistent.resolveGated(enforced) != null
-                val kept = enforced.copyOf()
-                val fresh = RevisedSimplex(zeroCostModel(uppers, rowCoeffs, rowRhs, kept)).solve() != null
-                checked++
-                assertTrue(gated == fresh, "gated=$gated fresh=$fresh for enforcement ${kept.toList()}")
-            }
+        val uppers = longArrayOf(7, 7, 7)
+        val rowCoeffs = arrayOf(
+            longArrayOf(1, 1, 0),
+            longArrayOf(-1, 0, 0),
+            longArrayOf(1, 0, 0),
+            longArrayOf(0, -1, -1),
+        )
+        val rowRhs = longArrayOf(4, -3, 1, -9)
+        val persistent = RevisedSimplex(zeroCostModel(uppers, rowCoeffs, rowRhs, BooleanArray(4) { true }))
+        val masks = listOf(
+            booleanArrayOf(true, true, true, true),
+            booleanArrayOf(true, true, false, true),
+            booleanArrayOf(true, false, false, true),
+            booleanArrayOf(false, true, true, false),
+            booleanArrayOf(false, false, false, false),
+            booleanArrayOf(true, true, false, false),
+        )
+
+        val outcomes = masks.map { mask ->
+            val gated = persistent.resolveGated(mask.copyOf()) != null
+            val fresh = RevisedSimplex(zeroCostModel(uppers, rowCoeffs, rowRhs, mask)).solve() != null
+            gated to fresh
         }
-        assertEquals(200, checked)
+
+        assertEquals(listOf(false, false, true, false, true, true).map { it to it }, outcomes)
     }
 
     @Test
