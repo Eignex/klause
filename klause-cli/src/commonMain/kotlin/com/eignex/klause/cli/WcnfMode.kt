@@ -17,20 +17,16 @@ import com.eignex.util.io.useSource
  * each original variable's value as a `0`/`1` bit-string (relaxation variables are not reported).
  * `-s` statistics are `c` comment lines.
  */
-internal object WcnfMode : CliMode {
-    override val names = listOf("wcnf", "maxsat")
-    override val extensions = listOf("wcnf")
-    override fun newSession(): ModeSession = Session()
+internal object WcnfMode {
+    fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
-        override fun flags(): List<FlagSpec> = emptyList()
-
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(wcnfSemantics)
             val parsed = openTextFile(path).useSource { Dimacs.parseWcnf(it) }.toProblem(
                 common.config.problemSettings(), semanticOverrides = overrides,
             )
-            cliLogger(common.verbose).v {
+            logVerbose(common.verbose) {
                 "parsed ${fileName(path)}: vars=${parsed.numOriginalBoolVars} " +
                     "auxiliaries=${parsed.problem.numBoolVars - parsed.numOriginalBoolVars} factors=${parsed.problem.numFactors}"
             }

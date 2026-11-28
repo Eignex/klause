@@ -38,15 +38,11 @@ import kotlin.time.TimeSource
  * `s UNBOUNDED` / `s UNSATISFIABLE` / `s UNKNOWN` and a `v name=value` line. `-s` statistics are `c`
  * comment lines.
  */
-internal object MpsMode : CliMode {
-    override val names = listOf("mps")
-    override val extensions = listOf("mps")
-    override fun newSession(): ModeSession = Session()
+internal object MpsMode {
+    fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
         private var outputState = MpsOutputState()
-
-        override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val start = TimeSource.Monotonic.markNow()

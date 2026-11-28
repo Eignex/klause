@@ -14,20 +14,16 @@ import com.eignex.util.io.useSource
  * by `0`. `-s` statistics are emitted as `c` comment lines. Weighted CNF (MaxSAT) is a distinct
  * format with an objective, handled by [WcnfMode].
  */
-internal object DimacsMode : CliMode {
-    override val names = listOf("dimacs", "cnf", "sat")
-    override val extensions = listOf("cnf")
-    override fun newSession(): ModeSession = Session()
+internal object DimacsMode {
+    fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
-        override fun flags(): List<FlagSpec> = emptyList()
-
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(dimacsSemantics)
             val problem = openTextFile(path).useSource { Dimacs.parse(it) }.toProblem(
                 common.config.problemSettings(), semanticOverrides = overrides,
             )
-            cliLogger(common.verbose).v {
+            logVerbose(common.verbose) {
                 "parsed ${fileName(path)}: bool=${problem.numBoolVars} factors=${problem.numFactors}"
             }
             val render: (Sample) -> String = { s -> renderDimacsModel(problem.numBoolVars, s) }

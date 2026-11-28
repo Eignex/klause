@@ -156,15 +156,15 @@ class SourceOptionsTest {
     @Test
     fun `inapplicable source controls should be rejected before a format opens its input`() {
         val requests = listOf<Pair<CliMode, Array<String>>>(
-            DimacsMode to arrayOf("--unbounded-int-lo", "1"),
-            WcnfMode to arrayOf("--unbounded-int-lo", "1"),
-            OpbMode to arrayOf("--unbounded-int-lo", "1"),
-            Xcsp3Mode to arrayOf("--unbounded-int-lo", "1"),
-            SmtLibMode to arrayOf("--source-relative-tolerance", "0"),
-            SmtLibMode to arrayOf("--source-relative-optimality-tolerance", "0"),
-            MiniZincMode to arrayOf("--source-relative-optimality-tolerance", "0"),
-            MiniZincMode to arrayOf("--pin-absent-optional-values", "false"),
-            MpsMode to arrayOf("--pin-absent-optional-values", "false"),
+            CliMode.DIMACS to arrayOf("--unbounded-int-lo", "1"),
+            CliMode.WCNF to arrayOf("--unbounded-int-lo", "1"),
+            CliMode.OPB to arrayOf("--unbounded-int-lo", "1"),
+            CliMode.XCSP3 to arrayOf("--unbounded-int-lo", "1"),
+            CliMode.SMTLIB to arrayOf("--source-relative-tolerance", "0"),
+            CliMode.SMTLIB to arrayOf("--source-relative-optimality-tolerance", "0"),
+            CliMode.MINIZINC to arrayOf("--source-relative-optimality-tolerance", "0"),
+            CliMode.MINIZINC to arrayOf("--pin-absent-optional-values", "false"),
+            CliMode.MPS to arrayOf("--pin-absent-optional-values", "false"),
         )
         for ((mode, args) in requests) {
             val common = CommonOptions()
@@ -177,8 +177,8 @@ class SourceOptionsTest {
     @Test
     fun `the same integer source controls should reach FlatZinc and SMT model declarations`() {
         for ((mode, text) in listOf(
-            MiniZincMode to "var int: x; solve satisfy;",
-            SmtLibMode to "(declare-const x Int) (check-sat)",
+            CliMode.MINIZINC to "var int: x; solve satisfy;",
+            CliMode.SMTLIB to "(declare-const x Int) (check-sat)",
         )) {
             val input = File.createTempFile("source-controls", ".input").apply {
                 writeText(text)

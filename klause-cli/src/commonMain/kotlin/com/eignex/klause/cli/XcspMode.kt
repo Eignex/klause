@@ -14,14 +14,10 @@ import com.eignex.util.io.useSource
  * `s UNSATISFIABLE` / `s UNKNOWN` status, and a `v <instantiation>` line with named values.
  * `-s` statistics are emitted as `c` comment lines.
  */
-internal object Xcsp3Mode : CliMode {
-    override val names = listOf("xcsp3", "xcsp")
-    override val extensions = listOf("xml", "xcsp", "xcsp3")
-    override fun newSession(): ModeSession = Session()
+internal object Xcsp3Mode {
+    fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
-        override fun flags(): List<FlagSpec> = emptyList()
-
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(xcsp3Semantics)
             // Parsing only reads: the base bake runs as presolve step 0, bounded by the presolve deadline.
@@ -29,7 +25,7 @@ internal object Xcsp3Mode : CliMode {
             val parsed = openTextFile(path).useSource { source ->
                 Xcsp3.parse(source, common.config.problemSettings(), semanticOverrides = overrides)
             }
-            cliLogger(common.verbose).v {
+            logVerbose(common.verbose) {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} int=${parsed.problem.numIntVars} " +
                     "factors=${parsed.problem.numFactors}"
             }

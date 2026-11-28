@@ -33,10 +33,8 @@ import kotlin.time.TimeSource
  * standard solution protocol (`----------` per solution, `==========` for completed search,
  * `=====UNSATISFIABLE=====` / `=====UNKNOWN=====`, `%%%mzn-stat` for `-s`).
  */
-internal object MiniZincMode : CliMode {
-    override val names = listOf("minizinc", "fzn", "flatzinc")
-    override val extensions = listOf("fzn")
-    override fun newSession(): ModeSession = Session()
+internal object MiniZincMode {
+    fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
         private var oznPath: String? = null
@@ -79,7 +77,7 @@ internal object MiniZincMode : CliMode {
             val original = program.sourceProgram
             sourceSemantics = original.semantics
             floatSource = original.floatVarsByName.isNotEmpty()
-            cliLogger(common.verbose).v {
+            logVerbose(common.verbose) {
                 "parsed $path: bools=${original.problem.numBoolVars} ints=${original.problem.numIntVars} " +
                     "factors=${original.problem.numFactors}"
             }
