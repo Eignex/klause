@@ -16,6 +16,7 @@ import com.eignex.lab.bench.BenchSuite
 import com.eignex.lab.bench.MetricDirection
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
 
 /** Paired repeat-invocation measurements of installed JVM CLI entry points. */
 fun main(args: Array<String>) {
@@ -25,8 +26,8 @@ fun main(args: Array<String>) {
 }
 
 private object CliWarmSuite : BenchSuite {
-    private const val REPETITIONS = 18
-    private const val WARMUPS = 5
+    private const val REPETITIONS = 100
+    private const val WARMUPS = 25
 
     override fun describe() = BenchDescriptor("cli-warm", "Warm installed CLI entry-point latency and CPU")
 
@@ -54,6 +55,16 @@ private object CliWarmSuite : BenchSuite {
         val root = requireNotNull(context.worktree).toFile()
         val seed = case.parameters.getValue("seed").toLong()
         CliStartupProfile.captureWarm(root, source, out, REPETITIONS, seed)
+        val outputs = (1..REPETITIONS).map { out.resolve("warm-$it.out") }
+        val protocolHashes = outputs.map { nativeOutcome(it, source.extension == "mps") }.distinct()
+        check(protocolHashes.size == 1) { "Warm terminal protocol differed on ${source.name}" }
+        val outputHashes = outputs.associateWith { sha256(it.readBytes()) }
+        out.resolve("output-sha256.tsv").writeText(outputHashes.entries.joinToString("\n", postfix = "\n") {
+            "${it.key.name}\t${it.value}"
+        })
+        val outputVariants = outputs.distinctBy { outputHashes.getValue(it) }
+        val retainedOutputs = (outputVariants + outputs.last()).distinct()
+        for (duplicate in outputs - retainedOutputs.toSet()) check(duplicate.delete())
         val timings = out.resolve("warm.tsv").readLines().drop(1).map { line ->
             line.split('\t').map(String::toLong)
         }
@@ -69,7 +80,8 @@ private object CliWarmSuite : BenchSuite {
         val details = buildJsonObject {
             put("schema", "cli-warm-v1")
             put("sourceSha256", input.sha256)
-            put("stdoutSha256", sha256(out.resolve("warm-1.out").readBytes()))
+            put("terminalProtocolSha256", protocolHashes.single())
+            put("stdoutVariants", outputVariants.size)
             put("solverSeed", seed)
             put("nodeLimit", 100_000)
             put("exact", true)
@@ -77,8 +89,18 @@ private object CliWarmSuite : BenchSuite {
             put("measured", warm.size)
             put("javaRuntime", System.getProperty("java.runtime.version"))
         }
-        val artifacts = listOf("warm.tsv", "warm.time", "warm.err", "warm-1.out", "warm-$REPETITIONS.out")
+        val artifacts = (listOf("warm.tsv", "warm.time", "warm.err", "output-sha256.tsv") + retainedOutputs.map { it.name })
             .map { context.artifact(it) }
         return BenchResult(case.id, metrics = metrics, artifacts = artifacts, details = details)
+    }
+
+    private fun nativeOutcome(output: File, mps: Boolean): String {
+        if (!mps) return sha256(output.readBytes())
+        val lines = output.readLines()
+        val status = lines.indexOfLast { it.startsWith("s ") }
+        val finalObjective = lines.take(status.coerceAtLeast(0)).indexOfLast { it.startsWith("o ") }
+        if (finalObjective < 0) return sha256(output.readBytes())
+        val policies = lines.filter { it.startsWith("c numericalSemantics=") || it.startsWith("c optimalityTolerance=") }
+        return sha256((policies + lines.drop(finalObjective)).joinToString("\n").encodeToByteArray())
     }
 }
