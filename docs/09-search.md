@@ -615,6 +615,12 @@ scans. Its window scratch belongs to one fire, so interruption discards that scr
 and leaves the factor queued to rebuild it. Completed deductions and their historical
 reasons survive; an incomplete fixpoint supplies no LP rounding witness or refutation.
 
+Global cardinality retains a previous variable-to-value flow assignment. When the
+network needs a new flow, a surviving assignment seeds one unit along its recorded
+residual edges if the value minimum or the remaining total capacity can receive it.
+Maximum flow completes or reroutes these seeds before residual filtering or conflict
+explanation.
+
 Shared CP assertions also poll the search context's containing allowance. A cancelled
 assertion retracts to its completed parent and retains the same alternative for a
 pausing traversal to retry. Retraction clears native incompleteness only after it

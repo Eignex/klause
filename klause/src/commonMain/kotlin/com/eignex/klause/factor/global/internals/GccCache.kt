@@ -45,6 +45,7 @@ internal class GccIncrementalState(state: PropagationState, val xs: IntArray, va
 internal class GccPropCache(val cachedDoms: Array<IntDomain?>) {
     val flow = GccFlowBuilder()
     var flowAssign: RevIntArray? = null
+    var assignmentReplay: GccAssignmentReplay? = null
 
     /** Reversible delta state for the incremental `definite`/`possible` counts (plain, no-presence
      *  path). Created on the first plain fire; a var-set change would recreate it (the var set is
@@ -106,5 +107,17 @@ internal class GccPropCache(val cachedDoms: Array<IntDomain?>) {
         if (xToOtherBuf.size < n) xToOtherBuf = IntArray(n)
         for (i in 0 until n) xToOtherBuf[i] = -1
         return xToOtherBuf
+    }
+}
+
+internal class GccAssignmentReplay(variableCount: Int, valueCount: Int) {
+    val supply = IntArray(variableCount)
+    val minimum = IntArray(valueCount)
+    val aboveMinimum = IntArray(valueCount)
+    var remainingTotal = -1
+
+    fun reset() {
+        minimum.fill(-1)
+        remainingTotal = -1
     }
 }
