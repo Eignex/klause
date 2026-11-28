@@ -482,7 +482,9 @@ internal object SolverInvocation {
                             line.startsWith("% klause-exact: _objective = ") ||
                                 line.startsWith("% klause-coordinate: _objective = ") ||
                                 line.startsWith(OBJECTIVE_KEY) || line.startsWith(MODEL_OBJECTIVE_KEY) -> {
-                                val value = ExactObjective.parse(line.substringAfter('=').trim().removeSuffix(";").trim())
+                                val value = ExactObjective.parse(
+                                    line.substringAfter('=').trim().removeSuffix(";").trim(),
+                                )
                                 if (value != null) pendingMiniZincObjective = value
                             }
                         }
@@ -596,8 +598,11 @@ internal object SolverInvocation {
             },
             stats = stats,
             attribution = attribution,
-            stdout = if (stdoutCapture != null) SolverOutput.Spool(requireNotNull(stdoutFile))
-                else SolverOutput.Text(raw?.toString().orEmpty()),
+            stdout = if (stdoutCapture != null) {
+                SolverOutput.Spool(requireNotNull(stdoutFile))
+            } else {
+                SolverOutput.Text(raw?.toString().orEmpty())
+            },
             command = cmd.joinToString(" "),
             stderr = diagnostics.text,
             stderrComplete = diagnostics.complete,

@@ -136,8 +136,11 @@ class SolverInvocationTest {
             val failure = assertFailsWith<SolverInvocation.Failure> {
                 SolverInvocation.withSourceInput(packed, Budget(10_000)) { plain, _ ->
                     staged = plain
-                    throw SolverInvocation.Failure(SolverInvocation.Result(null, null, null, proven = false,
-                        stats = mapOf("exit" to "2"), stdout = SolverOutput.Text("partial"), command = "cli", elapsedMs = 3), "failed")
+                    throw SolverInvocation.Failure(
+                        SolverInvocation.Result(null, null, null, proven = false, stats = mapOf("exit" to "2"),
+                            stdout = SolverOutput.Text("partial"), command = "cli", elapsedMs = 3),
+                        "failed",
+                    )
                 }
             }
 

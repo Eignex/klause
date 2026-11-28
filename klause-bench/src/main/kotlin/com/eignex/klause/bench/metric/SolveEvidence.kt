@@ -168,8 +168,11 @@ internal object SolveEvidence {
                 }
             }).iterator()
             val candidate = when {
-                solution.hasNext() -> if (modelOutput == null) boundedLines(solution.asSequence(), maxChars)
-                    else modelOutput(solution.asSequence(), maxChars)
+                solution.hasNext() -> if (modelOutput == null) {
+                    boundedLines(solution.asSequence(), maxChars)
+                } else {
+                    modelOutput(solution.asSequence(), maxChars)
+                }
                 exactCoordinates -> ""
                 else -> null
             } ?: return@useLines null

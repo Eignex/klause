@@ -338,7 +338,8 @@ class SolveMetricTest {
         val budget = Budget(10000)
         val invocation = SolverInvocation.Result(
             true, null, null, proven = false,
-            stats = mapOf("sourceInvocationMs" to "7"), stdout = SolverOutput.Text("v X=1\n"), command = "cli", elapsedMs = 7,
+            stats = mapOf("sourceInvocationMs" to "7"),
+            stdout = SolverOutput.Text("v X=1\n"), command = "cli", elapsedMs = 7,
         )
 
         val (record, raw) = SolveMetric.solve(
