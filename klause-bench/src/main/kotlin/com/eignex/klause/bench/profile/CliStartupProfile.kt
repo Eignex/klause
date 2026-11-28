@@ -18,6 +18,8 @@ object CliStartupProfile {
         "$CLI.DimacsMode\$Session::load", "$CLI.MpsMode\$Session::load", "$CLI.SmtLibMode\$Session::runCommands",
         "$CLI.SmtLibMode\$Session::loadSource", "$CLI.CliLogKt::cliLogger",
         "$CLI.SolveCore::solve", "$PIPELINE.SourceSetup::selectRoute", "$PIPELINE.SourceExecutionKt::execute",
+        "$CLI.CliInvocationStatsKt::cliInvocationStats", "$CLI.SolveCore::withModelObjective",
+        "$CLI.PresolveEffortStatsKt::presolveEffortStats",
         "$PIPELINE.FinitePipeline::prepare", "$PIPELINE.NativeSourceExecutionKt::executeNativeSource",
         "com.eignex.klause.arithmetic.quadratic.QuadraticCandidates::proposeActiveRows",
         "com.eignex.koblas.Koblas__KoblasEngineKt::<clinit>", "$KOBLAS_BACKEND::getDefault",
@@ -70,6 +72,14 @@ object CliStartupProfile {
     }
 
     private const val CLI_INSTALL = "klause-cli/build/install/klause-cli-jvm"
+
+    internal fun captureFresh(root: File, input: File, out: File, repeats: Int, seed: Long): List<Long> {
+        val script = root.resolve(CLI_INSTALL).resolve("bin/klause-cli")
+        val command = listOf(script.absolutePath) + solveOptions(input, seed)
+        return (1..repeats).map { iteration ->
+            runProcess(command, runtime, root, out.resolve("fresh-$iteration"))
+        }
+    }
 
     internal fun captureWarm(root: File, input: File, out: File, repeats: Int, seed: Long) {
         val dist = root.resolve(CLI_INSTALL)
@@ -126,9 +136,9 @@ object CliStartupProfile {
         }
     }
 
-    private fun runProcess(command: List<String>, options: List<String>, root: File, artifact: File) {
+    private fun runProcess(command: List<String>, options: List<String>, root: File, artifact: File): Long {
         val timed = listOf("/usr/bin/time", "-f", "%e\t%U\t%S\t%M", "-o", "$artifact.time")
-        val process = ProcessBuilder(timed + command).directory(root)
+        val builder = ProcessBuilder(timed + command).directory(root)
             .redirectOutput(File("$artifact.out")).redirectError(File("$artifact.err"))
             .apply {
                 environment()["KLAUSE_DEBUG"] = "false"
@@ -143,12 +153,16 @@ object CliStartupProfile {
                 environment().remove("JAVA_TOOL_OPTIONS")
                 environment().remove("_JAVA_OPTIONS")
                 environment()["JAVA_HOME"] = System.getProperty("java.home")
-            }.start()
+            }
+        val start = System.nanoTime()
+        val process = builder.start()
         if (!process.waitFor(90, TimeUnit.SECONDS)) {
             process.descendants().forEach { it.destroyForcibly() }
             process.destroyForcibly()
             error("Child exceeded whole-process allowance: $artifact")
         }
+        val elapsed = System.nanoTime() - start
         check(process.exitValue() == 0) { "$artifact exited ${process.exitValue()}" }
+        return elapsed
     }
 }
