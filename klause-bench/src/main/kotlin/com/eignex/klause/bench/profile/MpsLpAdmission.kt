@@ -25,6 +25,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
+import com.eignex.klause.solver.pipeline.FinitePipelinePreparation
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 import com.eignex.klause.solver.pipeline.SourceAttachment
@@ -39,14 +40,25 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.File
 import java.lang.management.ManagementFactory
+import java.lang.reflect.Proxy
 import java.util.Base64
 import kotlin.time.Duration.Companion.seconds
 
 internal object MpsLpAdmission {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..2 && args[0].startsWith("batch64="))
-        require(args.size == 1 || args[1] in setOf("queries=true", "queries=checkpoint"))
+        require(args.size in 1..5 && args[0].startsWith("batch64="))
+        val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
+        require(options.size == args.size - 1 && options.keys.all {
+            it in setOf("queries", "input-mib", "preparation-seconds", "preparation-work")
+        })
+        val queries = options["queries"]
+        require(queries == null || queries in setOf("true", "checkpoint"))
+        val inputBytes = inputByteLimit(options["input-mib"]?.toInt() ?: 16)
+        val limits = PreparationLimits(
+            options["preparation-seconds"]?.toInt() ?: 20,
+            options["preparation-work"]?.toLong() ?: 1_650_000_000L,
+        )
         val requests = Json.decodeFromString<List<List<String>>>(
             Base64.getDecoder().decode(args[0].substringAfter('=')).decodeToString(),
         )
@@ -54,38 +66,53 @@ internal object MpsLpAdmission {
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         requests.forEachIndexed { index, request ->
-            inspect(request, out.resolve("$index").apply { mkdirs() }, args.getOrNull(1))
+            inspect(request, out.resolve("$index").apply { mkdirs() }, queries, inputBytes, limits)
         }
     }
 
-    private fun inspect(request: List<String>, out: File, queries: String?) {
+    internal fun inputByteLimit(mebibytes: Int): Int {
+        require(mebibytes in 1..64)
+        return mebibytes * 1024 * 1024
+    }
+
+    internal data class PreparationLimits(val seconds: Int, val work: Long) {
+        init {
+            require(seconds in 1..120)
+            require(work in 1L..6_600_000_000L)
+        }
+    }
+
+    private fun inspect(request: List<String>, out: File, queries: String?, inputBytes: Int,
+        limits: PreparationLimits) {
         val options = request.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys == setOf("suite", "problem", "sha256"))
         val source = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
-        val bytes = CorpusFiles.open(CorpusFetcher.resolve(source.source)).use { it.readNBytes(16 * 1024 * 1024 + 1) }
-        require(bytes.size <= 16 * 1024 * 1024 && sha256(bytes) == options.getValue("sha256"))
+        val bytes = CorpusFiles.open(CorpusFetcher.resolve(source.source)).use { it.readNBytes(inputBytes + 1) }
+        require(bytes.size <= inputBytes && sha256(bytes) == options.getValue("sha256"))
         out.resolve("source.mps").writeBytes(bytes)
         val parsed = Mps.parse(bytes.decodeToString())
-        val stop = ExecutionControl.after(20.seconds)
+        val stop = ExecutionControl.after(limits.seconds.seconds)
         val original = requireNotNull(parsed.toLinearSourceProblem(cancellation = stop))
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             SourceAttachment(original, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
             maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE, cancellation = stop,
         ))
-        val plan = requireNotNull(invocation.preparedPlan)
+        val plan = requireNotNull(invocation.preparedPlan) {
+            "finite plan unavailable: route=${invocation.route::class.simpleName}, cancelled=${stop()}"
+        }
         val canonical = requireNotNull(plan.model)
         val sourceObjective = preparedObjective(plan)
-        val budget = PresolveBudget(1_650_000_000L)
+        val budget = PresolveBudget(limits.work)
         val preparation = FinitePipeline.prepare(FinitePipelineRequest(
             canonical, FiniteEngine.BACKTRACK, sourceObjective,
             cancellation = stop, solveCancellation = stop, presolveBudget = budget,
             randomSeed = 3L, preparedPlan = plan,
         ))
-        check(preparation.presolve?.infeasible != true) { "preparation refuted source" }
         val problem = preparation.problem
         val objective = preparation.objective
-        val report = buildJsonObject {
+        val status = preparationStatus(preparation, budget, stop)
+        val prepared = buildJsonObject {
             put("revision", Reports.readGitSha())
             put("suite", options.getValue("suite"))
             put("problem", options.getValue("problem"))
@@ -93,10 +120,11 @@ internal object MpsLpAdmission {
             put("scope", "prepared-root-relaxation-diagnostic")
             put("searchExecuted", false)
             put("sourceVerdictClaim", false)
-            put("preparationWorkAllowance", budget.allowance)
-            put("preparationWork", budget.spent())
-            put("preparationDeadlineSeconds", 20)
-            put("preparationCancelled", stop())
+            put("inputByteLimit", inputBytes)
+            put("preparationDeadlineSeconds", limits.seconds)
+            put("preparationDeadlineScope", "source-lowering-through-shape")
+            put("preparationWorkScope", "finite-pipeline")
+            status.forEach { (key, value) -> put(key, value) }
             put("preparationMaySolveBounds", true)
             put("canonicalFactors", canonical.factors.size)
             put("preparedObjectivePresent", sourceObjective != null)
@@ -106,18 +134,6 @@ internal object MpsLpAdmission {
             put("compiledBooleans", problem.numBoolVars)
             put("compiledReals", problem.numRealVars)
             put("compiledFactors", problem.factors.size)
-            put("factorKinds", buildJsonObject {
-                problem.factors.groupingBy { it::class.simpleName ?: "Factor" }.eachCount().toSortedMap()
-                    .forEach { (kind, count) -> put(kind, count) }
-            })
-            put("lpMaxTableauCells", problem.settings.lpMaxTableauCells)
-            put("lpCeilingTableauCells", problem.settings.lpCeilingTableauCells)
-            put("defaultAdmission", admission(problem, LpConfig.AUTO))
-            put("aggressiveAdmission", admission(problem, LpConfig.AGGRESSIVE))
-            put("mixedRecipes", recipes(problem as BakedProblem, objective, EngineMix.MIXED))
-            put("cpRecipes", recipes(problem, objective, EngineMix.BACKTRACK))
-            put("full", shape(problem, objective, false, stop))
-            put("objectiveCone", shape(problem, objective, true, stop))
             put("javaVersion", System.getProperty("java.version"))
             put("jvmMaxHeapBytes", Runtime.getRuntime().maxMemory())
             put("os", System.getProperty("os.name"))
@@ -126,11 +142,72 @@ internal object MpsLpAdmission {
                 ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
             })
         }
+        out.resolve("preparation.json").writeText("$prepared\n")
+        if (status["preparationComplete"] != JsonPrimitive(true)) {
+            out.resolve("admission.json").writeText("$prepared\n")
+            println(prepared)
+            return
+        }
+        var inspected = prepared
+        val report = try {
+            inspected = buildJsonObject {
+                prepared.forEach { (key, value) -> put(key, value) }
+                put("factorKinds", buildJsonObject {
+                    problem.factors.groupingBy { it::class.simpleName ?: "Factor" }.eachCount().toSortedMap()
+                        .forEach { (kind, count) -> put(kind, count) }
+                })
+                put("lpMaxTableauCells", problem.settings.lpMaxTableauCells)
+                put("lpCeilingTableauCells", problem.settings.lpCeilingTableauCells)
+                put("defaultAdmission", admission(problem, LpConfig.AUTO))
+                put("aggressiveAdmission", admission(problem, LpConfig.AGGRESSIVE))
+                put("mixedRecipes", recipes(problem as BakedProblem, objective, EngineMix.MIXED))
+                put("cpRecipes", recipes(problem, objective, EngineMix.BACKTRACK))
+            }
+            buildJsonObject {
+                inspected.forEach { (key, value) -> put(key, value) }
+                put("full", shape(problem, objective, false, stop))
+                put("objectiveCone", shape(problem, objective, true, stop))
+                preparationStatus(preparation, budget, stop).forEach { (key, value) -> put(key, value) }
+                put("shapeInspectionComplete", true)
+            }
+        } finally {
+            val finalPreparation = buildJsonObject {
+                inspected.forEach { (key, value) -> put(key, value) }
+                preparationStatus(preparation, budget, stop).forEach { (key, value) -> put(key, value) }
+            }
+            out.resolve("preparation.json").writeText("$finalPreparation\n")
+        }
         out.resolve("admission.json").writeText("$report\n")
         println(report)
+        if (preparationStatus(preparation, budget, stop)["preparationComplete"] != JsonPrimitive(true) ||
+            report["shapeInspectionComplete"] != JsonPrimitive(true)
+        ) return
         when (queries) {
-            "queries=true" -> MpsLpQuery.measure(problem, checkNotNull(objective), out)
-            "queries=checkpoint" -> MpsLpCheckpoint.measure(problem, checkNotNull(objective), out)
+            "true" -> MpsLpQuery.measure(problem, checkNotNull(objective), out)
+            "checkpoint" -> MpsLpCheckpoint.measure(problem, checkNotNull(objective), out)
+        }
+    }
+
+    internal fun preparationStatus(
+        preparation: FinitePipelinePreparation,
+        budget: PresolveBudget,
+        stop: ExecutionControl,
+    ): JsonObject {
+        val plan = preparation.javaClass.methods.single { it.name.startsWith("getExecutionPlan") }
+            .invoke(preparation) as PreparedSourcePlan?
+        val cancelled = stop()
+        val refuted = preparation.presolve?.infeasible == true
+        val baked = preparation.problem is BakedProblem
+        return buildJsonObject {
+            put("preparationWorkAllowance", budget.allowance)
+            put("preparationWork", budget.spent())
+            put("preparationCancelled", cancelled)
+            put("preparationRefuted", refuted)
+            put("preparedModelBaked", baked)
+            put("preparedPlanPresent", plan != null)
+            put("preparedPlanDecline", plan?.decline?.name)
+            put("preparationComplete", baked && plan != null && plan.decline == null && !refuted &&
+                !cancelled && budget.spent() < budget.allowance)
         }
     }
 
@@ -184,7 +261,7 @@ internal object MpsLpAdmission {
         }
     }
 
-    private fun admission(problem: Problem, config: LpConfig): JsonObject {
+    internal fun admission(problem: Problem, config: LpConfig): JsonObject {
         val method = LpAutoConfig.javaClass.methods.single { it.name.startsWith("admission$") }
         val observed = method.invoke(LpAutoConfig, problem, config, LpPlan())
         return buildJsonObject {
@@ -235,7 +312,7 @@ internal object MpsLpAdmission {
         return build.invoke(relaxer, domains, emptyList<Any>(), stop)
     }
 
-    private fun shape(problem: Problem, objective: LinearObjective?, cone: Boolean,
+    internal fun shape(problem: Problem, objective: LinearObjective?, cone: Boolean,
         stop: ExecutionControl): JsonObject {
         val relaxation = rootRelaxation(problem, objective, cone, stop)
         val model = get(relaxation, "Model")
@@ -260,11 +337,20 @@ internal object MpsLpAdmission {
         }
         val rowCounts = (0 until rows).groupingBy(::root).eachCount()
         val columnCounts = (0 until columns).groupingBy { root(rows + it) }.eachCount()
+        val coupled = rowCounts.keys.filter { it in columnCounts }
+        val rowOnly = rowCounts.entries.sumOf { (root, count) -> if (root in columnCounts) 0 else count }
+        val childCells = coupled.sumOf { root ->
+            val count = rowCounts.getValue(root).toLong()
+            count * (columnCounts.getValue(root) + count + 1L)
+        } + rowOnly.toLong() * (rowOnly + 1L)
+        val numerical = numericalOwnerShape(model, stop)
         return buildJsonObject {
             put("rows", rows)
             put("columns", columns)
             put("nonzeros", rowIndices.size)
             put("emittedDenseProxy", rows.toLong() * (columns.toLong() + rows + 1))
+            numerical.forEach { (key, value) -> put(key, value) }
+            put("naturalComponentDenseProxy", childCells)
             put("rowComponents", rowCounts.size)
             put("rowCoupledComponents", rowCounts.keys.count { (columnCounts[it] ?: 0) > 0 })
             put("rowOnlyRows", rowCounts.entries.sumOf { (root, count) -> if (root in columnCounts) 0 else count })
@@ -272,6 +358,39 @@ internal object MpsLpAdmission {
             put("largestComponentColumns", rowCounts.keys.maxOfOrNull { columnCounts[it] ?: 0 } ?: 0)
             put("isolatedColumns", (0 until columns).count { pointers[it] == pointers[it + 1] })
             put("persistentEligible", get(relaxation, "PersistentEligible") as Boolean)
+        }
+    }
+
+    private fun numericalOwnerShape(model: Any, stop: ExecutionControl): JsonObject {
+        val policy = Class.forName("com.eignex.klause.lp.bounding.LpComponentReuseKt")
+        val mergeWork = policy.getMethod("componentReuseMergeWork").invoke(null) as Long
+        val admissionType = Class.forName("com.eignex.klause.lp.engine.LpComponentAdmission")
+        var observed: Any? = null
+        val admission = Proxy.newProxyInstance(admissionType.classLoader, arrayOf(admissionType)) { _, method, args ->
+            when (method.name) {
+                "inspect" -> true
+                "getOwnerMergeWork" -> mergeWork
+                "accepts" -> {
+                    observed = requireNotNull(args)[0]
+                    false
+                }
+                else -> error("Unexpected diagnostic admission call: ${method.name}")
+            }
+        }
+        val factory = Class.forName("com.eignex.klause.lp.engine.ComponentLpSolverKt").methods.single {
+            it.name == "componentLpSolverOrNull" && it.parameterCount == 6
+        }
+        val engine: (Any, ExecutionControl, Int) -> Nothing = { _, _, _ -> error("Diagnostic constructed an engine") }
+        val component: (Any, List<Any>, List<Any>, IntArray) -> Nothing = { _, _, _, _ ->
+            error("Diagnostic constructed a component owner")
+        }
+        factory.invoke(null, model, stop, null, engine, component, admission)
+        check(!stop())
+        return buildJsonObject {
+            put("ownerMergeWork", mergeWork)
+            put("numericalOwners", observed?.let { get(it, "Blocks") as Int } ?: 0)
+            put("componentDenseProxy", observed?.let { get(it, "ComponentCells") as Long } ?: 0L)
+            put("modeledComponentBytes", observed?.let { get(it, "ModeledBytes") as Long } ?: 0L)
         }
     }
 
