@@ -122,8 +122,12 @@ private class ExactOptimizationRun(
         val cost = checked.metrics
         cache.accountInput(cost.work, cost.allocation, elapsed)
         observe(cost.work, cost.allocation, elapsed, 0)
-        if (cancellation()) throw ContinuationStop(ContinuationDecline.CANCELLED)
-        if (deadline?.invoke() == true) throw ContinuationStop(ContinuationDecline.TIME)
+        val interrupted = when {
+            cancellation() -> ContinuationDecline.CANCELLED
+            deadline?.invoke() == true -> ContinuationDecline.TIME
+            else -> null
+        }
+        if (interrupted != null) throw ContinuationStop(interrupted)
         if (policy.acceptBoolean(LpCertifier.RATIONAL, checked.witness != null || checked.conflict != null)) {
             val witness = policy.acceptNullable(LpCertifier.EXACT_BASIS, checked.witness)
             if (witness != null) return witness.primal

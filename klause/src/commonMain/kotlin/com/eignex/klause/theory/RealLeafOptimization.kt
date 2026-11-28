@@ -316,10 +316,14 @@ internal class RealLeafOptimization(
         val started = TimeSource.Monotonic.markNow()
         val grant = limits.maxTimeNs?.let { (it - exactTimeNs).coerceAtLeast(0L).nanoseconds }
         fun admit(work: Long, allocation: Long) {
-            if (cancellation()) throw ContinuationStop(ContinuationDecline.CANCELLED)
-            if (grant != null && started.elapsedNow() >= grant) throw ContinuationStop(ContinuationDecline.TIME)
-            if (work > remainingWork) throw ContinuationStop(ContinuationDecline.WORK)
-            if (allocation > funding.remainingAllocation) throw ContinuationStop(ContinuationDecline.ALLOCATION)
+            val decline = when {
+                cancellation() -> ContinuationDecline.CANCELLED
+                grant != null && started.elapsedNow() >= grant -> ContinuationDecline.TIME
+                work > remainingWork -> ContinuationDecline.WORK
+                allocation > funding.remainingAllocation -> ContinuationDecline.ALLOCATION
+                else -> null
+            }
+            if (decline != null) throw ContinuationStop(decline)
             chargeCell(work, allocation)
         }
         return try {
