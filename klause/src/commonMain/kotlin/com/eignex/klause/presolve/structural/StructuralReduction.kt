@@ -15,12 +15,7 @@ import com.eignex.util.collections.IntArrayList
 
 internal object StructuralReduction {
 
-    /**
-     * Apply every factor's own `Factor.structuralReduce` under the current domains, rewriting globals
-     * that their structure pins into simpler / lower-arity factors. The per-factor reductions are
-     * solution-set exact (the hook's contract), so the pass preserves the solution set; the driver only
-     * collects the replacements, intersects any returned bound narrowings into the domains, and rebuilds.
-     */
+    // `Factor.structuralReduce` is solution-set exact by contract, so the pass preserves the solution set.
     fun reduce(
         problem: BakedProblem,
         cancellation: ExecutionControl = ExecutionControl.Never,
@@ -69,15 +64,8 @@ internal object StructuralReduction {
         return PassDelta(dropped.toIntArray(), added, domains)
     }
 
-    /**
-     * The source form: the same hook, offered only to factors whose integer columns are all closed.
-     *
-     * A factor reasons from the domains it is handed, and an open column has none to hand — a box with an
-     * invented endpoint could let a factor conclude it is vacuous when the model is not. Over closed
-     * columns the declared value set, or the declared range when no set is stated, is the column's
-     * logical domain, so the hook's exactness holds as it does on the finite lane. A narrowing it returns
-     * is stated as a range, which is all a source pass may carry.
-     */
+    // Offered only to factors whose integer columns are all closed: an invented endpoint on an open column
+    // could let a factor conclude it is vacuous when the model is not. Narrowings are carried as ranges.
     fun reduceSource(
         problem: Problem,
         cancellation: ExecutionControl = ExecutionControl.Never,

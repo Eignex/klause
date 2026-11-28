@@ -12,24 +12,19 @@ import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.util.numbers.saturatedAdd
 import kotlin.time.TimeSource
 
-/**
- * One scheduled in-search simplification pass over the live constraint database. Passes run
- * per arm at a safe root boundary, with the session at the post-seed
- * root; each call works a bounded slice so a single restart never stalls on a full database sweep.
- *
- * Every pass must declare whether it preserves the variable set. The portfolio shares learned
- * clauses across arms under globally stable variable ids, and the native-SAT lane shares its base
- * clause arena read-only across arms — a variable-eliminating pass (BVE) in one arm would break
- * both contracts, so [Inprocessing] rejects such passes at construction. Variable-eliminating
- * simplification runs in presolve, once, before the portfolio fork.
- */
+// One scheduled in-search simplification pass, run per arm at a safe root boundary on a bounded slice so a
+// single restart never stalls on a full database sweep.
+//
+// Every pass must preserve the variable set: the portfolio shares learned clauses across arms under globally
+// stable variable ids, and the native-SAT lane shares its base clause arena read-only across arms. Variable
+// elimination runs once in presolve, before the portfolio fork.
 internal interface InprocessingPass {
-    /** True when the pass never adds, removes, or renames variables — the portfolio-safe category. */
+    // True when the pass never adds, removes, or renames variables.
     val preservesVariables: Boolean
     val spending: InprocessingSpending? get() = null
 
-    /** Run one bounded slice with [session] at the post-seed root, leaving it there, and count the work it
-     *  does into [stats] so a work-sliced search is charged for it. */
+    // Runs one bounded slice at the post-seed root, leaving the session there, and counts its work into stats
+    // so a work-sliced search is charged for it.
     fun run(
         session: PropagationSession,
         params: BacktrackParams,
@@ -37,7 +32,7 @@ internal interface InprocessingPass {
         containingWork: Long = Long.MAX_VALUE,
     )
 
-    /** Drop per-search cursors; called when the engine reseeds onto a fragment. */
+    // Called when the engine reseeds onto a fragment.
     fun reset()
 
     fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean = true) = Unit
@@ -58,10 +53,8 @@ internal interface InprocessingPass {
     ) = Unit
 }
 
-/**
- * Per-arm safe-root scheduling under one containing work ceiling. Restart cadence, optional work
- * and growth triggers share a cooldown that excludes the work the passes themselves spend.
- */
+// Per-arm safe-root scheduling under one containing work ceiling. Restart cadence, optional work and growth
+// triggers share a cooldown that excludes the work the passes themselves spend.
 internal class Inprocessing(
     private val passes: List<InprocessingPass>,
     private val cadence: Int,
@@ -284,17 +277,13 @@ internal class Inprocessing(
     }
 
     companion object {
-        /**
-         * Assemble the loop an engine's [params] ask for, or null when no pass is enabled. Seeded
-         * searches get no loop at all: a pass derives clauses by propagating at the current root,
-         * and with assumption pins standing those derivations would hold only under the pins yet be
-         * stored as unconditional learned clauses.
-         */
+        // Seeded searches get no loop: a pass derives clauses by propagating at the current root, and under
+        // assumption pins those derivations would be stored as unconditional learned clauses.
         fun from(params: BacktrackParams, stats: SearchStatsSink? = null): Inprocessing? {
             if (!params.assumptions.isEmpty || !params.assumptions.deductions.isEmpty) return null
             val passes = buildList {
-                // Subsumption first: it only shrinks the database, so vivification's probing works
-                // the surviving clauses instead of ones about to be dropped.
+                // Subsumption before vivification: it only shrinks the database, so vivification probes the
+                // surviving clauses instead of ones about to be dropped.
                 if (params.rootProbeBatch > 0) add(RootProbingPass())
                 if (params.rootSimplification) add(RootSimplificationPass())
                 if (params.subsumption) add(Subsumption())

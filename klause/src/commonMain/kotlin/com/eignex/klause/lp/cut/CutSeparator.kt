@@ -18,29 +18,21 @@ import com.eignex.klause.lp.statesUpperBound
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.util.numbers.BigFraction
 
-/** Everything a separator needs: the problem, the current relaxation, its LP solution, the session. */
 internal class CutContext(
     val problem: Problem,
     val relaxation: LpRelaxation,
-    /** Per-structural-column LP primal value (`FloatLpResult.primal`); the point to separate. */
     val primal: DoubleArray,
     val session: PropagationSession,
 ) {
-    /** The LP primal value of structural column [col] (0 outside the primal vector, e.g. an unmapped column). */
     fun primalOf(col: Int): Double = if (col in primal.indices) primal[col] else 0.0
 
-    /** The root (node-invariant) domain of integer variable [v] — the reference a separator compares
-     *  [session]'s live domain against; see [com.eignex.klause.lp.rootDomainOf]. */
     fun rootDomain(v: Int): IntDomain = problem.rootDomainOf(v)
 
-    /** Whether the model itself bounds integer variable [v] below, so a cut whose constants read that
-     *  root endpoint may be published as globally valid; see [com.eignex.klause.lp.statesLowerBound]. */
+    // A cut whose constants read a root endpoint is global only when the model itself states that bound.
     fun statesLowerBound(v: Int): Boolean = problem.statesLowerBound(v)
 
-    /** Whether the model itself bounds integer variable [v] above; see [statesLowerBound]. */
     fun statesUpperBound(v: Int): Boolean = problem.statesUpperBound(v)
 
-    /** Whether both of [v]'s root endpoints are the model's own; see [statesLowerBound]. */
     fun statesBothBounds(v: Int): Boolean = problem.statesBothBounds(v)
 
     fun withIntervalPremises(cut: Cut, variables: IntArray): Cut {
@@ -62,24 +54,14 @@ internal class CutContext(
     }
 }
 
-/**
- * Separates violated cuts from a fractional LP solution. Implementations inspect the LP point
- * and the problem structure and return cuts the point violates. Returning only violated cuts (rather
- * than all valid ones) keeps the LP from growing with constraints it does not need.
- */
+// Returns only cuts the LP point violates, so the LP does not grow with rows it does not need.
 internal interface CutSeparator {
     val family: CutFamily get() = CutFamily.UNSPECIFIED
     fun separate(ctx: CutContext): List<Cut>
 }
 
-/**
- * True when every [vars] member's live `[min, max]` equals the interval the model declares — a bound
- * derived from the live intervals is then valid at every solution, not only inside the node's box.
- *
- * A column whose root box closed a side the model left open never qualifies: its live interval matches
- * that box at the root, but the box bounds the search rather than the model, so a bound leaning on its
- * endpoint is exactly what may not be published as global.
- */
+// A bound from live intervals equal to the declared ones holds at every solution. A root box that closed a
+// side the model left open bounds the search, not the model, so such a column never qualifies.
 internal fun liveIntervalsAreDeclared(ctx: CutContext, vars: IntArray): Boolean {
     for (v in vars) {
         if (!ctx.statesBothBounds(v)) return false
@@ -90,8 +72,7 @@ internal fun liveIntervalsAreDeclared(ctx: CutContext, vars: IntArray): Boolean 
     return true
 }
 
-/** Hole-aware version of [liveIntervalsAreDeclared]: the live domain is always a subset of the root
- *  one, so equal sizes mean equal value sets. */
+// Hole-aware: the live domain is a subset of the root one, so equal sizes mean equal value sets.
 internal fun liveDomainsAreDeclared(ctx: CutContext, vars: IntArray): Boolean {
     for (v in vars) {
         if (!ctx.statesBothBounds(v)) return false

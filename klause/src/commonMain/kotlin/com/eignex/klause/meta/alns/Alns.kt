@@ -42,62 +42,28 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /**
- * Adaptive Large Neighborhood Search meta-optimizer on top of an arbitrary
- * [Optimizer] over [LocalSearchParams] (S. Ropke and D. Pisinger, "An Adaptive Large Neighborhood Search
- * Heuristic for the Pickup and Delivery Problem with Time Windows", Transportation Science 40(4), 2006,
- * https://doi.org/10.1287/trsc.1050.0135). Each iteration:
+ * Adaptive Large Neighborhood Search over an inner [Optimizer] (S. Ropke and D. Pisinger, "An Adaptive Large
+ * Neighborhood Search Heuristic for the Pickup and Delivery Problem with Time Windows", Transportation Science
+ * 40(4), 2006, https://doi.org/10.1287/trsc.1050.0135). Each iteration independent bandits pick a destroy and a
+ * repair operator, a randomized fraction of the variables is freed and the rest pinned via [Assumptions], and
+ * both bandits are rewarded by whether the repair beat the global best, was accepted, or was rejected. Rewards
+ * reach the bandits unchanged, so a bandit expecting Bernoulli probabilities needs rewards in `[0, 1]`.
  *
- *   1. Pick a destroy operator from [destroyOperators] via [destroyBandit] (kumulant
- *      [UnivariateBandit] — defaults to [RouletteWheelBandit]; swap in
- *      `MultiArmedBandit(BetaBernoulliTS())` for Thompson sampling or any other
- *      kumulant policy).
- *   2. Pick a repair operator from [repairOperators] via [repairBandit].
- *   3. Free a randomized fraction of the variables; pin the rest at incumbent values
- *      via [Assumptions].
- *   4. Hand the pinned problem to the chosen repair operator (typically calls
- *      `inner.minimize` with the pin set; alternative operators can vary the budget,
- *      restart cadence, or even the underlying solver).
- *   5. Reward both bandits: [newBestReward] / [acceptedReward] / [rejectedReward]
- *      depending on whether the repaired solution beats the global best, replaces the
- *      incumbent under [acceptance], or is rejected. Reward magnitudes are passed
- *      through to the bandit unchanged — callers using `BetaBernoulliTS` (which
- *      expects soft Bernoulli probabilities) should configure rewards in `[0, 1]`;
- *      the default values target `RouletteWheelBandit`'s weight-update scheme. Both
- *      bandits learn independently; the joint (destroy, repair) pair distribution
- *      emerges from their interaction.
- *
- * Compared to the [com.eignex.klause.localsearch.IteratedLocalSearchRestart] —
- * which lives inside the LS engine and re-anchors the assignment between flips — ALNS
- * is an *outer* loop: it repeatedly calls a repair operator with shrinking assumption
- * sets and lets the bandits learn which destroy/repair combo exposes the most rewarding
- * neighbourhood for this problem.
- *
- * Specialised to [LocalSearchParams] to override `maxFlips` per iteration.
- *
- * [LocalSearchParams.maxInstructions], when set, also bounds the outer destroy/repair loop: each
- * iteration is charged [flipsPerIteration] units — the allowance handed to that iteration's repair —
- * mirroring [com.eignex.klause.localsearch.LocalSearchSolver]'s counted restart (one transition, one
- * unit, regardless of the work it actually did). The loop stops at the first of [maxIterations],
- * the instruction budget, or [LocalSearchParams.cancellation]; the last iteration's own `maxFlips` is
- * clipped to whatever budget remains so a segment can't overshoot by a whole `flipsPerIteration`.
- * A resumable run retains both bootstrap searches until its first incumbent, then retains the
- * incumbent, acceptance policy and CP repair session across slices. Finite slices charge their offered
- * scheduling allowance separately from actual bootstrap and repair counters in [AlnsStats].
+ * [LocalSearchParams.maxInstructions] also bounds the outer loop: each iteration is charged [flipsPerIteration]
+ * units whatever its repair spent, and the last iteration's `maxFlips` is clipped to the remaining budget. A
+ * resumable run retains both bootstrap searches until its first incumbent, then the incumbent, acceptance policy
+ * and CP repair session across slices.
  */
 internal class Alns(
     val inner: Optimizer<LocalSearchParams>,
     val destroyOperators: List<DestroyOperator> = DestroyOperator.Defaults,
     val repairOperators: List<RepairOperator> = RepairOperator.Defaults,
     val acceptance: AcceptanceCriterion = AcceptanceCriterion.Improving,
-    /** Optional factory building the acceptance criterion from the initial incumbent's objective. A
-     *  simulated-annealing temperature is only meaningful relative to the objective's magnitude, so this
-     *  lets a caller scale the starting temperature to `f(initial)` (a fixed temperature would be inert on
-     *  a large objective and reckless on a tiny one). When null, [acceptance] is used as given. */
+    // A simulated-annealing temperature is only meaningful relative to the objective's magnitude, so the
+    // criterion can be built from the initial incumbent's objective.
     val acceptanceFor: ((initialObjective: Double) -> AcceptanceCriterion)? = null,
-    /** Bounds on the destroy size, as a fraction of the total variables. Each iteration draws the fraction
-     *  uniformly from `[minDestroyFraction, maxDestroyFraction]` (fixed when they are equal) — the textbook
-     *  ALNS randomized degree of destruction, alternating small refining neighbourhoods with large
-     *  diversifying ones so no single fixed size dominates the search. */
+    // Each iteration draws the destroyed fraction of the variables uniformly from this range, alternating small
+    // refining neighbourhoods with large diversifying ones.
     val minDestroyFraction: Double = 0.1,
     val maxDestroyFraction: Double = 0.4,
     val maxIterations: Int = 50,
@@ -105,32 +71,19 @@ internal class Alns(
     val newBestReward: Double = 3.0,
     val acceptedReward: Double = 1.0,
     val rejectedReward: Double = 0.0,
-    /** Single RNG driving destroy-operator randomization, acceptance criteria, repair
-     *  contexts, and the default-constructed bandits. Pass `Random(seed)` for a fully
-     *  reproducible ALNS run from one seed — every randomized component derives its
-     *  draws from this stream. Users supplying custom bandits are responsible for
-     *  those bandits' RNGs (kumulant bandits each take a `random: Random` parameter). */
+    // Drives every randomized component except caller-supplied bandits, so one seed reproduces a run.
     val rng: Random = Random.Default,
     val destroyBandit: UnivariateBandit = RouletteWheelBandit(destroyOperators.size, random = rng),
     val repairBandit: UnivariateBandit = RouletteWheelBandit(repairOperators.size, random = rng),
-    /** Optional session for cross-iteration state. When provided, [InnerLsRepair] (and
-     *  any other repair operator that reads `context.session`) routes through it so
-     *  DDFW factor weights and per-variable activity recency survive across iterations.
-     *  Required to make `DestroyOperator.activityBiased(session)` useful — without a
-     *  session it falls back to random. Pass `solver.session() as LocalSearchSession`. */
+    // Lets repair operators keep factor weights and activity recency across iterations; activity-biased destroy
+    // falls back to random without it.
     val session: LocalSearchSession? = null,
-    /** Optional backtrack LCG+LP engine and base params for CP repair ([BacktrackRepair]). When
-     *  set, a repair operator can solve each freed fragment with full propagation + clause learning +
-     *  LP bounding under the pin assumptions. Null on a pure-LS ALNS. */
+    // CP repair engine; null on a pure-LS ALNS.
     val backtrack: Optimizer<BacktrackParams>? = null,
     val backtrackParams: BacktrackParams? = null,
-    /** The verified-incumbent exchange this run takes part in, both ways. Every incumbent the outer loop
-     *  accepts as a new best is offered to it, and only a candidate the exchange verifies *and* finds
-     *  strictly better than the standing one is installed. Before each iteration ALNS adopts a not-yet-seen
-     *  installed incumbent that beats its own, so the next neighbourhood is destroyed from the globally-best
-     *  assignment. Startup and each bootstrap slice also acquire incumbents, each verified against the source
-     *  problem under the active assumptions before adoption. Null falls back to
-     *  [LocalSearchParams.pooledIncumbents]. */
+    // Every new best is offered to the exchange, and before each iteration ALNS adopts an unseen installed
+    // incumbent that beats its own, so the next neighbourhood is destroyed from the global best. Null falls back
+    // to LocalSearchParams.pooledIncumbents.
     val pooledIncumbents: IncumbentExchange<Sample, Double>? = null,
     private val literalSweep: DefinitionalSweep? = null,
 ) : ResumableOptimizer<LocalSearchParams> {
@@ -157,8 +110,7 @@ internal class Alns(
 
     private val _iterationLog: MutableList<IterationRecord> = mutableListOf()
 
-    /** History snapshot exposed for tests / debugging; not part of the Optimizer contract.
-     *  Read-only view — ALNS appends internally; callers may iterate but not mutate. */
+    // For tests and debugging; not part of the Optimizer contract.
     val iterationLog: List<IterationRecord> get() = _iterationLog
 
     data class IterationRecord(
@@ -476,15 +428,9 @@ internal class Alns(
         }
     }
 
-    /**
-     * The first incumbent for the destroy/repair loop. For a hybrid ALNS (a backtrack engine is present)
-     * seed it with a *budget-bounded complete solve*: complete search reaches a first feasible fast on both
-     * easy and feasibility-tight problems — where local search flails and leaves ALNS with no incumbent at
-     * all — and hands over a CP-quality start. It is capped to a fraction of the run's budget
-     * (via [com.eignex.klause.util.ExecutionControl.shorten]) so destroy/repair keeps the rest, with
-     * [BOOTSTRAP_DECISIONS] as the safeguard for a budget-less (deadline-free) run. A pure-LS ALNS (no
-     * backtrack engine), or a fragment the bootstrap can't seed, falls back to local search.
-     */
+    // A hybrid ALNS seeds with a budget-bounded complete solve, which reaches a first feasible fast on
+    // feasibility-tight problems where local search may leave no incumbent at all. It takes a fraction of the run's
+    // budget, with BOOTSTRAP_DECISIONS as the safeguard for a deadline-free run; otherwise local search seeds.
     private fun bootstrapIncumbent(
         objective: LinearObjective,
         params: LocalSearchParams,
@@ -792,12 +738,9 @@ internal class Alns(
     }
 
     private companion object {
-        /** Budget slice ([com.eignex.klause.util.ExecutionControl.shorten]) the complete-engine bootstrap may
-         *  use before yielding to destroy/repair. Calibration knob. */
         const val BT_BOOTSTRAP_FRACTION = 0.5
 
-        /** Decision-count safeguard on the complete-engine bootstrap for a deadline-free run, where
-         *  `shorten` cannot bound by time. Big enough to reach a first feasible on tight problems. */
+        // Bounds the bootstrap on a deadline-free run, where `shorten` cannot bound by time.
         const val BOOTSTRAP_DECISIONS = 50_000L
     }
 }

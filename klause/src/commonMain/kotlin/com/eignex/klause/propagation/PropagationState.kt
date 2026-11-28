@@ -21,68 +21,37 @@ import com.eignex.util.collections.MutableIntObjectMap
 import com.eignex.util.collections.MutableLongIntMap
 import kotlin.time.TimeSource
 
-/** Sentinel for [PropagationState.propagateAtomsForVar]'s carved-value parameter. */
 internal const val NO_CARVE: Long = Long.MIN_VALUE
 
-/** Blocking-literal slot with no blocker: the watcher always fires. Lit ids are
- *  non-negative ([Lit.make] = `var shl 1 | sign`), so −1 is a safe sentinel. */
+// Lit ids are non-negative, so -1 is a safe sentinel; the watcher always fires.
 internal const val NO_BLOCKER: Int = -1
 
-/** Poll the cancellation token once every `CANCEL_POLL_MASK + 1` factor fires when a real token
- *  is supplied (power-of-two minus one so the gate is a single `and`). */
+// Power of two minus one so the poll gate is a single `and`.
 private const val CANCEL_POLL_MASK: Int = 1023
 
-/** Fires a single [PropagationState.runToFixpoint] must exceed before its cancellation poll engages.
- *  Below it the deadline is left to the engine's between-decision poll — only a runaway fixpoint (an
- *  O(span) bound crawl) does this many fires in one call, so normal propagation and resumable slicing
- *  stay untouched. A multiple of `CANCEL_POLL_MASK + 1` so the aligned poll lands exactly on it.
- *
- *  NOTE: a floor counts *fires*, but a deadline is spent in *work*. A fixpoint whose fires each allocate
- *  order atoms can burn tens of seconds in far fewer fires than this trips, leaving `-t` ignored; see
- *  [com.eignex.klause.backtrack.BacktrackParams.propagationCancelFloor] for the per-run override. */
+// Fires a runToFixpoint must exceed before its cancellation poll engages, so only a runaway fixpoint (an O(span)
+// bound crawl) pays for it. A multiple of CANCEL_POLL_MASK + 1 so the aligned poll lands on it. A floor counts
+// fires while a deadline is spent in work, so atom-allocating fires can overrun it; BacktrackParams has a per-run
+// override.
 internal const val PROPAGATION_CANCEL_FLOOR: Int = 1 shl 20
 
 /**
- * Mutable working state passed to [Propagator.propagate]. Tracks the currently-known pinned bool
- * values and the (tightened) int domains, plus a **decision level** per pinned variable for
- * conflict-driven backjumping.
- *
- *  - Decisions (external pins from the driver / session) bump the level monotonically.
- *  - Implied pins (from factor propagation) inherit the maximum level of the variables the
- *    factor reads — i.e. the deepest decision that contributed.
- *  - On contradiction, the set of decision levels touched by the failing factor is what the
- *    driver reports as [PropagationResult.Unsat.conflictLevels].
- *
- *  Factors don't see the level machinery directly — they only call `pinBool` /
- *  `tightenIntMin` / `tightenIntMax` / `setInt`. The driver sets `currentLevel`
- *  to the inherited level before each factor invocation; mutators read it.
+ * Mutable working state passed to [Propagator.propagate]: pinned bools, tightened int domains and a decision level
+ * per pinned variable. Decisions bump the level; implied pins inherit the deepest level among the variables the
+ * firing factor reads. On contradiction, the failing factor's levels become
+ * [PropagationResult.Unsat.conflictLevels].
  */
 class PropagationState private constructor(
     /** Propagation-engine projection of the problem being propagated. */
     val projection: PropagationProblem,
     assumptions: Assumptions,
-    /**
-     * Incremental-presolve mode. When `true` the state supports mid-life factors — the
-     * presolve session appends factors and tombstones others between rounds via [addMidlifeFactor] /
-     * [tombstoneFactor] instead of rebuilding a fresh `Problem` each pass. The int-event
-     * machinery is forced on so a mid-life factor that subscribes to typed events wakes correctly even
-     * when the initial problem had no such factor. Defaults to `false`: a search state never adds
-     * presolve factors, so every allocation and branch below drops out.
-     */
+    // Supports mid-life factors appended and tombstoned between presolve rounds, with the int-event machinery
+    // forced live. A search state never adds presolve factors.
     internal val incremental: Boolean = false,
-    /**
-     * Opt into the native-SAT BCP lane. When `true` and the problem is
-     * [PropagationProblem.isNativeSatEligible], propagation runs through [NativeSatState]
-     * — an arena-packed two-watched-literal loop — instead of the general factor-queue fixpoint, and
-     * the general per-literal / occurrence watch indices are left unregistered. Defaults to `false`.
-     */
+    // Runs propagation through [NativeSatState] when the problem is eligible, leaving the general watch indices
+    // unregistered.
     internal val nativeSat: Boolean = false,
-    /**
-     * Opt into pseudo-Boolean cutting-planes conflict learning. When `true` and the
-     * problem is pure-Boolean, [ConflictAnalyzer] runs a [PbConflictResolvent] (with a clause-resolvent
-     * fallback) so conflicts on pseudo-Boolean constraints learn PB nogoods, not just clauses. Defaults
-     * to `false`; ignored on problems with integer variables (order-literal atoms have no PB reason).
-     */
+    // Ignored on problems with integer variables: order-literal atoms have no PB reason.
     internal val pbLearning: Boolean = false,
     prepared: PropagationBuffers?,
 ) {
@@ -108,10 +77,7 @@ class PropagationState private constructor(
 
     private val usesNativeSat = nativeSat && projection.isNativeSatEligible
 
-    /** Two-bit-per-var three-valued pin store. [boolAssigned] says whether the variable has
-     *  a definite value; [boolValueBits] holds the value when assigned (ignored otherwise).
-     *  Backed by [Bits] — packed `LongArray`, 8× cache-denser than an `Array<Boolean?>`
-     *  and one less pointer indirection per read (no boxed `Boolean`). */
+    // [boolValueBits] holds the value when [boolAssigned] is set; packed bits are denser than `Array<Boolean?>`.
     internal val boolAssigned: Bits = prepared?.boolAssigned ?: (Bits(problem.numBoolVars))
     internal val boolValueBits: Bits = prepared?.boolValueBits ?: (Bits(problem.numBoolVars))
 
@@ -119,9 +85,7 @@ class PropagationState private constructor(
     // undo writes mirror the canonical bits: 0 is open, 1 is false, and 2 is true.
     internal val nativeBoolTruth: ByteArray? = if (usesNativeSat) ByteArray(problem.numBoolVars) else null
 
-    /** Operator-indexable view preserving the call-site syntax `state.boolValues[v]` and
-     *  `state.boolValues[v] = x`. Reads `null` when unassigned. Write `null` clears the
-     *  assigned bit. The backing storage is the parallel-Bits pair above. */
+    /** Indexable view of the Boolean assignment: reads `null` when unassigned, and writing `null` unassigns. */
     inner class BoolView {
         /** Number of Boolean variables. */
         val size: Int get() = problem.numBoolVars
@@ -148,35 +112,26 @@ class PropagationState private constructor(
     /** Read/write view over the current Boolean assignment. */
     val boolValues: BoolView = BoolView()
 
-    /** The stable root domains this state was seeded from — the search root, read by propagators for a
-     *  variable's original bounds.
-     *
-     *  A [BakedProblem] hands back the array its fold owns, so seeding costs no copy on the paths that
-     *  build a state per probe. Raw model data reaches here only where no fold exists yet — the root bake
-     *  that builds a projection, and `Problem.propagate` over a source model — and materializes the
-     *  declared value sets, which is what that projection is itself built from. */
+    /**
+     * The root domains this state was seeded from, read by propagators for a variable's original bounds. A
+     * [BakedProblem] hands over its folded array, so seeding a state per probe costs no copy.
+     */
     val rootDomains: Array<IntDomain> =
         prepared?.rootDomains ?: ((problem as? BakedProblem)?.foldedIntDomains ?: problem.finiteIntDomains())
 
     /** Per-int current domain (copy of [rootDomains], narrowed as propagation proceeds). */
     val intDomains: Array<IntDomain> = prepared?.intDomains ?: (Array(problem.numIntVars) { rootDomains[it] })
 
-    /** Vars whose pin/domain changed since the driver last drained them. Primitive int
-     *  ring buffers to avoid the autoboxing tax `ArrayDeque<Int>` pays on every push/poll. */
+    // Primitive ring buffers avoid autoboxing on every push and poll.
     internal val dirtyBools: IntArrayDeque =
         prepared?.dirtyBools ?: (IntArrayDeque(initialCapacity = problem.numBoolVars.coerceAtLeast(8)))
     internal val dirtyInts: IntArrayDeque =
         prepared?.dirtyInts ?: (IntArrayDeque(initialCapacity = problem.numIntVars.coerceAtLeast(8)))
 
-    /** Typed int-event wakeup machinery (advisor index, pending-kind masks, delta accumulators) —
-     *  see [IntEventMachinery]. Empty when no factor opts in; forced live in [incremental] mode. */
     internal val intEvents: IntEventMachinery = prepared?.intEvents ?: (IntEventMachinery(projection, incremental))
 
-    // [propQueue] is the reusable factor worklist; [propStamp] is a per-factor "currently queued"
-    // membership set encoded as a generation stamp so resetting between propagation runs is
-    // O(1) (just bump [propGen]) instead of zeroing a `BooleanArray(factorCount)` on every
-    // pin. A factor is queued iff `propStamp[fid] == propGen`; dequeuing writes `propGen - 1`
-    // (any value ≠ propGen) so a factor can still re-enqueue itself within the same run.
+    // [propStamp] marks queued factors with a generation stamp, so a reset bumps [propGen] instead of zeroing an
+    // array per pin. Dequeuing writes `propGen - 1`, letting a factor re-enqueue within the same run.
     internal val propQueue: IntArrayDeque =
         prepared?.propQueue ?: IntArrayDeque(
             initialCapacity = if (usesNativeSat) 8 else problem.numFactors.coerceAtLeast(8),
@@ -186,9 +141,7 @@ class PropagationState private constructor(
     private var propGen: Int = 0
     internal var propagationSchedule: PropagationSchedule? = null
 
-    /** Reset the worklist for a new propagation run over [factorCount] factors. Grows
-     *  [propStamp] when learned clauses have pushed the factor count past its capacity, and
-     *  wraps [propGen] safely on the (astronomically rare) Int overflow. */
+    // Grows [propStamp] as learned clauses raise the factor count, and wraps [propGen] safely on overflow.
     private fun propBegin(factorCount: Int) {
         if (propStamp.size < factorCount) {
             var n = propStamp.size
@@ -204,7 +157,6 @@ class PropagationState private constructor(
         propagationSchedule?.begin()
     }
 
-    /** Enqueue [fid] if not already queued this run. */
     internal fun propEnq(fid: Int) {
         if (retiredLearnedFactor(fid)) {
             work++
@@ -226,20 +178,13 @@ class PropagationState private constructor(
     /** Deepest decision level contributing to this int var's current domain (-1 = untouched). */
     val intLevel: IntArray = prepared?.intLevel ?: (IntArray(problem.numIntVars) { -1 })
 
-    // Per-side split of [intLevel]: the decision level at which the *current* lower (resp. upper)
-    // bound was established. [intLevel] is the max of the two. Lets a current-bound order literal
-    // `[v ≥ d.min]` / `[v ≤ d.max]` reconstruct its exact (often shallower) level from a single
-    // slot, which is why [atomLevelForConflict] is a plain stored-slot read rather than a
-    // bound-history search. -1 = the bound is still at its root value (a level-0 global fact).
-    // Logged/restored by the undo trail.
+    // Level at which the current lower (resp. upper) bound was established; [intLevel] is the max of the two.
+    // -1 means the bound is still at its root value.
     internal val intMinLevel: IntArray = prepared?.intMinLevel ?: (IntArray(problem.numIntVars) { -1 })
     internal val intMaxLevel: IntArray = prepared?.intMaxLevel ?: (IntArray(problem.numIntVars) { -1 })
 
-    // Per-int-var interior-hole carve history: the (value, level, reason) at which each
-    // search-time interior carve happened. Bound moves need no such history — order literals carry
-    // their own level/reason on their trail slots. An eq atom ruled out by an
-    // interior hole materialized after the carve reads its level/reason from here. Lazily
-    // allocated, maintained while [undoLogging], truncated on backtrack via the undo log.
+    // Interior-hole carve history: an eq atom materialized after the carve reads its level and reason here. Bound
+    // moves need none, since order literals carry their own.
     internal val holeHistAnt: Array<ArrayList<IntArray?>?> = prepared?.holeHistAnt ?: (arrayOfNulls(problem.numIntVars))
 
     // Per int var, the undo-log positions of its bound-move records on the current path, oldest first, so a
@@ -273,37 +218,22 @@ class PropagationState private constructor(
     // that predates its deduction from a later one ([boolPinnedAt]). Meaningful only while the variable is pinned.
     internal val boolPinPos = prepared?.boolPinPos ?: (IntArray(problem.numBoolVars))
 
-    /**
-     * Decision-var encoded per level: index `lvl-1` holds either a bool var id (0..numBoolVars-1)
-     * or a shifted int var id (numBoolVars + intVar). Grows as decisions are pushed. Primitive
-     * int list (no boxing on push or indexed read).
-     */
+    // Index `lvl-1` holds a bool var id or `numBoolVars + intVar`.
     internal val levelToDecisionVar: IntArrayList =
         IntArrayList()
 
     /** Number of decisions pushed so far. Equals the maximum level. */
     val numDecisions: Int get() = levelToDecisionVar.size
 
-    /** Reused dedup scratch for [composeIntVarAtomAntecedents] — packed `(var, side, bound)` keys,
-     *  cleared per call so the constraint-wide reason path allocates no set and boxes no key. */
     private val composeAntecedentSeen: LongHashSet = LongHashSet()
 
-    /** Emit per-bound atom-lit antecedents for every var in [vars]. For each var,
-     *  if its current `min` is tighter than the initial domain min, emit `¬[v ≥ d.min]`;
-     *  similarly for the `max` side. The deduction's implicit clause is then
-     *  `(⋀ premises) → result`, which as antecedents-on-result is the disjunction of the
-     *  premises' negations.
-     *
-     *  Used by int-domain factors (AllDifferent, GCC, Element, Cumulative, Sort, ...)
-     *  that emit a constraint-wide reason: every involved var's current bounds participate
-     *  in the deduction. Per-bound atom-lits give 1UIP / minimization finer resolution than
-     *  the coarser bool-lit union that the antecedents-of-antecedents would unfold to.
-     *
-     *  Returns `null` when no var's bounds have been tightened past the initial domain —
-     *  the analyzer then treats the resulting int-fact as a level-0-style leaf. */
+    /**
+     * Bound-atom antecedents for a constraint-wide reason over [vars]: `¬[v ≥ d.min]` for each lower bound
+     * tightened past the root, likewise for upper bounds. Per-bound atoms give 1UIP and minimization finer
+     * resolution than the Boolean union they would unfold to. `null` when no bound is tightened, a level-0 leaf.
+     */
     fun composeIntVarAtomAntecedents(vars: IntArray): IntArray? {
-        // Reused, cleared per call (not re-entrant within one propagate) so the dedup pays no
-        // per-call set allocation nor the autoboxing a HashSet<Long> would on this hot reason path.
+        // Reused and not re-entrant within one propagate, so this hot reason path allocates and boxes nothing.
         val seen = composeAntecedentSeen
         seen.clear()
         val out = IntArrayList()
@@ -325,7 +255,6 @@ class PropagationState private constructor(
         return out.toIntArray()
     }
 
-    /** Level any pin created during the current factor invocation inherits. Set by the driver. */
     internal var currentLevel: Int = 0
         set(value) {
             field = value
@@ -341,25 +270,17 @@ class PropagationState private constructor(
         if (deferredLevelClause === literals) deferredLevelClause = null
     }
 
-    /** Settle the deferred level of the firing clause over [literals]; a no-op for any other fire. */
     internal fun settleClauseLevel(literals: IntArray) {
         if (deferredLevelClause === literals) currentLevel = maxLevelForClause(literals)
     }
 
-    /** Populated on contradiction; the driver reads it to form [PropagationResult.Unsat]. */
     @Suppress("DoubleMutabilityForCollection") // lazily allocated on conflict
     internal var conflictLevels: IntArray? = null
 
-    /** Per-var record of which factor most recently *forced* the value. `-1` means "set by a
-     *  decision / assumption, not by any factor's propagation step". Read by
-     *  [extractConflictFactors] to walk the propagation graph backwards from a conflict and
-     *  collect every factor that contributed. */
+    /** Factor that most recently forced each bool, `-1` for a decision or assumption. */
     val boolReason: IntArray = prepared?.boolReason ?: (IntArray(problem.numBoolVars) { -1 })
 
-    /** Factor that most recently tightened this int var's lower bound. `-1` = decision /
-     *  initial domain. Tracked separately from [intMaxReason] so two-sided narrowing
-     *  conflicts (one factor tightens min, another tightens max into infeasibility) both
-     *  surface in the core. */
+    /** Factor that most recently tightened this int var's lower bound, `-1` for a decision or the initial domain. */
     val intMinReason: IntArray = prepared?.intMinReason ?: (IntArray(problem.numIntVars) { -1 })
 
     /** Mirror of [intMinReason] for the upper bound. */
@@ -386,15 +307,10 @@ class PropagationState private constructor(
         get() = field?.takeIf { it.accepting || it.collectDeclines }
     internal var integerLearningTrailAtLevel: ((Int) -> Int?)? = null
 
-    /** Factor whose [Propagator.propagate] is currently running. Read by the impl methods so
-     *  state changes can be attributed back to a factor. `-1` between factor invocations
-     *  (decisions, assumption seeding) — those pins/tightenings record `reason = -1`. */
+    // -1 between factor invocations, so decisions and seed pins record reason -1.
     internal var currentFactor: Int = -1
 
-    /** Cumulative count of factor-forced assignments (bool pins + int tightens applied while
-     *  a factor's `propagate` is running, i.e. `currentFactor >= 0`). Decisions and seed
-     *  pins don't count. Read via [PropagationSession.propagationCount] for the
-     *  `propagations` stat; monotonic for the life of the state. */
+    // Factor-forced assignments only; decisions and seed pins do not count.
     internal var propagations: Long = 0L
 
     internal var work: Long = 0L
@@ -409,45 +325,28 @@ class PropagationState private constructor(
     internal var pendingFiniteMutation: FiniteDomainCompletion? = null
     internal var propagationNanos: Long = 0L
 
-    /** Set once [runToFixpoint]'s cancellation poll fires — the deadline passed mid-fixpoint, so the
-     *  state is at a partial (only-tightened, never over-pruned) fixpoint. Sticky: the deadline is
-     *  monotone, so once tripped the whole solve is aborting. The engine reads it through
-     *  [PropagationSession.fixpointCancelled] and returns `BudgetCapped` rather than treating the
-     *  under-propagated state as a solved leaf (which would be an unsound SAT). */
+    // Sticky, since the deadline is monotone. The engine returns `BudgetCapped` rather than reading the partial
+    // fixpoint as a solved leaf, which would be an unsound SAT.
     internal var runCancelled: Boolean = false
 
-    /** Per-call fire floor before [runToFixpoint]'s cancellation poll engages; see
-     *  [PROPAGATION_CANCEL_FLOOR]. Overridable so a test can force the runaway-fixpoint path
-     *  deterministically instead of having to drive a million-fire propagation. */
+    // Overridable so a test can force the runaway-fixpoint path without a million-fire propagation.
     internal var cancelFloor: Int = PROPAGATION_CANCEL_FLOOR
 
-    /**
-     * Seed set of factors directly implicated in a contradiction. Populated by [runToFixpoint]
-     * (the factor that returned `false`) and by the impl methods (both sides of a two-source
-     * narrowing). [extractConflictFactors] BFSes from this seed via the reason arrays to
-     * produce the full propagation-graph core.
-     */
-    // Reused across conflicts (cleared, not reallocated) and primitive (no Int boxing) — this is
-    // populated on the propagation conflict path, which is hot on conflict-heavy instances.
+    // Factors directly implicated in a contradiction; [extractConflictFactors] walks back from them. Reused and
+    // primitive because the conflict path is hot.
     internal val conflictSeedFactors: IntHashSet = IntHashSet()
 
-    /** Reused dedup scratch for [collectLevelsForVars] — avoids a per-conflict HashSet alloc. */
     internal val levelScratch: IntHashSet = IntHashSet()
 
     internal val conflictFactorScratch = ConflictFactorScratch()
 
-    /** Reused scratch for [com.eignex.klause.factor.bool.internals.pbFalseFormAntecedents] — a single
-     *  wide pseudo-Boolean factor pins many literals per sweep, each rebuilding the same assigned-literal
-     *  antecedent set, so a per-call [IntHashSet] alloc and its regrowth would dominate its root bake. */
+    // Reused: a wide pseudo-Boolean factor rebuilds the same antecedent set for each literal it pins, and a
+    // per-call set would dominate its root bake.
     internal val pbAntecedentSeen: IntHashSet = IntHashSet()
     internal val pbAntecedentBuf: IntArrayList = IntArrayList()
 
-    /** Var whose pinned value was contradicted by a decision-level pin attempt (i.e.
-     *  `pinBoolAsDecision` tried to set the opposite value of an existing pin). `-1` when
-     *  no such conflict is active. Lets the conflict analyzer learn from a
-     *  decision-vs-prior-pin contradiction by seeding from the prior pin's antecedents
-     *  plus the just-decided lit — without this, the analyzer falls back to chronological
-     *  backtrack on any conflict that doesn't come from a factor's `propagate`. */
+    // Var whose pin a decision tried to contradict, -1 when none. Lets the analyzer learn from a
+    // decision-vs-prior-pin conflict instead of backtracking chronologically.
     internal var lastDecisionConflictVar: Int = -1
 
     // Failure clauses or premise variables are private to the state and independent of incremental payloads.
@@ -467,7 +366,6 @@ class PropagationState private constructor(
     // Per-factor mutable scratch. Its drift across snapshot / restore is intentional: advisory
     // watch state self-corrects on each fire, avoiding snapshot copies of level-aware state.
 
-    /** Base and incremental factor payload references; General learned rows own their payload slots. */
     private class PayloadOwner(var values: ArrayList<Any?>)
     private val payloadOwner: PayloadOwner by lazy(LazyThreadSafetyMode.NONE) {
         PayloadOwner(prepared?.refPayloadStore ?: ArrayList<Any?>(problem.numFactors).apply {
@@ -480,17 +378,11 @@ class PropagationState private constructor(
             payloadOwner.values = value
         }
 
-    /** Indices in [refPayloadStore] currently holding a [SnapshottablePayload]. Maintained on every
-     *  write through [refPayload] so [mark] visits only these slots instead of scanning the whole
-     *  factor list per pin, avoiding O(numFactors) work on each decision. Pure-clause problems have none.
-     *  Snapshottable payloads belong to static factors
-     *  (Table / Mdd), so their ids stay below `numFactors` and never move under learned-clause
-     *  forgetting. */
+    // Lets [mark] visit only snapshottable slots instead of every factor per pin. They belong to static factors,
+    // so their ids never move under learned-clause forgetting.
     internal val snapshottableIndices: IntHashSet = IntHashSet()
 
-    /** Per-factor mutable payload slots (reference-typed). Writes route through this view so
-     *  [snapshottableIndices] stays in sync. General learned payloads share their paged row owner;
-     *  base and incremental slots delegate to [refPayloadStore]. */
+    /** Per-factor mutable payload slots; writes go through this view so snapshottable payloads stay tracked. */
     val refPayload: MutableList<Any?> by lazy(LazyThreadSafetyMode.NONE) {
         object : AbstractMutableList<Any?>() {
             override val size: Int
@@ -520,8 +412,6 @@ class PropagationState private constructor(
         }
     }
 
-    /** Learned-clause database — the [ConflictAnalyzer] nogoods plus their policy columns.
-     *  See [LearnedClauseDb]; registration / lookup / pruning live in `ClauseDb.kt`. */
     internal val learned: LearnedClauseDb = LearnedClauseDb(
         binaryClauseCount = prepared?.binaryClauseCount ?: run {
             var n = 0
@@ -546,21 +436,16 @@ class PropagationState private constructor(
         projection.nonIntEventWatcherIntOccurrences
     }
 
-    /** Constraints learned during conflict analysis; see [LearnedClauseDb]. */
     internal val learnedClauses: List<LearnedPropagator> get() = learned.initializedStore ?: emptyList()
 
     /** True iff any binary clause is known — the gate for binary-resolution minimization. */
     val hasBinaryClauses: Boolean get() = learned.binaryClauseCount > 0
 
-    /** Mid-life presolve factor overlay for [incremental] mode — see [MidlifeFactors]. */
     internal val midlife: MidlifeFactors = MidlifeFactors()
 
-    /** `problem.numFactors + learnedClauses.size` plus any mid-life factors. Use this instead of `problem.numFactors`
-     *  when iterating or sizing per-factor scratch in the engine. */
+    /** Base, learned and mid-life factor count; size per-factor engine scratch by it, not `problem.numFactors`. */
     val totalFactorCount: Int get() = problem.numFactors + learned.size + midlife.store.size
 
-    /** Per-literal bool watcher index (watch lists, blockers, back-pointers) —
-     *  see [BoolWatcherIndex]. Mutated by `Watches.kt` and the [forgetLearnedClauses] compaction. */
     private val watchIndex = lazy(LazyThreadSafetyMode.NONE) {
         prepared?.watches ?: BoolWatcherIndex(problem.numBoolVars, baseFactorCount = baseFactorCount)
     }
@@ -569,67 +454,41 @@ class PropagationState private constructor(
         get() = if (watchIndex.isInitialized()) watchIndex.value else null
 
     /**
-     * Reasons for implied Boolean pins, stored as eager antecedent literals or [lazyReason] markers.
-     * A unit [Clause] cites its other literals, all false at pin time. Null denotes a decision,
-     * assumption or deduction with no recorded reason and is treated as a leaf in conflict analysis.
-     * Maintained alongside the factor id in [boolReason] for first-UIP analysis.
+     * Reasons for implied Boolean pins, as eager antecedent literals or [lazyReason] markers. Null denotes a
+     * decision, assumption or deduction with no recorded reason, a leaf in conflict analysis.
      */
     val boolAntecedents: Array<IntArray?> = prepared?.boolAntecedents ?: (arrayOfNulls(problem.numBoolVars))
 
     /**
-     * Bool literals that forced the most-recent tightening of `intDomains[v].min`. Null
-     * when no factor recorded antecedents — analyzer treats as a leaf, same as a
-     * decision. Mirrors [boolAntecedents] on the int side; used by factors that pin
-     * bools based on int-domain state (e.g. [com.eignex.klause.factor.arithmetic.ReifiedLinear])
-     * so the aux pin's antecedents transitively reference the bool decisions that
-     * narrowed the int domain.
-     *
-     * Note: only the *current* tightening is tracked. If a factor at level 1 sets
-     * `v.min = 3` and another at level 2 sets `v.min = 5`, this array holds the level-2
-     * tightening's antecedents — analyzer reasoning about why `v.min = 3` later is unavailable.
+     * Literals that forced the current lower bound of `intDomains[v]`; null when none were recorded, which
+     * conflict analysis treats as a leaf. The int-side mirror of [boolAntecedents].
      */
     val intMinAntecedents: Array<IntArray?> = prepared?.intMinAntecedents ?: (arrayOfNulls(problem.numIntVars))
 
     /** Mirror of [intMinAntecedents] for the upper-bound side. */
     val intMaxAntecedents: Array<IntArray?> = prepared?.intMaxAntecedents ?: (arrayOfNulls(problem.numIntVars))
 
-    /** Bound-atom registry (LCG with virtual int-bound literals) — see [AtomStore]. Atom truth,
-     *  level, and antecedents are snapshotted when the bound crosses (never re-derived from a
-     *  bound-change history); restore drops atoms established after the snapshot point.
-     *  Allocation is lazy via [allocAtom]; the channeling and wake logic lives in `Atoms.kt`. */
     internal val atoms: AtomStore = prepared?.atoms ?: (AtomStore(problem.numIntVars))
 
-    /** LCG channeling clauses (`[x≥k+1]→[x≥k]`, `[x=k]↔[x≥k]∧[x≤k]`, …) accumulated as atoms
-     *  materialize, awaiting registration. [allocAtom] appends here; [flushPendingChanneling]
-     *  drains it into the learned-clause store as permanent clauses at a safe propagation boundary
-     *  (never mid-conflict-analysis, where `allocAtom` also fires). */
+    // Registered by [flushPendingChanneling] at a safe boundary, never mid-analysis where allocAtom also fires.
     internal val pendingChanneling: ArrayList<IntArray> = ArrayList()
 
-    /** Allocate (or look up) the atom for `[intVar ≥ threshold]` and return its virtual
-     *  variable id (past the bool var space). Pair with [Lit.make]
-     *  to encode as a positive or negative literal. */
+    /** Allocate or look up the atom `[intVar ≥ threshold]` and return its virtual variable id, for [Lit.make]. */
     fun atomVarGe(intVar: Int, threshold: Long): Int = allocAtom(intVar, kind = AtomKind.GE, threshold = threshold)
 
-    /** Allocate (or look up) the atom for `[intVar ≤ threshold]`. */
+    /** Allocate or look up the atom `[intVar ≤ threshold]`. */
     fun atomVarLe(intVar: Int, threshold: Long): Int = allocAtom(intVar, kind = AtomKind.LE, threshold = threshold)
 
-    /** Allocate (or look up) the atom for `[intVar = value]`. The negative-polarity literal
-     *  of this atom encodes `[intVar ≠ value]`; share the same atom id rather than allocating
-     *  a dedicated `Ne` kind. */
+    /** Allocate or look up the atom `[intVar = value]`; its negative literal encodes `[intVar ≠ value]`. */
     fun atomVarEq(intVar: Int, value: Long): Int = allocAtom(intVar, kind = AtomKind.EQ, threshold = value)
 
-    /** True iff bool [v] is currently assigned (by decision or propagation). Primitive — lets
-     *  hot factor loops test assignment without the `Boolean?` box that `boolValues[v]` allocates.
-     *  Pair with [boolValueAt] (only meaningful when this returns true). */
+    /** True iff bool [v] is assigned; a box-free alternative to `boolValues[v]`, paired with [boolValueAt]. */
     fun boolAssignedAt(v: Int): Boolean = boolAssigned.get(v)
 
-    /** Stored value of bool [v]; meaningful only when [boolAssignedAt] is true (undefined
-     *  otherwise). Primitive companion to [boolAssignedAt] for box-free hot-loop reads. */
+    /** Stored value of bool [v]; meaningful only when [boolAssignedAt] is true. */
     fun boolValueAt(v: Int): Boolean = boolValueBits.get(v)
 
-    /** Unified truth lookup over bool literals and atom-lit literals. Returns `null`
-     *  when undetermined. Pair with [Lit.evaluate] / explicit polarity branching to
-     *  reason about literal truth. */
+    /** Truth of a bool or atom literal, `null` when undetermined. */
     fun litTruth(lit: Int): Boolean? {
         work++
         val v = Lit.variable(lit)
@@ -642,12 +501,7 @@ class PropagationState private constructor(
         return Lit.evaluate(lit, raw)
     }
 
-    /** True iff [lit] is currently `true` (returns false when undetermined).
-     *
-     *  Plain bool literals (the dominant BCP case) read the packed bits directly instead of
-     *  routing through [litTruth]'s boxed `Boolean?` — a literal is true iff its variable is
-     *  assigned and the stored value matches the literal's polarity. Atom literals fall back to
-     *  the general path. */
+    /** True iff [lit] is currently `true`; false when undetermined. Bool literals read the packed bits unboxed. */
     fun litTrue(lit: Int): Boolean {
         work++
         val v = Lit.variable(lit)
@@ -657,8 +511,7 @@ class PropagationState private constructor(
         return litTruth(lit) == true
     }
 
-    /** True iff [lit] is currently `false` (returns false when undetermined). Bool-literal fast
-     *  path mirrors [litTrue]; assigned with the value opposing the literal's polarity. */
+    /** True iff [lit] is currently `false`; false when undetermined. */
     fun litFalse(lit: Int): Boolean {
         work++
         val v = Lit.variable(lit)
@@ -668,9 +521,7 @@ class PropagationState private constructor(
         return litTruth(lit) == false
     }
 
-    /** Assign [lit] to true, recording [antecedents] (the forcing clause's other literals).
-     *  Dispatches between bool pins ([pinBool]) and first-class atom assignment ([pinAtomLit]).
-     *  Returns `false` on conflict. */
+    /** Assign [lit] true, recording [antecedents] (the forcing clause's other literals); false on conflict. */
     fun pinLit(lit: Int, antecedents: IntArray? = null): Boolean {
         attributeReason(antecedents)
         val v = Lit.variable(lit)
@@ -679,47 +530,26 @@ class PropagationState private constructor(
         return pinAtomLit(atomIdOf(v), pos, antecedents)
     }
 
-    /**
-     * Assign atom [atomId] to [newT] as a first-class LCG literal: stamp its truth, level and
-     * forcing-clause [antecedents] on the atom trail directly, then reconcile the int domain to
-     * match. A clause (channeling / learned / propagator-explanation) that forces an atom thus
-     * records *itself* as the atom's reason — no reconstruction — which is what makes conflict
-     * analysis resolve through real clauses. For a bound the domain already implies (a looser atom
-     * cascaded by a monotonicity clause) the reconcile tighten is a no-op and the stamped truth
-     * stands; for a genuine narrowing (a learned clause pushing a new bound) it narrows the domain
-     * and channels onward. Returns `false` on conflict.
-     */
+    // A forcing clause records itself as the atom's reason, so conflict analysis resolves through real clauses.
     internal fun pinAtomLit(atomId: Int, newT: Boolean, antecedents: IntArray?): Boolean {
         val target = if (newT) 1 else 2
         val cur = atoms.truth[atomId]
         if (cur == target) return true // already established on this path
         val intVar = atoms.intVar[atomId]
         val k = atoms.threshold[atomId]
-        // A clause propagates a literal only when it is *genuinely unassigned*. The stored `0` is a
-        // cache miss, not proof of that — an atom the live domain already entails (at some lower
-        // level) also reads `0` when it was materialized after its bound crossed. Re-stamping such an
-        // atom at the current level, with this clause as its reason, would mis-date its truth (really
-        // decided earlier) and mis-attribute it, corrupting the levels 1UIP backjumps on. So stamp
-        // directly only when the domain does not yet decide the literal — a real narrowing this clause
-        // is forcing now. Otherwise fall through: an entailed atom keeps its domain-derived level and
-        // channeling reason (a no-op reconcile), and a domain-refuted one conflicts in the reconcile.
+        // The stored 0 is a cache miss, not proof of being unassigned: an entailed atom materialized after its
+        // bound crossed also reads 0, and re-stamping it here would mis-date it and corrupt 1UIP's levels. Stamp
+        // only when the domain does not decide the literal; otherwise the reconcile is a no-op or conflicts.
         if (cur == 0 && atomTruthOf(intVar, atoms.kind[atomId], k) == null) {
-            // Stamp the forcing clause as this atom's reason directly — the literal-primary step that
-            // lets conflict analysis and minimization resolve through a real, valid clause instead of
-            // a reconstructed bound reason. Recorded on the reversible atom trail first so backtrack
-            // restores it exactly, and before the reconcile so the narrowing's own [wakeAtom] finds
-            // the truth already set and keeps this clause reason rather than a channeling one.
+            // Recorded before the reconcile, so the narrowing's [wakeAtom] finds the truth set and keeps this
+            // clause as the reason.
             recordAtomTruthChange(atomId)
             boolPinOrder.add(problem.numBoolVars + atomId)
             atoms.truth[atomId] = target
             atoms.lvl[atomId] = currentLevel
             atoms.ant[atomId] = antecedents
-            // No watcher wake here: the reconcile below narrows the domain across this atom's
-            // threshold, and that narrowing's own [wakeAtom] fires the false-literal watchers (it
-            // finds the truth already stamped and takes its early-return wake path). Waking here as
-            // well would double-drive the channeling clauses and let them re-pin adjacent same-var
-            // atoms ahead of the order the narrowing establishes them in — fabricating a same-var
-            // coupling that 1UIP resolves into an unsound nogood.
+            // No wake here: the reconcile's own [wakeAtom] fires the watchers. Waking twice would let channeling
+            // clauses re-pin adjacent same-var atoms out of order, a coupling 1UIP resolves into an unsound nogood.
         }
         return when (atoms.kind[atomId]) {
             AtomKind.GE -> if (newT) {
@@ -743,66 +573,36 @@ class PropagationState private constructor(
         }
     }
 
-    /**
-     * Chronological journal of bool pins, decisions and implications interleaved. Used by
-     * [com.eignex.klause.propagation.ConflictAnalyzer] to walk the implication
-     * graph in reverse pin order — the standard 1UIP loop needs to resolve against the
-     * *most recently pinned* variable in the current conflict, which requires this
-     * append-only trail.
-     */
+    // Bool pins and atom establishments in pin order; 1UIP resolves against the most recently pinned variable.
     internal val boolPinOrder: IntArrayList =
         IntArrayList(initialCapacity = problem.numBoolVars.coerceAtLeast(8))
 
-    /** Per-variable unassign sink invoked by [undoTo]; see its doc. Null = no subscriber. */
+    /** Called with each variable [undoTo] unassigns; null when unsubscribed. */
     var unassignListener: ((Int) -> Unit)? = null
     internal var retractingListener: ((Int) -> Unit)? = null
 
-    /** Undo trail for bool/int cells — see [UndoLog].
-     *  Appended to by the `log*` functions in `Undo.kt`. Atom-table slots ride their own reversible
-     *  trail ([AtomStore.undoAtomId] and parallels); [undoTo] replays both, with the pin trail
-     *  [boolPinOrder] truncated to the mark so atoms established after it are dropped wholesale. */
     internal val undo: UndoLog = UndoLog()
 
-    /** Shared empty payload map for marks taken when no [SnapshottablePayload] is live —
-     *  avoids a per-push allocation in the common (no Table/Mdd) case. Read-only: [undoTo] only
-     *  iterates it. */
+    // Shared by marks taken with no live payload; read-only.
     internal val emptyPayloads: MutableIntObjectMap<SnapshottablePayload> = MutableIntObjectMap(1)
 
-    /** Reusable conflict analyzer for this state — one instance whose scratch buffers
-     *  persist across conflicts instead of reallocating per analysis. Single-threaded
-     *  session, so [LazyThreadSafetyMode.NONE] is safe and skips the sync overhead.
-     *  Created on the first conflict. */
+    // Created on the first conflict; its scratch persists across conflicts.
     internal val conflictAnalyzer: ConflictAnalyzer by lazy(LazyThreadSafetyMode.NONE) { ConflictAnalyzer(this) }
 
-    /** When false, mutators skip undo-log recording. Default off so the one-shot
-     *  propagation path (`Problem.propagate`) and bake-time fixpoint — neither of which
-     *  backtracks — pay nothing. [PropagationSession] flips it true after bake, before its
-     *  first push. */
+    /** When false, mutators skip undo-log recording, so one-shot propagation and the bake fixpoint pay nothing. */
     var undoLogging: Boolean = false
 
-    // Incremental objective lower bound: the always-on trivial bound, kept O(1) per node.
-    // The trivial lower bound on a `Σ boolWeights·x` objective under the current partial assignment is
-    //   objective.constant + Σ_b contribution(b) + <integer part>, where
-    //   contribution(b) = pinned ? (value ? w : 0) : min(w, 0).
-    // Pinning a bool var raises the bound by a nonnegative penalty, so the bool part is maintained on
-    // the reversible trail instead of rescanned every node, which would cost O(numBoolVars) per node on
-    // large pseudo-Boolean optimization. Installed lazily at the
-    // root; the integer part (usually empty for pseudo-Boolean) stays the caller's per-node scan.
+    // Incremental bool part of the trivial objective lower bound: `Σ_b contribution(b)` with
+    // `contribution(b) = pinned ? (value ? w : 0) : min(w, 0)`. Pinning only raises it, so it lives on the
+    // reversible trail instead of an O(numBoolVars) rescan per node; the integer part stays the caller's scan.
     private var objBoolWeights: LongArray? = null
     private var objBoolBaseConst: Long = 0L
     private var objBoolPenalty: RevLong? = null
 
-    /** Whether the incremental objective bool lower bound is live (see [objectiveBoolLowerBound]). */
     internal val objectiveBoolBoundInstalled: Boolean get() = objBoolWeights != null
 
-    /**
-     * Install the incremental objective bool lower bound from [weights] (indexed by bool var id). A no-op
-     * unless no decisions are retained and it is not already installed. A propagator's effective level
-     * can be zero above the search root. The baseline sums contributions that cannot be undone, so later
-     * pins/undos maintain the bound soundly
-     * on the reversible trail. Returns true once (or while) the incremental bound is live; false when it
-     * declined (not at root, or the baseline overflowed) so the caller rescans instead.
-     */
+    // A no-op unless no decisions are retained and it is not yet installed; the baseline sums contributions that
+    // cannot be undone. Returns false when it declined (not at root, or overflow), so the caller rescans.
     internal fun installObjectiveBoolBound(weights: LongArray): Boolean {
         if (objBoolWeights != null) return true
         if (levelToDecisionVar.size != 0) return false
@@ -827,9 +627,7 @@ class PropagationState private constructor(
         return true
     }
 
-    /** Fold the pin of bool [v] to [value] into the incremental objective bool lower bound. The penalty
-     *  is `contribution(pinned) − contribution(unpinned) = value ? max(w,0) : max(−w,0)`, always ≥ 0; the
-     *  reversible cell restores it on backtrack. */
+    // The penalty `value ? max(w,0) : max(−w,0)` is never negative; the reversible cell restores it on backtrack.
     internal fun bumpObjectiveBoolBound(v: Int, value: Boolean) {
         val weights = objBoolWeights ?: return
         if (v >= weights.size) return
@@ -839,26 +637,17 @@ class PropagationState private constructor(
         if (penalty != 0L) objBoolPenalty?.let { it.set(it.value + penalty) }
     }
 
-    /** The incremental bool part of the trivial objective lower bound — `Σ_b contribution(b)` over the
-     *  current assignment, excluding the objective constant and any integer terms. Valid only when
-     *  [objectiveBoolBoundInstalled]; O(1). */
+    // Excludes the objective constant and integer terms; valid only once installed.
     internal fun objectiveBoolLowerBound(): Long = objBoolBaseConst + (objBoolPenalty?.value ?: 0L)
 
-    /** Current undo-log size. A [LevelMark] captures this; iterating [undoVarAt] /
-     *  [undoIsBoolAt] over `[base, undoTop)` enumerates exactly the variables mutated since
-     *  position `base` — used by [PropagationSession] to compute the implied-fact diff of a
-     *  push incrementally instead of scanning every variable. */
+    /** Current undo-log size; [PropagationSession] diffs a push by the variables mutated since a position. */
     val undoTop: Int get() = undo.size
 
-    /** Native-SAT BCP engine when this state opted in and the problem qualifies; null on the
-     *  general LCG path. Its construction reads [boolPinOrder] and the clause arena (both live above),
-     *  so it is declared after them. */
+    // Declared after [boolPinOrder] and the clause arena, which its construction reads.
     internal val nativeEngine: NativeSatState? =
         if (usesNativeSat) NativeSatState(this) else null
 
-    /** Seed reason (all-false clause literals) stashed by [NativeSatState] on a conflict, so
-     *  [PropagationSession] can drive 1UIP through [ConflictAnalyzer.analyzeConflictClause] without a
-     *  factor lookup. Cleared by [undoTo]. */
+    // Seed reason stashed on a native conflict, so 1UIP needs no factor lookup.
     internal var nativeConflictReason: IntArray? = null
 
     init {
@@ -905,10 +694,7 @@ class PropagationState private constructor(
         if (problem.numBoolVars > 0) preparationIndexWork += watches.pos.reserve(baseFactorCount, 8)
     }
 
-    /** Install factor [fid]'s static wakeup subscriptions into the per-literal / per-int-event advisor
-     *  indices and its delta-consumer accumulators. Shared by initial construction (once per factor,
-     *  in factor-id order) and by an incremental presolve session registering a factor added mid-run
-     *  without rebuilding the whole state. */
+    // Shared by construction and by an incremental session registering a factor mid-run.
     private fun registerFactor(fid: Int, propagator: Propagator, preparation: Boolean = false) {
         val watchers = propagator.initialBoolWatchers
         if (watchers != null) {
@@ -930,20 +716,9 @@ class PropagationState private constructor(
         }
     }
 
-    /** True iff factor id [fid] has not been tombstoned. */
     internal fun factorAliveAt(fid: Int): Boolean = fid !in midlife.tombstoned
 
-    /**
-     * Append presolve [factor] to the live state as a mid-life factor and return its stable id.
-     * Installs its watcher subscriptions ([registerFactor]) and its occurrence-list wakeup overlay
-     * ([registerMidlifeOccurrences]), and grows [refPayload] by one slot so the factor's
-     * `state.refPayload[fid]` access stays in bounds. The factor does NOT fire here; the session drives
-     * a [runToFixpoint] afterwards (seeding it via `initialFactor` or `allFactors`).
-     *
-     * Only valid in [incremental] mode. A factor that consumes the int-event delta (a symmetry or
-     * structural pass can add one) is supported: the per-factor accumulators grow by one slot here so
-     * [registerFactor] can install it, and the delta machinery is always live in incremental mode.
-     */
+    // Incremental mode only. Does not fire the factor; the session drives a [runToFixpoint] afterwards.
     internal fun addMidlifeFactor(factor: Factor): Int {
         require(incremental) { "mid-life factors require an incremental PropagationState" }
         val prop = factor.propagatorProjection(provider =
@@ -952,8 +727,7 @@ class PropagationState private constructor(
         midlife.store.add(prop)
         midlife.factors.add(factor)
         refPayloadStore.add(null)
-        // Grow the delta accumulators in lockstep so a mid-life consumer's `intEvents.dirtyVars[fid]` slot
-        // exists before [registerFactor] populates it (delta machinery is always live in incremental mode).
+        // Grown in lockstep so a mid-life consumer's slot exists before [registerFactor] populates it.
         if (intEvents.deltaOn) {
             intEvents.dirtyVars.add(null)
             intEvents.dirtyMark.add(null)
@@ -964,26 +738,16 @@ class PropagationState private constructor(
         return fid
     }
 
-    /**
-     * Tombstone factor [fid] (base or mid-life): mark it dropped ([factorAt] then returns [NoPropagator],
-     * so it never fires again) and clear its [refPayload] slot. The id is retired, never reused — the
-     * slot must stay cleared so a later add can't inherit a stale payload (which can yield a wrong optimum). The
-     * factor's entries linger in the watcher indices and occurrence lists; they wake a [NoPropagator],
-     * a no-op.
-     */
+    // The id is retired, never reused: a later add must not inherit a stale payload. The factor's watcher and
+    // occurrence entries linger and wake a no-op [NoPropagator].
     internal fun tombstoneFactor(fid: Int) {
         require(incremental) { "tombstoning requires an incremental PropagationState" }
         if (!midlife.tombstoned.add(fid)) return
         refPayloadStore[fid] = null
     }
 
-    /**
-     * Register mid-life factor [fid]'s occurrence-list wakeup, mirroring [PropagationProblem.nonBoolWatcherBoolOccurrences]
-     * / [PropagationProblem.nonIntEventWatcherIntOccurrences]: a factor using per-literal bool watchers is excluded
-     * from every bool var's overlay (it wakes through [BoolWatcherIndex.byLit]); on the int side a var is
-     * excluded only when the factor subscribes to a typed event on *that* var. The overlays are allocated
-     * lazily on first need.
-     */
+    // A factor with per-literal bool watchers is excluded from every bool overlay; on the int side a var is
+    // excluded only when the factor subscribes to a typed event on it.
     private fun registerMidlifeOccurrences(fid: Int, factor: Factor, prop: Propagator) {
         if (prop === NoPropagator) return
         if (prop.initialBoolWatchers == null) {
@@ -1011,10 +775,7 @@ class PropagationState private constructor(
     /** Force bool `v` to [value]; returns false on conflict. */
     fun pinBool(v: Int, value: Boolean): Boolean = pinBoolImpl(v, value, antecedents = null)
 
-    /** Variant that records [antecedents] — the literals whose truth values implied this
-     *  pin. Lets the conflict analyzer reconstruct the propagation chain backwards. Pass
-     *  `null` (the default no-arg form) when the factor doesn't track antecedents — that's
-     *  fine, the analyzer just treats this pin as a leaf in the implication graph. */
+    /** As [pinBool], recording [antecedents]: literals, false now, that implied the pin. */
     fun pinBool(v: Int, value: Boolean, antecedents: IntArray?): Boolean {
         attributeReason(antecedents)
         return pinBoolImpl(v, value, antecedents)
@@ -1023,9 +784,7 @@ class PropagationState private constructor(
     /** Raise int `v`'s lower bound to [lo]; returns false on conflict. */
     fun tightenIntMin(v: Int, lo: Long): Boolean = tightenIntMinImpl(v, lo, null)
 
-    /** Variant that records [antecedents] — bool literals (false in the current state)
-     *  whose collective truth forced this lower-bound tightening. Used by the conflict
-     *  analyzer to walk the implication graph backwards through int-domain factors. */
+    /** As [tightenIntMin], recording [antecedents]: literals, false now, that forced the tightening. */
     fun tightenIntMin(v: Int, lo: Long, antecedents: IntArray?): Boolean {
         attributeReason(antecedents)
         return tightenIntMinImpl(v, lo, antecedents)
@@ -1049,11 +808,7 @@ class PropagationState private constructor(
         return setIntImpl(v, value, antecedents)
     }
 
-    /** Punch a hole in `v`'s domain at [value]. Returns `true` on success (including the
-     *  no-op case when [value] is already absent), `false` on conflict (would empty the
-     *  domain). When [value] is at the current endpoint, this is equivalent to a
-     *  bound-tighten by one; when it's interior, it transitions the domain to sparse
-     *  representation. */
+    /** Punch a hole in `v`'s domain at [value]; returns false only when that empties the domain. */
     fun excludeIntValue(v: Int, value: Long): Boolean = excludeIntValueImpl(v, value, null)
 
     /** Forbid [value] for int `v`; returns false on conflict. */
@@ -1068,32 +823,24 @@ class PropagationState private constructor(
     /** Pop one int var that's been dirtied since the last call, or `-1` if none. */
     fun pollDirtyInt(): Int = if (dirtyInts.isEmpty()) -1 else dirtyInts.removeFirst()
 
-    // Mark / undo for [PropagationSession]. A pop rewinds to a prior fixpoint by replaying
-    // the undo log (above) rather than re-propagating. The caller only ever marks / undoes
-    // between propagation cycles (i.e. when dirty queues are empty).
+    // Callers mark and undo only between propagation cycles, when the dirty queues are empty.
 
-    /** Opt-in marker for [refPayload] entries that need to participate in mark / undo.
-     *  By default refPayload drifts across push/pop (Clause-watcher style); a factor that
-     *  maintains level-sensitive incremental state (e.g. STR2 Table's sparse set of valid
-     *  tuples) implements this to get correct backtrack behavior. */
+    /**
+     * Opt-in for [refPayload] entries with level-sensitive incremental state, such as a table's sparse set of
+     * valid tuples; other payloads drift across push and pop.
+     */
     interface SnapshottablePayload {
         /** Deep-copy this payload for trail snapshotting. */
         fun snapshotCopy(): SnapshottablePayload
     }
 
-    /** Append a reversible cell to [UndoLog.revTrail] so its latest mutation is undone on the next
-     *  [undoTo] past this point. Called by [RevInt] / [RevRef] / [RevIntArray] on each logged write. */
     internal fun logReversible(cell: Trailed) {
         undo.revTrail.add(cell)
     }
 
     /**
-     * Lightweight per-level marker. Records only the *positions* a pop must rewind to: the
-     * undo-log size and the other append-only stacks' sizes, plus snapshot copies of any
-     * [SnapshottablePayload]s (the rare factors — Mdd / Table — whose incremental state
-     * isn't recomputed from scratch on each `propagate`). Copying whole per-level state would
-     * cost ~12 numVars-sized arrays per level; [undoTo] instead replays the undo log in
-     * O(changes-since-mark).
+     * Per-level marker: the append-only stack sizes a pop rewinds to, plus snapshot copies of any
+     * [SnapshottablePayload]s. [undoTo] replays the undo log in O(changes since the mark).
      */
     class LevelMark internal constructor(
         internal val undoSize: Int,
@@ -1104,23 +851,10 @@ class PropagationState private constructor(
         internal val atomUndoSize: Int,
     )
 
-    /**
-     * Run propagation until no factor can derive more. When [allFactors] is true, every
-     * factor is enqueued initially (the usual one-shot path). When false, only factors
-     * touching variables currently in the dirty queues are enqueued — for incremental use
-     * by a session that just applied a pin and wants to extend the fixpoint.
-     *
-     * Returns `null` on success (state is at fixpoint); otherwise the conflict-levels set.
-     *
-     * [cancellation] is polled whenever a real token is supplied (i.e. not [ExecutionControl.Never]),
-     * on both the full-propagation ([allFactors]) and the incremental per-node path. A targeted
-     * fixpoint can itself wedge on a slow propagator over wide domains (a reified-linear bound
-     * crawl tightens one step at a time across a Long-wide span), so the search path must poll too
-     * to honour the deadline. When no token is supplied the gate below is a dead, perfectly-
-     * predicted branch, so the BCP hot loop pays nothing on deadline-free solves. When the token
-     * fires the drain stops early and returns `null`; the partial fixpoint is sound (it only
-     * ever tightens), and the deadline that fired it makes the caller abort promptly anyway.
-     */
+    // [allFactors] enqueues every factor; otherwise only those touching dirty variables. Returns null at a
+    // fixpoint, else the conflict levels. A real [cancellation] token is polled on both paths, since a targeted
+    // fixpoint can wedge on a bound crawl across a Long-wide span; without one the gate is a dead branch. A fired
+    // token returns null early, and the partial fixpoint is sound because it only tightens.
     internal fun runToFixpoint(
         allFactors: Boolean,
         initialFactor: Int = -1,
@@ -1252,9 +986,8 @@ class PropagationState private constructor(
         cancellation: ExecutionControl,
         skipExpensiveBake: Boolean,
     ): IntArray? {
-        // The native-SAT lane runs its own arena-packed two-watched-literal BCP; the atom store,
-        // channeling flush, factor queue, and dirty-var drains below are all inert when there are no
-        // integer variables, so it bypasses them entirely.
+        // The atom store, channeling flush, factor queue and dirty-var drains are inert without integer
+        // variables, so the native lane bypasses them.
         nativeEngine?.let { native ->
             val attribution = factorAttribution ?: return native.propagate(allFactors, cancellation)
             val before = work
@@ -1270,20 +1003,16 @@ class PropagationState private constructor(
             if (runCancelled) attribution.note(family, FactorAttribution.Metric.Interrupted)
             return conflict
         }
-        // Clear conflict bookkeeping from any prior run — reusing the state across pushes
-        // would otherwise mix old seeds into a new conflict's core.
+        // Old seeds would otherwise leak into a new conflict's core.
         conflictSeedFactors.clear()
-        // Register any channeling clauses queued since the last fixpoint (as atoms materialized,
-        // including inside the just-finished conflict analysis) before snapshotting the factor
-        // count — a safe boundary with no factor mid-fire.
+        // Register channeling clauses queued since the last fixpoint, including during conflict analysis, at
+        // this safe boundary before snapshotting the factor count.
         flushPendingChanneling()
         val factorCount = totalFactorCount
         propBegin(factorCount)
         val pollable = cancellation !== ExecutionControl.Never
-        // Full propagation (bakes) is one-shot, not in the per-node BCP loop or a resumable slice, so
-        // it polls from the first fire. Only the incremental per-node path defers the poll past the
-        // fire floor, so a normal small fixpoint — and resumable slicing, which pauses at decision
-        // granularity — is never cut mid-propagation.
+        // Full propagation is one-shot, so it polls from the first fire. The per-node path defers the poll past
+        // the fire floor, so a small fixpoint and resumable slicing are never cut mid-propagation.
         val floor = if (allFactors) 0 else cancelFloor
         seedQueue(allFactors, factorCount, initialFactor, initialFactors)
         for (i in 0 until learned.pendingAttach.size) {
@@ -1305,13 +1034,9 @@ class PropagationState private constructor(
             for (fid in 0 until factorCount) propEnq(fid)
             return
         }
-        // Atom-lit watchers woken by int tightens before runToFixpoint was called are capped:
-        // a stale id from before a forget/renumber may linger in the pre-run queue.
+        // Capped: a stale id from before a forget can linger in the pre-run queue.
         drainDirtyIntoQueue(atomFactorCap = factorCount)
-        // Optional seed — used by [PropagationSession.addLearnedClause] to force the
-        // newly-stored learned clause to fire on the next propagation cycle (it would
-        // otherwise sit dormant since the watcher index only wakes on false-going
-        // literals, and a freshly-added clause's watches haven't been triggered yet).
+        // A freshly added clause's watches have not been triggered, so without this seed it would sit dormant.
         if (initialFactor in 0 until factorCount) propEnq(initialFactor)
         // Seed a batch of freshly-added mid-life factors so each fires once on the next cycle;
         // like [initialFactor], their watches haven't been triggered yet so they'd sit dormant.
@@ -1341,11 +1066,8 @@ class PropagationState private constructor(
         while (propQueue.isNotEmpty()) {
             if (runCancelled) return null
             if (maxFires != Int.MAX_VALUE && fireCount >= maxFires) return null
-            // Only a single fixpoint that itself runs away — an O(span) reified-linear bound crawl
-            // over a Long-wide domain, millions of fires deep — needs the deadline *inside*
-            // propagation. A normal per-node fixpoint is tiny and pauses cleanly at the engine's
-            // between-decision poll, so the fire floor leaves that path (and resumable slicing, which
-            // pauses at decision granularity) untouched: the poll is never even consulted there.
+            // Only a runaway fixpoint (an O(span) bound crawl, millions of fires) needs the deadline inside
+            // propagation; normal per-node fixpoints and resumable slicing stay below the fire floor.
             if (pollable) {
                 if (fireCount >= floor && (fireCount and CANCEL_POLL_MASK) == 0 && cancellation()) {
                     if (!cancelIsPause) runCancelled = true
@@ -1408,10 +1130,7 @@ class PropagationState private constructor(
             }
             if (!propagated) {
                 attribution?.note(family, FactorAttribution.Metric.Conflicts)
-                // The failing factor is always in the core, regardless of whether it
-                // recorded a conflict via the impl methods (some factors return false
-                // without calling pin/tighten — they just detected infeasibility from
-                // the current state).
+                // The failing factor is always in the core, even when it failed without pinning anything.
                 seedConflictFactor(fid)
                 return conflictLevels ?: factorVarsConflictLevels(fid)
             }
@@ -1421,10 +1140,7 @@ class PropagationState private constructor(
         return null
     }
 
-    /** Drain the dirty bool/int vars and the atom-woken factors into the worklist — run once to
-     *  seed an incremental fixpoint and again after every factor fire. [atomFactorCap] bounds the
-     *  atom-woken factor ids (the seed path caps at the live factor count since a stale id can
-     *  linger in the pre-run queue; post-fire wakes pass [Int.MAX_VALUE]). */
+    // [atomFactorCap] bounds atom-woken ids: a stale id from before a forget can linger in the pre-run queue.
     private fun drainDirtyIntoQueue(atomFactorCap: Int) {
         while (true) {
             val v = pollDirtyBool()
@@ -1442,36 +1158,21 @@ class PropagationState private constructor(
         }
     }
 
-    /**
-     * Effective decision level for firing factor [f] (id [fid]). A *pure-bool* clause only fires when
-     * a watched bool literal just went false at the current decision level (bools are only pinned by
-     * decisions or clause propagation, all stamped at the current level), so its level is the current
-     * decision level with no scan on the BCP hot path. Atom-lit clauses can fire on an atom that
-     * flipped at a sub-decision level, so they scan their literals, deferred to [settleClauseLevel].
-     */
+    // A pure-bool clause fires only on a literal falsified at the current level, so it takes that level without a
+    // scan on the BCP hot path. Atom-literal clauses defer their literal scan to [settleClauseLevel].
     private fun effectiveLevelFor(f: Propagator, fid: Int): Int = when {
         f is ClausePropagator -> levelToDecisionVar.size
 
-        // A learned non-clause constraint (a cutting-planes pseudo-Boolean nogood) lives in
-        // the learned store, not [problem.factors] / [MidlifeFactors.factors]; read its var footprint off
-        // the propagator itself.
+        // A learned non-clause constraint lives in the learned store; read its footprint off the propagator.
         fid >= baseFactorCount && !incremental && f is LearnedPropagator -> maxLevelForVars(f.boolVars, f.intVars)
 
         else -> {
-            // A base factor reads its vars from the immutable problem; a mid-life presolve factor
-            // (fid >= baseFactorCount, only in [incremental] mode) from [MidlifeFactors.factors].
+            // A mid-life presolve factor reads its vars from [MidlifeFactors.factors].
             val factor = if (fid < baseFactorCount) problem.factors[fid] else midlife.factors[fid - baseFactorCount]
             maxLevelForVars(factor.boolVars, factor.intVars)
         }
     }
 
-    /**
-     * Enqueue every factor that should fire on `v`'s newly-pinned value, using the
-     * split wakeup paths: occurrence-list for factors that don't watch literals, plus the
-     * per-literal watcher index for those that do. For watcher-using
-     * factors only the literal that just transitioned to *false* triggers a fire — true
-     * literals satisfy the clause, no propagation needed.
-     */
     private fun enqueueForBoolChange(v: Int) {
         work += nonBoolWatcherOcc[v].size
         for (fid in nonBoolWatcherOcc[v]) propEnq(fid)
@@ -1481,31 +1182,20 @@ class PropagationState private constructor(
             work += list.size
             for (i in 0 until list.size) propEnq(list[i])
         }
-        // The literal that just became false is the one whose polarity opposes the pin.
-        // The var is assigned here (added to dirtyBools only after a successful pin), so read
-        // the packed value bit directly instead of the boxing `boolValues[v]` accessor.
+        // The literal opposing the pin just became false; the var is assigned, so read the packed bit unboxed.
         val falseLit = Lit.make(v, !boolValueBits.get(v))
         val watchers = watches.byLit[falseLit]
         val blockers = watches.blockersByLit[falseLit]
         work += watchers.size
         for (i in 0 until watchers.size) {
-            // Blocking-literal short-cut: if the cached blocker for this watch is
-            // already true, the factor is satisfied and waking it would be a no-op — skip
-            // the enqueue and the clause dereference entirely. NO_BLOCKER falls through and
-            // always fires, so factors without blockers keep their unconditional wakeup.
+            // A true blocker means the factor is satisfied: skip the wake and the clause dereference.
             val blocker = blockers[i]
             if (blocker != NO_BLOCKER && litTrue(blocker)) continue
             propEnq(watchers[i])
         }
     }
 
-    /**
-     * Record that int var [v] just changed: add it to [dirtyInts] and, when typed int-event
-     * watchers are active, OR the [kindMask] (one or more `IntEvent.*_BIT`s) into [IntEventMachinery.dirtyKinds]`[v]`
-     * so [enqueueForIntChange] wakes the right advisors. [IntEvent.FIXED_BIT] is added automatically
-     * when the post-mutation domain is a singleton, so a mutator only passes the bound/value kind it
-     * caused. No-op beyond the dirty enqueue when no factor subscribes (the mask array is empty).
-     */
+    // [IntEvent.FIXED_BIT] is added for a singleton result, so a mutator passes only the kind it caused.
     internal fun markIntDirty(v: Int, kindMask: Int) {
         dirtyInts.addLast(v)
         if (intEvents.dirtyKinds.isEmpty()) return
@@ -1514,15 +1204,7 @@ class PropagationState private constructor(
         intEvents.dirtyKinds[v] = intEvents.dirtyKinds[v] or mask
     }
 
-    /**
-     * Enqueue every factor that should fire on `v`'s domain change, mirroring [enqueueForBoolChange]
-     * on the int side: the occurrence-list factors that don't subscribe to typed events on `v`
-     * ([PropagationProblem.nonIntEventWatcherIntOccurrences]), plus — for each
-     * [IntEvent] kind that actually occurred (read from [IntEventMachinery.dirtyKinds]) — the advisors registered
-     * in [IntEventMachinery.forEachWatcher]. The kind mask is cleared after dispatch so it doesn't leak into a
-     * later change to the same variable. When no factor subscribes this reduces to the plain
-     * occurrence-list walk over [PropagationProblem.intOccurrences].
-     */
+    // The kind mask is cleared after dispatch so it does not leak into a later change to the same variable.
     private fun enqueueForIntChange(v: Int) {
         work += nonIntEventWatcherOcc[v].size
         for (fid in nonIntEventWatcherOcc[v]) propEnq(fid)
@@ -1549,8 +1231,6 @@ class PropagationState private constructor(
         }
     }
 
-    /** Record [v] in [fid]'s dirty-variable delta if [fid] consumes it ([IntEventMachinery.dirtyMark] dedups).
-     *  No-op for non-consumers and when no factor in the problem consumes a delta. */
     private fun accumulateDirtyVar(fid: Int, v: Int) {
         if (fid >= intEvents.dirtyMark.size) return
         val mark = intEvents.dirtyMark[fid] ?: return
@@ -1559,13 +1239,9 @@ class PropagationState private constructor(
     }
 
     /**
-     * Drain and return the dirty-variable delta accumulated for [factorId] since it last drained —
-     * the subscribed variables that fired, a superset of those actually changed since the consumer's
-     * last fire (see [IntEventMachinery.dirtyVars]). A consumer ([Propagator.consumesIntEventDelta])
-     * calls this on a fire and recovers the exact removed values by diffing its own reversible
-     * baseline for these variables. Clears the accumulator (keeping it in lockstep with the
-     * consumer's baseline update), so call it exactly when the baseline is advanced. Returns an empty
-     * array for a non-consuming factor.
+     * Drain the dirty-variable delta for [factorId]: a superset of the variables changed since its last drain,
+     * which a [Propagator.consumesIntEventDelta] consumer diffs against its own reversible baseline. Call exactly
+     * when that baseline advances. Empty for a non-consumer.
      */
     fun drainIntEventDirtyVars(factorId: Int): IntArray {
         if (intEvents.dirtyVars.isEmpty()) return emptyIntArray()

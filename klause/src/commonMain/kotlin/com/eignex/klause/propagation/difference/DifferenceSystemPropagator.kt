@@ -11,48 +11,23 @@ import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
-/**
- * Maximum open heads visited per refutation sweep. Each costs at most one shortest-path search;
- * changes through the constant node can make every head eligible, so this bounds per-sweep work.
- * Closed guards need only a bucket scan and consume no allowance.
- *
- * Deferred heads stay queued for successive decisions. Delaying a refutation leaves its edge open
- * for Boolean search to decide, preserving verdict soundness.
- */
+// Open heads per sweep, each costing at most one shortest-path search. Deferred heads stay queued; a
+// delayed refutation leaves its edge open for Boolean search, so soundness is unaffected.
 private const val HEAD_SWEEP_BUDGET = 64
 private const val HUB_REFUTATION_FAILED = -1
 
-/**
- * Joint propagation of a [DifferenceSystem] in the DPLL(T) shape: the asserted edges are consistent
- * exactly when their graph admits a potential function, and an unasserted edge whose guard is still open
- * is *refuted* as soon as the asserted edges already carry a path that would close a negative cycle
- * through it.
- *
- * The second half is what makes the propagator more than a final check. On a real difference-logic
- * instance nearly every edge is guarded by a reified row's aux, so a check that only fires once the
- * Boolean layer has decided the guards learns a nogood after the fact and never prunes ahead of one.
- * Refuting the guard turns the graph into a source of implications the Boolean layer can search on.
- *
- * A deduction is explained by the guards on the path (or cycle) that forced it, so the learned clause
- * names exactly the reified rows whose conjunction is contradictory.
- *
- * **The constant node is measured, not walked.** A bounded column contributes `zero → v` and `v → zero`,
- * so on a model whose columns are all bounded that node has degree `2n`: the graph is strongly connected,
- * every shortest-path search spans it, and no reachability argument narrows a sweep. Those edges
- * stay in the system — the potential has to remain feasible for them, and a cycle through one is a real
- * conflict — but a per-head search does not walk them. Instead
- * [IncrementalDifferenceGraph.refreshZeroDistances] measures the distance to and from that node once per
- * sweep, and a head reads the route off as `d(y → x) = min(d(y ⇝ x), d(y ⇝ zero) + d(zero ⇝ x))`.
- *
- * That is exact, not an approximation. A shortest path visits the node at most once — a second visit
- * encloses a cycle, which is either negative, and so a conflict, or non-negative, and so removable — so
- * splitting at that single visit accounts for every route, including the ones that reach it through model
- * rows rather than straight off an endpoint's own range. Both halves keep their own predecessor chain,
- * which is what lets a refutation routed that way still name the guards on each segment.
- *
- * Scott Cotton and Oded Maler, "Fast and Flexible Difference Constraint Propagation for DPLL(T)",
- * SAT 2006, LNCS 4121, https://doi.org/10.1007/11814948_19.
- */
+// Joint propagation of a DifferenceSystem in the DPLL(T) shape: the asserted edges are consistent exactly
+// when their graph admits a potential function, and an open guarded edge is refuted as soon as the
+// asserted edges carry a path that would close a negative cycle through it. Deductions are explained by
+// the guards on the forcing path or cycle.
+//
+// The constant node is measured, not walked: with every column bounded it has degree 2n and would make
+// every search span the graph. Its edges stay in the system, but refreshZeroDistances measures distances
+// to and from it once per sweep, and a head reads `d(y, x) = min(d(y ⇝ x), d(y ⇝ zero) + d(zero ⇝ x))`.
+// This is exact because a shortest path visits the node at most once.
+//
+// Scott Cotton and Oded Maler, "Fast and Flexible Difference Constraint Propagation for DPLL(T)",
+// SAT 2006, LNCS 4121, https://doi.org/10.1007/11814948_19.
 internal class DifferenceSystemPropagator(
     edges: List<DifferenceEdge>,
     private val indexGuards: Map<Int, DifferenceIndexGuard> = emptyMap(),
@@ -65,30 +40,23 @@ internal class DifferenceSystemPropagator(
     private val numVertices: Int
     private val nodes: IntArray
 
-    /** Which edges state a declared range; the graph keeps them but no per-head search walks them. */
+    // Declared-range edges; the graph keeps them but no per-head search walks them.
     private val hub: BooleanArray
 
-    /** The vertex standing for the constant 0, which every declared-range edge is incident to. */
     private val zeroVertex: Int get() = numVertices - 1
 
-    // Guarded edges bucketed by head vertex: every edge in a bucket is refuted or not by the distances
-    // out of that one vertex, so a bucket costs a single shortest-path search rather than one per edge.
+    // Guarded edges bucketed by head vertex, so a bucket costs a single shortest-path search.
     private val bucketVertex: IntArray
     private val bucketStart: IntArray
     private val bucketEdge: IntArray
 
-    // Reverse index over every edge: walked from a vertex it reaches the vertices that can reach it, which
-    // is what narrows a sweep to the heads an assertion could have moved.
+    // Reverse index over every edge, narrowing a sweep to the heads an assertion could have moved.
     private val revStart: IntArray
     private val revEdge: IntArray
 
-    /**
-     * Per-solve mutable half, kept on [PropagationState.refPayload] rather than on the propagator: one
-     * propagator instance backs every arm of a portfolio, so the graph and its explanation cannot live
-     * on the shared object. It needs no reversible storage — edge activity is re-read from the state on
-     * every fire, and a potential feasible for a set stays feasible for any subset of it, so a backtrack
-     * leaves the structure correct without any undo.
-     */
+    // Per-solve state lives on refPayload because one propagator instance backs every portfolio arm. No
+    // undo is needed: edge activity is re-read on every fire, and a potential feasible for a set stays
+    // feasible for any subset.
     private class Session(
         numVertices: Int,
         tail: IntArray,
@@ -102,12 +70,12 @@ internal class DifferenceSystemPropagator(
         val pendingTails = IntArrayList()
         var reason: IntArray? = null
 
-        /** Bumped only when an edge is asserted, which is the one way a path can shorten. */
+        // Bumped only when an edge is asserted, the one way a path can shorten.
         var assertVersion: Int = 0
         var sweptVersion: Int = -1
         var sweptDecisions: Int = -1
 
-        /** Tails of the edges asserted since the last sweep; see [headsToSweep]. */
+        // Tails of the edges asserted since the last sweep.
         val newTails = IntArrayList()
 
         val heads = IntArrayDeque()
@@ -127,7 +95,6 @@ internal class DifferenceSystemPropagator(
 
         fun nextHead(): Int = heads.removeFirst().also { queuedHeads[it] = false }
 
-        /** Mark [v] reached in the current traversal, false when it already was. */
         fun reach(v: Int): Boolean {
             if (reached[v] == stamp) return false
             reached[v] = stamp
@@ -200,16 +167,8 @@ internal class DifferenceSystemPropagator(
         for (i in guards.indices) revEdge[revFill[head[i]]++] = i
     }
 
-    /**
-     * The heads a sweep still has to visit after the assertions in [Session.newTails], or [bucketVertex]
-     * when every head has to be revisited.
-     *
-     * Asserting `a -> b` can only shorten a path `y ~> x` that runs through it, which needs `y ~> a`. A
-     * head that reaches no newly-asserted tail therefore cannot have gained a refutation, and searching
-     * from it again would repeat the previous answer.
-     *
-     * Retraction uses the full head set: it can release implied pins when the search backtracks past them.
-     */
+    // Asserting `a → b` can only shorten a path `y ⇝ x` through it, which needs `y ⇝ a`, so only heads
+    // reaching a newly asserted tail can gain a refutation.
     private fun headsToSweep(session: Session): IntArray {
         if (session.newTails.size == 0) return bucketVertex
         val graph = session.graph
@@ -247,13 +206,9 @@ internal class DifferenceSystemPropagator(
             session.newTails.clear()
             return true
         }
-        // At most one sweep per decision. The fixpoint wakes this propagator repeatedly as other factors
-        // move domains — roughly twenty times per node on a large SMT model — and each waking that
-        // asserted an edge would otherwise sweep again over a state the rest of the fixpoint has not
-        // finished settling. Deferring to the next decision defers a refutation, never drops one: the
-        // edge stays open and the Boolean layer may decide it in the meantime, which the sweep then reads
-        // off the trail. Assertion and retraction above stay eager, because a negative cycle is a
-        // conflict and must be seen on the trail that produced it.
+        // At most one sweep per decision, since the fixpoint wakes this propagator many times per node.
+        // Deferring a refutation never drops it: the edge stays open for the Boolean layer. Assertion and
+        // retraction stay eager because a negative cycle must be seen on the trail that produced it.
         if (state.numDecisions == session.sweptDecisions && !session.retractedSinceSweep) return true
         if (changed || !descended || session.retractedSinceSweep) {
             // A route through the constant can shorten outside row-only reachability, so it widens the
@@ -292,7 +247,6 @@ internal class DifferenceSystemPropagator(
         }
     }
 
-    // Assert every edge that newly holds; false on the first that closes a negative cycle.
     private fun assertHeldEdges(state: PropagationState, session: Session): Boolean {
         val graph = session.graph
         for (e in session.guards.indices) {
@@ -307,15 +261,11 @@ internal class DifferenceSystemPropagator(
         return true
     }
 
-    /** Whether edge [e] currently holds, so it belongs in the graph. */
     private fun asserted(state: PropagationState, session: Session, e: Int): Boolean =
         session.guards[e] == DifferenceEdge.ALWAYS || state.litTrue(session.guards[e])
 
-    /**
-     * Falsify the guard of every open edge the asserted system already contradicts. Edge `x → y` of
-     * weight `w` closes a negative cycle exactly when the shortest asserted path `y ⇝ x` has weight
-     * `d` with `d + w < 0`, so one search out of `y` decides every open edge whose head is `y`.
-     */
+    // Edge `x → y` of weight w closes a negative cycle exactly when the shortest asserted path `y ⇝ x` has
+    // weight d with d + w < 0, so one search out of y decides every open edge with head y.
     private fun refuteOpenEdges(state: PropagationState, session: Session): Boolean {
         var openHeads = 0
         while (!session.heads.isEmpty() && openHeads < HEAD_SWEEP_BUDGET) {
@@ -331,8 +281,7 @@ internal class DifferenceSystemPropagator(
         return true
     }
 
-    // The open edges with head [v], into the session's pending lists. A head's stages are separate methods so each
-    // compiles apart: in one body every loop entered on-stack recompiled the whole sweep.
+    // A head's stages are separate methods so each JIT-compiles apart from the whole sweep.
     private fun collectOpenEdges(state: PropagationState, session: Session, v: Int) {
         val graph = session.graph
         session.pending.clear()
@@ -345,9 +294,8 @@ internal class DifferenceSystemPropagator(
         }
     }
 
-    // The route through the constant node is already measured, so it refutes without a search and spares the search
-    // from settling that edge's tail at all. Returns how many pending edges it left open, or
-    // [HUB_REFUTATION_FAILED] when a refutation conflicts.
+    // Refutes through the already-measured constant node without a search. Returns how many pending edges
+    // remain open, or HUB_REFUTATION_FAILED when a refutation conflicts.
     private fun refuteViaHub(state: PropagationState, session: Session, v: Int): Int {
         val graph = session.graph
         var open = 0
@@ -377,7 +325,6 @@ internal class DifferenceSystemPropagator(
         return true
     }
 
-    /** Pin edge [e]'s guard false, explained by [antecedents] — the guards on whatever refuted it. */
     private fun refute(state: PropagationState, session: Session, e: Int, antecedents: IntArray): Boolean {
         val lit = Lit.negate(session.guards[e])
         if (state.pinLit(lit, antecedents)) return true
@@ -385,15 +332,10 @@ internal class DifferenceSystemPropagator(
         return false
     }
 
-    /**
-     * The clause blocking a set of asserted [edges]: the negation of every guard on them. Each such
-     * literal is false now — the edge is asserted, so its guard holds — which is what conflict analysis
-     * requires of a seed. An all-unconditional set has no guards and yields the empty clause, which says
-     * the system is unsatisfiable outright.
-     */
+    // Negated guards of asserted edges, all currently false as conflict analysis requires. An
+    // all-unconditional set yields the empty clause: the system is unsatisfiable outright.
     private fun blockingClause(session: Session, edges: IntArray): IntArray {
-        // Guard order is the edge order, and an edge set is small, so a linear membership check
-        // costs less than a hash set and keeps the emitted clause deterministic.
+        // Edge sets are small, so a linear membership check beats a hash set and keeps the clause deterministic.
         val lits = IntArrayList(edges.size)
         for (e in edges) {
             val g = session.guards[e]
@@ -404,13 +346,8 @@ internal class DifferenceSystemPropagator(
         return if (lits.isEmpty()) emptyIntArray() else lits.toIntArray()
     }
 
-    /**
-     * Weight of the shortest route `from ⇝ zero ⇝ to`, or [NO_BOUND] when either half is unreachable or
-     * the pair cannot be summed inside [Long].
-     *
-     * The clamp an unbounded model invents is ±2^62, so two of them sum past [Long] — an overflowing pair
-     * is reported as no route at all rather than as a wrapped one.
-     */
+    // NO_BOUND when either half is unreachable or the sum overflows; two ±2^62 clamps of an unbounded model
+    // can sum past Long.
     private fun hubDistance(graph: IncrementalDifferenceGraph, from: Int, to: Int): Long {
         val a = graph.distanceToZeroFrom(from)
         val b = graph.distanceFromZeroTo(to)
@@ -419,11 +356,7 @@ internal class DifferenceSystemPropagator(
         return if (((a xor sum) and (b xor sum)) < 0L) NO_BOUND else sum
     }
 
-    /**
-     * Whether an edge of weight [weight] closes a negative cycle against a path of weight [distance],
-     * which is the test that refutes it. An absent or unreachable distance decides nothing, and neither
-     * does a sum that leaves [Long].
-     */
+    // An unreachable distance or an overflowing sum decides nothing.
     private fun closesNegativeCycle(distance: Long, weight: Long): Boolean {
         if (distance == NO_BOUND) return false
         val sum = distance + weight
@@ -435,11 +368,7 @@ internal class DifferenceSystemPropagator(
         (state.refPayload[factorId] as? Session)?.reason
 
     private companion object {
-        /**
-         * A column side no declared domain states. Shares its value with
-         * [IncrementalDifferenceGraph.UNREACHABLE] deliberately: both mean "no path of any weight", and
-         * [closesNegativeCycle] rejects the two alike.
-         */
+        // Deliberately equal to IncrementalDifferenceGraph.UNREACHABLE: both mean no path of any weight.
         const val NO_BOUND: Long = Long.MAX_VALUE
     }
 }

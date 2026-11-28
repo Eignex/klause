@@ -23,15 +23,11 @@ import kotlin.concurrent.Volatile
 /**
  * Disjunction of Boolean literals.
  *
- * Local search scores it with a two-watched-literal scheme (Moskewicz et al., "Chaff: engineering an
- * efficient SAT solver", DAC 2001, https://doi.org/10.1145/378239.379017). Two indices into [literals]
- * are watched at any time; the clause is satisfied iff at least one watched literal evaluates to true.
- * When an accepted flip turns a watched literal false, the unwatched literals are scanned for a true one
- * to rewatch, O(1) amortized when most flips leave the watches alone. Single-literal clauses have only
- * one watch (`w2 = -1`).
+ * Local search scores it with two watched literals (Moskewicz et al., "Chaff: engineering an
+ * efficient SAT solver", DAC 2001, https://doi.org/10.1145/378239.379017).
  *
- * Repeated literals are folded at construction. A variable may occur with both polarities, in
- * which case the clause is tautological.
+ * Repeated literals are folded at construction. A variable occurring with both polarities makes the
+ * clause tautological.
  */
 class Clause(literals: IntArray) :
     Factor,
@@ -60,12 +56,8 @@ class Clause(literals: IntArray) :
 
     override val variables: VarList = BoolVars(literals.litVars())
 
-    /**
-     * CP-only tri-state cache: −1 unknown, 0 contains atom literals, 1 contains only Boolean variables.
-     * A pure-Boolean clause fires at the current decision level, allowing dispatch to skip its level
-     * scan. Atom literals may fire below that level and still require the scan. Fixed per Problem
-     * and valid across learned-clause forgetting/remapping; unused by local search.
-     */
+    // −1 unknown, 0 contains atom literals, 1 only Boolean variables. A pure-Boolean clause fires at the
+    // current decision level, so dispatch can skip its level scan; atom literals may fire below it.
     private var pureBoolMemo: Int = -1
 
     /** True iff every literal is a plain bool var (variable id `< numBoolVars`), memoised. */

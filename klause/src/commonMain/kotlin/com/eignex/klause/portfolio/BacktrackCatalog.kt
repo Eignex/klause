@@ -22,23 +22,12 @@ import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.util.ArmCatalog
 
 /**
- * The public catalog of backtrack (complete-search) arm recipes — the backtrack counterpart of
- * [LocalSearchCatalog]. It maps the string-label boundary (CLI
- * `bt-arm=`, telemetry) to a fresh [BacktrackRecipe], and exposes the credit-ordered
- * per-[Kind] pool. [BacktrackWorkerConfig] wraps these recipes into runnable portfolio arms; a caller
- * outside `klause` (the CLI) resolves named backtrack pools through here into `PortfolioScenario.btPool`.
- *
- * **Per-kind ranking** ([ranked]): SAT-optimized first (the pigeonhole guard), the conflict-driven
- * workhorse, the LP-intensity spread from the default emphasis, then the selector arms: the restart-level
- * selector portfolio, LinUCB routing and the free engine for optimization, dom-wdeg and first-fail for
- * satisfaction. A CSP ranks fewer LP arms and no LinUCB (it has no bound to exploit). Clausal satisfaction
- * leads with its clause-only proof recipe. A pool built for a model keeps only the arms whose needs the
- * model offers.
+ * Catalog of backtrack (complete-search) arm recipes, keyed by the labels of the CLI `bt-arm=` option and
+ * telemetry. [ranked] gives each [Kind]'s pool in credit order.
  */
 object BacktrackCatalog {
 
-    /** The CDCL/SAT stack (adaptive restarts, target phasing, tiered learned DB, vivification); the
-     *  pigeonhole guard, ranked first in both orders. */
+    // The pigeonhole guard.
     private fun satOptimized() = BacktrackRecipe("satOptimized") { seed, onEvent ->
         BacktrackPresets.satOptimized(randomSeed = seed, onEvent = onEvent)
     }
@@ -56,7 +45,6 @@ object BacktrackCatalog {
             )
         }
 
-    /** LastConflict + VSIDS + solution-guided values — the general-COP bound workhorse. */
     private fun conflictDriven() = BacktrackRecipe("conflictDriven") { seed, onEvent ->
         BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent)
     }
@@ -73,8 +61,6 @@ object BacktrackCatalog {
         )
     }
 
-    /** The learned LinUCB variable heuristic ([RegressionVariableSelector]) on solution-guided
-     *  values — the COP routing / feasibility-reach diversity arm. */
     private fun linUcb() = BacktrackRecipe("linucb") { seed, onEvent ->
         BacktrackParams(
             randomSeed = seed,
@@ -86,13 +72,11 @@ object BacktrackCatalog {
         )
     }
 
-    /** The bare free engine (default heuristics, Luby restarts) — plateau diversity. */
     private fun free() = BacktrackRecipe("free") { seed, onEvent ->
         BacktrackParams(randomSeed = seed, lubyRestartBase = 256L, onEvent = onEvent)
     }
 
-    /** Classic first-fail: smallest-domain variable + min value — the FD default many models are written
-     *  for. A fixed-order diversity arm distinct from the VSIDS/dom-wdeg workhorses. */
+    // The fixed order many FD models are written for.
     private fun firstFail() = BacktrackRecipe("first-fail") { seed, onEvent ->
         BacktrackParams(
             randomSeed = seed,
@@ -103,8 +87,6 @@ object BacktrackCatalog {
         )
     }
 
-    /** Weighted-degree branching (dom/wdeg) on solution-guided values — a conflict-history variable
-     *  order distinct from VSIDS, strong on structured CSP/COP. */
     private fun domWdeg() = BacktrackRecipe("domwdeg") { seed, onEvent ->
         BacktrackParams(
             randomSeed = seed,
@@ -116,8 +98,6 @@ object BacktrackCatalog {
         )
     }
 
-    /** Activity-based search (ABS) variable order + impact-based value order — a probing-driven
-     *  heuristic that reads the propagation reaction, distinct from the conflict-driven arms. */
     private fun activity() = BacktrackRecipe("activity") { seed, onEvent ->
         BacktrackParams(
             randomSeed = seed,
@@ -128,10 +108,6 @@ object BacktrackCatalog {
         )
     }
 
-    /** An LP arm: the conflict-driven core with the LP-relaxation family resolved at [emphasis].
-     *  `AGGRESSIVE` is the whole structurally-applicable family (cuts + hulls + probe); `DEFAULT` is
-     *  simplex bounding + objective propagation without the expensive cut machinery; `CONSERVATIVE` is
-     *  the cheap combinatorial bounds only. Built only where [emphasis] has something to enable. */
     private fun lpArm(emphasis: LpEmphasis) = BacktrackRecipe("lp-${emphasis.name.lowercase()}") { seed, onEvent ->
         BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(lpConfig = LpConfig(emphasis))
     }
@@ -141,10 +117,8 @@ object BacktrackCatalog {
         base.copy(lpConfig = LpConfig(LpEmphasis.DEFAULT), lpPlan = base.lpPlan.copy(lbTreeSearch = true))
     }
 
-    /** A restart-level selector portfolio: one arm that switches its (variable, value) heuristic
-     *  at every Luby restart under a UCB1 bandit — VSIDS / dom-wdeg / activity / conflict-ordering paired
-     *  with min / impact / solution-guided values — so the arm learns per instance which complete-search
-     *  heuristic suits it. A fresh portfolio per worker (it holds mutable bandit state). */
+    // Switches its (variable, value) heuristic at every Luby restart under a UCB1 bandit. A fresh portfolio
+    // per worker because it holds mutable bandit state.
     private fun selectorSwitch() = BacktrackRecipe("selector-switch") { seed, onEvent ->
         val palette = SelectorPortfolio.ucb1(
             listOf(
@@ -163,15 +137,10 @@ object BacktrackCatalog {
         )
     }
 
-    /** The conflict-driven workhorse with objective-guided value selection: dive toward each
-     *  variable's cost-minimising polarity first, so the incumbent improves fast. Built only on a model with
-     *  an objective — a diversity arm distinct from the cost-agnostic value orders above. */
     private fun objectiveGuided() = BacktrackRecipe("objective-guided") { seed, onEvent ->
         BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(objectiveGuidedValues = true)
     }
 
-    /** Build the recipe for [arm]'s typed identity — the single place each arm's params originate.
-     *  Keeps [BacktrackArm.label] and the produced recipe's [BacktrackRecipe.label] in lockstep. */
     private fun make(arm: BacktrackArm): BacktrackRecipe = when (arm) {
         BacktrackArm.SatOptimized -> satOptimized()
         BacktrackArm.ClausalBalanced -> clausal(arm, 0.975, maxLearned = 4000)
@@ -220,8 +189,7 @@ object BacktrackCatalog {
         BacktrackArm.ConflictDriven,
         BacktrackArm.SupportAware,
         BacktrackArm.PropagationGuided,
-        // The relaxation refutes a satisfaction node by infeasibility, which needs no objective — the
-        // emphasis is the axis here exactly as it is for the optimize palette.
+        // The relaxation refutes a satisfaction node by infeasibility, which needs no objective.
         BacktrackArm.LpDefault,
         BacktrackArm.LpAggressive,
         BacktrackArm.LpConservative,
@@ -241,24 +209,21 @@ object BacktrackCatalog {
 
     private val catalog = ArmCatalog(BacktrackArm.entries, BacktrackArm::label, ::make)
 
-    /** Every arm label across both kinds (COP is the superset), for validation and error messages. */
+    /** Every arm label across both kinds. */
     fun labels(): List<String> = catalog.labels(copOrder)
 
-    /** Every arm label for [kind], in credit order — for enumerating the pool by name. */
+    /** Every arm label for [kind], in credit order. */
     fun labels(kind: Kind): List<String> = catalog.labels(rankedArms(kind))
 
-    /** A fresh recipe for the arm named [label] (CLI `bt-arm=` boundary). */
+    /** A fresh recipe for the arm named [label]. */
     fun byLabel(label: String): BacktrackRecipe = catalog.byLabel(label)
 
     /** One fresh recipe for every arm of [kind], in credit order. */
     fun ranked(kind: Kind): List<BacktrackRecipe> = catalog.ranked(rankedArms(kind))
 
-    /** One fresh recipe for every arm of [kind] the model behind [facts] offers the needs of, in credit order. */
     internal fun ranked(kind: Kind, facts: ProblemFacts): List<BacktrackRecipe> =
         catalog.ranked(rankedArms(kind, facts))
 
-    /** The arms of [kind] the model behind [facts] offers the needs of, in credit order. Clausal satisfaction
-     *  leads with its clause-only proof recipe. */
     internal fun rankedArms(kind: Kind, facts: ProblemFacts): List<BacktrackArm> {
         val order = rankedArms(kind)
         val ranked = if (kind == Kind.CSP && facts.profile.problemClass == ProblemClass.Sat) {
@@ -269,24 +234,16 @@ object BacktrackCatalog {
         return ranked.filter { facts.eligibility(it.label, it.needs).admitted }
     }
 
-    /** A fresh recipe for [arm]. */
     internal fun recipe(arm: BacktrackArm): BacktrackRecipe = make(arm)
 
-    /** The arm named [label], or null for a recipe the catalog does not hold. */
     internal fun armOf(label: String): BacktrackArm? = BacktrackArm.entries.firstOrNull { it.label == label }
 
-    /** Per-arm recipe factories for [kind], in credit order — each builds a fresh recipe (the factory
-     *  shape the CLI feeds to `PortfolioScenario.btPool`). */
+    /** Per-arm factories of fresh recipes for [kind], in credit order. */
     fun factories(kind: Kind): List<() -> BacktrackRecipe> = catalog.factories(rankedArms(kind))
 }
 
-/**
- * Typed identity of every backtrack catalog arm — the backtrack counterpart of
- * [LocalSearchArm]. [BacktrackCatalog] orders and instantiates these;
- * [label] is the external name (CLI `bt-arm=` / telemetry), kept in lockstep with the built
- * recipe's label. [role] is what the arm covers in a roster; [needs] is what the arm needs from a model to
- * differ from the arm it is built on.
- */
+// label is the external name (CLI `bt-arm=`, telemetry) and must match the built recipe's label. needs is
+// what the arm needs from a model to differ from the arm it is built on.
 internal enum class BacktrackArm(val label: String, val role: ArmRole, val needs: Set<ArmNeed> = emptySet()) {
     SatOptimized("satOptimized", ArmRole.LearningProof),
     ClausalBalanced("clausal-balanced", ArmRole.LearningProof, setOf(ArmNeed.Clausal)),

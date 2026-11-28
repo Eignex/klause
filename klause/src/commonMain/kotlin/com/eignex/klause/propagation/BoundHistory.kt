@@ -5,27 +5,19 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.MutableLongIntMap
 
-// The interior-hole carve record: the per-var (value, level, reason) of each interior hole carved
-// out of a variable's domain during search. Bound atoms carry their establishment level/reason on
-// their own trail slots ([AtomStore.lvl] / [AtomStore.ant]); this record is the
-// equivalent for an eq atom ruled out by a hole — it answers the level and reason of an eq atom
-// materialized after its value was carved, when no trail slot was stamped at carve time. Pushed by
-// [pushHoleHist], truncated on backtrack alongside the carve, read by [holeReasonFor] /
-// [holeLevelFor] / [holeHistHas].
+// Interior-hole carve record: per-var (value, level, reason) of each interior hole carved during search. It
+// answers the level and reason of an eq atom materialized after its value was carved, when no atom trail slot
+// was stamped. Truncated on backtrack alongside the carve.
 
-/** Reason for the interior carve of `k` from `v`'s domain, as recorded (possibly lazy, see [reasonOf]);
- *  null denotes a reasonless fact or decision. */
 internal fun PropagationState.holeReasonFor(v: Int, k: Long): IntArray? {
     if (rootHoleHist[v]?.contains(k) == true) return null
     val slot = holeHistIndex[v]?.getOrDefault(k, -1) ?: -1
     return if (slot >= 0) requireNotNull(holeHistAnt[v])[slot] else null
 }
 
-/** True iff `k` is on `v`'s interior-carve record. Since the record is truncated on every undo,
- *  a hit means `k` is excluded *and* was carved as a pure-interior hole on the current
- *  path — so [holeReasonFor] / [holeLevelFor] hold its real (other-variable) reason and carve
- *  level. Lets the conflict derivation prefer that over the same-var complementary-bound citation
- *  that otherwise cycles for a value far from the live bound. */
+// The record is truncated on every undo, so a hit means `k` is excluded on the current path with a recorded
+// level and reason. Conflict derivation prefers that over the same-var complementary-bound citation, which
+// cycles for a value far from the live bound.
 internal fun PropagationState.holeHistHas(v: Int, k: Long): Boolean {
     if (rootHoleHist[v]?.contains(k) == true) return true
     return (holeHistIndex[v]?.getOrDefault(k, -1) ?: -1) >= 0 || survivorRestrictionFor(v, k) != null
@@ -72,20 +64,14 @@ internal fun PropagationState.pushHoleHist(v: Int, value: Long, level: Int, ant:
     poss.add(undo.size)
 }
 
-/**
- * The undo-log size when interior value `k` was carved out of `v`'s domain on the current path, or -1 when no
- * carve of it is on record: a root hole, a value past a bound, or one a survivor restriction dropped as an
- * unconditional fact.
- */
+// Undo-log size at the carve; -1 when no carve of the value is on record, such as a value past a bound.
 internal fun PropagationState.carvedAt(v: Int, k: Long): Int {
     if (rootHoleHist[v]?.contains(k) == true) return 0
     val slot = holeHistIndex[v]?.getOrDefault(k, -1) ?: -1
     return if (slot >= 0) requireNotNull(holeHistPos[v])[slot] else survivorRestrictionFor(v, k)?.position ?: -1
 }
 
-/** Level at which interior value `k` was carved out of `v`'s domain. `0` when no
- *  search-time carve is on record — the hole then predates the search (bake-time
- *  propagation), which is a root fact. */
+// 0 when no search-time carve is on record: the hole predates the search and is a root fact.
 internal fun PropagationState.holeLevelFor(v: Int, k: Long): Int {
     if (rootHoleHist[v]?.contains(k) == true) return 0
     val slot = holeHistIndex[v]?.getOrDefault(k, -1) ?: -1

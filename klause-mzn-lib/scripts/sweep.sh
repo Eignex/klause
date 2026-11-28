@@ -7,7 +7,7 @@
 #
 # Prereqs:
 #   - MiniZinc installed (`minizinc --version`).
-#   - `./gradlew :klause-bench:downloadMzn` already run.
+#   - The corpus under klause-bench/build/mzn/minizinc-benchmarks.
 #   - `./gradlew :klause-cli:installJvmDist` already run.
 
 set -uo pipefail
@@ -42,7 +42,6 @@ echo "problem,instance,outcome,elapsed_s,detail"
 
 for prob_dir in "$CORPUS"/*/; do
   prob="$(basename "$prob_dir")"
-  # Skip non-problem dirs.
   [[ "$prob" == "LICENSE" || "$prob" == "README"* ]] && continue
   mzn_files=( "$prob_dir"*.mzn )
   [[ -e "${mzn_files[0]}" ]] || continue
@@ -51,7 +50,6 @@ for prob_dir in "$CORPUS"/*/; do
   # Pick the smallest .dzn (if any).
   dzn_files=( "$prob_dir"*.dzn )
   if [[ -e "${dzn_files[0]}" ]]; then
-    # smallest by size
     dzn=$(ls -S "$prob_dir"*.dzn 2>/dev/null | tail -1)
     instance="$(basename "$dzn")"
     invocation=( "$mzn" "$dzn" )

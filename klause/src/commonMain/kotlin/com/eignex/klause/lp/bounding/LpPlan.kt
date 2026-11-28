@@ -10,402 +10,271 @@ import com.eignex.klause.lp.relaxation.LpSourcePreparation
  */
 data class LpPlan(
     /**
-     * Native LP-relaxation bounding for branch-and-bound minimisation. When true, scheduled
-     * nodes solve an exact integer LP relaxation of the live problem and prune when the relaxation
-     * is infeasible or its objective bound, rounded up to the next integer, is `≥` the incumbent.
-     * This strictly dominates the cheap per-term lower bound (which still runs first as a fast
-     * pre-filter) but costs an LP solve per scheduled node. Disabled by default; a no-op for
-     * problems with no LP-emittable factors (the relaxation is then empty and never prunes).
+     * Native LP-relaxation bounding for branch-and-bound minimisation. Scheduled nodes solve an exact
+     * LP relaxation of the live problem and prune when it is infeasible or its bound, rounded up, is `≥`
+     * the incumbent. The cheap per-term lower bound still runs first as a pre-filter.
      */
     val bounding: Boolean = false,
     /**
-     * Frequency policy for [bounding]: solve the LP at one in every [boundEvery] pruning checks
-     * rather than at every node, since the LP solve dominates a node's cost. `1` solves at every
-     * checked node; larger values trade pruning power for throughput. Must be positive.
+     * Solve the [bounding] LP at one in every [boundEvery] pruning checks; `1` solves at every checked
+     * node. Must be positive.
      */
     val boundEvery: Int = 1,
     /**
-     * Depth policy for [bounding]: skip the LP solve below this decision depth. The relaxation is
-     * tightest and most valuable near the root where bounds are loose; deep nodes are nearly fixed
-     * and rarely repay the solve. `Int.MAX_VALUE` (default) applies LP bounding at every depth.
+     * Skip the [bounding] LP below this decision depth; deep nodes are nearly fixed and rarely repay the
+     * solve. `Int.MAX_VALUE` applies it at every depth.
      */
     val boundMaxDepth: Int = Int.MAX_VALUE,
     /**
-     * Pivot budget for [bounding]'s dual solve: a node LP that reaches this many pivots hands back the
-     * iterate it has reached instead of running on to the optimum. `0` disables the budget entirely,
-     * leaving the size-derived one that on most models never binds.
+     * Pivot budget for [bounding]'s dual solve: a node LP that reaches this many pivots returns its
+     * current iterate. `0` leaves only the size-derived budget.
      *
-     * The dual simplex is dual-feasible at every basis it passes through, so a stopped solve still
-     * carries a valid bound — it just may be looser. That makes this a throughput knob, not a refusal:
-     * every model still gets its LP, and a stopped solve still prunes on the bound it reached. What it
-     * cannot do is claim an optimum, so reduced-cost fixing and tableau cuts stand down on one.
-     *
-     * The budget does not apply to every solve. A relaxation that prunes is worth its pivots outright —
-     * capping one measurably costs bound quality — so this bites only on an LP that has run the effort
-     * ladder's warmup window of prunable solves without a single prune, and any prune lifts it
-     * permanently ([LpPivotBudget]).
-     *
-     * Off by default: the models with the most to gain are the ones that never find an incumbent, and a
-     * prune-based gate cannot distinguish those from a model whose LP has not started pruning yet.
+     * The dual simplex is dual-feasible at every basis, so a stopped solve still prunes on a valid, looser
+     * bound; it cannot claim an optimum, so reduced-cost fixing and tableau cuts stand down on it. The
+     * budget applies only after the effort ladder's warmup window passes without a prune, and any prune
+     * lifts it permanently ([LpPivotBudget]). Off by default because a prune-based gate cannot tell a
+     * model that never finds an incumbent from one whose LP has not started pruning yet.
      */
     val boundMaxPivots: Int = 0,
     /**
-     * Adaptive node LP work budget ([LpWorkBudget]): each solve's budget is set from what the last one
-     * did — stopped short while progressing raises it, stalling among tied columns lowers it, a clean
-     * optimum resets it to what the model's size implies.
-     *
-     * Budgets in work rather than pivots, since a pivot costs an order of magnitude more on a dense
-     * basis than a sparse one, and adapts on the solve itself rather than on prune counts, which cannot
-     * separate a useless relaxation from a search that has not yet found an incumbent. On by default.
+     * Adaptive node LP work budget ([LpWorkBudget]): stopping short while progressing raises the next
+     * budget, stalling among tied columns lowers it, and a clean optimum resets it to the size-derived
+     * value. It budgets work rather than pivots because a pivot costs far more on a dense basis.
      */
     val boundAdaptiveWork: Boolean = true,
     /**
-     * Deterministic ceiling on what the node LP may spend per node the search explores, in [com.eignex.klause.lp.engine.LpWork]
-     * operations ([LpEffortGovernor]). Exceeding it, having pruned nothing, demotes the LP to its floor
-     * budget; a prune restores it and restarts its evidence window. `0` disables the rule.
-     *
-     * A ratio rather than a wall-clock fraction because it is scale-free and reproducible: it says *the
-     * LP is taxing the search* without needing to know how long the run may take or how fast the machine
-     * is, so two identical invocations demote at the same point. The total is capped separately, also in
-     * work ([lpWorkBudgetFraction]).
+     * Deterministic ceiling on node LP work per explored node, in [com.eignex.klause.lp.engine.LpWork]
+     * operations ([LpEffortGovernor]). Exceeding it without a prune demotes the LP to its floor budget;
+     * a prune restores it and restarts its evidence window. `0` disables the rule. A work ratio keeps
+     * the demotion point reproducible across machines.
      */
     val boundMaxOpsPerNode: Long = 20_000L,
     /**
-     * Work — [com.eignex.klause.lp.engine.LpWork] operations — the one-shot pre-search root LP may
-     * spend on cut harvesting, the root bound and primal probes, or `0` to bound it by the clock alone.
-     *
-     * The root harvest decides which cuts every later node inherits, so time-boxing it makes the whole
-     * search a function of machine speed. [rootBudgetFraction] remains the wall-clock backstop.
+     * [com.eignex.klause.lp.engine.LpWork] operations the one-shot pre-search root LP may spend on cut
+     * harvesting, the root bound and primal probes, or `0` to bound it by the clock alone. Work rather than
+     * time, because the root harvest decides which cuts every later node inherits.
+     * [rootBudgetFraction] remains the wall-clock backstop.
      */
     val rootMaxWork: Long = 200_000_000L,
     /**
-     * Warm-start each node's LP solve from a recent node's basis instead of re-solving cold. Branch
-     * decisions only tighten bounds, which leaves a parent basis dual-feasible, so the child
-     * re-optimises in a handful of dual pivots. The constraint matrix is identical across nodes
-     * (only bounds change), so the basis transfers directly. Sound either way — a stale or singular
-     * basis just falls back to a cold solve; this only changes pivot count, never the result.
-     * Enabled by default when [bounding] is on.
+     * Warm-start each node's LP from a recent node's basis. Branching only tightens bounds, so a parent
+     * basis stays dual-feasible; a stale or singular basis falls back to a cold solve.
      */
     val warmStart: Boolean = true,
     /**
-     * LP-guided branching: when the per-node LP has solved (requires [bounding]), steer each
-     * branch variable by its fresh fractional LP value — an int var splits `x ≤ floor(lp)` (the
-     * dichotomy separating the fractional LP point), an integral value dives round-toward-LP. Pure
-     * search-order guidance — it changes which solutions are found first, never the optimum or
-     * feasibility — so it is correctness-neutral. A no-op for variables with no fresh LP value, and
-     * for any emphasis that leaves [bounding] off, since there is then no LP value to steer by.
+     * LP-guided branching: steer each branch variable by its fresh fractional LP value, splitting an int
+     * var at `x ≤ floor(lp)` and diving an integral value round-toward-LP. Changes search order only.
+     * Needs [bounding] for an LP value.
      */
     val branching: Boolean = true,
     /**
-     * LP-rounding primal heuristic: before search, solve the root LP and try to round its
-     * fractional point into a feasible assignment by pinning each discrete variable toward its LP value
-     * and propagating. Publication requires the composed witness check, source-accepted continuous
-     * coordinates or certified completion, and improvement over the available incumbent cutoff.
-     * A declined mixed proposal permits peer-target and directed rounding of the same LP point before
-     * bounded feasibility pumping under the same root allowance. The relaxation point supplies only a
-     * target, so it cannot establish source feasibility on its own. Requires a LinearObjective; off by
-     * default; never changes the complete search's feasible region.
+     * LP-rounding primal heuristic: before search, round the root LP point into a feasible assignment by
+     * pinning each discrete variable toward its LP value and propagating, falling back to peer-target and
+     * directed rounding and bounded feasibility pumping under the same root allowance. Publication requires
+     * the composed witness check, source-accepted or certified continuous coordinates, and improvement over
+     * the incumbent cutoff. Requires a LinearObjective.
      */
     val probe: Boolean = false,
     /**
-     * Cut generation: at a scheduled node, after the LP solve, run separators that add valid
-     * linear cuts the fractional LP point violates (AllDifferent Hall-set cuts, Gomory integrality
-     * cuts), re-solving to tighten the bound. Requires [bounding]; off by default.
+     * Cut generation: after a scheduled node's LP solve, run separators that add cuts the LP point
+     * violates and re-solve. Requires [bounding].
      */
     val cuts: Boolean = false,
     /**
-     * During-search cut separation depth: when [cuts] holds, the structural separators also run
-     * at search nodes whose decision level is at most this, not only at the root. Each such node, after
-     * its LP solve, separates the violated cuts from its LP point and re-solves for a tighter bound;
-     * globally-valid cuts join the persistent pool so descendants inherit them, while node-local cuts
-     * tighten only that node's solve (they never leak to siblings, so the bound stays sound). The depth
-     * gate keeps the effort root-dominant — the relaxation is loosest and the cuts most valuable near
-     * the root. `0` runs the root harvest only. Requires [cuts].
+     * When [cuts] holds, also run the structural separators at search nodes up to this decision level.
+     * Globally valid cuts join the persistent pool; node-local cuts tighten only that node's solve. `0`
+     * runs the root harvest only.
      */
     val cutSearchMaxDepth: Int = 16,
-    /**
-     * Include Gomory integrality cuts among the [cuts] separators. These come from the simplex
-     * tableau and strengthen any fractional LP regardless of problem structure; the exact integer
-     * tableau makes them numerically clean. On by default when [cuts] is set.
-     */
+    /** Include Gomory integrality cuts among the [cuts] separators; the exact integer tableau keeps them clean. */
     val gomory: Boolean = true,
     /**
-     * Include Gomory mixed-integer (MIR) cuts among the [cuts] separators. Derived from the same
-     * tableau rows as [gomory] but with the stronger mixed-integer rounding multiplier, so they
-     * dominate the pure-integer cut on rows with fractional nonbasic coefficients. Like [gomory]
-     * they need no problem structure and stay exact in the integer tableau. On by default when
-     * [cuts] is set.
+     * Include Gomory mixed-integer (MIR) cuts among the [cuts] separators. They use the same tableau rows as
+     * [gomory] with the stronger mixed-integer rounding multiplier.
      */
     val mir: Boolean = true,
     /**
-     * Genuine subtour-elimination cuts for Circuit globals. When true and [bounding] holds,
-     * each Circuit gets an arc-indicator relaxation (degree + channelling rows) and a max-flow
-     * separator adds the directed cutset inequalities that fractional/subtour LP points violate.
-     * Adds one column per candidate arc (skipped above an arc-count cap), so it is opt-in and off by
-     * default; a no-op when no Circuit exists.
+     * Subtour-elimination cuts for Circuit globals: an arc-indicator relaxation per Circuit plus a max-flow
+     * separator for the violated directed cutset inequalities. Adds one column per candidate arc, skipped
+     * above an arc-count cap. Requires [bounding].
      */
     val circuit: Boolean = false,
     /**
-     * Linearize constant-array Element globals with a one-hot selector model. When true and
-     * [bounding] holds, each Element over a constant table gets selector columns and channelling
-     * rows — its exact convex hull `result = Σ arr[p]·[idx=p]` — so the LP sees `result`'s dependence
-     * on `idx`. Adds O(len) columns per Element (skipped above a length cap), so it is opt-in and off
-     * by default; a no-op when no constant-array Element exists.
+     * One-hot selector hull `result = Σ arr(p)·[idx=p]` for constant-array Element globals. Adds O(len)
+     * columns per Element, skipped above a length cap. Requires [bounding].
      */
     val element: Boolean = false,
     /**
-     * Linearize Table globals with their convex hull. When true and [bounding] holds, each
-     * Table gets one selector column per allowed tuple with `Σ y_t = 1` and per-column channels
-     * `xs[j] = Σ tuple_t[j]·y_t`, so the LP sees the exact convex hull of the allowed tuples. Adds
-     * O(numTuples) columns per Table (skipped above a tuple-count cap), so it is opt-in and off by
-     * default; a no-op when no Table exists.
+     * Convex hull of each Table's allowed tuples: one selector column per tuple with `Σ y_t = 1` and
+     * channels `xs(j) = Σ tuple_t(j)·y_t`. Skipped above a tuple-count cap. Requires [bounding].
      */
     val table: Boolean = false,
-    /**
-     * One-hot NValue value hull. When true and [bounding] holds, each NValue contributes a
-     * per-value "used"-indicator model so the distinct-count target gets an LP bound (a real lower
-     * bound under minimisation). Sound by construction; off by default; a no-op when no NValue exists.
-     */
+    /** One-hot value hull per NValue, giving the distinct-count target an LP bound. Requires [bounding]. */
     val nValue: Boolean = false,
     /**
-     * Regular DFA flow hull. When true and [bounding] holds, each Regular contributes the
-     * layer-expanded automaton flow model (arc vars + flow-conservation + channel rows) — the exact
-     * convex hull of its accepting strings, so an objective over the sequence gets a tight LP bound.
-     * Sound by construction; off by default; a no-op when no Regular exists or the unfolding exceeds
-     * the arc cap.
+     * Layer-expanded DFA flow hull per Regular, the exact convex hull of its accepting strings. Skipped when
+     * the unfolding exceeds the arc cap. Requires [bounding].
      */
     val regular: Boolean = false,
     /**
-     * Mdd layered flow hull. When true and [bounding] holds, each Mdd contributes the layered
-     * flow model (arc vars + flow-conservation + value channel + cost channel) — the exact convex hull
-     * of its accepting paths, so an objective over the sequence (or a cost-MDD's cost var) gets a tight
-     * LP bound. Sound by construction; off by default; a no-op when no Mdd exists or the unfolding
-     * exceeds the arc cap.
+     * Layered flow hull per Mdd with value and cost channels, the exact convex hull of its accepting paths.
+     * Skipped when the unfolding exceeds the arc cap. Requires [bounding].
      */
     val mdd: Boolean = false,
     /**
-     * Count-variable GlobalCardinality count hull. When true and [bounding] holds, each
-     * count-variable GCC contributes a one-hot selector model (`Σ_v z_iv = 1`, channel
-     * `Σ_v v·z_iv = xs(i)`, and `Σ_i z_{i,cover(k)} = counts(k)` per cover value) so a count variable
-     * in the objective gets an exact LP bound. Sound by construction; off by default; a no-op when no
-     * count-variable GCC exists or the selector count exceeds the cell cap.
+     * One-hot count hull per count-variable GlobalCardinality (`Σ_v z_iv = 1`, `Σ_v v·z_iv = xs(i)`,
+     * `Σ_i z_{i,cover(k)} = counts(k)`). Skipped above the cell cap. Requires [bounding].
      */
     val gccCount: Boolean = false,
     /**
-     * Objective-cone / precedence-only sub-relaxation. When true and [bounding] holds, the
-     * per-node LP is built over **only** the variables and rows transitively connected to the
-     * objective, with every big-M [com.eignex.klause.factor.arithmetic.ReifiedLinear] disjunctive row
-     * dropped — for scheduling, the critical-path / longest-path bound (precedence + objective). The
-     * point is that this subset has no disjunctive ordering bools, so it always fits the relaxation-size
-     * cap where the full relaxation does not; it is a cheaper, looser, always-sound bound (any subset
-     * of constraints is a relaxation). Forces the hull / circuit / cut / cumulative LP features off.
-     * Off by default.
+     * Objective-cone sub-relaxation: build the per-node LP over only the variables and rows connected to
+     * the objective, dropping every big-M [com.eignex.klause.factor.arithmetic.ReifiedLinear] row. For
+     * scheduling this is the precedence bound; it fits the relaxation-size cap where the full relaxation
+     * does not. Forces the hull, circuit, cut and cumulative features off. Requires [bounding].
      */
     val objectiveCone: Boolean = false,
     /**
-     * Build the per-node relaxation over only the factors that touch LP-only continuous (real)
-     * columns — the residual real-feasibility sub-relaxation the satisfaction path prunes with. The
-     * Boolean clause structure is enforced by propagation already, so dropping its rows loses no
-     * pruning power at an infinite incumbent while shrinking the basis from the clause count to the
-     * real-atom count. Requires [bounding]; off by default.
+     * Build the per-node relaxation over only the factors touching LP-only real columns. Propagation
+     * already enforces the Boolean clause rows, so dropping them loses no pruning at an infinite incumbent.
+     * Requires [bounding].
      */
     val realResidual: Boolean = false,
-    /**
-     * Whether the adaptive LP auto-off may **re-probe** a disabled per-node LP on exponential
-     * backoff to recover subtrees where the relaxation becomes useful again. `true` is the adaptive
-     * default; `false` makes a disable irreversible. No effect when [bounding] is off.
-     */
+    /** Whether the adaptive LP auto-off may re-probe a disabled per-node LP on exponential backoff. */
     val autoOffReprobe: Boolean = true,
     /**
-     * Wall-clock budget for the one-shot pre-search root LP work: the cut harvest, the root
-     * relaxation-bound capture, and the LP-rounding [probe] all share one deadline so a pathological
-     * root relaxation cannot consume the whole time budget before branch-and-bound gets its first node.
-     * The budget is [rootBudgetFraction] of the time remaining when search
-     * starts — so search keeps the rest of every slice — capped at [rootBudgetMillis]. Each root step is
-     * cooperatively cancelled at the budget and degrades gracefully (a half-harvested cut pool, a `NaN`
-     * root bound, no probe seed), never unsoundly. `0.0` disables the cap.
+     * Wall-clock share of the time remaining at search start for the pre-search root LP work (cut harvest,
+     * root bound, [probe]), capped at [rootBudgetMillis]. Each root step stops cooperatively at the deadline
+     * and degrades soundly. `0.0` disables the cap.
      */
     val rootBudgetFraction: Double = 0.5,
-    /** Absolute ceiling in milliseconds on the [rootBudgetFraction] pre-search root-LP budget; also the
-     *  sole cap when the time remaining is unknown (the non-pausable one-shot path). */
+    /** Absolute ceiling in milliseconds on the [rootBudgetFraction] budget; the sole cap when the time
+     *  remaining is unknown. */
     val rootBudgetMillis: Long = 30_000,
     /**
-     * Share of the total solve budget optional root and node LP work may spend, as a cumulative **work
-     * allowance** ([LpEffortGovernor]).
-     *
-     * The share converts to [com.eignex.klause.lp.engine.LpWork] operations at a fixed rate calibrated
-     * on MIPLIB, so the allowance is a function of the budget and never of the clock: two identical
-     * invocations stop their LP at the same point. It counts what the engine's work meter counts —
-     * simplex work and the node-LP overhead charged in the same unit — and each solve is capped at what is
-     * left of it. `LpStats.workAllowanceSpent` records when it ran out.
-     *
-     * The allowance is cumulative across root and node work, prunes included; once spent, optional node
-     * LP work stops so search keeps its time. `0.0` disables it; it has no effect when the total budget is
-     * unknown.
+     * Share of the total solve budget that optional root and node LP work may spend, converted at a fixed
+     * rate to a cumulative [com.eignex.klause.lp.engine.LpWork] allowance ([LpEffortGovernor]) so it never
+     * depends on the clock. Once spent, optional node LP stops. `0.0` disables it; no effect when the total
+     * budget is unknown.
      */
     val lpWorkBudgetFraction: Double = 0.25,
     /**
-     * Energetic makespan lower-bound row for the scheduling globals. When true and
-     * [bounding] holds, each Cumulative / Disjunctive whose makespan variable `M` can be verified
-     * (`M ≥ startᵢ + durᵢ` from the actual linear / array-max links) contributes one row
-     * `capacity·M ≥ cap·t1 + Σ energy-after(t1)` — the energetic / area objective bound the
-     * start-variable LP otherwise lacks for scheduling. Sound by construction (a missing row only
-     * loosens; the makespan link is never guessed); off by default; a no-op without a verifiable
-     * scheduling makespan. See [com.eignex.klause.lp.relaxation.CumulativeRelaxation].
+     * Energetic makespan row `capacity·M ≥ cap·t1 + Σ energy-after(t1)` for each Cumulative / Disjunctive
+     * whose makespan variable `M` is verified from the linear or array-max links. Requires [bounding]. See
+     * [com.eignex.klause.lp.relaxation.CumulativeRelaxation].
      */
     val cumulative: Boolean = false,
     /**
-     * Diffn per-axis cumulative makespan bound. When true and [bounding] holds, each
-     * constant-size Diffn is projected onto both axes as a cumulative (capacity = the maximum
-     * perpendicular extent) and contributes the same energetic makespan row as [cumulative] — a
-     * sound lower bound on a strip-length / extent variable (its `t1 = min-est` case is the area bound
-     * `Σ wᵢ·hᵢ ≤ W·H`). Sound by construction; off by default; a no-op unless an axis extent is a
-     * verifiable upper bound on every task end. See [com.eignex.klause.lp.relaxation.CumulativeRelaxation].
+     * Projects each constant-size Diffn onto both axes as a cumulative and adds the [cumulative] makespan
+     * row. Applies only when an axis extent verifiably bounds every task end. Requires [bounding]. See
+     * [com.eignex.klause.lp.relaxation.CumulativeRelaxation].
      */
     val diffn: Boolean = false,
     /**
-     * Time-indexed LP reformulation of the scheduling globals. When true and [bounding]
-     * holds, each Cumulative / Disjunctive over a bounded horizon gets binary `x_{i,t}` start
-     * columns with assignment, start-channel and per-time-point resource rows — the resource–time
-     * coupling the start-variable LP lacks, so the LP bound is far tighter than the energetic row
-     * ([cumulative]) alone. Adds O(n·H) columns, hard-gated on the horizon, so it is opt-in and off
-     * by default; a no-op without a bounded-horizon scheduling global.
+     * Time-indexed reformulation of each Cumulative / Disjunctive over a bounded horizon: binary `x_{i,t}`
+     * start columns with assignment, start-channel and per-time-point resource rows. Adds O(n·H) columns,
+     * gated on the horizon. Requires [bounding].
      */
     val cumulativeTimeIndexed: Boolean = false,
     /**
-     * Preemptive min-cost-flow feasibility / makespan bound for the scheduling globals. When
-     * true, a node is pruned if the tasks' energy cannot be preemptively packed into their release /
-     * deadline windows at capacity (an exact max-flow feasibility test, strictly stronger than the
-     * pairwise-window [energeticReasoning] scan and horizon-independent — it keys off
-     * the O(n) start-bound breakpoints, not the time axis), and the verified makespan variable is
-     * lower-bounded by the smallest feasible completion time. Pure relaxation; off by default; a no-op
-     * without a scheduling global. See [com.eignex.klause.bound.CumulativeFlowBound].
+     * Preemptive max-flow feasibility and makespan bound for the scheduling globals: prunes a node when the
+     * tasks' energy cannot be packed preemptively into their windows, and lower-bounds the verified
+     * makespan. Keys off the O(n) start-bound breakpoints, so it is horizon-independent. See
+     * [com.eignex.klause.bound.CumulativeFlowBound].
      */
     val cumulativeFlow: Boolean = false,
-    /** Frequency policy for [cumulativeFlow]: run the max-flow check at one in every this-many
-     *  pruning checks, mirroring [energeticEvery]. Must be positive. */
+    /** Run the [cumulativeFlow] check at one in every this-many pruning checks. Must be positive. */
     val cumulativeFlowEvery: Int = 1,
     /**
-     * 0/1 multi-knapsack subgradient Lagrangian bounding. When true and the objective is a
-     * [com.eignex.klause.solver.objective.LinearObjective], a node also computes a Lagrangian bound for
-     * problems with several `PseudoBoolean` capacity rows: one capacity row is kept and solved **exactly**
-     * by 0/1-knapsack DP while the rest are dualized, so the bound captures integrality the monolithic LP
-     * relaxes away. Shares [lagrangianIterations]. Independent of [bounding]; off by
-     * default; a no-op unless a clean capacity `PseudoBoolean` (positive literals/weights, `≤`) is present.
+     * 0/1 multi-knapsack Lagrangian bound for a
+     * [com.eignex.klause.solver.objective.LinearObjective] with several clean `PseudoBoolean` capacity rows:
+     * one row is solved exactly by knapsack DP while the rest are dualized. Shares [lagrangianIterations].
+     * Independent of [bounding].
      */
     val knapsackLagrangian: Boolean = false,
     /**
-     * Decompose a separable LP into its column components at the solver seam and solve each block
-     * independently ([com.eignex.klause.lp.engine.ComponentLpSolver]). Exact — the stitched optimum, primal
-     * point, and duals match the monolithic solve — while each block's factorization costs a fraction
-     * of the monolithic one. On by default; the `lp-component-split` param opts a run out.
+     * Solve a separable LP per column component ([com.eignex.klause.lp.engine.ComponentLpSolver]). The
+     * stitched optimum, point and duals match the monolithic solve.
      */
     val componentSplit: Boolean = true,
     /**
-     * Subgradient Lagrangian bounding for structured globals. When true and the objective is a
-     * [com.eignex.klause.solver.objective.LinearObjective], a node also computes a Lagrangian bound from an
-     * AllDifferent global (its variables solved exactly as a min-cost assignment, with the linear
-     * constraints over them dualized) and prunes when that bound — rounded up — reaches the incumbent.
-     * Independent of [bounding]; off by default; a no-op when no eligible AllDifferent exists.
+     * AllDifferent Lagrangian bound for a [com.eignex.klause.solver.objective.LinearObjective]: the
+     * AllDifferent solved as a min-cost assignment with its linear constraints dualized, pruning when the
+     * rounded-up bound reaches the incumbent. Independent of [bounding].
      */
     val lagrangian: Boolean = false,
-    /** Subgradient ascent iterations per node for [lagrangian] / [knapsackLagrangian]; more
-     *  iterations tighten the bound. */
+    /** Subgradient ascent iterations per node for [lagrangian] / [knapsackLagrangian]. */
     val lagrangianIterations: Int = 15,
     /**
-     * Energetic-reasoning infeasibility check for Cumulative globals. When true, a node is
-     * pruned if some Cumulative is energetically over-subscribed (required mandatory energy in a time
-     * window exceeds capacity·width). Pure feasibility test; off by default; a no-op without a
-     * Cumulative. Applied on the minimization path alongside the other LP bounds.
+     * Energetic-reasoning infeasibility check: prune a node when some Cumulative needs more mandatory energy
+     * in a window than capacity·width.
      */
     val energeticReasoning: Boolean = false,
     /**
-     * Frequency policy for [energeticReasoning]: run the window scan at one in every
-     * [energeticEvery] pruning checks, mirroring [boundEvery]. The scan is O(windows² · tasks)
-     * per Cumulative with no incremental state, so on task-heavy models it dominates a node's
-     * cost; a cadence trades missed prunes for throughput. `1` (default) checks at every pruned
-     * node. [LpAutoConfig] derives a size-aware cadence from the task counts when *it* enables
-     * the check. Must be positive.
+     * Run the [energeticReasoning] window scan at one in every [energeticEvery] pruning checks. The scan is
+     * O(windows² · tasks) per Cumulative with no incremental state. [LpAutoConfig] derives a size-aware
+     * cadence when it enables the check. Must be positive.
      */
     val energeticEvery: Int = 1,
     /**
-     * Retain source-feasibility clauses over absolute variable-bound atoms. Farkas certificates
-     * produce conflict nogoods, mixed-row projections produce implications guarded by their complete
-     * row and bound premises, and energetic reasoning produces over-subscription nogoods. The
-     * bounded LP pool admits row implications for immediate registration, so sibling subtrees can
-     * reuse them before restart. Restart shares these implications without registering them again;
-     * other queued clauses retain restart-time registration. LP sources require [bounding]; energetic
-     * sources require [energeticReasoning]. When a conflict certificate resolves to an asserting 1UIP
-     * clause the engine backjumps and learns immediately, so this helps even with restarts off;
-     * non-asserting certificates fall back to restart-time registration. A
-     * certificate leaning on a live-big-M reified row cites the bounds that justify the M alongside its
-     * column seats; one leaning on a node-local cut is not expressible as a globally valid bound-atom
-     * clause and is withheld — the prune itself still happens. Off by default.
+     * Retain source-feasibility clauses over absolute variable-bound atoms: Farkas conflict nogoods,
+     * mixed-row implications guarded by their row and bound premises, and energetic over-subscription
+     * nogoods. Row implications register immediately so sibling subtrees reuse them; an asserting 1UIP
+     * certificate backjumps and learns at once, other clauses register at restart. A certificate on a
+     * live-big-M row cites the bounds justifying its M; one leaning on a node-local cut is withheld
+     * while the prune still happens. LP sources require [bounding]; energetic sources require
+     * [energeticReasoning].
      */
     val learn: Boolean = false,
     /**
-     * Per-hull pruning: before search, drop each convex-hull technique that adds no strength to the root
-     * relaxation bound (solve the root LP with the hull off; keep it only if its removal loosens the
-     * bound). The build-time counterpart of the adaptive effort ladder — it sheds a single unhelpful hull
-     * while the rest keep running, so a hull that costs per-node build effort without tightening is paid
-     * for once at the root rather than at every node. Sound (a hull is a sound relaxation either way, and
-     * one is dropped only when the root bound is unchanged). Requires [bounding]; off by default.
+     * Before search, drop each convex-hull technique whose removal leaves the root relaxation bound
+     * unchanged, so an unhelpful hull is paid for once at the root. Requires [bounding].
      */
     val pruneHulls: Boolean = false,
     /**
-     * Objective shaving: before search, probe whether the objective can be proven to exceed its
-     * current lower bound — assume `objVar ≤ v` and, if the LP relaxation + propagation prove that
-     * infeasible, raise the root lower bound to `v + 1`. Sound (every raise is a proof that lower values
-     * are infeasible). Requires [bounding] and a single ascending objective variable. Off by default.
+     * Objective shaving: before search, assume `objVar ≤ v` and raise the root lower bound to `v + 1` when
+     * the LP relaxation and propagation refute it. Requires [bounding] and a single ascending objective
+     * variable.
      */
     val objectiveShaving: Boolean = false,
     /**
-     * Variable shaving: before search, probe each integer variable's domain bounds — assume
-     * `v ≤ lo` (resp. `v ≥ hi`) and, if the LP relaxation + propagation prove that infeasible, tighten
-     * the bound inward. Sound (every tightening is a proof that the shaved-off values are infeasible).
-     * Requires [bounding]; costs probes per variable, so off by default.
+     * Variable shaving: before search, assume `v ≤ lo` (resp. `v ≥ hi`) per integer variable and tighten the
+     * bound inward when the LP relaxation and propagation refute it. Requires [bounding].
      */
     val variableShaving: Boolean = false,
     /**
-     * LP-guided tree-search primal subsolver over finite discrete domains. Mixed leaves use the same
-     * numerical completion and configured source acceptance as ordinary search. Returns checked
-     * incumbents only; exhaustion and unbounded leaves supply no terminal proof. Requires [bounding];
-     * off by default.
+     * LP-guided tree-search primal subsolver over finite discrete domains. Returns checked incumbents
+     * only; exhaustion and unbounded leaves supply no terminal proof. Requires [bounding].
      */
     val lbTreeSearch: Boolean = false,
     /**
      * Add the big-M tight face of each [com.eignex.klause.factor.arithmetic.ArrayMinMax] on top of the
      * envelope, bounding the extremum from the tight side (Anderson, Huchette, Ma, Tjandraatmadja and
      * Vielma, "Strong mixed-integer programming formulations for trained neural networks", Math. Program.
-     * 2020, https://doi.org/10.1007/s10107-020-01474-5). Sound relaxation; gated. Off by default.
+     * 2020, https://doi.org/10.1007/s10107-020-01474-5).
      */
     val linMaxTightFace: Boolean = false,
     /**
      * Relax each [com.eignex.klause.factor.arithmetic.Product] `result = a·b` with its McCormick
      * envelope (the square case degenerates to secant/tangent) — McCormick, "Computability of global
      * solutions to factorable nonconvex programs: Part I", Math. Program. 1976,
-     * https://doi.org/10.1007/BF01580665. Sound relaxation; gated. Off by default.
+     * https://doi.org/10.1007/BF01580665.
      */
     val productMcCormick: Boolean = false,
     /**
-     * Separate implied-bound cuts from the probing implication graph: `litVal(A) ≤ litVal(B)` for
-     * each violated probing implication not already an explicit binary clause. Sound (valid at every
-     * solution); requires [cuts]. Off by default.
+     * Separate implied-bound cuts `litVal(A) ≤ litVal(B)` from the probing implication graph, for each
+     * violated implication not already an explicit binary clause. Requires [cuts].
      */
     val impliedBoundCuts: Boolean = false,
     /**
      * Separate single-node flow-cover cuts: detect a capacity row `Σ yⱼ ≤ b` whose flows
      * carry variable-upper-bounds `yⱼ ≤ uⱼ·xⱼ` (`xⱼ ∈ {0,1}`) and add the violated flow-cover inequality
      * (Padberg, Van Roy and Wolsey, "Valid linear inequalities for fixed charge problems", Oper. Res. 1985,
-     * https://doi.org/10.1287/opre.33.4.842). Sound (valid at every integer solution); requires [cuts].
-     * Off by default.
+     * https://doi.org/10.1287/opre.33.4.842). Requires [cuts].
      */
     val flowCoverCuts: Boolean = false,
     /**
-     * Boolean RLT relaxation: multiply each small 0/1 knapsack row by its binaries and linearize
-     * the products `xₖ·xᵢ` with their McCormick envelope (product columns + rows). Sound — the
-     * relaxation excludes no integer solution; adds capped product columns, so it is gated. Requires
-     * [bounding]; off by default.
+     * Boolean RLT relaxation: multiply each small 0/1 knapsack row by its binaries and linearize the
+     * products `xₖ·xᵢ` with their McCormick envelope. Adds capped product columns. Requires [bounding].
      */
     val booleanRlt: Boolean = false,
     /** Harvest globally valid cuts before search. Node separation remains independent. */
@@ -415,15 +284,10 @@ data class LpPlan(
     /** Source-template retention and admission, independent of the enabled numerical techniques. */
     val sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
 ) {
-    /**
-     * Whether Gomory integrality cuts actually run: [gomory] permits them, [cuts] admits the
-     * separators at all.
-     *
-     * Derived here so callers cannot separate cuts when [cuts] is disabled.
-     */
+    /** Whether Gomory integrality cuts run: [gomory] permits them and [cuts] admits separators. */
     val gomoryEnabled: Boolean get() = cuts && gomory
 
-    /** Whether MIR cuts actually run, on the same terms as [gomoryEnabled]. */
+    /** Whether MIR cuts run, on the same terms as [gomoryEnabled]. */
     val mirEnabled: Boolean get() = cuts && mir
 }
 

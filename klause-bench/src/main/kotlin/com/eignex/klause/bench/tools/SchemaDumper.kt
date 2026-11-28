@@ -9,7 +9,7 @@ import com.eignex.skema.SchemaDef
 import com.eignex.skema.schemaJsonConfig
 import kotlinx.serialization.json.Json
 
-/** Source of the bundled JSON instance — regenerate via `:klause-bench:dumpSchema`. */
+// Source of the bundled JSON instance; regenerate via `:klause-bench:dumpSchema`.
 private class CampaignSchema : VariableSchema() {
     val premium by boolVar()
     val type by nominal("a", "b", "c")

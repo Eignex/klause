@@ -13,14 +13,10 @@ import com.eignex.util.arrays.argsortBy
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
 
-/** CP propagator for [PseudoBoolean]: bounds propagation for `Σ weights(i)·literals(i) ⟨op⟩ bound`.
- *
- *  [watched] enables a weighted watched-literal wakeup scheme (Chai and Kuehlmann, "A fast pseudo-Boolean
- *  constraint solver", IEEE TCAD 24(3), 2005, https://doi.org/10.1109/TCAD.2004.842808), used for learned
- *  `≥` constraints so they don't wake on every literal change. While the summed weight of the non-false
- *  watched literals is at least `bound + maxCoeff`, the constraint has slack ≥ every coefficient and can
- *  neither propagate nor conflict — so it only needs to fire when a *watched* literal goes false. Base
- *  pseudo-Boolean constraints keep the occurrence-list wakeup (`watched = false`). */
+// [watched] enables weighted watched-literal wakeup (Chai and Kuehlmann, "A fast pseudo-Boolean constraint
+// solver", IEEE TCAD 24(3), 2005, https://doi.org/10.1109/TCAD.2004.842808) for learned `≥` constraints:
+// while the non-false watched weight is at least `bound + maxCoeff`, the slack covers every coefficient, so
+// the constraint can neither propagate nor conflict and need only fire when a watched literal goes false.
 internal class PseudoBooleanPropagator(
     override val boolVars: IntArray,
     override val intVars: IntArray,
@@ -31,12 +27,9 @@ internal class PseudoBooleanPropagator(
     private val watched: Boolean = false,
 ) : LearnedPropagator {
 
-    /** Weight covering target for the watched scheme: while the non-false watched weight reaches this,
-     *  no literal can be forced. Only meaningful for a `≥` [watched] constraint. */
     private val watchTarget: Long = if (watched) bound + (weights.maxOrNull() ?: 0L) else 0L
 
-    /** Literal indices ordered by descending weight — the greedy pick order for the smallest covering
-     *  watch set. Built only in [watched] mode. */
+    // Greedy pick order for the smallest covering watch set.
     internal val byWeightDesc: IntArray = if (watched) {
         argsortBy(literals.size) { a, b -> weights[b].compareTo(weights[a]) }
     } else {
@@ -46,7 +39,6 @@ internal class PseudoBooleanPropagator(
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
         if (watched) propagateWatched(state, factorId) else propagatePbBounds(state, weights, literals, op, bound)
 
-    /** Select non-false literals in descending weight order until they cover [watchTarget]. */
     fun selectWatched(state: PropagationState): IntArray = selectCover(state).first
 
     private fun selectCover(state: PropagationState): Pair<IntArray, Boolean> {
@@ -62,39 +54,22 @@ internal class PseudoBooleanPropagator(
         return out.toIntArray() to false
     }
 
-    /**
-     * Watched-literal propagation. Recomputes the covering watch set from the current assignment and
-     * reconciles [PropagationState.refPayload]`[factorId]` (the installed watched literals) against it. If
-     * the set covers [watchTarget] the constraint can't propagate — return true without scanning. Only
-     * when the covering target is unreachable does it fall through to full bounds propagation.
-     */
     private fun propagateWatched(state: PropagationState, factorId: Int): Boolean {
         val old = state.refPayload[factorId] as? IntArray ?: emptyIntArray()
         val (next, covered) = selectCover(state)
-        // Reconcile watches against the new selection: drop the dropped, install the added. Safe to mutate the
-        // watcher index here — propagate runs after the wakeup walk over the fired literal's list.
+        // Safe to mutate the watcher index: propagate runs after the wakeup walk over the fired literal's list.
         for (lit in old) if (!next.contains(lit)) state.removeBoolWatch(factorId, lit)
         for (lit in next) if (!old.contains(lit)) state.installLitWatch(lit, factorId)
         state.refPayload[factorId] = next
-        // Covered ⇒ slack ≥ every coefficient ⇒ nothing to do. Otherwise bounds-propagate (force / detect
-        // conflict); [next] then watches every non-false literal so any further change re-fires.
+        // Uncovered, [next] watches every non-false literal so any further change re-fires.
         if (covered) return true
         return propagatePbBounds(state, weights, literals, op, bound)
     }
 
-    /** Clause-form nogood when propagation fails: the disjunction of each pinned
-     *  literal's false-form. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         pbFalseFormAntecedents(state, literals, excludeVar = -1, extraLit = Lit.NONE)
 
-    /**
-     * Load this constraint into [acc] as a coefficient-carrying `≥` reason for pseudo-Boolean
-     * cutting-planes conflict analysis. `GE` loads directly; `LE` flips every literal's
-     * polarity and sets the degree to `Σweights − bound`. An `EQ` is two `≥` constraints — the relevant
-     * half is the one that forced [forcedLit] (forced-true own-literal ⇒ lower `≥` bound; forced-false ⇒
-     * upper `≤` bound); with no forced literal (a seed) the violated half is read from [state]. Returns
-     * false on overflow.
-     */
+    // An `EQ` loads the half that forced [forcedLit], or for a seed the violated half.
     fun loadReason(acc: PbAccumulator, forcedLit: Int, state: PropagationState): Boolean = when (op) {
         PbOp.GE -> acc.loadPb(weights, literals, geBound = bound)
 
@@ -116,8 +91,6 @@ internal class PseudoBooleanPropagator(
         }
     }
 
-    /** For a seed equality conflict: true iff the lower-bound half `Σ w·ℓ ≥ bound` is the violated one
-     *  (the achievable sum of the non-false literals falls short of the bound). */
     private fun geSideViolated(state: PropagationState): Boolean {
         var nonFalseSum = 0L
         for (i in literals.indices) {
@@ -127,16 +100,14 @@ internal class PseudoBooleanPropagator(
         return nonFalseSum < bound
     }
 
-    /** Load the `≤` constraint `Σ w·ℓ ≤ bound` as its `≥` complement `Σ w·¬ℓ ≥ (Σw − bound)`. */
+    // `Σ w·ℓ ≤ bound` as its `≥` complement `Σ w·¬ℓ ≥ (Σw − bound)`.
     private fun loadLe(acc: PbAccumulator): Boolean {
         var sum = 0L
         for (w in weights) sum += w
-        val flipped = IntArray(literals.size) { literals[it] xor 1 } // toggle the polarity bit
+        val flipped = IntArray(literals.size) { literals[it] xor 1 }
         return acc.loadPb(weights, flipped, geBound = sum - bound)
     }
 
-    /** True iff the equality's own literal on [forcedLit]'s variable is exactly [forcedLit] (true) —
-     *  i.e. the lower-bound (`≥`) half requires it true. */
     private fun forcedByGeSide(forcedLit: Int): Boolean {
         val v = Lit.variable(forcedLit)
         for (lit in literals) if (Lit.variable(lit) == v) return lit == forcedLit

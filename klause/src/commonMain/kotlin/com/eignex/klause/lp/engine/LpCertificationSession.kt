@@ -143,9 +143,9 @@ internal fun numericalLpRefutation(
 // its own basis: at a dual-degenerate optimum a reduced cost that is exactly zero takes a random sign from any
 // inexact duals, and only the exact zero clears a column nothing bounds. A basis whose exact duals leave some
 // reduced cost truly wrong-signed, or whose exact duals decline, gets one cleanup: primal pivots from its own basis
-// at a pricing tolerance well below the engine's, as a solver re-optimizes when unscaled infeasibilities exceed its
-// tolerance. A stop the engine made early moves on to the true optimum in a few pivots; a basis already optimal but
-// priced with noisy duals finds nothing to pivot on and is left to the exact ladder, so the pivots are capped.
+// at a pricing tolerance well below the engine's. A stop the engine made early moves on to the true optimum in a few
+// pivots; a basis already optimal but priced with noisy duals finds nothing to pivot on and is left to the exact
+// ladder, so the pivots are capped.
 private fun floatOptimum(
     model: LpModel,
     result: FloatLpResult,

@@ -20,11 +20,7 @@ import com.eignex.util.collections.sortedKeys
 sealed interface PropagationResult {
 
     /**
-     * Newly-forced facts beyond the input assumptions. Stored as parallel primitive
-     * arrays sorted ascending by key — no autoboxing on iteration or lookup, no
-     * `HashMap` allocations when combining with [Assumptions].
-     *
-     * Primitive APIs ([forEachBool], [forEachInt], [boolValueOrNull], [intValueOrNull])
+     * Newly forced facts beyond the input assumptions, as parallel arrays sorted by key. The primitive accessors
      * are the hot path; the [bools] / [ints] map views serve cold call sites.
      */
     class Implied internal constructor(
@@ -36,8 +32,7 @@ sealed interface PropagationResult {
         val intKeys: IntArray,
         /** Forced values aligned with [intKeys]. */
         val intValues: LongArray,
-        /** Int var ids whose lower bound was tightened (but not yet singleton). Disjoint
-         *  from [intKeys]; ascending. Includes non-singleton bound-SAC deductions. */
+        /** Int var ids whose lower bound was tightened short of a singleton, ascending; disjoint from [intKeys]. */
         val intMinKeys: IntArray = emptyIntArray(),
         /** Lower-bound values aligned with [intMinKeys]. */
         val intMinValues: LongArray = emptyLongArray(),
@@ -50,10 +45,7 @@ sealed interface PropagationResult {
         val intHoleVarIds: IntArray = emptyIntArray(),
         /** Forbidden values aligned with [intHoleVarIds]. */
         val intHoleValues: LongArray = emptyLongArray(),
-        /** Set-restrictions `v ∈ {survivors}` for variables reduced to a sparse survivor set — recorded
-         *  instead of one interior hole per excluded value, which is O(span) for a wide-but-sparse domain.
-         *  CSR: var `intSetKeys[i]`'s survivors are `intSetValues[intSetOffsets[i] until intSetOffsets[i+1]]`
-         *  ([intSetOffsets] size `intSetKeys.size + 1`, or empty when there are none). Disjoint from [intKeys]. */
+        /** Variables reduced to a sparse survivor set, ascending, instead of O(span) holes; disjoint from [intKeys]. */
         val intSetKeys: IntArray = emptyIntArray(),
         /** CSR row offsets into [intSetValues]; size `intSetKeys.size + 1`, or empty when there are none. */
         val intSetOffsets: IntArray = emptyIntArray(),
@@ -119,17 +111,14 @@ sealed interface PropagationResult {
             for (i in intKeys.indices) action(intKeys[i], intValues[i])
         }
 
-        /** Invoke [action] for each survivor-set restriction `(id, sortedSurvivors)` — the compact
-         *  form of a wide-but-sparse reduction. The survivors are the exact surviving values in
-         *  ascending order; callers restrict the variable's domain to them. */
+        /** Invoke [action] for each survivor-set restriction `(id, ascending survivors)`. */
         inline fun forEachIntSet(action: (id: Int, survivors: LongArray) -> Unit) {
             for (i in intSetKeys.indices) {
                 action(intSetKeys[i], intSetValues.copyOfRange(intSetOffsets[i], intSetOffsets[i + 1]))
             }
         }
 
-        /** Reinterpret this implied set as an [Assumptions]. Both share the same key-sorted
-         *  parallel-array layout, so the conversion copies each primitive array without rebuilding. */
+        /** This implied set as [Assumptions]; the layouts match, so each array is copied without rebuilding. */
         fun toAssumptions(): Assumptions = Assumptions(
             boolKeys = boolKeys.copyOf(),
             boolValues = boolValues.copyOf(),
@@ -203,9 +192,10 @@ sealed interface PropagationResult {
             append("})")
         }
 
-        /** Union this implied set with [other] by replaying everything from [other] over this base.
-         *  Bound tightenings take the tighter value; holes union; a variable pinned in the union is
-         *  dropped from the bound and hole sets. Used by root-bake probing to accumulate deductions. */
+        /**
+         * Union with [other]: bounds take the tighter value, holes union, and a variable pinned in the union leaves
+         * the bound and hole sets.
+         */
         fun merge(other: Implied): Implied {
             val bools = MutableIntObjectMap<Boolean>()
             forEachBool { k, v -> bools.put(k, v) }
@@ -222,10 +212,8 @@ sealed interface PropagationResult {
             val holes = MutableIntObjectMap<LongHashSet>()
             forEachIntHole { id, v -> holes.getOrPut(id) { LongHashSet() }.add(v) }
             other.forEachIntHole { id, v -> holes.getOrPut(id) { LongHashSet() }.add(v) }
-            // Set-restrictions accumulate by INTERSECTION: v ∈ S and v ∈ T both hold, so v ∈ S ∩ T.
-            // A var restricted on only one side keeps that side's survivors; an empty intersection is
-            // left as-is (an empty survivor set signals infeasibility on apply, exactly as a crossed
-            // min/max bound does).
+            // Set restrictions intersect. An empty intersection is kept: it signals infeasibility on apply, as
+            // crossed bounds do.
             val sets = MutableIntObjectMap<LongArray>()
             forEachIntSet { id, s -> sets.put(id, s) }
             other.forEachIntSet { id, t ->
@@ -290,15 +278,12 @@ sealed interface PropagationResult {
             return holes
         }
 
-        /** This set's per-variable survivor sets (var → ascending survivors), for threading through
-         *  [build] unchanged in the single-set [withMin] / [withMax] / [withHole] paths. */
         private fun setMap(): MutableIntObjectMap<LongArray> {
             val m = MutableIntObjectMap<LongArray>()
             forEachIntSet { id, survivors -> m.put(id, survivors) }
             return m
         }
 
-        /** Intersection of two ascending survivor arrays (two-pointer); result stays ascending. */
         private fun intersectSorted(a: LongArray, b: LongArray): LongArray {
             val out = LongArrayList(minOf(a.size, b.size))
             var i = 0
@@ -321,11 +306,6 @@ sealed interface PropagationResult {
 
         /** Shared [PropagationResult] instances. */
         companion object {
-            /** Materialise an [Implied] from the accumulation maps used by [merge] / [withMin] / [withMax] /
-             *  [withHole], emitting the key-sorted parallel arrays the constructor expects. [holes] maps a
-             *  variable to its set of forbidden values (emitted as `(id, value)` rows sorted by
-             *  `(id, value)`); [sets] maps a variable to its ascending survivor values, emitted as the CSR
-             *  [intSetKeys]/[intSetOffsets]/[intSetValues] (empty when there are none). */
             private fun build(
                 bools: MutableIntObjectMap<Boolean>,
                 ints: MutableIntLongMap,
@@ -381,9 +361,7 @@ sealed interface PropagationResult {
             /** The empty implied set (nothing forced). */
             val EMPTY: Implied = Implied(emptyIntArray(), emptyBooleanArray(), emptyIntArray(), emptyLongArray())
 
-            /** Map-based factory. Call sites use `Implied(bools, ints)`; the constructor
-             *  normalises to the primitive sorted-array form. Optional bound-tightening
-             *  args carry non-singleton deductions, including SAC-at-root. */
+            /** Map-based factory; the bound-tightening args carry non-singleton deductions. */
             operator fun invoke(
                 bools: Map<Int, Boolean> = emptyMap(),
                 ints: Map<Int, Long> = emptyMap(),
@@ -419,39 +397,22 @@ sealed interface PropagationResult {
     /**
      * Sound, incomplete proof of infeasibility.
      *
-     *  - [conflictLevels] is the set of *decision levels* involved in the conflict. For a
-     *    [PropagationSession], `session.pinBool(v, value)` lives at the level it was pushed
-     *    at; `seed` assigns levels `1..|assumptions|` in iteration order. Level 0 is never
-     *    in the set — it represents the problem-constraint phase, not a decision.
-     *  - [conflictBools] / [conflictInts] identify variables visited by native conflict analysis
-     *    when it learns a constraint. Otherwise they identify decision variables at the conflicting
-     *    levels. Activity selectors use this attribution; DFS backjump targets use [conflictLevels].
-     *  - [conflictFactors] is the set of `Problem.factors` ids that
-     *    derived the contradiction: the factor that returned `false` from `propagate` plus,
-     *    via a backward walk of the reason trail, every factor whose firing contributed to its
-     *    premises. Empty when the contradiction came from a seed assumption check.
-     *
-     *  The conflict subset is jointly unsatisfiable but not guaranteed minimal — callers must
-     *  not assume minimality. An empty result means the contradiction was implied by problem
-     *  constraints alone (no input was load-bearing).
+     * [conflictLevels] are the decision levels involved; level 0, the problem-constraint phase, never appears.
+     * [conflictBools] / [conflictInts] name the variables native conflict analysis visited when it learned a
+     * constraint, else the decision variables at the conflicting levels. [conflictFactors] are the
+     * `Problem.factors` ids that derived the contradiction, empty when a seed assumption check failed. The
+     * conflict is jointly unsatisfiable but not necessarily minimal; an empty one means the problem constraints
+     * alone are infeasible.
      */
-    // Conflict id/level sets are primitive IntArrays, not Set<Int>: they're produced once per
-    // conflict (a hot path on conflict-heavy instances) and consumers only iterate / membership-
-    // test / `isEmpty` them — all of which work allocation-free on IntArray. Array fields compare
-    // by reference under the data-class equality; no consumer compares a whole Unsat by value.
+    // Primitive arrays: produced once per conflict on a hot path and only iterated or membership-tested. Array
+    // fields compare by reference; no consumer compares a whole Unsat by value.
     @ConsistentCopyVisibility
     data class Unsat internal constructor(
         val conflictBools: IntArray = emptyIntArray(),
         val conflictInts: IntArray = emptyIntArray(),
         val conflictLevels: IntArray = emptyIntArray(),
         val conflictFactors: IntArray = emptyIntArray(),
-        /**
-         * First-UIP analysis result captured before state revert, or `null` when the
-         * conflict happened at level 0 (no learning possible), inside an assumption
-         * seed (no failing factor to seed from), or in a backend that doesn't run the
-         * analyzer. Engines that support non-chronological backjump (CDB) read
-         * `learnedClause` to pick a [ConflictAnalyzer.AnalysisResult.Learned.backjumpLevel].
-         */
+        // Null at level 0, inside an assumption seed, or in a backend that does not run the analyzer.
         internal val learnedClause: ConflictAnalyzer.AnalysisResult? = null,
     ) : PropagationResult
 }

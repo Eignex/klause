@@ -5,27 +5,18 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.mulExact
 
-/**
- * LP relaxation — the four McCormick envelope inequalities `(a−aL)(b−bL) ≥ 0`, `(a−aH)(b−bH) ≥ 0`,
- * `(aH−a)(b−bL) ≥ 0`, `(a−aL)(bH−b) ≥ 0`, each expanded to a linear row in `result, a, b`. Bounds are
- * the root boxes, so the rows are global and the relaxation never cuts a feasible point. For
- * `a = b` (a square) the `a` and `b` coefficients coalesce into the secant/tangent relaxation. HULL.
- *
- * Each envelope leans on one endpoint of each operand, and an endpoint the model does not state was
- * invented to close the search box: the product may leave that box at a genuine solution, and the row
- * built on it would cut the solution off. So the four are emitted individually, each only over the two
- * sides the model states — a square with one open side keeps the single envelope tangent to it.
- *
- * McCormick, "Computability of global solutions to factorable nonconvex programs: Part I — Convex
- * underestimating problems", Mathematical Programming 10 (1976), https://doi.org/10.1007/BF01580665.
- */
+// The four McCormick envelope rows over the root boxes. Each leans on one endpoint per operand, and an
+// unstated endpoint was invented to close the search box, so each row is emitted only over two stated
+// sides; a square with one open side keeps the single tangent envelope.
+//
+// McCormick, "Computability of global solutions to factorable nonconvex programs: Part I — Convex
+// underestimating problems", Mathematical Programming 10 (1976), https://doi.org/10.1007/BF01580665.
 internal fun Product.emitLpRelaxation(builder: RelaxationBuilder) {
     if (!builder.hullEnabled()) return
     val aLow = builder.statesLowerBound(a)
     val aHigh = builder.statesUpperBound(a)
     val bLow = builder.statesLowerBound(b)
     val bHigh = builder.statesUpperBound(b)
-    // An operand with neither side stated leaves no envelope at all; allocate no column for it.
     if (!(aLow || aHigh) || !(bLow || bHigh)) return
     val aDom = builder.rootDomain(a)
     val bDom = builder.rootDomain(b)
@@ -37,12 +28,8 @@ internal fun Product.emitLpRelaxation(builder: RelaxationBuilder) {
     val aCol = builder.intColumn(a)
     val bCol = builder.intColumn(b)
 
-    /**
-     * `(a − ea)(b − eb) ⟨op⟩ 0` expanded to `result − eb·a − ea·b ⟨op⟩ −ea·eb`; coefficients coalesce
-     * when a and b coincide. The constants are a product of two endpoints, so a model stating wide
-     * bounds can push them past 64 bits — that envelope is declined rather than emitted at a wrapped
-     * constant, which would cut off feasible points while marked globally valid.
-     */
+    // `(a − ea)(b − eb) ⟨op⟩ 0` as `result − eb·a − ea·b ⟨op⟩ −ea·eb`. An envelope whose constants pass
+    // 64 bits is declined: a wrapped constant would cut off feasible points.
     fun mcCormick(ea: Long, eb: Long, op: LinearOp) {
         val coeffs: LongArray
         val rhs: Long

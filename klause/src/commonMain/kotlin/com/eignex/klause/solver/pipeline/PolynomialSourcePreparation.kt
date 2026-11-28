@@ -135,7 +135,6 @@ internal fun PolynomialTheoryRequest.reconstructSource(
     return published.takeIf { tolerance.accepts(it, verification) is Verification.Accepted }
 }
 
-// Each term activity of this objective at the floats [point] publishes.
 private fun QuadraticObjectiveSpec.publishedTerms(point: Sample): List<BigFraction> {
     fun value(variable: QuadraticVariable): BigFraction = when (variable) {
         is QuadraticVariable.Bool -> if (point.boolValue(variable.id.index)) BigFraction.ONE else BigFraction.ZERO
@@ -148,7 +147,6 @@ private fun QuadraticObjectiveSpec.publishedTerms(point: Sample): List<BigFracti
     }
 }
 
-// The objective of [point] at the floats it publishes.
 private fun QuadraticObjectiveSpec.publishedValue(point: Sample): BigFraction =
     publishedTerms(point).fold(BigFraction.of(constant.numerator, constant.denominator)) { sum, term -> sum + term }
 

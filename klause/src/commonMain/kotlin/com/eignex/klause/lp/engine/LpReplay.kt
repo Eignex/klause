@@ -87,9 +87,8 @@ internal fun interface LpReplayValidator {
     fun validate(model: LpModel, step: LpReplayStep): LpIndependentCheck
 }
 
-/** Executes captures through the engine factories and interfaces after capability/event validation.
- * Unsupported transitions fail explicitly; gated solves return uncertified float candidates.
- * Returned bases are copied warm-start hints, never portable factor snapshots. */
+// Unsupported transitions fail explicitly; gated solves return uncertified float candidates. Returned bases are
+// copied warm-start hints, never portable factor snapshots.
 internal object LpReplay {
     fun replay(
         capture: LpCapture,

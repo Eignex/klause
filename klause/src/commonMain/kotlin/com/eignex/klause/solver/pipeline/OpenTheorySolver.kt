@@ -161,7 +161,7 @@ sealed interface OpenTheoryAssignment {
 
 /**
  * Typed exact scalar for a polynomial-real witness, including through source reconstruction.
- * Returns null for routes whose real coordinates retain their existing rational string surface.
+ * Returns null for routes whose real coordinates keep their rational string form.
  */
 fun OpenTheoryAssignment.algebraicRealValue(id: Int): AlgebraicReal? = when (this) {
     is OpenTheoryAssignment.Sampled -> sample.algebraicReals?.get(id) ?: sample.symbolicReals?.get(id)?.algebraic
@@ -176,20 +176,14 @@ fun OpenTheoryAssignment.algebraicRealValue(id: Int): AlgebraicReal? = when (thi
 internal fun SourceMapping.lift(assignment: OpenTheoryAssignment): OpenTheoryAssignment =
     rebuild.lift(assignment, source.numBoolVars, source.numIntVars)
 
-/**
- * [assignment] with the Boolean columns this rebuild recovers, over a model of [numBoolVars] columns.
- *
- * The open lane's half of the reconstruction: the steps are stated once, in the presolve layer, and each
- * lane reads its own witness into the `BooleanArray` they evaluate over. A witness answers by accessor
- * and cannot be written through, so the recovered values ride along in a wrapper rather than in place.
- *
- * [numBoolVars] and [numIntVars] count the columns before the elimination, and [assignment] is asked for
- * every one of them — including the eliminated ones, which a pass leaves in place and unconstrained. A
- * pass that renumbered instead would put an id past the end of the witness it produced.
- *
- * Integer values are read at arbitrary precision, which is the width an open route answers in; they are
- * materialized only when a step reads or recovers one, so literal-only reconstruction costs no parsing.
- */
+// The open lane's half of the reconstruction: the steps live in the presolve layer, and a witness cannot be
+// written through, so the recovered values ride along in a wrapper.
+//
+// [numBoolVars] and [numIntVars] count the columns before the elimination, and [assignment] is asked for
+// every one of them, including the eliminated ones a pass leaves in place and unconstrained.
+//
+// Integers are materialized only when a step reads or recovers one, so literal-only reconstruction costs no
+// parsing.
 internal fun SourceRebuilds.lift(
     assignment: OpenTheoryAssignment,
     numBoolVars: Int,
@@ -253,12 +247,8 @@ internal fun OpenTheoryResult.withSourceSemantics(semantics: EffectiveSourceSema
 }
 
 /**
- * Executes the complete theory route selected for a prepared open source model.
- *
- * The route and ownership plan describe the prepared source. Source-safe preparation may rewrite the
- * factors ownership is indexed by; only an unchanged model and projection binding retain a captured
- * plan. Frontends consume this uniform result rather than importing or dispatching to individual
- * theory implementations.
+ * Executes the complete theory route selected for a prepared open source model and answers one uniform
+ * [OpenTheoryResult].
  */
 class OpenTheoryEngine internal constructor(
     // The route the caller's source model declared, which is all there is to name a backend by when
@@ -317,7 +307,6 @@ class OpenTheoryEngine internal constructor(
         model.semantics,
     )
 
-    /** Decide an already-prepared model under the plan selected from it. */
     internal constructor(
         planned: OpenSourcePreparation.Planned,
         preparationCancellation: ExecutionControl,
@@ -338,7 +327,7 @@ class OpenTheoryEngine internal constructor(
         OpenTheorySolveState(params),
     )
 
-    /** Execute one feasibility round against the caller's solve-wide [state]. */
+    // One feasibility round against the caller's solve-wide [state].
     internal fun solve(params: TheoryParams, state: OpenTheorySolveState): OpenTheoryResult {
         val result = solvePrepared(params, state)
         val stats = result.stats.copy(smt = state.smt.snapshot())
@@ -360,12 +349,9 @@ class OpenTheoryEngine internal constructor(
             }
         }
 
-    /**
-     * Prepare the source, close its open sides and set the search up, stopping at the first branch: decided when
-     * preparation or the root settles the model, else a run [OpenTheoryRun.advance] drives. [nodePolicy] sees every
-     * branch, so a caller that pauses there gets a run it can resume slice by slice; the theory's own checks stop
-     * only on [params]' tokens, never on a slice.
-     */
+    // Stops at the first branch: decided when preparation or the root settles the model, else a run
+    // [OpenTheoryRun.advance] drives. [nodePolicy] sees every branch, so a caller that pauses there gets a
+    // resumable run; the theory's own checks stop only on [params]' tokens, never on a slice.
     @Suppress("TooGenericExceptionCaught") // Invocation cleanup preserves an arbitrary primary failure.
     internal fun begin(
         params: TheoryParams,
@@ -512,7 +498,7 @@ class OpenTheoryEngine internal constructor(
         }
     }
 
-    /** A theory search held open across [advance] calls; closing it releases the search. */
+    // Closing it releases the search.
     internal inner class OpenTheoryRun(
         private val planned: PlannedSearch,
         private val run: SearchRun,
@@ -525,10 +511,9 @@ class OpenTheoryEngine internal constructor(
 
         val preparationStats: PresolveStats? get() = stats.presolve
 
-        /** The search this run drives. */
         val session: com.eignex.klause.solver.search.SearchSession get() = planned.session
 
-        /** Continue the search: its verdict, or null when the node policy paused it. */
+        // Null when the node policy paused the search.
         fun advance(): OpenTheoryResult? = when (val event = run.next()) {
             is SearchRunEvent.Satisfied -> {
                 val assignment = witnesses.assemble(event.model, prepared.mapping)
@@ -558,7 +543,6 @@ class OpenTheoryEngine internal constructor(
         override fun close() = planned.close()
     }
 
-    /** Prepare the source under the caller's stop, once per engine. */
     private fun prepare(cancellation: ExecutionControl): OpenSourcePreparation = preparation
         ?: prepareSource(cancellation).also {
             if (!cancellation() &&
@@ -566,11 +550,10 @@ class OpenTheoryEngine internal constructor(
             ) preparation = it
         }
 
-    /** The bound-closing phase's allowance: what is left of preparation's, capped by the solve's own. */
+    // What is left of preparation's allowance, capped by the solve's own.
     private fun boundCancellation(prepared: PreparedSource, cancellation: ExecutionControl): ExecutionControl =
         alsoStoppedBy(cancellation).let { stop -> prepared.budget?.orSpent(stop) ?: stop }
 
-    /** The preparation allowance and the solve's own stop, whichever fires first. */
     private fun alsoStoppedBy(cancellation: ExecutionControl): ExecutionControl =
         preparationCancellation.includingStop( cancellation)
 
@@ -614,7 +597,6 @@ class OpenTheoryEngine internal constructor(
     }
 }
 
-/** The `-s` backend label for a complete open route. */
 internal fun ProblemPipeline.backendName(): String = when (this) {
     ProblemPipeline.DIFFERENCE_THEORY -> "difference-theory"
     ProblemPipeline.EXACT_LRA -> "exact-lra"
@@ -622,7 +604,7 @@ internal fun ProblemPipeline.backendName(): String = when (this) {
     ProblemPipeline.FINITE_CP, ProblemPipeline.UNSUPPORTED_OPEN -> error("not an open theory route")
 }
 
-/** Solve-wide controls and telemetry shared by every feasibility round of one open optimization. */
+// Shared by every feasibility round of one open optimization.
 internal class OpenTheorySolveState(private val params: TheoryParams) {
     val work = OpenTheoryWorkSink(params.openWorkLimit)
     val smt = SmtStatsSink()
@@ -640,7 +622,6 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
     private var capturedGlue = 0L
     private var capturedRootFixed = 0
 
-    /** What the request's hint draw produced, cost, and has steered so far. */
     val hints: OpenHintStats get() = drawStats.copy(
         steeredSplits = steering?.steeredSplits ?: 0L, usage = smt.hintUsage.snapshot(),
     )
@@ -649,16 +630,10 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
     private var steering: CountingCandidateHints? = null
     private var deferred: SearchCandidateHints? = null
 
-    /**
-     * The request's one unverified branch-order hint, deferred until enough splits have asked for it.
-     *
-     * Drawn at most once for the whole request. Every feasibility round of one descent shares the plan's
-     * clauses — only the bound row moves, and no clause states it — so a redraw per round would spend
-     * the allowance again to reach the same proposal. A draw that proposed nothing is remembered as
-     * nothing and is not retried either, since retrying is what a spent or cancelled allowance has
-     * already answered. The deferral carries across rounds with it, so a descent whose rounds each
-     * branch a little accumulates toward one draw rather than restarting the count.
-     */
+    // Drawn at most once per request. Every round of one descent shares the plan's clauses (only the bound
+    // row moves, and no clause states it), so a redraw would spend the allowance to reach the same proposal.
+    // An empty draw is not retried either. The split deferral carries across rounds, so a descent whose
+    // rounds each branch a little accumulates toward one draw.
     fun candidateHints(plan: ComponentPlan, model: Problem, cancellation: ExecutionControl): SearchCandidateHints {
         deferred?.let { return it }
         params.openHintFlips ?: return SearchCandidateHints.None.also { deferred = it }
@@ -666,7 +641,7 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
             .also { deferred = it }
     }
 
-    /** Spend the allowance once the traversal has shown it branches, within what the budget has left. */
+    // Spends the allowance once the traversal has shown it branches, within what the budget has left.
     private fun draw(plan: ComponentPlan, model: Problem, cancellation: ExecutionControl): SearchCandidateHints {
         val flips = params.openHintFlips ?: return SearchCandidateHints.None
         // One budget covers the draw and the traversal that reads it: the sink hands out what it still
@@ -706,21 +681,17 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
         capturedRootFixed = maxOf(capturedRootFixed, session.rootFixedCount)
     }
 
-    /**
-     * Root fixings and glue clauses over every round so far, [live] the round still searching, in the counters a
-     * backtrack search reports them in: the portfolio credits both routes' progress alike.
-     */
+    // Counted in the units a backtrack search reports, so the portfolio credits both routes' progress alike.
     fun progress(live: com.eignex.klause.solver.search.SearchSession?): SearchStats = SearchStats(
         rootFixed = MaxResult(maxOf(capturedRootFixed, live?.rootFixedCount ?: 0).toDouble()),
         glueClauses = SumResult((capturedGlue + (live?.glueClauseCount ?: 0L)).toDouble()),
     )
 }
 
-/** How [OpenTheoryEngine.begin] left a solve: decided before the first branch, or running. */
+// How [OpenTheoryEngine.begin] left a solve: decided before the first branch, or running.
 internal sealed interface OpenTheoryStart {
-    /** Preparation, bound closing or the root settled the model. */
+    // Preparation, bound closing or the root settled the model.
     class Decided(val result: OpenTheoryResult) : OpenTheoryStart
 
-    /** The search is set up; [run] drives it. */
     class Running(val run: OpenTheoryEngine.OpenTheoryRun) : OpenTheoryStart
 }

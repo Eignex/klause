@@ -337,14 +337,8 @@ class DifferenceSearchComponent private constructor(
 
     private fun sourceFragment(): DifferenceFragment? = relativeBranches?.fragment ?: base
 
-    /**
-     * Publish consequences of always-active rows and the current root bounds.
-     *
-     * Every antecedent is fixed for this root lifetime: guarded rows are excluded, and root facts can
-     * only be replaced through `resetRootFacts`, which is followed by component initialization. The
-     * consequences therefore live at level zero, survive ordinary backtracking, and need no
-     * retractable Boolean explanation.
-     */
+    // Guarded rows are excluded and root facts change only through `resetRootFacts`, which reinitializes the
+    // component, so these consequences live at level zero and need no retractable Boolean explanation.
     private fun publishRootBounds(context: SearchContext): ComponentResult {
         val plan = rootBoundPlan ?: return ComponentResult.Consistent
         if (context.decisionLevel != 0) return ComponentResult.Consistent

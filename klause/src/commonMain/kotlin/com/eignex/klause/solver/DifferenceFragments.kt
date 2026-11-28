@@ -13,7 +13,6 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.impliedLinearRows
 
-/** Gather the immutable difference fragment represented by this core model data. */
 internal fun differenceFragmentOf(factors: Array<Factor>, numIntVars: Int, intBounds: IntBounds): DifferenceFragment? {
     if (numIntVars == 0) return null
     val zero = DifferenceFragment.ZERO
@@ -37,7 +36,6 @@ internal fun differenceFragmentOf(factors: Array<Factor>, numIntVars: Int, intBo
     return DifferenceFragment(edges)
 }
 
-/** Whether every integer row can be decided by the complete difference-theory route. */
 internal fun hasCompleteDifferenceCoverage(factors: Array<Factor>): Boolean {
     val scratch = ArrayList<DifferenceEdge>(2)
     for (factor in factors) {
@@ -48,7 +46,7 @@ internal fun hasCompleteDifferenceCoverage(factors: Array<Factor>): Boolean {
     return true
 }
 
-/** Whether the model is complete and numerically safe for the difference-theory route. */
+// Complete coverage alone is not enough: the fragment must also be numerically safe.
 internal fun supportsCompleteDifferenceTheory(factors: Array<Factor>, numIntVars: Int, intBounds: IntBounds): Boolean =
     hasCompleteDifferenceCoverage(factors) &&
         (differenceFragmentOf(factors, numIntVars, intBounds)?.carriesAPotential() ?: true)

@@ -109,45 +109,28 @@ import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
-/** One step of [ResumableMinimize.runUntilEvent]: a new incumbent, the terminal verdict, or a
- *  slice-boundary pause (only in pausable mode). */
+// Paused occurs only in pausable mode.
 internal sealed interface StepEvent {
     data class Incumbent(val result: MinimizeResult.WithSample) : StepEvent
     data class Terminal(val result: MinimizeResult) : StepEvent
     data object Paused : StepEvent
 }
 
-/**
- * Cap on admitting a pooled or previous candidate (its pin check and real completion), composed with the
- * run's own token rather than standing in for it, so admission still stops at a cancellation or a slice
- * boundary. It bounds the case that token cannot: a run with budget to spare whose completion runs away.
- */
+// Caps admitting a pooled or previous candidate (pin check and real completion), composed with the run's own
+// token: it bounds a run with budget to spare whose completion runs away.
 private val LP_VERIFY_BUDGET = 100.milliseconds
 
-/**
- * The optimize driver: branch-and-bound minimisation over the shared [SearchRun]. A thin wrapper that
- * owns the incumbent, the LP-relaxation family (built once; persists across slices = rolling warm
- * starts), the objective-bound propagation, and the stats sink lifecycle; the DFS orchestration itself
- * lives in [SearchRun], driven through typed model, node, and lifecycle policies. [runUntilEvent] advances to the next
- * reportable event (a new incumbent, the terminal verdict, or — in pausable mode — a slice-boundary
- * pause) and returns; the engine retains all state so the next call resumes.
- *
- * Two callers drive it, differing only in [pausable]:
- *  - [BacktrackSolver.improvements] streams it lazily — one [StepEvent.Incumbent] yielded per call, then the terminal;
- *    a fired cancellation is a hard stop.
- *  - [runSlice] runs it one time slice at a time for [com.eignex.klause.portfolio.Portfolio]:
- *    a fired slice deadline pauses ([StepEvent.Paused]); a later call resumes mid-tree so the
- *    arm never cold-restarts.
- */
+// Branch-and-bound minimization over the shared SearchRun. Owns the incumbent, the LP-relaxation family (built
+// once, so warm starts roll across slices), objective-bound propagation and the stats sink lifecycle.
+// runUntilEvent advances to the next incumbent, terminal verdict or, in pausable mode, slice-boundary pause, and
+// retains all state so the next call resumes mid-tree.
 @Suppress("TooGenericExceptionCaught") // ownership boundaries preserve arbitrary primary and cleanup failures
 internal class ResumableMinimize(
     // Carries the immutable problem and shared search helpers; the solver holds no per-run state.
     private val solver: BacktrackSolver,
     private val objective: LinearObjective,
     params0: BacktrackParams,
-    // true: a fired cancellation is a slice boundary the caller may resume past ([runSlice]); false:
-    // it is a hard terminal stop ([BacktrackSolver.improvements] one-shot). The single difference between the two
-    // ways this one engine is driven.
+    // true: a fired cancellation is a slice boundary runSlice may resume past; false: a hard terminal stop.
     private val pausable: Boolean = true,
     // Repair owns the handle across fragment terminals and explicitly closes it after the final fragment.
     private val rebindable: Boolean = false,
@@ -205,11 +188,9 @@ internal class ResumableMinimize(
     override var exhaustionBound = Double.NEGATIVE_INFINITY
         private set
 
-    // The LP-relaxation family is resolved from [BacktrackParams.lpConfig] inside [LpEngine]
-    // (the single intent→plan home), so this carries the caller's params verbatim — only the slice
-    // cancellation and the Hamming/recent-window knobs are fixed here; the per-slice deadline is re-armed in
-    // runSlice.
-    // One-shot calls retain their invocation token. Resumed calls replace it while keeping a bound lifetime scope.
+    // LpEngine resolves lpConfig, so this carries the caller's params except the slice cancellation and the
+    // enumeration filter. One-shot calls retain their invocation token; resumed calls replace it while keeping a
+    // bound lifetime scope.
     private val baseCancellation: ExecutionControl = params0.cancellation
     private var params: BacktrackParams = params0.copy(
         cancellation = runToken(includeSlice = true),
@@ -220,17 +201,16 @@ internal class ResumableMinimize(
     // Slice control without a coroutine: a re-armable deadline plus the current global token.
     private var globalToken: ExecutionControl = params0.cancellation
 
-    // Wall-clock anchor for sizing the LP sub-budgets against [BacktrackParams.solveBudgetMillis] on the
-    // non-pausable one-shot path, where no slice deadline is armed. Captured at construction,
-    // which is the solve start for that path.
+    // Wall-clock anchor for sizing LP sub-budgets against solveBudgetMillis on the one-shot path, where no slice
+    // deadline is armed.
     private val startMark = TimeSource.Monotonic.markNow()
 
-    // The allowance includes LP and propagation work so costly nodes consume proportionally more of a slice.
     private var clausePrimal: MonotoneClausePrimal? = null
     private var clausePrimalStarted = false
     private var clausePrimalCandidate: Sample? = null
 
-    // Leaf searches spend LP work; atomic overspend remains as debt against later slices.
+    // The slice allowance includes LP and propagation work, so costly nodes consume more of a slice; atomic
+    // overspend remains as debt against later slices.
     private var leafSearchWork = 0L
     private val slice = SliceBudget(
         {
@@ -248,11 +228,9 @@ internal class ResumableMinimize(
 
     private fun sliceCancelled(): Boolean = solveCancelled() || (pausable && sliceExpired())
 
-    /**
-     * What ends the whole run, as opposed to [sliceCancelled]'s slice boundary. Root propagation and
-     * deductions at retained levels use this token. Shared decision assertions add the search context's
-     * allowance: a cut assertion retracts its fresh level before a later slice retries it.
-     */
+    // Ends the whole run, as opposed to the slice boundary. Root propagation and deductions at retained levels use
+    // this token; shared decision assertions add the search context's allowance, and a cut assertion retracts its
+    // fresh level before a later slice retries it.
     private fun solveCancelled(): Boolean = if (pausable) globalToken() else baseCancellation()
 
     // solveCancelled as a token that also states the run's deadline, so a phase it is handed can budget a share of
@@ -268,20 +246,11 @@ internal class ResumableMinimize(
 
     private fun runDeadline(): ComparableTimeMark? = (if (pausable) globalToken else baseCancellation).deadline()
 
-    /**
-     * The node budget when one is armed, and *only* the node budget.
-     *
-     * Leaving the per-slice clock as an outer bound defeats the purpose: whenever it binds first the
-     * pause point is a function of machine speed again, and the run stops being comparable to itself.
-     * The whole solve is still bounded — [globalToken] carries the real deadline and is checked
-     * alongside this — so dropping the per-slice deadline cannot overrun anything.
-     */
     private fun sliceExpired(): Boolean = slice.expired()
 
-    // The run's single verified incumbent. Every producer offers into it and none of them writes the
-    // best directly, so one admission rule and one strict-improvement test decide what stands — and the
-    // version the exchange stamps tells the offering producer whether *it* installed the improvement.
-    // Replaced wholesale by [rebind], whose fragment incumbent starts empty again.
+    // The run's single verified incumbent. Producers only offer into it, so one admission rule and one
+    // strict-improvement test decide what stands; the stamped version tells a producer whether it installed the
+    // improvement. rebind replaces it with an empty fragment incumbent.
     private var incumbents = minimizingSampleExchange(problem, params.toleranceCheck)
     private val bestObj: Double get() = incumbents.current()?.objective?.pruningBound ?: Double.POSITIVE_INFINITY
     private var singleObj: SingleIntObjective? = null
@@ -327,9 +296,8 @@ internal class ResumableMinimize(
         owner.own(AutoCloseable { clearOptimization() })
     }
 
-    // Built once; persists across slices, so warm starts roll forward. Always constructed so the
-    // always-on linear lower bound runs; its internal bounds are null/empty when their feature flag
-    // is off.
+    // Built once and kept across slices, so warm starts roll forward. Always constructed so the linear lower bound
+    // runs even with every LP feature off.
     private lateinit var lpEngine: LpEngine
     private var leafSolver: LeafRealSolver? = null
     private var pendingRealLeaf: LpSolveCursor<LeafRealResult>? = null
@@ -584,8 +552,7 @@ internal class ResumableMinimize(
             LeafRealResult(LpVerdict.INDETERMINATE, doubleArrayOf())
     }
 
-    // LP-guided branching hints (search-only): owned here so the engine depends only on the record sink.
-    // The engine records each node's LP solution into it; the descent reads it for variable/value order.
+    // The engine records each node's LP solution here; the descent reads it for variable and value order.
     private val lpHints: LpHints? =
         if (params.lpPlan.branching) {
             LpHints(problem.numIntVars, problem.numBoolVars, params.lpDirectionalGains,
@@ -613,11 +580,9 @@ internal class ResumableMinimize(
     private val pooledIncumbents = params.pooledIncumbents?.let { IncumbentSubscription(it) }
     private val traversal by lazy(LazyThreadSafetyMode.NONE) { OptimizationTraversalPolicy() }
 
-    // Built lazily so it binds the engine's session (created inside the engine's constructor). Its first
-    // use is the first-run boundExchange work, well after construction.
+    // Lazy so it binds the session the engine creates.
     private val boundExchange by lazy { PortfolioBoundExchange(problem, session, params, singleObj) { gapFloor } }
 
-    /** Terminal verdict once the search completes; null while still pending. */
     private var done: MinimizeResult? = null
     private var pendingIncumbent: MinimizeResult.WithSample? = null
 
@@ -626,8 +591,7 @@ internal class ResumableMinimize(
     private var closed = false
     override val isDone: Boolean get() = done != null
 
-    /** Live counters; [SolveStatsSink.snapshot] reads elapsed time without needing the sink stopped, so
-     *  this is meaningful mid-search as well as after one. */
+    // The sink's snapshot reads elapsed time without stopping it, so this is meaningful mid-search.
     override val stats: SolveStats get() = sink.snapshot()
 
     override val work: Long get() = slice.spent()
@@ -941,12 +905,8 @@ internal class ResumableMinimize(
         resources.closeAfter(failure)
     }
 
-    /**
-     * Re-drive this search on a new [assumptions] set with a fresh [decisionBudget] (LNS repair):
-     * Re-seeds the persistent session and resets the fragment incumbent, while the LP
-     * relaxation warm start and the session's learned-clause database survive. The caller must drive
-     * successive repairs against a monotone non-increasing objective cutoff.
-     */
+    // LNS repair: re-seeds the persistent session on new assumptions and resets the fragment incumbent, while the LP
+    // warm start and learned clauses survive. The caller must keep the objective cutoff non-increasing.
     fun rebind(assumptions: Assumptions, decisionBudget: Long) {
         check(rebindable) { "search is not rebindable" }
         check(!closed) { "search is closed" }
@@ -1000,10 +960,6 @@ internal class ResumableMinimize(
         unattainedFloor = null
     }
 
-    /** Advance the search to the next reportable [StepEvent].
-     *
-     * Visible to the enclosing solver, which streams it from [BacktrackSolver.improvements].
-     */
     fun runUntilEvent(): StepEvent {
         try {
             done?.let { return StepEvent.Terminal(it) }
@@ -1199,8 +1155,7 @@ internal class ResumableMinimize(
         }
     }
 
-    /** Assert the incumbent bound on the objective var at the root; true iff that empties the root
-     *  (optimum proven). */
+    // True iff the bound empties the root, proving the incumbent optimal.
     private fun assertObjectiveBoundAtRoot(): Boolean {
         val selected = singleObj ?: return postBoolObjectiveCutoffAtRoot()
         val objectiveVar = selected.varId
@@ -1212,11 +1167,8 @@ internal class ResumableMinimize(
         return session.assertObjectiveBound(objectiveVar, threshold, atMost = ascending) is PropagationResult.Unsat
     }
 
-    /*
-     * Bounds open columns from the incumbent cutoff at level 0; see objectiveCutoffBounds.
-     * Re-runs only after an improvement. An empty root proves the incumbent optimal.
-     * This removes non-improving solutions, so only optimization reaches it, never enumeration.
-     */
+    // Bounds open columns from the incumbent cutoff at level 0; see objectiveCutoffBounds. Re-runs only after an
+    // improvement. It removes non-improving solutions, so only optimization reaches it, never enumeration.
     private fun tightenOpenColumnsAtRoot(): Boolean {
         if (!bestObj.isFinite()) return false
         val value = bestObj.toLong()
@@ -1230,16 +1182,10 @@ internal class ResumableMinimize(
         return false
     }
 
-    /**
-     * For a pure-Boolean weighted objective (no single objective variable) post the incumbent cutoff
-     * `Σ boolWeights_b·x_b ≤ bestObj − constant − 1` as a permanent pseudo-Boolean constraint, so CDCL and
-     * pseudo-Boolean cutting-planes learning can *refute* it — the mechanism that proves optimality (a
-     * weighted-Boolean objective has no objective variable to bound, so tree exhaustion alone rarely
-     * closes it). Fired at the root on each restart, re-posting only when the incumbent improved. The
-     * cutoff normalizes to `Σ |w_b|·ℓ_b ≥ degree` with `ℓ_b = x_b` when `w_b < 0` else `¬x_b`,
-     * `degree = Σ_{w_b>0} w_b − (bestObj − constant − 1)`. Returns true iff it empties the root
-     * (optimum proven). Integer constraints are independent of this Boolean cost view.
-     */
+    // For a pure-Boolean weighted objective, post the incumbent cutoff `Σ boolWeights_b·x_b ≤ bestObj − constant − 1`
+    // as a permanent pseudo-Boolean constraint, so cutting-planes learning can refute it and prove optimality; tree
+    // exhaustion alone rarely closes a weighted-Boolean objective. Re-posts only when the incumbent improved.
+    // True iff it empties the root.
     private fun postBoolObjectiveCutoffAtRoot(): Boolean {
         if (!params.pbObjectiveCutoff) return false
         val best = incumbents.current()?.objective?.exact ?: return false
@@ -1251,9 +1197,7 @@ internal class ResumableMinimize(
         ) is PropagationResult.Unsat
     }
 
-    /** Offer [sample] (objective [o]) to [incumbents]; fires inline telemetry and returns the incumbent
-     *  to surface when this call installed it, else null. Admission — a finite score, and the certified
-     *  continuous values only a leaf's residual LP can attach — is [sampleAdmission]'s to decide. */
+    // Returns the incumbent to surface when this call installed it, else null. Admission is sampleAdmission's.
     private fun recordIfImproving(
         sample: Sample,
         o: Double,
@@ -1282,10 +1226,8 @@ internal class ResumableMinimize(
             params.improvedSolutionSink?.invoke(sample, score.display)
             params.onEvent?.invoke(SearchEvent.Incumbent(score.display))
         }
-        // Carry the counters as they stand. A caller that consumes the improvement stream and stops when
-        // it dries up holds only the last step it saw, so an incumbent without stats leaves the whole run
-        // reporting nothing — search and LP alike. Snapshotting mid-search is sound: it reads elapsed time
-        // live rather than requiring the sink to have been stopped.
+        // A caller that stops consuming the stream holds only the last step it saw, so each incumbent carries the
+        // counters as they stand.
         return MinimizeResult.BestFound(sample, score.display, TerminationReason.BudgetExhausted, sink.snapshot())
     }
 
@@ -1305,14 +1247,9 @@ internal class ResumableMinimize(
         return true
     }
 
-    /**
-     * Initial pre-search root work (harvest the global cut pool, capture the root relaxation bound for
-     * the integrality-gap metric, root shaving, bound exchange, and the primal probes). Run on the first
-     * engine step so the live cancellation gates the LP solves. Returns the first incumbent if a probe
-     * seeds one (in which case the tree-search probe is skipped this call), else null. The root-LP work
-     * is time-boxed by [rootLpBudget]. Interrupted rounding retains its basis for later slices under
-     * the remaining root and LP work allowances.
-     */
+    // Pre-search root work: cut pool harvest, root relaxation bound, shaving, bound exchange and primal probes. Runs
+    // on the first engine step so the live cancellation gates the LP solves; the root LP work is time-boxed by
+    // rootLpBudget. Interrupted rounding retains its basis for later slices.
     private fun firstRunWork(): MinimizeResult.WithSample? {
         if (!hasPreparation && !rootLayoutPending) sink.start()
         return firstRunWorkBody()
@@ -1329,11 +1266,9 @@ internal class ResumableMinimize(
         return recordIfImproving(accepted, objective.evaluate(accepted), startingWitness = !rebindable)
     }
 
-    /**
-     * [sample] as a leaf of this run when an engine already propagated its discrete part outside this run's
-     * assumptions: only those pins and the real completion remain. A checked ray is kept in [unboundedLeaf].
-     * Null, with the reason given to [onDecline], when either refuses it or [token] stops it.
-     */
+    // A sample whose discrete part an engine already propagated outside this run's assumptions: only those pins and
+    // the real completion remain. A checked ray is kept in unboundedLeaf. Null, with the reason given to onDecline,
+    // when either refuses it or the token stops it.
     private fun engineLeaf(sample: Sample, token: ExecutionControl, onDecline: (String) -> Unit = {}): Sample? {
         fun decline(outcome: String): Sample? {
             onDecline(if (token()) "CANCELLED" else outcome)
@@ -1394,8 +1329,7 @@ internal class ResumableMinimize(
         admissionStarted?.let {
             sink.lp.observePrimalPhase("ROOT_ADMISSION", admissionOutcome, it.elapsedNow().inWholeNanoseconds)
         }
-        // Objective shaving: raise the objective's proven lower bound before search when the LP +
-        // propagation prove lower values infeasible. Sound — every raise is a proof.
+        // Objective shaving: each raise is proved by the LP and propagation.
         if (lpEngine.params.lpPlan.objectiveShaving) {
             singleObj?.let { obj ->
                 lpEngine.shaveObjectiveLb(obj.varId, obj.ascending, rootToken)?.let { lb ->
@@ -1403,8 +1337,7 @@ internal class ResumableMinimize(
                 }
             }
         }
-        // Variable shaving: tighten integer domains the LP + propagation prove cannot reach their
-        // declared bounds. Sound — each tightening is a proof.
+        // Variable shaving: each tightening is proved by the LP and propagation.
         if (lpEngine.params.lpPlan.variableShaving) {
             for (sb in lpEngine.shaveVariableBounds(rootToken)) {
                 session.implyIntAtLeast(sb.varId, sb.lo)
@@ -1613,12 +1546,8 @@ internal class ResumableMinimize(
         return outcome == "PENDING"
     }
 
-    /**
-     * One-shot pre-search LP work: harvest the global cut pool and capture the root relaxation bound for
-     * the integrality-gap metric (search only bounds from level 1 down, so this is the sole root
-     * capture). [token] is the shared root-LP budget — the slice/global cancellation time-boxed to
-     * `LpPlan.rootBudgetFraction`.
-     */
+    // Harvest the global cut pool and capture the root relaxation bound; search bounds only from level 1 down, so
+    // this is the sole root capture.
     private fun initRootLp(token: ExecutionControl): Boolean {
         if (lpEngine.automaticSparseTrial && rootBoundHandoffBaseline == null) {
             val domain = lpEngine.linearLowerBound(objective, session).takeUnless { it == Long.MIN_VALUE }?.toDouble()
@@ -1630,9 +1559,7 @@ internal class ResumableMinimize(
             preparationCancellation = rootLpPreparationBudget())
         captureRootHandoffFloor(rootBound)
         sink.lp.observeRootBound(0, rootBound)
-        // Publish the root LP bound to the portfolio's shared lower-bound manager: a sound global lower
-        // bound on the optimum, so a peer arm can pair it with its own incumbent to prove optimality. A
-        // NaN (no LP structure) carries no information and the sink ignores it.
+        // A sound global lower bound a peer can pair with its own incumbent; NaN means no LP structure.
         if (!rootBound.isNaN()) params.objectiveLowerBoundSink?.invoke(rootBound)
         if (rootBound > provedRootBound) provedRootBound = rootBound
         return true
@@ -1663,28 +1590,18 @@ internal class ResumableMinimize(
         }
     }
 
-    /**
-     * The shared cooperative-cancellation budget for the pre-search root LP work: the
-     * slice/global [BacktrackParams.cancellation] OR-ed with a wall-clock deadline of
-     * `LpPlan.rootBudgetFraction` of the time remaining (capped at `LpPlan.rootBudgetMillis`). The time
-     * remaining is read from the current slice deadline when one is armed, else from
-     * [BacktrackParams.solveBudgetMillis] and [startMark] on the non-pausable one-shot path — so
-     * the cap tracks the real deadline on both paths rather than the absolute ceiling, which exceeds a
-     * short budget and would let root work consume the whole solve. Only the absolute cap
-     * applies when neither the slice end nor the budget is known. It also stops once the LP has spent
-     * `LpPlan.rootMaxWork` or the LP work allowance the node solves share. A non-positive fraction
-     * disables the cap.
-     */
+    // Root LP budget: the run's cancellation OR-ed with rootBudgetFraction of the time remaining, capped at
+    // rootBudgetMillis, so root work cannot consume a short solve. Only the absolute cap applies when no remaining
+    // time is known. It also stops at rootMaxWork or the shared LP work allowance. A non-positive fraction
+    // disables the cap.
     private fun rootLpBudget(): ExecutionControl {
         val fraction = params.lpPlan.rootBudgetFraction
         if (fraction <= 0.0) return params.cancellation
         val cap = params.lpPlan.rootBudgetMillis
         val remaining = remainingBudgetMillis()
         val budgetMillis = if (remaining != null) minOf((remaining * fraction).toLong(), cap) else cap
-        // Work first, clock second. A harvest bounded by time keeps a different set of cuts on every
-        // run, and the search inherits them, so nothing downstream is comparable to itself; bounding it
-        // by work makes the harvest a property of the model. The deadline stays as the backstop for
-        // cost the meter cannot see.
+        // Work first, clock second: a time-bounded harvest keeps a different set of cuts on every run, while a
+        // work bound makes it a property of the model. The deadline is the backstop for cost the meter cannot see.
         return rootLpPreparationBudget() or
             if (params.cancellation.workScheduled())
                 ExecutionControl.Never else
@@ -1701,9 +1618,7 @@ internal class ResumableMinimize(
             }
     }
 
-    /** Milliseconds left until the effective deadline: the armed slice end (pausable portfolio path),
-     *  else [BacktrackParams.solveBudgetMillis] minus the elapsed since [startMark] (the one-shot path),
-     *  else null when no budget is known. */
+    // The armed slice end on the pausable path, else solveBudgetMillis minus the time since startMark.
     private fun remainingBudgetMillis(): Long? {
         slice.deadline?.let { return (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds }
         return params.solveBudgetMillis?.let { it - startMark.elapsedNow().inWholeMilliseconds }
@@ -1727,7 +1642,7 @@ internal class ResumableMinimize(
         session.decisionLevel == 0 && lpEngine.automaticSparseTrial && !lpEngine.params.lpPlan.componentOwnership &&
             lpEngine.rootPrimalTargets?.let { !it.auxiliary && it.knownColumns == null } == true
 
-    /** LP guidance affects only branch order; the shared runner still owns every frame and retraction. */
+    // LP guidance affects only branch order; the shared runner still owns every frame and retraction.
     private inner class LpGuidedBranching : BacktrackBranching {
         private var sourcePreference: Pair<RootPrimalTargets, Long>? = null
         private var sourceDecision: SearchDecision? = null
@@ -1800,7 +1715,6 @@ internal class ResumableMinimize(
         }
     }
 
-    /** Refutes LP-dominated partial assignments through the shared frame stack. */
     private inner class LpNodePolicy : SearchNodePolicy {
         override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
             slice.charge()
@@ -1876,7 +1790,6 @@ internal class ResumableMinimize(
         }
     }
 
-    /** Turns feasible shared models into strictly improving optimization incumbents. */
     private inner class IncumbentPolicy : SearchModelPolicy {
         override fun onModel(
             model: com.eignex.klause.solver.search.AssembledSearchModel,
@@ -1945,9 +1858,9 @@ internal class ResumableMinimize(
             }
         }
 
-        // A leaf whose objective approaches [infimum] without attaining it. Its point stands as an incumbent, and the
+        // A leaf whose objective approaches infimum without attaining it. Its point stands as an incumbent, and the
         // leaf is passed over without a nogood: values between the infimum and its point stay open, so the leaf's
-        // floor in objective units bounds what the terminal may claim instead of the run-wide indeterminate flag.
+        // floor bounds what the terminal may claim instead of the run-wide indeterminate flag.
         private fun infimumLeaf(sample: Sample, real: LeafRealResult, infimum: BigFraction): SearchModelDisposition {
             val discrete = sample.copy(reals = DoubleArray(problem.numRealVars),
                 exactReals = List(problem.numRealVars) { BigFraction.ZERO })
@@ -1964,7 +1877,6 @@ internal class ResumableMinimize(
         }
     }
 
-    /** CP optimization configuration and root-boundary work for the shared traversal. */
     private inner class OptimizationTraversalPolicy :
         SearchTraversalPolicy,
         SearchRunLifecycle {
@@ -1974,9 +1886,8 @@ internal class ResumableMinimize(
             )
         override val booleanBranching = BooleanBranching.None
 
-        // Two allowances, and a decision is charged against both. [decisionLimit] bounds one slice and is
-        // refilled whenever a driver re-enters — a restart, an arm resuming, an LNS repair — so it never
-        // bounds a solve. [BacktrackParams.nodeBudget] is the solve-spanning one that enforces a node limit.
+        // A decision charges both decisionLimit, which bounds one slice and is refilled whenever a driver re-enters,
+        // and the solve-spanning nodeBudget.
         override val decisionBudget = SearchDecisionBudget {
             val withinSlice = --decisionLimit >= 0L
             val budget = params.nodeBudget?.allowance ?: return@SearchDecisionBudget withinSlice

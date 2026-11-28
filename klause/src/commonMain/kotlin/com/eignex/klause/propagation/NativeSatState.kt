@@ -11,18 +11,11 @@ import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.storage.borrowBackingArray
 import com.eignex.util.collections.storage.primitiveCapacityBytes
 
-/**
- * Two-watched-literal BCP (Moskewicz et al., "Chaff: engineering an efficient SAT solver", DAC 2001,
- * https://doi.org/10.1145/378239.379017) for arena-packed pure-Boolean problems. A trail-pointer literal sweep
- * avoids factor dispatch and order-literal atoms. The general lane's trail, pin machinery,
- * antecedents and [ConflictAnalyzer] remain shared.
- *
- * Watch positions `watchPos(2h)` and `watchPos(2h+1)` index the two watched literals of clause `h`;
- * `watchEntries(L)` lists clauses watching `L`. Watches are rebuilt per session and may drift
- * across backtracking. Base literals stay in the immutable [ClauseArena]; learned clauses use
- * individually owned payload array per learned clause. Relocation moves handles and leaves the
- * arena shareable read-only.
- */
+// Two-watched-literal BCP (Moskewicz et al., "Chaff: engineering an efficient SAT solver", DAC 2001,
+// https://doi.org/10.1145/378239.379017) for arena-packed pure-Boolean problems. A trail-pointer literal sweep
+// avoids factor dispatch and order-literal atoms; the trail, pin machinery and [ConflictAnalyzer] stay shared.
+// Watches are rebuilt per session and may drift across backtracking. Base literals stay in the immutable
+// [ClauseArena], so it remains shareable read-only.
 internal class NativeSatState(private val state: PropagationState) {
 
     private val arena = state.projection.clauseArena
@@ -69,18 +62,13 @@ internal class NativeSatState(private val state: PropagationState) {
     private var capPreparationDefers = 0L
     private var capPendingReplayCalls = 0L
 
-    // Per-learned-clause policy columns, parallel to the learned index — the native mirror of
-    // LearnedClauseDb's forgetting/three-tier metadata. Recent use shares lifecycle storage;
-    // permanent clauses survive every forget.
+    // Native mirror of LearnedClauseDb's forgetting and three-tier columns.
     private val metadata = NativeLearnedMetadata()
     private val learnedUnits = IntArrayList()
     private var unitsPending = false
     private val rechecks = IntArrayList()
     private var recheckHead = 0
 
-    // The origin an imported learned clause came from, parallel to the learned columns; see [OriginCounts].
-
-    /** Uses of imported learned clauses, by origin. */
     val importUses = OriginCounts()
 
     // Keep learned positions separate so the first learned clause cannot double the base allocation.
@@ -107,8 +95,7 @@ internal class NativeSatState(private val state: PropagationState) {
     // Base unit clauses, pinned once at root during the initial full propagation.
     private val baseUnits = IntArrayList()
 
-    /** Trail cursor: every literal in `boolPinOrder[0, bcpHead)` has been propagated. Reset to the
-     *  (truncated) trail size on backtrack, since the surviving prefix is already propagated. */
+    // Every literal in `boolPinOrder[0, bcpHead)` is propagated; backtrack truncates it to the trail size.
     var bcpHead = 0
 
     private var retiredRootSources: IntHashSet? = null
@@ -358,7 +345,6 @@ internal class NativeSatState(private val state: PropagationState) {
         }
     }
 
-    /** The clause's literals as a fresh array (the seed reason for conflict analysis). */
     private fun clauseLits(h: Int): IntArray {
         val lits = if (h < baseCount) arena.lits else learnedPayloads[h - baseCount]
         val start = if (h < baseCount) arena.start(h) else 0
@@ -367,8 +353,7 @@ internal class NativeSatState(private val state: PropagationState) {
         }
     }
 
-    /** The clause's literals except index [skip] — the antecedent set recorded for a forced unit,
-     *  matching the general clause propagator's reason exactly. Null for a single-literal clause. */
+    // Matches the general clause propagator's reason exactly; null for a single-literal clause.
     private fun antecedentsExcept(h: Int, skip: Int): IntArray? {
         val len = clauseLen(h)
         if (len <= 1) return null
@@ -392,12 +377,8 @@ internal class NativeSatState(private val state: PropagationState) {
         state.conflictLevels = levels.toIntArray()
     }
 
-    /**
-     * Register a learned clause and fire it once against the current assignment: pin its sole
-     * non-false literal (the asserting UIP after a backjump), flag a conflict if every literal is
-     * already false, or just install watches when two or more literals are still open. The trailing
-     * [propagate] call continues BCP from any pin this makes.
-     */
+    // Fires once against the current assignment: pins the sole non-false literal, flags a conflict when every
+    // literal is false, else installs watches.
     fun addLearned(
         lits: IntArray,
         lbd: Int,
@@ -506,8 +487,6 @@ internal class NativeSatState(private val state: PropagationState) {
         learnedCount++
         return baseCount + i
     }
-
-    // Learned-clause policy accessors: the native mirror of the LearnedClauseDb columns.
 
     internal fun sharingMemory(sample: SharingMemoryObservation, protected: SharingMemoryObservation.Seen<Int>) {
         repeat(3) { sample.step() }
@@ -881,7 +860,6 @@ internal class NativeSatState(private val state: PropagationState) {
         "learnedCapActiveClauses" to activeCount.toLong(),
     )
 
-    /** Literals of learned clause [i] as a fresh array, for glue export and introspection. */
     fun literalsOf(i: Int): IntArray = clauseLits(baseCount + i)
 
     fun literalCountOf(i: Int): Int = clauseLen(baseCount + i)
@@ -901,8 +879,7 @@ internal class NativeSatState(private val state: PropagationState) {
         }
     }
 
-    /** Mark learned clause forced by factor id [fid] (if it is one) as reused since the last
-     *  reduction — drives three-tier promotion, mirroring `PropagationState.noteLearnedUse`. */
+    // Drives three-tier promotion.
     fun markUsed(fid: Int) {
         val i = fid - baseCount
         if (i !in 0 until learnedCount) return
@@ -1147,12 +1124,8 @@ internal class NativeSatState(private val state: PropagationState) {
         return true
     }
 
-    /**
-     * Propagate to fixpoint. On the first [allFactors] call (the session bake) the base unit clauses
-     * are pinned at root and the sweep starts from the trail head; afterwards each call resumes from
-     * [bcpHead] over the pins added since. Returns the conflicting clause's decision levels, or null
-     * at a clean fixpoint.
-     */
+    // The first [allFactors] call pins the base units at root; later calls resume from [bcpHead]. Returns the
+    // conflicting clause's decision levels, or null at a fixpoint.
     fun propagate(allFactors: Boolean, cancellation: ExecutionControl): IntArray? {
         if (pendingConflict) {
             pendingConflict = false
@@ -1216,7 +1189,7 @@ internal class NativeSatState(private val state: PropagationState) {
         return null
     }
 
-    /** Process every clause watching [falseLit] (which just became false). Returns false on conflict. */
+    // Returns false on conflict.
     private fun propagateFalse(falseLit: Int): Boolean {
         var entries = watchEntries[falseLit] ?: return true
         if (entries.holdsRetired) {
@@ -1293,7 +1266,6 @@ internal class NativeSatState(private val state: PropagationState) {
         return true
     }
 
-    /** A non-false literal index other than the two watched ([lIdx], [otherIdx]); -1 if none. */
     private fun findNonFalse(lits: IntArray, start: Int, len: Int, lIdx: Int, otherIdx: Int, scanStart: Int): Int {
         if (len == 2) return -1
         if (len == 3) {

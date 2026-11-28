@@ -54,18 +54,12 @@ import com.eignex.klause.util.workScheduled
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntHashSet
 
-/** Map touched-seed-level [IntArray] to the subset of [input] assumptions at those
- *  levels. Returns `null` when the input was empty (no assumption layer to
- *  project) or no level was touched (no information). */
+// Null when there is no assumption layer or no level was touched.
 internal fun BacktrackSolver.projectTouchedToAssumptions(input: Assumptions, levels: IntArray): Assumptions? {
     if (input.isEmpty || levels.isEmpty()) return null
-    // [levels] is already the touched seed-level array; the projection is idempotent over
-    // duplicates, so pass it straight through (no dedup set needed).
     return projectSeedConflictToAssumptions(input, levels)
 }
 
-/** Convert a touched-seed-level set into a sorted-ascending [IntArray], or empty
- *  when there were no touches (or no seed in the first place). */
 internal fun touchedToArray(touched: IntHashSet?): IntArray {
     if (touched == null || touched.isEmpty()) return emptyIntArray()
     val out = touched.toIntArray()
@@ -73,10 +67,7 @@ internal fun touchedToArray(touched: IntHashSet?): IntArray {
     return out
 }
 
-/** Lift a [PropagationResult.Unsat]'s factor-level conflict info to a klause [UnsatCore].
- *  Empty `conflictFactors` (seed-only contradiction, no factor invocation involved)
- *  collapses to `null` — the API contract is "core absent" rather than "core empty",
- *  since an empty core wouldn't be actionable. */
+// A seed-only contradiction has no factor core, reported as absent rather than empty.
 internal fun coreOf(unsat: PropagationResult.Unsat): UnsatCore? = if (unsat.conflictFactors.isEmpty()) {
     null
 } else {
@@ -86,28 +77,21 @@ internal fun coreOf(unsat: PropagationResult.Unsat): UnsatCore? = if (unsat.conf
 internal sealed interface SearchOutcome {
     data class Found(val sample: Sample) : SearchOutcome
 
-    /** DFS exhausted without finding a model. [core] is non-null when the exhaustion
-     *  was forced by root-level propagation (bake or seed); after a full DFS-tree
-     *  walk, no single-factor core explains the result and [core] stays null.
-     *  [touchedAssumptionLevels] retains a jointly refuted seed prefix at propagation
-     *  or the full seed range after tree exhaustion. It feeds the assumption-core
-     *  projection in [com.eignex.klause.solver.result.satisfyUnderAssumptions]. */
+    // core is non-null only when root propagation forced the exhaustion. touchedAssumptionLevels holds a jointly
+    // refuted seed prefix at propagation or the full seed range after tree exhaustion, for assumption-core
+    // projection.
     data class Exhausted(
         val core: UnsatCore? = null,
         val touchedAssumptionLevels: IntArray = emptyIntArray(),
-        /** True when a leaf was reached whose residual LP-only continuous relaxation could not be
-         *  certified feasible or infeasible (see `LpEngine.leafCertify`), so the tree is not provably
-         *  all-infeasible — the terminal verdict must be `unknown`, not UNSAT. */
+        // A leaf's continuous relaxation could not be certified either way, so the verdict is unknown, not UNSAT.
         val indeterminate: Boolean = false,
         val stopCause: SearchStopCause? = null,
     ) : SearchOutcome
     data class BudgetCapped(val stopCause: SearchStopCause? = null) : SearchOutcome
 }
 
-/**
- * How a pausable [CpSatisfactionTraversal] meets its slice boundary: whether a fired cancellation is the slice
- * ending rather than the run, and the hook each node runs before it branches.
- */
+// How a pausable traversal meets its slice boundary: whether a fired cancellation ends the slice rather than the
+// run, and the hook each node runs before it branches.
 internal class TraversalSlice(
     val pauses: () -> Boolean,
     val beforeBranch: () -> Boolean,
@@ -115,19 +99,12 @@ internal class TraversalSlice(
     val remainingLpWork: () -> Long? = { null },
 )
 
-/**
- * Satisfaction path for a CP/theory search, advanced one outcome at a time.
- *
- * This has no private DFS trail: [CpSearchComponent] and every supplied theory component are driven by
- * [com.eignex.klause.solver.search.SearchRun]. With a [slice] the traversal pauses where the slice fires — a
- * cancellation that [TraversalSlice.pauses] reports as the slice's own makes [next] return null at decision
- * or LP iteration granularity, and the next [next] resumes mid-tree. Root propagation polls
- * [propagationCancellation], since a
- * fixpoint a slice cut would leave the session under-propagated for the arm that resumes it.
- *
- * A [singleModel] caller takes one model, so the columns [leafColumns] admits are completed at leaves rather than
- * decided; an enumeration, a sampler or a counter tells models apart by those columns and keeps deciding them.
- */
+// Satisfaction search driven by the shared SearchRun, advanced one outcome at a time. With a slice, next() returns
+// null where the slice fires and the following call resumes mid-tree. Root propagation polls
+// propagationCancellation, since a fixpoint cut by a slice would leave the session under-propagated.
+//
+// A singleModel caller takes one model, so the leafColumns columns are completed at leaves rather than decided; an
+// enumeration, a sampler or a counter tells models apart by those columns and keeps deciding them.
 @Suppress("TooGenericExceptionCaught") // ownership boundaries must preserve arbitrary primary and cleanup failures
 internal class CpSatisfactionTraversal(
     private val problem: BakedProblem,
@@ -201,7 +178,7 @@ internal class CpSatisfactionTraversal(
     private var initialization: Iterator<ComponentResult?>? = null
     private var deferredRoot = false
 
-    // The verdict the root reached before any search, handed out by the first [next].
+    // The verdict the root reached before any search, handed out by the first next().
     private var currentAssumptions = params.assumptions
     private var rootOutcome: SearchOutcome? = null
     val hasRootOutcome: Boolean get() = rootOutcome != null
@@ -304,17 +281,15 @@ internal class CpSatisfactionTraversal(
         }
     }
 
-    /** Poll cancellation on a fixed cadence, so a slice bounded by work pauses on the same node every run. */
+    // A fixed polling cadence makes a work-bounded slice pause on the same node every run.
     var fixedCancellationCadence: Boolean = false
         set(value) {
             field = value
             run?.fixedCancellationCadence = value
         }
 
-    /** Variables the traversal's search has fixed at its root; see [PropagationSession.rootFixedVariableCount]. */
     fun rootFixedVariableCount(): Int = cp.session.rootFixedVariableCount()
 
-    /** LP work the traversal's relaxations have done, for a slice that charges it against its budget. */
     fun lpWork(): Long = lpResources.sumOf { it.totalSolveWork() } + (sink?.lp?.standaloneWork ?: 0L)
 
     val initializationCancelled: Boolean get() = cp.session.fixpointCancelled
@@ -368,12 +343,9 @@ internal class CpSatisfactionTraversal(
         if (run == null && rootOutcome == null) run = session.openRun(problem.numBoolVars, traversal)
     }
 
-    /**
-     * Advance to the next outcome, or null when a pausable traversal reached its slice boundary with search still
-     * pending. Ordinary terminal outcomes close the traversal's LP resources; a model
-     * releases their persistent solvers instead, since a lazy caller may abandon the traversal after it.
-     * Rebindable Boolean queries retain the prepared state until their owner closes it.
-     */
+    // Null when a pausable traversal reached its slice boundary with search pending. Terminal outcomes close the LP
+    // resources; a model releases their persistent solvers instead, since a lazy caller may abandon the traversal
+    // after it. Rebindable Boolean queries retain the prepared state until their owner closes it.
     fun next(): SearchOutcome? {
         check(!closed) { "traversal is closed" }
         sharedSession?.let { session ->
@@ -471,7 +443,6 @@ internal class CpSatisfactionTraversal(
         if (!rebindable) close()
     }
 
-    /** Close the invocation resources; idempotent. */
     override fun close() {
         if (closed) return
         closed = true
@@ -487,7 +458,6 @@ internal class CpSatisfactionTraversal(
         }
     }
 
-    /** Close after [failure], keeping it primary. */
     fun closeAfter(failure: Throwable) {
         if (closed) return
         closed = true
@@ -517,7 +487,6 @@ private fun releaseLpResources(resources: List<LpSearchResource>) {
     failure?.let { throw it }
 }
 
-/** CP-specific wiring around the shared traversal engine for satisfaction and model streaming. */
 private class CpSatisfactionTraversalPolicy(
     private val cp: CpSearchComponent,
     private val params: BacktrackParams,
@@ -681,7 +650,6 @@ private class CpSatisfactionTraversalPolicy(
     }
 }
 
-/** The shared learned-clause bound mirrors the CP database's own cap and glue threshold. */
 internal fun BacktrackParams.sharedLearnedDb(): SearchLearnedDbParams =
     SearchLearnedDbParams(maxClauses = maxLearnedClauses, glueLbd = lbdGlueThreshold,
         softLimitBytes = learnedMemoryBytes, reclamationWork = learnedMemoryWork,

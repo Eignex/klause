@@ -17,21 +17,12 @@ import com.eignex.util.numbers.mulExact
 import com.eignex.util.numbers.subExact
 import kotlin.math.abs
 
-/**
- * Common linear sub-sum extraction (the contract-direction counterpart of [AffineSingletons], which
- * *expands* a variable into its definition). When an equality defines a variable as a linear sub-sum
- * `y = B + Σ_j A_j·x_j` (unit pivot on `y`, at least two partner terms), any other [Linear] row that
- * contains that whole sub-sum with a common integer multiplier `k` — every `x_j` at coefficient `k·A_j`
- * — has `k·Σ_j A_j·x_j` rewritten to the single term `k·y` (the bound absorbing `k·B`). The partner
- * terms collapse into one variable, shrinking the row's arity and the LP relaxation's density.
- *
- * Solution-set preserving and needs no reconstruction: the defining equality is retained, so
- * `Σ_j A_j·x_j = y − B` holds in every solution and the rewritten row is equivalent term-for-term.
- */
+// The contracting counterpart of [AffineSingletons]: given a definition `y = B + Σ_j A_j·x_j`, a row containing
+// the whole sub-sum at a common multiplier `k` has `k·Σ_j A_j·x_j` replaced by `k·y`, shrinking its arity. The
+// definition is retained, so the rewrite is solution-set preserving and needs no reconstruction.
 internal object LinearSubSumAggregation {
 
-    /** Above this factor count the candidate scan is skipped — the reduction is a density optimisation,
-     *  not a correctness need, so forgoing it on giant models keeps presolve bounded (sound). */
+    // A density optimisation only, so skipping it on giant models is sound.
     private const val MAX_FACTORS = 200_000
     private const val MAX_SCAN_WORK = 1_000_000L
     private const val SCAN_WORK_PER_TERM = 8L
@@ -71,9 +62,7 @@ internal object LinearSubSumAggregation {
         }
     }
 
-    /** A sub-sum definition `y = B + Σ A_j·x_j` read off a unit-pivot equality: the pivot [y], the
-     *  constant [b] (`B`), and the partner form `x_j ↦ A_j` in [form]. [defIndex] is the equality's own
-     *  factor index, so it is never rewritten against itself. */
+    // `y = b + Σ form(x_j)·x_j`; [defIndex] keeps the equality from being rewritten against itself.
     private class Definition(val defIndex: Int, val y: Int, val b: Long, val form: Map<Int, Long>)
 
     private const val MAX_SPARSE_WIDTH = 4096
@@ -251,8 +240,7 @@ internal object LinearSubSumAggregation {
         val definitions = collectDefinitions(rows, work)
         if (definitions.isEmpty()) return PassDelta()
 
-        // Index Linear rows by variable, so a definition is matched only against rows that mention its
-        // rarest partner rather than the whole model.
+        // A definition is matched only against rows mentioning its rarest partner.
         val rowsByVar = MutableIntObjectMap<Incidence>()
         var indexedTerms = 0L
         for (i in factors.indices) {
@@ -270,7 +258,7 @@ internal object LinearSubSumAggregation {
 
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
-        val rewritten = HashSet<Int>() // one substitution per row per pass; the round engine re-runs
+        val rewritten = HashSet<Int>() // one substitution per row per pass; the round engine re-runs it
         val retainedDefinitions = HashSet<Int>()
         for (def in definitions) {
             if (!work.visit()) break
@@ -298,9 +286,8 @@ internal object LinearSubSumAggregation {
         return PassDelta(droppedIndices = dropped.toIntArray(), addedFactors = added)
     }
 
-    /** Every unit-pivot sub-sum definition among the equality [Linear]s: an equality `Σ c_j·v_j = b` with
-     *  a variable `v_p` of coefficient `±1` and at least two other terms yields `v_p = c_p·b + Σ_{j≠p}
-     *  (−c_p·c_j)·v_j`. The lowest-id unit-coefficient variable is the pivot (deterministic). */
+    // An equality `Σ c_j·v_j = b` with a unit `c_p` and at least two other terms gives
+    // `v_p = c_p·b + Σ_{j≠p} (−c_p·c_j)·v_j`.
     private fun collectDefinitions(factors: Array<Linear?>, work: Work): List<Definition> {
         val out = ArrayList<Definition>()
         for (i in factors.indices) {
@@ -327,8 +314,7 @@ internal object LinearSubSumAggregation {
         return out
     }
 
-    /** Index of the lowest-id variable with a `±1` coefficient, or `null` if none — the deterministic
-     *  pivot whose isolation keeps every folded coefficient integral. */
+    // A unit pivot keeps every folded coefficient integral; the lowest id makes the choice deterministic.
     private fun unitPivotIndex(vars: IntArray, constants: IntegerConstants, work: Work): Int? {
         var best = -1
         for (j in vars.indices) {
@@ -339,20 +325,17 @@ internal object LinearSubSumAggregation {
         return if (best < 0) null else best
     }
 
-    /** The partner variable of [form] contained in the fewest rows — the cheapest anchor to scan. */
     private fun rarestPartner(form: Map<Int, Long>, rowsByVar: MutableIntObjectMap<Incidence>, work: Work): Incidence? {
         var best: Incidence? = null
         for (v in form.keys) {
             if (!work.visit()) return null
-            val rows = rowsByVar[v] ?: return null // a partner in no row: no match possible
+            val rows = rowsByVar[v] ?: return null
             if (best == null || rows.rows.size < best.rows.size) best = rows
         }
         return best
     }
 
-    /** The common integer multiplier `k` with which [row] contains [def]'s whole partner form — every
-     *  partner `x_j` present at coefficient `k·A_j`, one nonzero `k` for all — or `null` if the form is
-     *  absent, partial, or unevenly scaled (so no exact sub-sum to fold). */
+    // The one nonzero `k` with every partner present at `k·A_j`, or null when the form is partial or uneven.
     private fun matchMultiplier(row: Linear, constants: IntegerConstants, def: Definition, work: Work): Long? {
         val coeffByVar = MutableIntLongMap(row.vars.size)
         for (j in row.vars.indices) {
@@ -362,9 +345,9 @@ internal object LinearSubSumAggregation {
         var k = 0L
         for ((x, a) in def.form) {
             if (!work.visit()) return null
-            if (!coeffByVar.containsKey(x)) return null // partner missing → not a full sub-sum
+            if (!coeffByVar.containsKey(x)) return null
             val c = coeffByVar.getOrDefault(x, 0L)
-            if (a == 0L) return null // a zero form coefficient is no term (collectDefinitions drops these)
+            if (a == 0L) return null
             if (c == Long.MIN_VALUE && a == -1L) return null
             if (c % a != 0L) return null
             val ratio = c / a
@@ -378,13 +361,10 @@ internal object LinearSubSumAggregation {
         return if (k == 0L) null else k
     }
 
-    /** Magnitude past which the `k·B` bound shift (or its addition to the row bound) is treated as
-     *  overflow-risky and the fold declined — real coefficients sit far below this. */
+    // A `k·B` shift past this magnitude declines the fold as overflow-risky.
     private const val OVERFLOW_GUARD = 1_000_000_000_000_000L
 
-    /** [row] with `k·Σ A_j·x_j` replaced by the single term `k·y`: drop every partner term, add `k` to
-     *  `y`'s coefficient, and shift the bound by `k·B` (moving `k·(y − B)` to the left leaves the same
-     *  relation). Coalescing in [Linear]'s constructor folds `k·y` into any existing `y` term. */
+    // Drops every partner term, adds `k` to `y`'s coefficient and shifts the bound by `k·B`.
     private fun rewrite(row: Linear, constants: IntegerConstants, def: Definition, k: Long, work: Work): Linear? {
         return try {
             val shift = mulExact(k, def.b)
@@ -395,7 +375,7 @@ internal object LinearSubSumAggregation {
                 val coeffs = ArrayList<Long>(row.vars.size)
                 for (j in row.vars.indices) {
                     if (!work.visit()) return null
-                    if (def.form.containsKey(row.vars[j])) continue // absorbed into k·y
+                    if (def.form.containsKey(row.vars[j])) continue
                     if (row.vars[j] == def.y) addExact(constants.coeff(j), k)
                     vars.add(row.vars[j])
                     coeffs.add(constants.coeff(j))

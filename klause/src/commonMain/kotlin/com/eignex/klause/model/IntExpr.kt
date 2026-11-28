@@ -129,15 +129,10 @@ data class IntMod(
     val den: IntExpr,
 ) : IntExpr
 
-/** Cardinality `|setExpr|` — returns the count of universe elements indicated true. */
+/** Cardinality `|setExpr|`. */
 @Serializable
 @SerialName("setcard")
 data class SetCard(
     /** The set whose cardinality is taken. */
     val set: SetExpr,
 ) : IntExpr
-
-// Each *Opt node mirrors its non-opt sibling but carries a parallel [presents] list of
-// Boolean expressions. The compiler reads each [BoolExpr] as a presence literal, threads
-// it into the corresponding factor's `presents: IntArray`, and the factor handles the
-// rest natively (see [com.eignex.klause.factor.OptPresence]).

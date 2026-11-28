@@ -52,7 +52,6 @@ data class LocalSearchStats(
     fun mergedWith(o: LocalSearchStats): LocalSearchStats = LocalSearchStats(
         moves = SumResult(moves.sum + o.moves.sum),
         stalls = SumResult(stalls.sum + o.stalls.sum),
-        // Earliest time-to-best across workers; -1 sentinels defer to any real reading.
         timeToBestMs = when {
             timeToBestMs < 0L -> o.timeToBestMs
             o.timeToBestMs < 0L -> timeToBestMs
@@ -93,11 +92,8 @@ data class LocalSearchStats(
     )
 }
 
-/**
- * Mutable [LocalSearchStats] accumulator. Moves/stalls are plain counters (they reach the millions, so
- * per-event stat updates would be pure overhead — the LS loop sets them in bulk at exit). Also holds
- * the LS restart count, which the sink folds into [SearchStats.restarts]. See [SolveStatsSink].
- */
+// Moves and stalls reach the millions, so the LS loop sets them in bulk at exit instead of per event.
+// The restart count folds into [SearchStats.restarts].
 internal class LocalSearchStatsSink {
     private var moves: Long = 0L
     private var stalls: Long = 0L
@@ -121,7 +117,6 @@ internal class LocalSearchStatsSink {
     var phaseNanos: (() -> Map<String, Long>)? = null
     var objectiveScoring: (() -> Map<String, Long>)? = null
 
-    /** Count one decided candidate: [refuted] or [undecided] when it was not accepted. */
     fun recordCompletion(refuted: Boolean, undecided: Boolean,
         stage: CompletionRefutationStage = CompletionRefutationStage.PROVIDER) {
         completions++
@@ -136,7 +131,6 @@ internal class LocalSearchStatsSink {
         if (undecided) completionsUndecided++
     }
 
-    /** Record the LS move / restart / stall totals in one call at loop exit. */
     fun recordWork(moves: Long, restarts: Long, stalls: Long) {
         this.moves = moves
         this.restarts = restarts
@@ -154,8 +148,7 @@ internal class LocalSearchStatsSink {
         geometricProposalCandidates = candidates
     }
 
-    /** Record the incumbent fingerprint: objective (NaN if never feasible), residual violation, and the
-     *  wall ms at which it was found (-1 if no incumbent). */
+    // objective is NaN if never feasible; foundAtMs is -1 without an incumbent.
     fun recordIncumbent(objective: Double, violation: Double, foundAtMs: Long) {
         incumbentObjective = objective
         incumbentViolation = violation

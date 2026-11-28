@@ -13,19 +13,12 @@ import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
-/**
- * An open theory search advanced a slice at a time, its decision stack, learned clauses and theory state kept
- * between slices, for a portfolio to schedule beside local search.
- *
- * Setup — preparation, bound closing and the root — runs whole in the first slice: cut short it would decide
- * nothing and have to start over, and one longer than every slice would then never finish. After it a slice ends
- * only at a branch, once its [OpenTheoryWorkStats.openWork][com.eignex.klause.solver.result.OpenTheoryWorkStats.openWork]
- * share or its time is spent and at least one branch was expanded in it, so a theory check is never cut by a slice
- * and every slice moves the search. The global token passed to each [runSlice] stops it for good.
- *
- * [state] is the solve-wide state the run charges its work and statistics to, shared when several runs make up one
- * solve.
- */
+// Advanced a slice at a time, its decision stack, learned clauses and theory state kept between slices.
+//
+// Setup (preparation, bound closing and the root) runs whole in the first slice: cut short it would decide nothing
+// and have to start over. After it a slice ends only at a branch, once its `openWork` share or its time is spent
+// and at least one branch was expanded, so a theory check is never cut and every slice moves the search. The
+// global token passed to each [runSlice] stops it for good. [state] is shared when several runs make up one solve.
 internal class ResumableOpenTheory(
     private val engine: OpenTheoryEngine,
     private val params: TheoryParams,
@@ -50,25 +43,19 @@ internal class ResumableOpenTheory(
 
     private fun sliceSpent(): Boolean = state.work.spent >= sliceEndWork || sliceEnd?.hasPassedNow() == true
 
-    /** Whether the search has reached its verdict. */
     val isDone: Boolean get() = verdict != null
 
-    /** Work spent so far on [state], in `openWork` units. */
+    // In `openWork` units.
     val work: Long get() = state.work.spent
 
-    /** The search's root fixings and glue clauses so far, counted over [state]. */
     val progress: SearchStats get() = state.progress(run?.session)
 
-    /** The verdict's stats once decided, else retained preparation and live work and progress counters. */
     val stats: SolveStats get() = verdict?.stats ?: SolveStats(
         presolve = preparationStats, openTheory = state.work.snapshot(), search = progress,
     )
 
-    /**
-     * Advance until a verdict, [global] firing, or the slice ending: after [sliceWork] `openWork` units when
-     * non-negative, or after [sliceMillis], whichever comes first. The verdict once there is one, else null with
-     * the search paused.
-     */
+    // Advances until a verdict, [global] firing, or the slice ending after [sliceWork] `openWork` units (when
+    // non-negative) or [sliceMillis]. Null while the search is paused.
     fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceWork: Long): OpenTheoryResult? {
         verdict?.let { return it }
         globalToken = global.bindStopControl()

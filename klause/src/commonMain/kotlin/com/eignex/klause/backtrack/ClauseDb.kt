@@ -15,7 +15,7 @@ import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.storage.borrowBackingArray
 import com.eignex.util.collections.storage.primitiveCapacityBytes
 
-/** Reduce the learned-clause database at a restart without discarding permanent or glue clauses. */
+// Never discards permanent or glue clauses.
 internal fun forgetIfOverCap(
     session: PropagationSession,
     params: BacktrackParams,

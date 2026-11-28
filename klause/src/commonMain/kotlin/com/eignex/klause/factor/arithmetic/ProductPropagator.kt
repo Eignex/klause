@@ -17,14 +17,7 @@ internal class ProductPropagator(
     val intVars: IntArray,
 ) : Propagator {
 
-    /**
-     * Advisor subscription: `propagate` derives everything from the corner products and
-     * corner divisions of the `[min, max]` intervals of `a`, `b`, and `result` — it reads only
-     * `min`/`max`. An interior hole can change none of those, so the propagator subscribes to
-     * [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] on each variable and skips interior
-     * `VALUE_REMOVED` wakes. Deduplicated so an aliased operand (e.g. `a == b` for a square) is
-     * subscribed once.
-     */
+    // Propagation reads only interval corners, so interior VALUE_REMOVED wakes are skipped.
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =

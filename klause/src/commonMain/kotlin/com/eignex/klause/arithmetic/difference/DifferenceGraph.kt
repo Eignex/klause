@@ -3,39 +3,30 @@ package com.eignex.klause.arithmetic.difference
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 
-/** How often a relaxation sweep looks at the budget: often enough to land inside one pass over a large
- *  edge set, rarely enough that the check does not show up against the relaxation itself. */
+// How often a relaxation sweep looks at the budget: often enough to land inside one pass over a large
+// edge set, rarely enough that the check does not show up against the relaxation itself.
 private const val POLL_INTERVAL = 8192
 
-/** Outcome of computing potentials over a difference graph. */
 internal sealed interface Potentials {
-    /** One potential per vertex, so the system is feasible. */
     class Found(val values: LongArray) : Potentials
 
-    /** A negative cycle: the system has no solution. */
     data object Infeasible : Potentials
 
-    /** The budget or arithmetic range prevented a completed sweep, so nothing is claimed. */
+    // The budget or arithmetic range prevented a completed sweep, so nothing is claimed.
     data object Abandoned : Potentials
 }
 
-/** Shortest paths from one real graph node. */
 internal sealed interface ShortestPaths {
-    /** Finite distances for the reachable nodes. */
     class Found(val values: LongArray, val reachable: BooleanArray) : ShortestPaths
 
-    /** A negative cycle is reachable from the source. */
     data object Infeasible : ShortestPaths
 
-    /** The path search is incomplete because its budget is exhausted. */
     data object Abandoned : ShortestPaths
 }
 
-/**
- * Difference constraints `to - from <= weight` as a weighted edge list. Cycle and potential searches are
- * Bellman-Ford relaxations (R. Bellman, "On a routing problem", Quart. Appl. Math. 16(1), 1958,
- * https://doi.org/10.1090/qam/102435).
- */
+// Difference constraints `to - from <= weight` as a weighted edge list. Cycle and potential searches are
+// Bellman-Ford relaxations (R. Bellman, "On a routing problem", Quart. Appl. Math. 16(1), 1958,
+// https://doi.org/10.1090/qam/102435).
 internal class DifferenceGraph(val numVars: Int) {
     private val from = IntArrayList()
     private val to = IntArrayList()
@@ -50,10 +41,8 @@ internal class DifferenceGraph(val numVars: Int) {
         return from.size - 1
     }
 
-    /**
-     * An edge cycle of negative total weight, or null when the search finds none or [cancelled] stops it.
-     * Null reports no deduction; it does not prove consistency.
-     */
+    // An edge cycle of negative total weight, or null when the search finds none or [cancelled] stops it.
+    // Null reports no deduction; it does not prove consistency.
     fun negativeCycle(active: BooleanArray? = null, cancelled: () -> Boolean = { false }): IntArray? =
         negativeCycleWithPotential(active, cancelled, null)
 
@@ -103,7 +92,6 @@ internal class DifferenceGraph(val numVars: Int) {
         return extractCycle(changed, predEdge)
     }
 
-    /** Vertex potentials witnessing feasibility, or an infeasible/abandoned outcome. */
     fun potentials(
         active: BooleanArray? = null,
         cancelled: () -> Boolean = { false },
@@ -206,13 +194,11 @@ internal class DifferenceGraph(val numVars: Int) {
         return false
     }
 
-    /**
-     * Shortest paths from [source], optionally following every edge backwards.
-     *
-     * Unreachable nodes have no distance; keeping that bit separately lets `Long.MAX_VALUE` remain a
-     * representable path weight. Arithmetic overflow only drops a relaxation, which weakens a bound
-     * computation without inventing one.
-     */
+    // Shortest paths from [source], optionally following every edge backwards.
+    //
+    // Unreachable nodes have no distance; keeping that bit separately lets `Long.MAX_VALUE` remain a
+    // representable path weight. Arithmetic overflow only drops a relaxation, which weakens a bound
+    // computation without inventing one.
     fun shortestPaths(
         source: Int,
         active: BooleanArray? = null,

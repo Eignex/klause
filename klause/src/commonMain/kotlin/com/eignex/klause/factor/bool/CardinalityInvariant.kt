@@ -17,7 +17,6 @@ internal class CardinalityInvariant(
     private val max: Int,
 ) : Invariant {
 
-    /** Signed contribution of each variable to the count. */
     private val signedByVar: IntLongMap = buildSignedLitsByVar(literals)
 
     private fun signedForVar(v: Int): Long = signedByVar[v]
@@ -30,8 +29,7 @@ internal class CardinalityInvariant(
         state.longPayload[factorId] = count
     }
 
-    /** max |signedByVar(v)| over [boolVars]: bounds the count change of a single flip, for
-     *  [updateBoolBreakMakeForFlip]'s early-out. */
+    // Bounds the count change of a single flip, for the early-out in [updateBoolBreakMakeForFlip].
     private val maxAbsSigned: Long = run {
         var m = 0L
         for (v in boolVars) {
@@ -55,7 +53,7 @@ internal class CardinalityInvariant(
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
         cardDegree(state.longPayload[factorId], state.violationSoftCap)
 
-    /** Compressed Δ violation-degree if `u` (currently `uVal`) were flipped at true-count `n`. */
+    // Compressed violation-degree delta if `u` (currently `uVal`) were flipped at true-count `n`.
     private fun signedDelta(n: Long, u: Int, uVal: Boolean, softCap: Int): Int {
         val signedU = signedForVar(u)
         if (signedU == 0L) return 0
@@ -103,8 +101,7 @@ internal class CardinalityInvariant(
         }
     }
 
-    /** Self-preserving moves during objective descent: swap one currently-true literal with
-     *  one currently-false literal to preserve count `n`. */
+    // Swaps one true literal with one false literal, preserving the count during objective descent.
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (boolVars.size < 2 || literals.size < 2) return
         if (boolVars.size != literals.size) return
@@ -150,8 +147,8 @@ internal class CardinalityInvariant(
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
-    /** Adjust break/make counts after [flippedVar] has been flipped. Early-out when both pre- and post-flip
-     *  counts sit at least [maxAbsSigned] inside `[min, max]`, where no single flip can change violation. */
+    // Early-out when both pre- and post-flip counts sit at least [maxAbsSigned] inside `[min, max]`, where no
+    // single flip can change violation.
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
         val signedFlipped = signedForVar(flippedVar)
         if (signedFlipped == 0L) return
@@ -178,7 +175,6 @@ internal class CardinalityInvariant(
     }
 
     companion object {
-        /** Cap on (true-lit, false-lit) swap-pair proposals in [proposeStructuredMoves]. */
         const val PAIR_PROPOSAL_CAP: Int = 32
     }
 }

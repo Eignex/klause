@@ -13,30 +13,14 @@ import kotlin.math.abs
 import kotlin.random.Random
 
 /**
- * Iterated Local Search restart policy. Maintains a *population* of feasible basin
- * anchors and restarts by picking one at random to anchor, then applying a random
- * perturbation. Compared to [AdaptivePerturbationRestart], which always anchors to the
- * global best-feasible-so-far, ILS allows the search to drift through sub-optimal
- * regions: an [AcceptanceCriterion] decides whether a feasible anchor joins the
- * population. See Lourenço, Martin and Stützle, "Iterated Local Search", Handbook of
- * Metaheuristics (2003), https://doi.org/10.1007/0-306-48056-5_11.
+ * Iterated Local Search restart policy: restarts from a random member of a population of feasible anchors plus a
+ * random perturbation, or fully at random while the population is empty. Lourenço, Martin and Stützle, "Iterated
+ * Local Search", Handbook of Metaheuristics (2003), https://doi.org/10.1007/0-306-48056-5_11.
  *
- *  - [populationSize] — number of incumbents tracked. Default 1 = classic single-anchor
- *    ILS. Larger values give a population-based variant: each restart picks a random
- *    member, and when an anchor is accepted it replaces the population's worst.
- *
- *  - [acceptance] — when [onLocalOptimum] or [onFeasibleStall] offers a feasible candidate, this decides
- *    whether the new sample joins the population (replacing the worst member if at
- *    capacity). Comparison is against the population's *worst* incumbent so a candidate
- *    that beats only the weakest member is admitted; under single-incumbent mode this
- *    reduces to comparing against the lone incumbent.
- *
- *  - [adaptivePerturbation] — when true, ramps [perturbationStrength] up on stalls
- *    ([adaptiveStallThreshold] consecutive rejected anchors) and decays it when an
- *    anchor is accepted. Bounded by [maxPerturbationStrength].
- *
- *  - Falls back to a full random restart when the population is empty — same behaviour
- *    as [AdaptivePerturbationRestart] before the first feasible.
+ *  - [populationSize]: incumbents tracked; an accepted anchor replaces the worst.
+ *  - [acceptance]: decides whether a feasible candidate joins, compared against the worst member.
+ *  - [adaptivePerturbation]: raises [perturbationStrength] after [adaptiveStallThreshold] consecutive rejections,
+ *    up to [maxPerturbationStrength], and lowers it on acceptance.
  */
 class IteratedLocalSearchRestart(
     /** Steps without improvement before a restart. */
@@ -48,30 +32,16 @@ class IteratedLocalSearchRestart(
     val adaptiveStallThreshold: Int = 3,
     val maxPerturbationStrength: Int = 50,
     val populationSize: Int = 1,
-    /** Probability per restart of generating the anchor via crossover of two random
-     *  population members instead of single-anchor perturbation. Ignored when
-     *  `populationSize < 2`; 0.0 disables crossover. */
+    /** Probability per restart of building the anchor by crossover of two members; needs `populationSize >= 2`. */
     val crossoverRate: Double = 0.0,
-    /** How crossover combines two parents' values per variable. [CrossoverBias.Uniform]
-     *  (default) flips a fair coin; [CrossoverBias.BetterBiased] weights toward the
-     *  parent with the lower objective. Only consulted when [crossoverRate] > 0 and a
-     *  crossover restart fires. */
+    /** How crossover picks each variable's parent. */
     val crossoverBias: CrossoverBias = CrossoverBias.Uniform,
-    /** Perturbation kind for the kick from a feasible anchor. [PerturbationKind.Uniform]
-     *  scatters single-variable mutations across the problem; [PerturbationKind.BasinHopping]
-     *  randomises every variable of a small set of randomly-picked factors, producing a
-     *  coordinated jump biased toward escaping the current basin. */
+    /** Kick applied from a feasible anchor. */
     val perturbationKind: PerturbationKind = PerturbationKind.Uniform,
-    /** When true, crossover transfers entire factor scopes at once instead of mixing
-     *  per-variable, preserving co-adapted assignments that uniform recombination would
-     *  shred. */
+    /** Crossover copies whole factor scopes, preserving co-adapted assignments. */
     val linkageAware: Boolean = false,
-    /** Optional contextual-bandit acceptance: when non-null, the accept/reject of a feasible
-     *  anchor is decided by any 2-arm kumulant [ContextualBandit] (arm 0 = accept, 1 = reject) over
-     *  context features (margin vs the population's worst and best, stall fraction) instead of the
-     *  fixed [acceptance] criterion. The bandit is rewarded by whether the population best improved
-     *  by the next candidate anchor, so it learns *when* drifting through worse basins pays off. The
-     *  [acceptanceBandit] factory builds the default; null (default) keeps the fixed criterion. */
+    // Replaces acceptance when set: arm 0 accepts, arm 1 rejects, rewarded when the population best improves by
+    // the next candidate anchor.
     private val acceptanceBandit: ContextualBandit? = null,
 ) : RestartPolicy {
 
@@ -80,15 +50,13 @@ class IteratedLocalSearchRestart(
         require(crossoverRate in 0.0..1.0) { "crossoverRate must be in [0, 1], got $crossoverRate" }
     }
 
-    /** Incumbents sorted by ascending objective (index 0 best, last worst), at most [populationSize]. */
+    // Ascending objective, index 0 best.
     private val population: MutableList<Incumbent> = ArrayList(populationSize)
     var perturbationStrength: Int = initialPerturbationStrength
         private set
     private var stallCount: Int = 0
 
-    /** Last completed engine-prepared restart's input-change result for unconditional AllDifferent
-     *  boards. `null` denotes no completed observed restart, including unanchored and non-board runs.
-     *  The outcome is pending while a sliced greedy-repair pass is suspended. */
+    /** Input-change result of the last completed AllDifferent board restart; null when none completed. */
     var lastBoardRestartOutcome: BoardRestartOutcome? = null
         private set
     internal var changedBoardRestarts = 0L
@@ -96,8 +64,7 @@ class IteratedLocalSearchRestart(
     internal var declinedBoardRestarts = 0L
         private set
 
-    // Pending bandit decision, rewarded at the next candidate anchor by whether the population best
-    // improved since (delayed credit, the standard meta-bandit signal). -1 = nothing pending.
+    // Credited at the next candidate anchor; -1 when nothing is pending.
     private var pendingArm: Int = -1
     private var pendingContext: DoubleArray? = null
     private var pendingBestBefore: Double = Double.POSITIVE_INFINITY
@@ -115,11 +82,8 @@ class IteratedLocalSearchRestart(
 
     override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= maxFlipsBeforeRestart
 
-    /** Drop the tracked incumbents and reset perturbation/adaptation state. A reused policy instance
-     *  must not carry incumbents — or their variable arity — across independent solves, else the
-     *  anchor/crossover paths index a stale sample against a different problem's dimensions. The
-     *  learned [acceptanceBandit] weights are intentionally kept; only the pending, half-credited
-     *  decision is cleared. */
+    /** Drops incumbents and adaptation state so a reused policy never indexes a stale sample against another
+     *  problem; learned bandit weights are kept. */
     override fun reset() {
         population.clear()
         stallCount = 0
@@ -165,9 +129,7 @@ class IteratedLocalSearchRestart(
         }
     }
 
-    /** Decide accept/reject via the contextual bandit, first crediting the previous decision by
-     *  whether the population best improved since it was made. The first candidate (empty
-     *  population) is always accepted to seed the population. */
+    // The first candidate is always accepted to seed the population.
     private fun banditAccept(bandit: ContextualBandit, objective: Double, worstObjective: Double): Boolean {
         val bestBefore = population.firstOrNull()?.objective ?: Double.POSITIVE_INFINITY
         pendingContext?.let { ctx ->
@@ -186,8 +148,6 @@ class IteratedLocalSearchRestart(
         return arm == ACCEPT_ARM
     }
 
-    /** Context for the acceptance bandit: how the candidate compares to the population's worst and
-     *  best incumbents, and how deep the current stall is — all normalised to roughly [-1, 1]. */
     private fun acceptanceFeatures(objective: Double, worstObjective: Double, bestObjective: Double): DoubleArray {
         val vsWorst = if (worstObjective.isFinite()) (worstObjective - objective) / (abs(worstObjective) + 1.0) else 1.0
         val vsBest = if (bestObjective.isFinite()) (bestObjective - objective) / (abs(bestObjective) + 1.0) else 0.0
@@ -197,8 +157,7 @@ class IteratedLocalSearchRestart(
 
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
         lastBoardRestartOutcome = null
-        // Crossover restart: recombine two random population members; skips perturbation since
-        // crossover itself diversifies. Only fires with ≥2 incumbents.
+        // Crossover itself diversifies, so it skips perturbation.
         if (population.size >= 2 && state.rng.nextDouble() < crossoverRate) {
             val (parentA, parentB) = pickTwoDistinct(state.rng)
             val probA = crossoverBias.probParentA(parentA.objective, parentB.objective)
@@ -238,10 +197,7 @@ class IteratedLocalSearchRestart(
         return Sample(bools, ints)
     }
 
-    /** Pick parent A's value at index [i] with probability [probA], falling back to the
-     *  other parent when the chosen one is too short. Incumbents captured at different
-     *  arities within one solve can differ in array length, so neither parent is a safe
-     *  bound for the child (sized from the problem). */
+    // Incumbents captured at different arities can differ in length, so a short parent falls back to the other.
     private fun pickBool(a: Sample, b: Sample, i: Int, probA: Double, rng: Random): Boolean {
         val preferA = rng.nextDouble() < probA
         return when {
@@ -264,10 +220,7 @@ class IteratedLocalSearchRestart(
         }
     }
 
-    /** Linkage-aware crossover: copy entire factor scopes from one parent at a time.
-     *  Each factor's bool+int scope is the linkage group, copied together from one parent.
-     *  A variable in several scopes takes the last factor's pick; a variable in no scope
-     *  falls back to a per-variable coin flip. */
+    // A variable in several scopes takes the last factor's pick; one in no scope takes a per-variable coin flip.
     private fun linkageAwareCrossover(
         state: LocalSearchState,
         a: Sample,
@@ -328,9 +281,8 @@ class IteratedLocalSearchRestart(
         private const val ACCEPT_ARM = 0
         private const val ACCEPT_FEATURES = 3
 
-        /** A 2-arm (accept / reject) contextual bandit over the acceptance features: Bayesian linear
-         *  regression + [MultivariateGaussian] Thompson posterior. Pass to
-         *  [IteratedLocalSearchRestart]'s `acceptanceBandit`. */
+        /** Accept/reject contextual bandit: Bayesian linear regression with a [MultivariateGaussian] Thompson
+         *  posterior. */
         fun acceptanceBandit(
             seed: Long = 0L,
             exploration: Double = 1.0,

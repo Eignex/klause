@@ -5,14 +5,12 @@ import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.source.CorpusSelection
 import kotlin.random.Random
 
-/** A selected problem and the suite it was selected from, which with [ProblemRef.name] names it exactly. */
 internal data class SelectedProblem(val suite: String, val ref: ProblemRef, val defaultPerFamily: Int? = null) {
-    /** The family per-family caps count in: the provider's own grouping, kept apart per suite. */
+    // The provider's own grouping, kept apart per suite.
     val family: String get() = "$suite:${ref.family ?: ref.name.substringBefore('/')}"
 }
 
-/** The source collection [ref] comes from, the `collection` klause-lab files its reference results under: the
- *  fetched collection's id, or a path-derived label for a vendored or in-code problem. */
+// The `collection` klause-lab files reference results under.
 internal fun collectionOf(ref: ProblemRef): String = when (val s = ref.source) {
     is ProblemSource.Prepared -> "prepared"
     is ProblemSource.External -> s.collection.id
@@ -23,8 +21,8 @@ internal fun collectionOf(ref: ProblemRef): String = when (val s = ref.source) {
 }
 
 internal object BenchSelection {
-    /** Admit only the round-robin prefix needed for a positive overall cap. Format balancing needs every
-     * family's admitted size for its water-fill, so it keeps the complete per-family selection. */
+    // Admits only the round-robin prefix a positive overall cap needs. Format balancing needs every family's admitted
+    // size for its water-fill, so it keeps the complete per-family selection.
     fun select(
         candidates: List<SelectedProblem>,
         perFamily: Int?,
@@ -59,12 +57,8 @@ internal object BenchSelection {
         }
     }
 
-    /**
-     * Cap each family of [candidates] at [perFamily], or at its suite's default when that is null, keeping the
-     * head of the family or, with a [seed], a seeded sample of it. [accept] runs only on the instances a cap
-     * reaches, in that order, so an expensive filter (reading each source for its objective) fills the cap with
-     * accepted instances without reading the whole corpus. Families keep their first-seen order.
-     */
+    // accept runs only on the instances a cap reaches, in order, so an expensive filter fills the cap without reading
+    // the whole corpus.
     fun capFamilies(
         candidates: List<SelectedProblem>,
         perFamily: Int?,

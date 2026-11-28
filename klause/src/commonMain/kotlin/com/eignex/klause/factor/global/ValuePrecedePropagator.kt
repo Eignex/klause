@@ -10,7 +10,6 @@ import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.propagation.lazyReason
 import com.eignex.util.collections.IntArrayList
 
-/** CP propagation logic for `value_precede`. */
 internal class ValuePrecedePropagator(
     val boolVars: IntArray,
     val intVars: IntArray,

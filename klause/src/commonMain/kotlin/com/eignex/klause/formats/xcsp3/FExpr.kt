@@ -33,11 +33,9 @@ sealed interface FExpr {
         /** Parse text into an [FExpr] tree. */
         fun parse(s: String): FExpr = Parser(s).parseFull()
 
-        /** True when [text] uses only scalar `%<digits>` group placeholders — no `%...` splice, `%i..%j`
-         *  range, or bare `%`. Such a template can be parsed once and reused across a group's instances by
-         *  substituting tokens into the [FExpr] tree ([substitute]) instead of re-expanding and re-parsing
-         *  the string per row; the range/splice forms produce space-joined token lists that only a
-         *  string expansion can place, so they keep the general path. */
+        /** True when [text] uses only scalar `%<digits>` group placeholders, so it can be parsed once and
+         *  filled per row by [substitute]. A `%...` splice, `%i..%j` range or bare `%` expands to a token
+         *  list that only string expansion can place. */
         fun isScalarTemplate(text: String): Boolean {
             var i = 0
             while (i < text.length) {

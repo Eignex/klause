@@ -10,10 +10,8 @@ import com.eignex.klause.util.ExecutionControl
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
-/**
- * LP-owned template and compact root layout retention. Compatible views share a namespace token
- * and template publication slots. The [rowScope] also binds the ordered factor identities.
- */
+// Compatible views share a namespace token and template publication slots; rowScope also binds the ordered
+// factor identities.
 internal class LpPreparationCache private constructor(
     private val namespace: LpPreparationNamespace,
     private val rowScope: Any,
@@ -27,18 +25,12 @@ internal class LpPreparationCache private constructor(
         AtomicReference<LpSparseRootLayout?>(null),
     )
 
-    /**
-     * Shares this namespace and its publication slots with a compatible view under a fresh row layout
-     * token, so the next preparation validates that view's actual factor identities.
-     */
+    // A fresh row layout token makes the next preparation validate the view's own factor identities.
     fun inherited(): LpPreparationCache = LpPreparationCache(namespace, Any(), sourceSlot, finiteSlot,
         AtomicReference<LpSparseRootLayout?>(null))
 
-    /**
-     * Shares everything, including the row layout token, which lets template rebinding skip its
-     * per-factor identity scan. Only a caller that has itself checked that the view's ordered factors
-     * are identical to this cache's view may use it.
-     */
+    // Sharing the row layout token lets template rebinding skip its identity scan, so only a caller that
+    // checked the view's ordered factors are identical may use it.
     fun inheritedForIdenticalFactors(): LpPreparationCache =
         LpPreparationCache(namespace, rowScope, sourceSlot, finiteSlot, sparseRootSlot)
 
@@ -148,7 +140,6 @@ internal class LpSparseRootLayout(
     fun matches(source: Problem, target: LinearObjective): Boolean = source === problem && target === objective
 }
 
-/** Prepares or revalidates this view's LP source templates in its inherited preparation cache. */
 internal fun PreparedFactorProjections.prepareLpTemplates(
     objective: LinearObjective?,
     token: ExecutionControl,
@@ -160,7 +151,7 @@ internal fun PreparedFactorProjections.prepareLpTemplates(
 ): LpPreparationTemplates? =
     lpPreparation.prepare(this, objective, token, reuseIndexes, reuseMetadata, earned, compileBoundRows, onWork)
 
-/** Funds later earned preparation with completed construction work on this view. */
+// Funds later earned preparation with completed construction work.
 internal fun PreparedFactorProjections.recordLpConstruction(
     completedUnits: Long,
     token: ExecutionControl,

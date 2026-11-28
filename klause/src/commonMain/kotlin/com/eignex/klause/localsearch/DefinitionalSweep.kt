@@ -27,18 +27,13 @@ import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.MutableIntObjectMap
 
 /**
- * Topologically ordered functional definitions consumed by [LocalSearchSolver]. The engine-side,
- * format-agnostic DAG covers the whole model: integer definitions through [SweepNode.IntDef],
- * Boolean reifications and channels, set membership, conjunction/disjunction, and variable-index
- * element access. Frontends supply neutral source definition hints and Boolean-fold roles.
- *
- * Sweeping evaluates defined variables from free variables so local search need only repair the
- * remaining constraints. [network] maintains those definitions incrementally after each move.
- * Integer results are clamped to their domains; out-of-range element accesses leave outputs
- * untouched. Affected factors remain violated, so the sweep cannot fabricate feasibility.
+ * Topologically ordered functional definitions over integer, Boolean, set-membership and element outputs. Sweeping
+ * evaluates defined variables from free ones so local search repairs only the remaining constraints. Integer results
+ * are clamped to their domains and an out-of-range element access leaves its output untouched, so affected factors
+ * stay violated and the sweep cannot fabricate feasibility.
  */
 class DefinitionalSweep internal constructor(
-    /** Defining nodes in topological order — every node's inputs are free vars or earlier nodes. */
+    // Every node's inputs are free vars or earlier nodes.
     private val nodes: List<SweepNode>,
 ) {
     private val maintainedBools = IntHashSet().also { defined ->
@@ -81,20 +76,16 @@ class DefinitionalSweep internal constructor(
 
     /** Factory for sweeps inferred from the factor IR. */
     companion object {
-        /** Materialize source definition hints in this consumer's node and dependency representation.
-         * Constraints remain enforced; competing outputs, cyclic cones and outputs admitting the
-         * minimum-word no-write sentinel stay searched. ExecutionControl discards the whole view. */
+        /** Sweep from source definition [hints]; competing outputs, cyclic cones and outputs admitting
+         *  [SweepNode.NO_WRITE] stay searched. Null when nothing applies or [cancellation] stops it. */
         fun fromSource(
             problem: Problem,
             hints: List<DefinitionHint>,
             cancellation: ExecutionControl = ExecutionControl.Never,
         ): DefinitionalSweep? = sourceDefinitionSweep(problem, hints, cancellation)
 
-        /** Infer definitions using the source domains to recognize hinted binary literal channels.
-         * Unique unit unary predicates used only by those channels are maintained with them.
-         * Hinted native [com.eignex.klause.factor.table.Element] results follow their indexes and selected cells,
-         * and [com.eignex.klause.factor.arithmetic.DivMod] quotients and remainders follow their operands.
-         * Competing definitions and cyclic cones remain searched. */
+        /** Infers definitions from [problem], adding hinted literal channels, element results and div/mod
+         *  outputs. Competing definitions and cyclic cones stay searched. */
         fun infer(
             problem: Problem,
             definedHints: IntArray = IntArray(0),
@@ -147,19 +138,12 @@ class DefinitionalSweep internal constructor(
             return if (cancellation() || ordered.isEmpty()) null else DefinitionalSweep(ordered)
         }
 
-        /** Infer a sweep from the factor IR, so local search derives functionally-defined vars from the
-         *  decision vars instead of searching them. Supported sources:
-         *  - every integer [Abs] defines its output from its operand;
-         *  - every `Product(a, b, out)` defines `out = a·b` (a product always determines its output);
-         *  - every [Power] with an integer base defines its output from that base;
-         *  - a `Linear` equality is oriented to define var v ONLY when v is in [definedHints] — the
-         *    front-end's `defines_var` info (e.g. a `(eq, v)` sum). Orienting a bare equality without that
-         *    hint could pick a decision var as the output and derive it to an infeasible value, so it is
-         *    never done unhinted;
-         *  - hinted min/max expression cones and their affine operands and aliases.
-         *  - hinted affine indexes read by Elements or unit unary equality predicates.
-         *  A var claimed by more than one definition, or transitively by itself, is left searched. Nodes
-         *  come out in topological order; returns null when nothing is definable. */
+        /**
+         * Infers definitions from the factor IR: integer [Abs], `Product` and integer-base [Power] outputs, plus
+         * hinted linear equalities, extrema and affine indexes. An unhinted equality is never oriented, since it
+         * could derive a decision var to an infeasible value. A var claimed twice or by its own cone stays searched;
+         * null when nothing is definable.
+         */
         fun infer(
             factors: Array<Factor>,
             numIntVars: Int,
@@ -214,13 +198,9 @@ class DefinitionalSweep internal constructor(
                     if (cancellation.definitionStopped()) return null
                     if (v in 0 until numIntVars) hinted[v] = true
                 }
-                // Deriving a hinted sum var is always sound but only pays off when it sits atop a functional
-                // cone that bottoms out at lightly-constrained decision vars — the objective-decomposition
-                // shape (e.g. `c = Σ x_i·x_j`, then `c²` in the objective). Two guards keep it there:
-                //  - its sole non-`Product` occurrence is its own definer (it feeds nothing but the objective's
-                //    product terms), and
-                //  - every summand is itself a `Product` result (the sum caps a product cone, not a layer of
-                //    feasibility-critical decision variables whose exclusion from search stalls repair).
+                // A hinted sum is derived only atop a product cone: its sole non-product occurrence is its definer
+                // and every summand is a product result. Otherwise deriving it removes feasibility-critical
+                // decision vars from search and stalls repair.
                 val nonProductOcc = IntArray(numIntVars)
                 for (f in factors) {
                     if (cancellation.definitionStopped()) return null
@@ -354,7 +334,7 @@ class DefinitionalSweep internal constructor(
         }
     }
 
-    /** Build a gradient view of a finite canonical objective using this consumer's definitions. */
+    /** Incremental view of [objective] over this sweep's definitions, or null when none applies. */
     fun functionalObjective(objective: LinearObjective): IncrementalObjective? =
         functionalObjective(objective, ExecutionControl.Never)
 
@@ -393,10 +373,9 @@ class DefinitionalSweep internal constructor(
     }
 
     /**
-     * Build a [FunctionalObjective] `Σ termCoeffs·terms + Σ boolTermCoeffs·[boolTerm holds] + constant`
-     * in the direction given by [minimize] over this sweep's int and bool cones, so local search descends the
-     * objective on the decision (leaf) vars rather than the functionally-defined ones. Returns null
-     * when no term is defined here or a reachable definition has no exact objective evaluator.
+     * Objective `Σ termCoeffs·terms + Σ boolTermCoeffs·[boolTerm holds] + constant` over this sweep's cones, so
+     * local search descends it on the leaf vars. Null when no term is defined here or a reachable definition has
+     * no exact evaluator.
      */
     fun functionalObjective(
         terms: IntArray,
@@ -691,8 +670,7 @@ class DefinitionalSweep internal constructor(
                 domains[out].clamp(if (assignment.boolValue(b)) 1L else 0L)
         }
 
-        /** `out ↔ ⋀ ins` / `out ↔ ⋁ ins` over bool *literals* (polarity-encoded via [Lit], the
-         *  FlatZinc compiler's bool-array element form — negated members are legal). */
+        /** `out ↔ ⋀ ins` or `out ↔ ⋁ ins` over polarity-encoded [Lit] literals. */
         class BoolFold(
             /** The defined output var id. */
             override val out: Int,
@@ -796,14 +774,9 @@ class DefinitionalSweep internal constructor(
         InvariantNetwork.preparation(nodes, numIntVars, numBoolVars)
 
     /**
-     * Evaluate every defined var bottom-up from the current values in [assignment] — then
-     * evaluate the remaining **reification aux bools**: klause's own lowering introduces
-     * `aux ↔ (Σ c·x op b)` Tseitin factors outside the annotation graph, and the aux is just as
-     * definitional, so each aux in [factors] is set to the actual truth of its linear (skipping
-     * [frozenBool] vars; consistent with any [SweepNode.CmpReif] result since both evaluate the
-     * same final int values). Pure evaluation on both halves; factors *reading* a defined var
-     * stay subject to ordinary search. Callers must recompute incremental solver state
-     * afterwards.
+     * Evaluates every defined var bottom-up from [assignment], then sets each reified-linear aux Boolean in
+     * [factors] that no node maintains and [frozenBool] leaves free to the truth of its row. Factors reading a
+     * defined var stay searched; callers must recompute incremental solver state afterwards.
      */
     fun sweep(
         assignment: Assignment,

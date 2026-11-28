@@ -9,17 +9,12 @@ import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.subExact
 
 /**
- * Exact minimum-cost bipartite assignment over [Long] costs — the AllDifferent Lagrangian
- * subproblem. Assigns each of [numVars] variables a distinct value from `0 until numValues`, minimizing
- * the total cost of the chosen `(variable, value)` options, where an option's cost is supplied by
- * [addOption] and absent options are forbidden.
+ * Exact minimum-cost bipartite assignment over [Long] costs, the AllDifferent Lagrangian subproblem: each of
+ * [numVars] variables takes a distinct value from `0 until numValues` among the options given by [addOption].
  *
- * Solved as a successive-shortest-paths min-cost flow: a source feeds one unit to each variable,
- * each variable connects to its allowed values at the option cost, and each value feeds one unit to
- * the sink. Shortest paths are found with SPFA (Bellman–Ford queue) so negative option costs — which
- * arise once Lagrangian multipliers adjust the objective coefficients — are handled directly. All
- * arithmetic is exact; an overflow surfaces as [CheckedLongOverflowException] for the caller to treat as
- * "skip the Lagrangian bound at this node".
+ * Solved as successive-shortest-paths min-cost flow with SPFA (Bellman–Ford queue), so the negative option costs
+ * Lagrangian multipliers produce are handled directly. An overflow surfaces as [CheckedLongOverflowException],
+ * for the caller to skip the bound at this node.
  */
 internal class MinCostAssignment(private val numVars: Int, private val numValues: Int) {
     private val source = 0
@@ -55,23 +50,17 @@ internal class MinCostAssignment(private val numVars: Int, private val numValues
         head[v] = to.size - 1
     }
 
-    /** Allow variable [varIdx] to take value [valueIdx] at the given [optionCost]. */
     fun addOption(varIdx: Int, valueIdx: Int, optionCost: Long) {
         addEdge(varNode(varIdx), valueNode(valueIdx), 1, optionCost)
     }
 
-    /** A complete assignment (all variables matched) at [cost], or [infeasible] when none exists. */
     class Result(val feasible: Boolean, val cost: Long, val assignedValue: IntArray) {
         companion object {
             fun infeasible(): Result = Result(false, 0L, emptyIntArray())
         }
     }
 
-    /**
-     * Solve. Returns the optimal complete assignment, or [Result.infeasible] when fewer than
-     * [numVars] variables can be matched (which, for an AllDifferent subproblem, proves the node
-     * infeasible). Throws [CheckedLongOverflowException] if the accumulated cost exceeds 64 bits.
-     */
+    // Infeasible when fewer than numVars variables can be matched, which proves an AllDifferent node infeasible.
     fun solve(): Result {
         var total = 0L
         val prevEdge = IntArray(nodeCount)
@@ -102,7 +91,7 @@ internal class MinCostAssignment(private val numVars: Int, private val numValues
         return Result(true, total, assigned)
     }
 
-    /** SPFA shortest path from source by cost; fills [prevEdge]; null if the sink is unreachable. */
+    // SPFA shortest path from source by cost, filling prevEdge; null if the sink is unreachable.
     private fun shortestPath(prevEdge: IntArray): Long? {
         val dist = LongArray(nodeCount)
         val reached = BooleanArray(nodeCount)

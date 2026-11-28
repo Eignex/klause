@@ -5,10 +5,7 @@ import com.eignex.klause.localsearch.MoveSink
 import kotlin.jvm.JvmInline
 
 /**
- * A named, parameterised generator of candidate moves — the single place a given candidate kind is
- * produced (a violated-factor repair, a frontier step, a structured feasibility move). Local-search
- * strategies draw their candidates from these shared sources rather than re-implementing the
- * generation loops.
+ * A named, parameterised generator of one kind of candidate move, shared by local-search strategies.
  *
  * Contract:
  *  - Pure with respect to the assignment, domains, violations and factor degrees. Candidates enter

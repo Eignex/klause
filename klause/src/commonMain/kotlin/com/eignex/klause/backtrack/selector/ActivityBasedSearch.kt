@@ -7,15 +7,9 @@ import com.eignex.util.collections.IndexedMaxHeap
 import com.eignex.util.collections.IntArrayList
 import kotlin.random.Random
 
-/**
- * Activity-based search (Michel and Van Hentenryck, "Activity-Based Search for Black-Box Constraint
- * Programming Solvers", CPAIOR 2012, https://doi.org/10.1007/978-3-642-29828-8_15). Picks `argmax activity(v) / dom(v)`
- * over unpinned variables. [PropagationResult.Implied] bumps variables forced into singletons;
- * partial domain reductions do not contribute.
- *
- * Decay uses geometric increment growth and rescales near [Double] overflow. Higher [decay]
- * retains older evidence. Activities survive [onRestart] unless [resetOnRestart] is true.
- */
+// Activity-based search (Michel and Van Hentenryck, "Activity-Based Search for Black-Box Constraint
+// Programming Solvers", CPAIOR 2012, https://doi.org/10.1007/978-3-642-29828-8_15): `argmax activity(v) /
+// dom(v)`. Only variables forced into singletons are bumped; partial domain reductions do not contribute.
 internal class ActivityBasedSearch(
     private val decay: Double = 0.999,
     private val resetOnRestart: Boolean = false,
@@ -70,8 +64,7 @@ internal class ActivityBasedSearch(
     }
 
     override fun onCommit(varRef: VarRef) {
-        // Implicit decay: grow increment so future bumps are larger (equivalent to dividing
-        // every prior activity by `decay`, without touching the keys). Same trick as VSIDS.
+        // Implicit decay as in VSIDS: growing the increment divides every prior activity by `decay`.
         increment /= decay
         if (increment > rescaleThreshold) rescaleAll()
     }

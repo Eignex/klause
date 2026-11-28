@@ -8,40 +8,23 @@ import com.eignex.util.collections.IndexedMaxHeap
 import com.eignex.util.collections.IntArrayList
 import kotlin.random.Random
 
-/**
- * Domain-over-weighted-degree (Boussemart, Hemery, Lecoutre and Sais, "Boosting Systematic Search by
- * Weighting Constraints", ECAI 2004, pp. 146–150). Maintains a per-factor *failure weight* that is bumped
- * every time the factor participates in a conflict — read off
- * [PropagationResult.Unsat.conflictFactors], which carries the full propagation-graph
- * attribution. The variable score is then
- *     wdeg(v) / dom(v)
- * where `wdeg(v) = Σ factor_weights[f]` over every factor mentioning `v`. Pick the
- * variable with the highest score; first-fail with a conflict-driven prior on which
- * constraints have proven hard so far.
- *
- * Compared to [Vsids]: dom/wdeg attributes "hardness" to *constraints* (so two variables
- * touched by the same hard constraint are both prioritised), while VSIDS attributes
- * directly to *variables*.
- *
- * Weights persist across [onRestart].
- * Resizes the factor-weights array across problems for instance reuse.
- */
+// Domain-over-weighted-degree (Boussemart, Hemery, Lecoutre and Sais, "Boosting Systematic Search by
+// Weighting Constraints", ECAI 2004, pp. 146–150): `wdeg(v) / dom(v)`, where each factor in a conflict's
+// propagation-graph attribution gains weight 1. Weights persist across restarts.
 internal class DomWdeg : VariableSelector {
 
     override fun fresh() = DomWdeg()
 
     private var factorWeights: DoubleArray = DoubleArray(0)
 
-    // Combined bool+int heap keyed on `wdeg(v) = Σ factorWeights[f]`; the dom(v) divider
-    // is applied at pick time via an upper-bound prune. See [pickByActivityWithDomDivider].
+    // Keyed on `wdeg(v)`; the dom(v) divider applies at pick time.
     private var heap: IndexedMaxHeap? = null
     private var problemRef: Problem? = null
     private var numBoolCached: Int = 0
     private var numIntCached: Int = 0
     private val pickSkipBuffer = IntArrayList(16)
 
-    /** Conflict bumps that arrived before the first [pick] (so before we'd captured the
-     *  problem reference). Applied as part of the next [pick]'s heap init. */
+    // Conflict bumps that arrive before the first pick has captured the problem.
     private val pendingBumps = IntArrayList(8)
 
     private fun ensureInitialized(session: PropagationSession) {
@@ -89,8 +72,6 @@ internal class DomWdeg : VariableSelector {
     }
 
     override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
-        // conflictFactors comes from a backward walk of the reason trail, so every contributing
-        // constraint gets +1, not just the single failing one.
         val problem = problemRef
         for (fid in unsat.conflictFactors) {
             if (problem == null) {
@@ -102,7 +83,6 @@ internal class DomWdeg : VariableSelector {
         }
     }
 
-    /** Push the `+1` weight change on factor [fid] into every var in its scope's heap key. */
     private fun applyFactorBump(problem: Problem, fid: Int) {
         val h = heap ?: return
         val factor = problem.factors[fid]

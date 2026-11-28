@@ -9,7 +9,7 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.Locale
 
-/** How a record's claims were judged: the solver's own report, unchecked by the bench. */
+// The solver's own report, unchecked by the bench.
 internal const val REPORTED_RESULT_POLICY = "reported-result-v1"
 
 internal object SolveEvidence {
@@ -93,7 +93,6 @@ internal object SolveEvidence {
         return witness?.takeIf { it.length <= maxChars }
     }
 
-    /** The assignments of the last complete DZN solution in [raw], from its first assignment line on. */
     fun miniZincSolution(raw: String): String? {
         val complete = raw.split("----------").dropLast(1).lastOrNull() ?: return null
         val lines = complete.lineSequence().filter { line ->
@@ -104,9 +103,8 @@ internal object SolveEvidence {
         return if (start < 0) null else lines.drop(start).joinToString("\n")
     }
 
-    /** The last complete DZN solution, mapped by [modelOutput] when given, with the `% klause-exact:`,
-     *  `% klause-coordinate:` and `% klause-float-` lines of that solution appended; an exact-coordinate-only
-     *  solution keeps those lines alone. */
+    // Appends the solution's `% klause-exact:`, `% klause-coordinate:` and `% klause-float-` lines; an
+    // exact-coordinate-only solution keeps those lines alone.
     private fun miniZincWitness(raw: String, modelOutput: ((String) -> String)?): String? = (
         miniZincSolution(raw)?.let { modelOutput?.invoke(it) ?: it }
             ?: if (exactCoordinates(raw) != null) "" else null
@@ -123,7 +121,6 @@ internal object SolveEvidence {
         ?.lineSequence()?.filter { it.startsWith("% klause-exact: ") || it.startsWith("% klause-coordinate: ") }
         ?.map { it.substringAfter(": ") }?.toList()?.takeIf { it.isNotEmpty() }?.joinToString("\n")
 
-    /** The last complete XCSP3 `<instantiation>` of the `v ` lines, without their prefix. */
     private fun xcspInstantiation(raw: String): String? {
         var candidate: StringBuilder? = null
         var witness: String? = null

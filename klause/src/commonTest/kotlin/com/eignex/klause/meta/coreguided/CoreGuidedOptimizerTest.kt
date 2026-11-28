@@ -76,8 +76,8 @@ class CoreGuidedOptimizerTest {
 
     @Test
     fun `weighted overlapping cores should yield a sample cost matching the bound`() {
-        // Weighted star mutex with distinct weights forcing RC2 weight-splitting on the
-        // shared soft. Optimum: keep the heavy b0 (w=6), violate b1+b2 (1+1) = cost 2.
+        // Distinct weights force weight splitting on the shared soft. Optimum: keep the heavy b0 (w=6),
+        // violate b1+b2 (1+1) = cost 2.
         val problem = Problem(
             numBoolVars = 3,
             numIntVars = 0,

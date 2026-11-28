@@ -28,14 +28,9 @@ import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.util.ExecutionControl
 import java.io.File
 
-/**
- * A parsed instance lifted into klause's solver representation, plus an optional objective in the
- * minimise-canonical form the runner expects, and whether the source maximises it. The XCSP3 and SMT-LIB
- * parsers negate a maximised objective themselves; an MPS objective arrives in its source sense.
- *
- * The model is built on first read: a format whose in-process model needs finite bounds still reports its
- * sense for an instance only the subprocess route can solve.
- */
+// The objective is minimization-canonical: the XCSP3 and SMT-LIB parsers negate a maximized objective themselves, an
+// MPS objective arrives in its source sense. The model is built on first read, so a format whose in-process model needs
+// finite bounds still reports its sense for an instance only the subprocess route can solve.
 internal class Ingested(
     private val model: Lazy<Problem>,
     val objective: LinearObjective? = null,
@@ -43,14 +38,10 @@ internal class Ingested(
 ) {
     constructor(problem: Problem, objective: LinearObjective? = null) : this(lazyOf(problem), objective)
 
-    /** The in-process model; throws for one the in-process frontend cannot build. */
+    // Throws when the in-process frontend cannot build the model.
     val problem: Problem get() = model.value
 }
 
-/**
- * Dispatches [Format] to its in-process parser. Formats requiring external compilation
- * report [inProcess] as false and resolve through their runner.
- */
 internal interface ProblemFormat {
     val format: Format
     val inProcess: Boolean
@@ -87,13 +78,11 @@ internal object JsonSchemaFormat : ProblemFormat {
     override fun ingest(file: File) = Ingested(JsonSchema.parse(CorpusFiles.readText(file)).compile().problem)
 }
 
-/** Compiled by the `minizinc` CLI, then parsed in-process — see `runner.MiniZincRunner`. */
 internal object MiniZincFormat : ProblemFormat {
     override val format = Format.MINIZINC
     override val inProcess = false
 }
 
-/** XCSP3 parsing into a solver problem and minimize-canonical objective. */
 internal object Xcsp3Format : ProblemFormat {
     override val format = Format.XCSP3
     override val inProcess = true
@@ -107,7 +96,6 @@ internal object Xcsp3Format : ProblemFormat {
     }
 }
 
-/** SMT-LIB source setup for the finite in-process benchmark adapter. */
 internal object SmtLibFormat : ProblemFormat {
     override val format = Format.SMTLIB
     override val inProcess = true
@@ -140,9 +128,7 @@ internal object SmtLibFormat : ProblemFormat {
     }
 }
 
-/** MPS (MIP) ingest → klause integer model. Parsing and lowering live in `formats.mps`; this wrapper
- *  normalises to the minimise-canonical objective the runner expects (an MPS `OBJSENSE MAX`
- *  negates every coefficient). */
+// An MPS `OBJSENSE MAX` negates every coefficient to reach the minimization-canonical objective.
 internal object MpsFormat : ProblemFormat {
     override val format = Format.MPS
     override val inProcess = true

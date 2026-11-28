@@ -15,13 +15,7 @@ internal class ArrayMinMaxPropagator(
     val intVars: IntArray,
 ) : Propagator {
 
-    /**
-     * Advisor subscription: `propagate` tightens `result` against the operands' bounds and
-     * pushes `result`'s bound back onto every operand — reading only `min`/`max`. An interior hole
-     * never moves a `min`/`max`, so the factor subscribes to [IntEvent.LB_RAISED] /
-     * [IntEvent.UB_LOWERED] on each variable and skips interior `VALUE_REMOVED` wakes. A repeated
-     * operand is subscribed once.
-     */
+    // Propagation reads only bounds, so interior VALUE_REMOVED wakes are skipped.
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
@@ -88,7 +82,6 @@ internal class ArrayMinMaxPropagator(
         return false
     }
 
-    // The [upper] (else lower) bound atom of each of [vars] that sits inside its root domain.
     private fun bounds(state: PropagationState, vars: IntArray, upper: Boolean): IntArray? {
         val out = IntArrayList()
         for (v in vars) {

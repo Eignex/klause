@@ -6,13 +6,9 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
-/**
- * The source, seed, work, measurement, runtime and build identities of a fixed-work pair. Each facet gathers every
- * claim an arm makes about it, from the planned parameters through the retained record; claims within one arm must
- * agree and at least one must be present, and the arms must agree unless a declared difference [Facet.allowedBy] it.
- */
+// Claims within one arm must agree and at least one must be present; the arms must agree unless a declared difference
+// allows it.
 internal object FixedWorkFacets {
-    /** One identity, its claims within an arm, and the declared differences that let it differ between arms. */
     private class Facet(val name: String, val allowedBy: Set<String>, val claims: (JsonObject) -> List<String?>)
 
     fun check(
@@ -128,7 +124,7 @@ internal object FixedWorkFacets {
         Facet("library fingerprint", setOf("library")) { listOf(details(it, "identity", "libraryFingerprint")) },
     )
 
-    /** Parameters whose agreement the facets already check against the record. */
+    // The facets already check these against the record.
     private val COVERED = setOf(
         "sha256", "source-path", "seed", "unit", "limit", "measurement", "warmups", "recipe", "deadline-seconds",
         "trace-rows",

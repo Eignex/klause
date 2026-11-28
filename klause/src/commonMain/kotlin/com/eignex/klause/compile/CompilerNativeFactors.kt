@@ -22,10 +22,8 @@ import com.eignex.klause.model.Or
 import com.eignex.klause.model.VariableCumulativeExpr
 import com.eignex.util.collections.LongArrayList
 
-/**
- * Allocate the column [spec] declares. An open side keeps the full signed-word box as its finite
- * fallback, so no lane reads an invented endpoint as tighter than the representable range.
- */
+// An open side keeps the full signed-word box as its finite fallback, so no lane reads an invented endpoint
+// as tighter than the representable range.
 internal fun Lowering.declareIntDomain(spec: IntDomainSpec): Int {
     val runs = spec.values
     val domain = if (runs == null) {
@@ -62,10 +60,8 @@ internal fun Lowering.assertLex(expr: LexExpr) {
     factors += LexLess(xs, ys, expr.strict)
 }
 
-/**
- * `lex(x, y) ⟺ x(0) < y(0) ∨ (x(0) = y(0) ∧ lex(x(1..), y(1..)))`, built from the last index inward. A
- * reified order has no native factor, so it lowers through these comparisons.
- */
+// `lex(x, y) ⟺ x(0) < y(0) ∨ (x(0) = y(0) ∧ lex(x(1..), y(1..)))`, built from the last index inward. A
+// reified order has no native factor, so it lowers through these comparisons.
 internal fun lexDecomposition(expr: LexExpr): BoolExpr {
     val last = expr.xs.lastIndex
     var result: BoolExpr = IntCompare(expr.xs[last], if (expr.strict) IntCmpOp.LT else IntCmpOp.LE, expr.ys[last])
@@ -77,10 +73,8 @@ internal fun lexDecomposition(expr: LexExpr): BoolExpr {
     return result
 }
 
-/**
- * Post one native cumulative. An array of literals stays constant; any other array becomes columns, with
- * each column's upper bound as the constant the factor keeps beside it.
- */
+// Literal arrays stay constant; any other array becomes columns, each with its upper bound as the constant
+// the factor keeps beside it.
 internal fun Lowering.assertVariableCumulative(expr: VariableCumulativeExpr) {
     val starts = IntArray(expr.starts.size) { varIdOfLifted(expr.starts[it]) }
     val (durations, durationVars) = constantsOrColumns(expr.durations)
@@ -106,10 +100,6 @@ private fun Lowering.constantsOrColumns(exprs: List<IntExpr>): Pair<LongArray, I
     return LongArray(columns.size) { intDomains[columns[it]].max } to columns
 }
 
-/**
- * Decode [expr]'s factor with this compilation's codecs, rename its local ids to the bound columns and
- * post it unchanged.
- */
 internal fun Lowering.assertFactorConstraint(expr: FactorConstraint) {
     val local = factorCodecs.decodeFromJsonElement(expr.node)
     val bools = IntArray(expr.bools.size) {

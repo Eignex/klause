@@ -73,15 +73,15 @@ internal class FlatZincValues private constructor(
         published = program.publishedReals(boolValue, intValue, ::nearest, publicationNarrowing())
     }
 
-    // A real coordinate as a decimal literal: an algebraic one narrowed to its nearest binary64 value, and one past
-    // binary64 as the largest finite value of its sign, which [rounding] notes.
+    // An algebraic coordinate narrows to its nearest binary64 value; one past binary64 prints as the largest
+    // finite value of its sign, which rounding notes.
     fun realValue(id: Int): Double {
         printed += id
         val value = published?.get(id) ?: nearest(id)
         return if (value.isInfinite()) (if (value > 0) Double.MAX_VALUE else -Double.MAX_VALUE) else value
     }
 
-    // Why a printed [realValue] is not the coordinate's nearest binary64 value, or null when it is.
+    // Why a printed realValue is not the coordinate's nearest binary64 value, or null when it is.
     fun rounding(id: Int): String? = when {
         id !in printed -> null
         published?.get(id)?.let { it != nearest(id) } == true -> "tolerance"

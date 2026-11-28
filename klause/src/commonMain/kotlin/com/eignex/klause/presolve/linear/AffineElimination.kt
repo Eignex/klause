@@ -33,34 +33,18 @@ import com.eignex.util.numbers.subExact
 internal object AffineSingletons {
 
     /**
-     * Affine variable elimination. Eliminates an integer variable `x` defined by an
-     * `n`-term equality `c_x·x + Σ_j c_j·y_j = b` with a **unit** pivot coefficient `|c_x| = 1`, i.e.
-     * `x = B + Σ_j A_j·y_j` where `A_j = −c_x·c_j` and `B = c_x·b`. The defining equality is dropped,
-     * the affine relation is folded into every other [Linear] that mentions `x`, and bounds on the
-     * `y_j` are added so `x` stays inside its declared domain; `x` becomes unconstrained and is
-     * rebuilt from the solution by the steps [asRebuilds] states.
+     * Eliminates an integer `x` defined by an equality `c_x·x + Σ_j c_j·y_j = b`. The definition is dropped,
+     * `x = b/c_x + Σ_j (−c_j/c_x)·y_j` folds into every other [Linear] mentioning `x`, bound rows on the `y_j`
+     * keep `x` in its domain, and `x` is rebuilt by [asRebuilds].
      *
-     * Two-term equalities are the common case (an alias or a one-partner definition); the `n`-term
-     * generalisation projects out an *implied-free* variable defined by a longer sum (e.g. an
-     * auxiliary `x = y1 + y2 − y3` used nowhere a global needs it). The unit-pivot restriction keeps
-     * every folded coefficient integral unconditionally; a **non-unit** pivot is admitted only for an
-     * implied-free (contained) `x` and only when `c_x` divides every other coefficient and the
-     * bound, so `x = b/c_x + Σ_j (−c_j/c_x)·y_j` stays integral for *all* partner assignments. A
-     * non-unit pivot that fails the divisibility test is left to the residue-class doubleton below.
+     * A unit pivot keeps every folded coefficient integral. A non-unit pivot is admitted only for a contained
+     * `x` whose coefficient divides every other coefficient and the bound; the rest go to the residue-class pass.
+     * An alias `x = y` renames `x` in every factor via `Factor.remap`. The rewrite-cost policy also keeps
+     * [ReifiedLinear] channels and unit views through [ComparisonClause]. A single-partner `x = a·y + b` also
+     * projects out of globals accepting `Factor.substituteAffine`; a multi-partner relation folds only into
+     * linear rows.
      *
-     * For the **alias** case `x = y` (`n = 2`, `A = 1`, `B = 0`) the substitution `x → y` is a plain
-     * variable rename, applied to *every* factor via `Factor.remap` regardless of type.
-     * Otherwise the relation folds into every other [Linear], and the rewrite-cost policy also
-     * retains [ReifiedLinear] channels through the fold and unit views through [ComparisonClause].
-     * A **single-partner** `x = a·y + b`
-     * additionally projects out of any non-linear factor that can represent the affine view via
-     * `Factor.substituteAffine` (an Element index shift, a Table column rewrite). A multi-partner
-     * `B + Σ A_j·y_j` only folds into admitted linear rows — a global keyed on `x`'s value as a sum can't
-     * represent it. The contained slice (`x` in no other factor) is the zero-fold special case,
-     * and is what lets an `n`-term definition be projected out.
-     *
-     * Variables in [objectiveIntVars] stay protected unless [objective] supplies an exact objective
-     * whose aliases and translations can be substituted with checked coefficient arithmetic.
+     * Variables in [objectiveIntVars] stay protected unless [objective] admits an exact substitution.
      */
     fun eliminateAffineSingletons(
         problem: BakedProblem,
@@ -101,15 +85,9 @@ internal object AffineSingletons {
         }
     }
 
-    /**
-     * [eliminateAffineSingletons] over a canonical source model.
-     *
-     * Two differences, both forced by what a declaration states. A bound row is emitted only for a side
-     * the model bounds, since an open side gives `x` no bound to carry over to its terms. And the
-     * residue-class doubletons are left alone: restricting a partner to the values that keep `x` an
-     * in-domain integer is a value set with holes, which a range cannot state and a hull would state
-     * wrongly — it would admit the partner values that make `x` non-integral.
-     */
+    // [eliminateAffineSingletons] over a canonical source model. A bound row is emitted only for a side the model
+    // bounds, since an open side gives `x` no bound to carry to its terms. Residue-class doubletons are skipped:
+    // the partner values keeping `x` an in-domain integer form a set with holes, which a range cannot state.
     fun eliminateSourceAffineSingletons(
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
@@ -137,7 +115,6 @@ internal object AffineSingletons {
             .also { it.objective = out.objective }
     }
 
-    /** What one run of the elimination produced: the surviving factors and the substitutions it recorded. */
     private class Eliminated(val factors: List<Factor>, val subs: List<AffineSub>, val objective: LinearObjective?)
 
     @Suppress("LongParameterList") // one body serves both lanes; the parameters are the lane's differences
@@ -200,14 +177,9 @@ internal object AffineSingletons {
             }
         }
         val subs = ArrayList<AffineSub>()
-        // Before any fold the working set is byte-for-byte the pristine input, so the first candidate scan
-        // can read the session's shared occurrence index directly (its CSR is in stable-id order). If no
-        // candidate exists there, the pass is fruitless and returns without ever building the mutable
-        // [AffineWorkingSet] — skipping its O(occurrences) index copy on every barren firing. On a re-run the
-        // engine supplies the variables the delta touched since the last firing: a candidate can only newly
-        // arise on a touched variable (an untouched variable's factors, and hence its foldability, are
-        // unchanged since the previous run reached its fixpoint), so the scan need only test the factors
-        // those variables appear in — O(delta) instead of O(factors) on the common fruitless re-run.
+        // Before any fold the working set equals the input, so the first scan reads the session's shared
+        // occurrence index and a barren firing returns without copying it into [AffineWorkingSet]. On a re-run
+        // only a touched variable can head a new candidate, so only its factors are tested.
         if (sharedIntOcc != null) {
             val seed = AffineSeedOccurrences(problem.factors, sharedIntOcc, pivotOrder == AffinePivotOrder.REWRITE_COST)
             val hasCandidate = if (incrementalTouchedVars != null) {
@@ -227,29 +199,14 @@ internal object AffineSingletons {
             }
             if (!hasCandidate) return null
         }
-        // The working set holds the factors by stable id (tombstones for drops, appends for the folded
-        // rewrites and bound rows) and a per-variable occurrence index maintained across eliminations.
-        // The session-maintained index matches the pristine input factor order, so the first candidate
-        // search reads it instead of rebuilding an O(factors) index; each fold then patches only the
-        // occurrence entries of the rewritten factors rather than re-indexing the whole set.
         val ws = AffineWorkingSet(
             problem.factors, eliminated.size, sharedIntOcc,
             pivotOrder == AffinePivotOrder.REWRITE_COST)
-        // Each elimination rewrites only the factors mentioning the pivot and appends bound rows, so the
-        // per-elimination cost is O(occurrences of x) rather than O(factors). The candidate scan still
-        // walks the live factors in order (the elimination order is selection-order-sensitive), but the
-        // membership predicates it runs are answered from the incremental occurrence index.
-        // Poll the budget so it stops with the eliminations made so far — sound (the remaining
-        // affine-defined variables simply stay and are solved directly).
-        // Which pivot to take next is a policy ([AffinePivotOrder]), because elimination cost depends on
-        // the order as much as on the set: folding the cheap pivots first shrinks the graph, so folds that
-        // would have been expensive become cheap or stop existing. The gates below (fill-in budget, absorb
-        // cap) can only refuse a fold; they cannot defer one.
+        // Elimination cost depends on the order as much as on the set: folding cheap pivots first shrinks later
+        // folds, hence the [AffinePivotOrder] policy. The gates below can only refuse a fold, never defer one.
+        // Stopping early is sound; the remaining affine-defined variables stay.
         val order = AffinePivotOrders.new(pivotOrder, ws, eliminated, objVars, capWide, pivotable, cancellation)
-        // Cumulative substitution fill-in (Σ pivot-degree · substituted-terms). A dense chain of wide
-        // folds is superlinear and can dominate presolve on large models where it barely simplifies;
-        // once the budget is spent the loop stops, leaving the remaining affine-defined variables to be
-        // solved directly (sound). The budget is far above what productive models spend.
+        // Σ pivot-degree · substituted-terms: a dense chain of wide folds is superlinear.
         var fillIn = 0L
         while (!cancellation()) {
             val cand = order.next() ?: break
@@ -291,35 +248,25 @@ internal object AffineSingletons {
             subs.add(AffineSub(r.x, r.constTerm, intArrayOf(r.y), longArrayOf(r.coeffY), divisor = r.divisor))
         }
         if (subs.isEmpty()) return null
-        // The eliminations rebuilt the factor list in place; recover the delta against the input by
-        // identity — every survivor is === an input factor, so the drops are the inputs absent from
-        // [factors] and the adds are the factors [foldOutVariable] introduced (rewrites + domain bounds).
         return Eliminated(ws.liveFactors(), subs, objectiveRewrite?.result())
     }
 
-    /**
-     * The next pivot to fold out, and the bookkeeping that keeps that choice cheap across eliminations.
-     * Every candidate is vetted by [candidateInFactor] under the run's consumer policy, and stopping
-     * early is always sound (an unfolded variable simply stays and is solved directly).
-     */
+    // Every candidate is vetted by [candidateInFactor]; stopping early is sound since an unfolded variable stays.
     internal interface PivotOrder {
 
-        /** The next pivot to fold, or `null` when no admissible candidate remains. */
         fun next(): AffineCandidate?
 
-        /** Record that the fold just made rewrote factors from stable id [minRewrittenId] upward. */
+        // The fold just made rewrote factors from stable id [minRewrittenId] upward.
         fun onFolded(minRewrittenId: Int)
 
-        /** Reconsider an equality after its selected pivot becomes protected. */
+        // Reconsiders an equality after its selected pivot becomes protected.
         fun onRejected(definitionId: Int)
     }
 
-    /** The `Int` value window; a single-partner global's affine view (an index/position shift) is only
-     *  representable when the fold's scale and offset land in it. */
+    // A single-partner global's affine view is an index shift, representable only when scale and offset fit Int.
     private val INT_RANGE = Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()
 
-    /** Cap on a residue partner's domain span: scanning each value to build the restricted domain is
-     *  O(span), and a residue class on a very wide domain would flood it with holes, so skip above it. */
+    // Building the restricted partner domain is O(span), and a residue class on a wide domain floods it with holes.
     private const val RESIDUE_DOMAIN_SPAN_CAP = 1024
 
     // In an underdetermined model (see [PresolveContext.affineUnderdetermined]), defer a fold whose fill-in
@@ -327,27 +274,18 @@ internal object AffineSingletons {
     // wide rows without simplifying. The variable stays (sound, solved directly).
     private const val WIDE_FILL_IN = 64
 
-    // Cap on how many folds a single linear row may absorb, applied in every model. Folding a pivot into a
-    // row rebuilds and re-coalesces the whole row; a row that keeps absorbing folds from successive pivots
-    // grows monotonically, so the k-th fold into it costs O(k) — O(folds²) churn that also hands the solver a
-    // denser problem rather than a simpler one. Once a row has absorbed this many folds, leave any further
-    // pivot that would rewrite it unfolded (sound — the variable stays and is solved directly), which bounds
-    // each row's growth. Set well above the handful of folds a productively-eliminated variable draws, so
-    // only a row that is a fold sink is capped.
+    // Each fold into a row rebuilds the whole row, so a row absorbing folds from successive pivots costs
+    // O(folds²) and densifies the model. A pivot that would rewrite a row past this cap stays unfolded.
     internal const val FOLD_ABSORB_CAP = 16
 
-    /** Cumulative substitution-fill-in budget across the whole pass (Σ pivot-degree · substituted-terms).
-     *  [FOLD_ABSORB_CAP] bounds individual row growth; this bounds aggregate work across all rows.
-     *  Once spent, the loop stops and remaining affine-defined variables are solved directly. */
+    // [FOLD_ABSORB_CAP] bounds one row's growth; this bounds aggregate fill-in across the pass.
     private const val AFFINE_FILL_IN_BUDGET = 300_000L
 
-    /** Skip the whole affine pass on instances with more than this many factors: the O(factors) candidate
-     *  scan dominates presolve on multi-million-factor giants (where it also barely simplifies), and the
-     *  pass is optional (skipping is sound). */
+    // The O(factors) candidate scan dominates presolve on multi-million-factor models; skipping is sound.
     private const val AFFINE_MAX_FACTORS = 1_000_000
 
-    /** A residue-class doubleton `a·x + b·y = c` (no unit pivot) at [defIdx]: `x` is contained and
-     *  reconstructed as `(constTerm + coeffY·y) / divisor` over the [restrictedY] partner domain. */
+    // A non-unit doubleton `a·x + b·y = c` with `x` contained, rebuilt as `(constTerm + coeffY·y) / divisor`
+    // over [restrictedY].
     private class ResidueCandidate(
         val defIdx: Int,
         val x: Int,
@@ -382,8 +320,6 @@ internal object AffineSingletons {
         return null
     }
 
-    /** The residue-class doubleton the 2-term equality at stable id [di] defines, or `null` if it defines
-     *  none. The per-factor body of [findResidueCandidate], reused by the touched-variable re-scan. */
     private fun residueCandidateInFactor(
         ws: FactorOcc,
         di: Int,
@@ -401,10 +337,8 @@ internal object AffineSingletons {
             val y = f.vars[1 - xi]
             val a = row.coeff(xi)
             val b = row.coeff(1 - xi)
-            // The unit-pivot loop already ran, so a remaining 2-term EQ has no unit coefficient;
-            // guard anyway. `x` must be contained (a non-unit fold can't stay integral) and free.
-            // `y`'s domain is restricted below, so it too must stay clear of the objective — the
-            // pass leaves every objective variable untouched.
+            // `x` must be contained, since a non-unit fold can't stay integral. `y`'s domain is restricted
+            // below, so it too must stay clear of the objective.
             if (a == 0L || a == 1L || a == -1L || eliminated[x] || eliminated[y] || x == y) continue
             if (x in objectiveIntVars || y in objectiveIntVars) continue
             if (!ws.isContained(di, x)) continue
@@ -425,12 +359,8 @@ internal object AffineSingletons {
         return null
     }
 
-    /**
-     * The domain of the single partner `y` of a holed pivot `x = constTerm + a·y`, restricted to the `y`
-     * that keep `x` off its holes, or null when `x` has more than one term, the partner is too wide to
-     * scan, or no `y` survives. Carrying the holes there lets the pivot fold without the rebuild landing
-     * on a value its domain excludes.
-     */
+    // Restricts the single partner of a holed pivot to the values keeping `x` off its holes, so the rebuild
+    // never lands on an excluded value.
     private fun holedPivotPartner(domains: Array<IntDomain>, c: AffineCandidate): IntDomain? {
         if (c.termVars.size != 1) return null
         val domY = domains[c.termVars[0]]
@@ -439,8 +369,7 @@ internal object AffineSingletons {
         return restrictPartnerDomain(domY, domains[c.x], 1L, -c.termCoeffs[0], c.constTerm)
     }
 
-    /** The partner domain restricted to the `y` values for which `x = (c − b·y)/a` is an integer
-     *  inside [domX], or null when the projection is empty or needs wider arithmetic. */
+    // The `y` for which `x = (c − b·y)/a` is an integer in [domX]; null when empty or on overflow.
     private fun restrictPartnerDomain(domY: IntDomain, domX: IntDomain, a: Long, b: Long, c: Long): IntDomain? {
         val valid = LongArrayList()
         for (y in domY.min..domY.max) {
@@ -464,9 +393,8 @@ internal object AffineSingletons {
         return d
     }
 
-    /** An `EQ` [Linear] at [defIdx] defining `x = constTerm + Σ termCoeffs·termVars` (unit pivot). The
-     *  other occurrences of `x` are either all foldable (Linear) or — for the alias case `x = y` —
-     *  substituted via `Factor.remap` into any factor type. */
+    // The EQ at [defIdx] defines `x = constTerm + Σ termCoeffs·termVars`. An alias substitutes into any factor
+    // via `Factor.remap`.
     internal class AffineCandidate(
         val defIdx: Int,
         val x: Int,
@@ -485,18 +413,13 @@ internal object AffineSingletons {
         pivotable: ((Linear, Int) -> Boolean)? = null,
         cancellation: ExecutionControl = ExecutionControl.Never,
     ): AffineCandidate? {
-        // The scan walks the live factors in stable-id order — the same order a fresh compacted list would
-        // present — so it picks candidates in the identical sequence a full rebuild would. Give up after
-        // [AFFINE_SCAN_ABORT] consecutive non-candidates: on a huge factor set with no exploitable affine
-        // structure, scanning to the end is pure fruitless cost. Sound: an unfound pivot stays.
+        // Stable-id order picks candidates in the sequence a full rebuild would. Giving up after
+        // [AFFINE_SCAN_ABORT] non-candidates is sound: an unfound pivot stays.
         val limit = minOf(ws.size.toLong(), start.toLong() + AFFINE_SCAN_ABORT).toInt()
         var polled = 0
         var di = ws.nextEqId(start)
         while (di < limit) {
-            // Poll the presolve deadline inside the scan, not only between folds: a single scan over a large
-            // wide-row factor set can run for seconds, so without this the budget cannot bound it.
-            // Count iterations (a dense counter) rather than keying on [di], which a candidate index makes
-            // sparse. Giving up returns the folds made so far — sound (an unfound pivot simply stays).
+            // One scan over a large wide-row factor set can run for seconds. Count iterations, since [di] is sparse.
             if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return null
             cancellation.charge(AFFINE_WORK_WEIGHT)
             candidateInFactor(
@@ -513,20 +436,13 @@ internal object AffineSingletons {
         return null
     }
 
-    /** Poll the cancellation once per this many scanned factors (a power-of-two mask for a cheap check). */
     internal const val CANCEL_POLL_MASK = 0x3FF
 
-    /** Consecutive non-candidate factors [findAffineCandidate] scans before giving up. Set well above the
-     *  gap between successive pivots in any model where affine is productive (which cluster near the top),
-     *  so ordinary instances scan to completion unchanged; only a fruitless walk over a giant factor set is
-     *  cut short. */
+    // Far above the gap between successive pivots in productive models, so only a fruitless walk over a giant
+    // factor set is cut short.
     private const val AFFINE_SCAN_ABORT = 200_000
 
-    /** The affine candidate the equality at stable id [di] defines (a pivot with unit or divisible
-     *  coefficient and foldable other occurrences), or `null` if it defines none. The per-factor body of
-     *  [findAffineCandidate], reused by the touched-variable re-scan so a fruitless re-run need only test
-     *  the factors mentioning a variable the delta changed. The per-candidate "where else does x occur"
-     *  checks are O(occurrences-of-x) off the occurrence index, not a fresh O(factors) scan. */
+    // Per-factor body of [findAffineCandidate], also used by the touched-variable re-scan.
     internal fun candidateInFactor(
         ws: FactorOcc,
         di: Int,
@@ -586,12 +502,9 @@ internal object AffineSingletons {
             // unconstrained — trading a lane the model could have routed to for one reduction. A column
             // with holes needs a single partner to take them: the bound rows carry only its range.
             if (pivotable != null && !pivotable(f, xi)) continue
-            // The substitution `x = (bound − Σ c_j·y_j) / c_x` stays integral for *every*
-            // assignment of the partners only when `c_x` divides each `c_j` and the bound — for a
-            // unit pivot trivially, and for a non-unit pivot exactly when `x` is implied-free
-            // (contained in this equality alone) and `c_x | gcd(c_j, bound)`. A
-            // non-unit pivot that fails the divisibility test would fold non-integral coefficients,
-            // so it is left for the residue-class doubleton pass or for propagation.
+            // `x = (bound − Σ c_j·y_j) / c_x` stays integral for every partner assignment only when `c_x` divides
+            // each `c_j` and the bound. A non-unit pivot must also be contained in this equality alone; one that
+            // fails is left to the residue-class pass.
             val isUnit = cx == 1L || cx == -1L
             if (!isUnit && !dividesAllPartnersAndBound(f.vars, row, xi)) continue
             if (!isUnit && !ws.isContained(di, x)) continue
@@ -618,11 +531,8 @@ internal object AffineSingletons {
             // pivot has no other occurrences, so `otherOccurrencesAllLinear` holds vacuously.
             val isAlias = termVars.size == 1 && termCoeffs[0] == 1L && constTerm == 0L
             if (isAlias && ws.aliasOverflowsLong(di, x, termVars[0])) continue
-            // Defer a fold that would inflate rather than simplify (leave the variable). Aliases are pure
-            // renames that never inflate, so they always proceed. Otherwise skip a pivot whose fold would
-            // rewrite a row that has already absorbed [FOLD_ABSORB_CAP] folds (bounding the accumulating-row
-            // pathology), and additionally cap total fill-in at the tighter [WIDE_FILL_IN] in underdetermined
-            // models.
+            // Aliases never inflate. Other folds skip rows at [FOLD_ABSORB_CAP] and, in underdetermined models,
+            // fill-in past [WIDE_FILL_IN].
             if (!isAlias) {
                 if (ws.anyOtherLinearAtAbsorbCap(di, x)) continue
                 if (capWide && (ws.degreeOf(x) - 1).toLong() * termVars.size > WIDE_FILL_IN) continue
@@ -630,10 +540,8 @@ internal object AffineSingletons {
                 // rewrites — sound (x stays, solved directly) and avoids a wrong wrapped coefficient.
                 if (ws.foldOverflowsLong(di, x, termVars, termCoeffs, constTerm, cancellation)) continue
             }
-            // A single-partner affine `x = a·y + b` can also be projected out of non-linear globals
-            // that absorb the affine view (via Factor.substituteAffine); a multi-partner relation
-            // only folds into admitted linear rows. The global's affine view is an index/position shift in
-            // Int space, so a scale or offset beyond Int range takes the Linear-fold path instead.
+            // A global absorbs a single-partner `x = a·y + b` via Factor.substituteAffine as an index shift in Int
+            // space, so a scale or offset beyond Int range takes the Linear-fold path instead.
             val singlePartnerSubstitutable = !isAlias && termVars.size == 1 &&
                 termCoeffs[0] in INT_RANGE && constTerm in INT_RANGE &&
                 ws.otherOccurrencesAffineSubstitutable(di, x, termCoeffs[0].toInt(), constTerm.toInt(),
@@ -645,11 +553,8 @@ internal object AffineSingletons {
         return null
     }
 
-    /** Whether any variable in [touchedVars] heads a unit-pivot or residue candidate, testing only the
-     *  factors those variables appear in (deduplicated). A re-run's new candidates are confined to the
-     *  touched variables, so a `false` result means the pass is fruitless this firing — byte-identical to
-     *  the full scan, which would also find nothing. `true` falls back to the full elimination loop, whose
-     *  stable-id scan order the O(delta) test cannot reproduce. */
+    // New candidates are confined to touched variables, so `false` means the full scan would find nothing too.
+    // `true` falls back to the full loop, whose stable-id order this test cannot reproduce.
     private fun anyTouchedVarHeadsCandidate(
         seed: AffineSeedOccurrences,
         touchedVars: IntArray,
@@ -669,9 +574,7 @@ internal object AffineSingletons {
             for (k in 0 until degree) {
                 val di = seed.occurrenceAt(x, k)
                 if (!checked.add(di)) continue
-                // Poll the deadline: this re-scan is O(touched · occurrences) and each candidate test walks
-                // a row, so on a wide-row model it must be interruptible. Bailing reports "no candidate", so
-                // affine skips this firing — sound (a partial pass only forgoes reduction).
+                // O(touched · occurrences) on wide rows; bailing skips this firing, which is sound.
                 if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return false
                 cancellation.charge(AFFINE_WORK_WEIGHT)
                 if (candidateInFactor(
@@ -696,8 +599,6 @@ internal object AffineSingletons {
         return false
     }
 
-    /** Whether the pivot coefficient at [xi] divides every other coefficient and the bound of the row, so
-     *  substituting out the pivot variable keeps all folded coefficients and the constant term integral. */
     private fun dividesAllPartnersAndBound(vars: IntArray, row: IntegerConstants, xi: Int): Boolean {
         val cx = row.coeff(xi)
         if (cx == 0L) return false
@@ -706,13 +607,8 @@ internal object AffineSingletons {
         return true
     }
 
-    /**
-     * The read-only occurrence queries the candidate scans ([findAffineCandidate], [findResidueCandidate])
-     * run: walk the factors by stable id and, per pivot, test where else the variable occurs. Both the
-     * mutable [AffineWorkingSet] and the pristine-input [AffineSeedOccurrences] answer these,
-     * so a scan can run over the
-     * session's shared occurrence index without first materialising a mutable working set.
-     */
+    // Read-only occurrence queries of the candidate scans, answered by both the mutable [AffineWorkingSet] and
+    // the pristine-input [AffineSeedOccurrences] so a scan needs no working set.
     internal interface FactorOcc {
         val size: Int
         fun factorAt(id: Int): Factor?
@@ -740,23 +636,15 @@ internal object AffineSingletons {
             cancellation: ExecutionControl,
         ): Boolean
 
-        /** Whether any [Linear] factor other than [defIdx] that mentions [x] has already absorbed
-         *  [FOLD_ABSORB_CAP] folds — a fold on [x] would rewrite that row once more. Always `false` before any
-         *  fold (the pristine seed), so it only ever defers a pivot targeting an established fold sink. */
+        // Always false on the pristine seed.
         fun anyOtherLinearAtAbsorbCap(defIdx: Int, x: Int): Boolean
 
-        /** How many ids a rewrite has *promoted* into the pivot-candidate set so far. The promotion list is
-         *  append-only, so a reader that remembers this count picks up later promotions from its tail
-         *  ([promotedAt]) instead of re-walking every candidate id. Zero on the pristine seed, which
-         *  rewrites nothing. */
+        // Ids a rewrite promoted into the pivot-candidate set. The list is append-only, so a reader remembering
+        // this count reads later promotions from its tail via [promotedAt].
         fun promotedCount(): Int
 
-        /** The [k]-th promoted stable id (`0 until promotedCount()`). */
         fun promotedAt(k: Int): Int
 
-        /** Whether folding the pivot `x = constTerm + Σ termCoeffs·termVars` into any Linear row that
-         *  mentions [x] (other than [defIdx]) would overflow 64-bit arithmetic. When it would, the
-         *  candidate is skipped and `x` is left un-eliminated (sound) rather than wrapping a coefficient. */
         fun foldOverflowsLong(
             defIdx: Int,
             x: Int,
@@ -766,23 +654,15 @@ internal object AffineSingletons {
             cancellation: ExecutionControl = ExecutionControl.Never,
         ): Boolean
 
-        /** Whether renaming [x] to [replacement] would coalesce an integer linear row past [Long]. */
         fun aliasOverflowsLong(defIdx: Int, x: Int, replacement: Int): Boolean
 
-        /** The smallest stable id `>= from` that could head a pivot — a live [Linear] equality of arity
-         *  `>= 2` — or [size] if none remains, in ascending order. Lets the candidate scan skip the
-         *  inequality/global bulk (which can never be a candidate) instead of testing every id, while
-         *  still visiting the identical candidates in the identical order a walk over every id would: a
-         *  fold that promotes a row into the candidate class is tracked, and a dropped or degraded id may
-         *  still be returned and is re-rejected by the candidate gate. */
+        // The smallest id `>= from` that could head a pivot (a live [Linear] equality of arity `>= 2`), or [size].
+        // A fold that promotes a row into that class is tracked; a dropped or degraded id may still be returned
+        // and is rejected by the candidate gate.
         fun nextEqId(from: Int): Int
     }
 
-    // Drop the defining equality and remove `x`: for the alias case `x = y`, substitute `x → y` into
-    // every other factor via Factor.remap (any factor type); otherwise fold `x = constTerm +
-    // Σ termCoeffs·termVars` into every other Linear mentioning `x`. In both cases bounds on the term
-    // vars keep `x` within its domain. Returns the lowest stable id whose candidacy the fold can newly
-    // establish — the point the candidate scan may safely resume from.
+    // Returns the lowest stable id whose candidacy the fold can newly establish, where the scan may resume.
     private fun foldOutVariable(problem: Problem, ranges: ColumnRanges, ws: AffineWorkingSet, c: AffineCandidate): Int =
         if (c.isAlias) ws.alias(problem, ranges, c) else ws.fold(ranges, c)
 
@@ -795,10 +675,8 @@ internal object AffineSingletons {
     }
 }
 
-/** A single affine elimination `x = (constTerm + Σ termCoeffs·termVars) / divisor` recorded by
- *  [AffineSingletons] during [Presolve]. [divisor] is `1` for the unit-pivot cases and the pivot coefficient for a
- *  residue-class doubleton, where the division is always exact on the values the partner's restricted
- *  domain admits. */
+/** An elimination `x = (constTerm + Σ termCoeffs·termVars) / divisor` recorded during [Presolve]. A residue-class
+ *  [divisor] is exact on every value the partner's restricted domain admits. */
 internal class AffineSub(
     val x: Int,
     val constTerm: Long,
@@ -807,16 +685,10 @@ internal class AffineSub(
     val divisor: Long = 1,
 )
 
-/**
- * The affine eliminations as the steps that rebuild them, latest first.
- *
- * Reverse elimination order: an eliminated `x` may depend on a `y` eliminated later (a chain), and a
- * later elimination never depends on an earlier one (the candidate scan skips already-eliminated
- * partners), so reversing guarantees every `y` is recovered before the `x` that reads it.
- */
+// Latest first: an eliminated `x` may read a partner eliminated later, never one eliminated earlier.
 internal fun List<AffineSub>.asRebuilds(): SourceRebuilds = SourceRebuilds(
     asReversed().map { RebuildStep.AffineValue(it.x, it.constTerm, it.termVars, it.termCoeffs, it.divisor) },
 )
 
-// A reified row remains a two-way channel when rewritten; it cannot supply an asserted pivot.
+// Work units per scanned factor, tested term or folded fill-in entry, relative to one simplex operation.
 internal const val AFFINE_WORK_WEIGHT = 10L

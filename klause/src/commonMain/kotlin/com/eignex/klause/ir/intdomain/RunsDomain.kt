@@ -7,8 +7,8 @@ import com.eignex.klause.ir.IntSpan
 import com.eignex.klause.ir.defaultDomainStorageSettings
 import com.eignex.util.collections.LongArrayList
 
-/** Interval-run list: flattened sorted disjoint present runs `[lo0,hi0, lo1,hi1, …]`, `>= 2` runs,
- *  strict gaps between them, `runs[0] == min`, `runs[last] == max`. */
+// Flattened sorted disjoint present runs [lo0,hi0, lo1,hi1, …]: at least two runs, strict gaps between them,
+// runs[0] == min and runs[last] == max.
 internal class RunsDomain(
     override val min: Long,
     override val max: Long,
@@ -59,7 +59,7 @@ internal class RunsDomain(
         holes
     }
 
-    /** Index of the run containing [value], or `-1`. Assumes `value in min..max`. */
+    // Index of the run containing value, or -1. Assumes value in min..max.
     private fun runIndexContaining(value: Long): Int {
         var lo = 0
         var hi = (runs.size shr 1) - 1
@@ -77,7 +77,7 @@ internal class RunsDomain(
         return if (value <= runs[(ans shl 1) + 1]) ans else -1
     }
 
-    /** Smallest run index `k` with `runs[2k+1] >= from`. */
+    // Smallest run index k with runs[2k+1] >= from.
     private fun runFirstEndGe(from: Long): Int {
         var lo = 0
         var hi = (runs.size shr 1) - 1
@@ -94,7 +94,6 @@ internal class RunsDomain(
         return ans
     }
 
-    /** The flattened `lo,hi` run list, copied. */
     fun copyRuns(): LongArray = runs.copyOf()
 
     override fun contains(value: Long): Boolean = value in min..max && runIndexContaining(value) >= 0
@@ -105,7 +104,7 @@ internal class RunsDomain(
     override fun lower(value: Long): Long {
         val cand = value - 1
         if (cand in this) return cand
-        // Last run starting below [value]; its end is the nearest present value on the left (the run
+        // Last run starting below value; its end is the nearest present value on the left (the run
         // cannot reach cand, or the fast path above would have hit).
         var lo = 0
         var hi = (runs.size shr 1) - 1
@@ -125,7 +124,7 @@ internal class RunsDomain(
     override fun higher(value: Long): Long {
         val cand = value + 1
         if (cand in this) return cand
-        // First run starting above [value]; its start is the nearest present value on the right.
+        // First run starting above value; its start is the nearest present value on the right.
         var lo = 0
         var hi = (runs.size shr 1) - 1
         var ans = hi

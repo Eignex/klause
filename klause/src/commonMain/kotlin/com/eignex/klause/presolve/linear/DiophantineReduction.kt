@@ -13,30 +13,18 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.LongArrayList
 import kotlin.math.abs
 
-/**
- * Per-variable modular (Diophantine) domain tightening for integer equalities. In `Σ aᵢ·xᵢ = b`, every
- * other term is a multiple of `m = gcd(aⱼ : j ≠ i)`, so `aᵢ·xᵢ ≡ b (mod m)` — which confines `xᵢ` to a
- * single residue class `xᵢ ≡ r (mod m')`. Its bounds then move inward to the nearest in-class value; an
- * empty range is a contradiction. This is the reasoning [CoefficientStrengthening] does not do (it only
- * divides the whole constraint by its coefficient gcd and rejects `g ∤ b`); the residue is per-variable.
- *
- * The finite form carves the off-class values out of a domain of at most [SIZE_CAP] values and leaves a
- * wider one alone, so a residue class never costs an O(span) sweep. The source form has only ranges to
- * state, so it moves each closed side inward to the nearest in-class value and leaves an open side open.
- * Everything is gated to `|value| < 2³¹` so the modular arithmetic cannot overflow.
- */
+// In `Σ aᵢ·xᵢ = b` every other term is a multiple of `m = gcd(aⱼ : j ≠ i)`, so `aᵢ·xᵢ ≡ b (mod m)` confines `xᵢ`
+// to one residue class. The finite form carves off-class values from small domains; the source form moves each
+// closed side inward to the nearest in-class value. Values are gated to `|v| < 2³¹` so the arithmetic cannot
+// overflow.
 internal object DiophantineReduction {
 
-    /** Domain-size ceiling for the interior carve: above it a domain is left alone rather than iterated,
-     *  so a wide domain never triggers an O(size) sweep. */
     private const val SIZE_CAP = 4096
 
-    // Work charged per equality scanned, scaled by its length: the residue scan is linear in the row.
     private const val DIOPHANTINE_WORK_WEIGHT = 10L
 
     private const val POLL_INTERVAL = 64
 
-    /** `true` when `|v| < 2³¹`, so a product of two such values stays below 2⁶² — the overflow gate. */
     private fun fitsHalfLong(v: Long): Boolean = v > -(1L shl 31) && v < (1L shl 31)
 
     private fun gcd(a: Long, b: Long): Long {
@@ -50,13 +38,10 @@ internal object DiophantineReduction {
         return x
     }
 
-    /**
-     * The solution set of `a·x ≡ b (mod m)` (with `m > 0`) as `x ≡ r (mod mod)` with `0 ≤ r < mod`, or
-     * `null` when there is no solution. Assumes `|a|, |b|, m` all fit [fitsHalfLong].
-     */
+    // `a·x ≡ b (mod m)` as `x ≡ r (mod mod)`, or null when unsolvable. Requires `|a|, |b|, m` to fit [fitsHalfLong].
     private fun solveCongruence(a: Long, b: Long, m: Long): Pair<Long, Long>? {
         val aMod = ((a % m) + m) % m
-        // Extended Euclid on (aMod, m): find s with aMod·s ≡ g (mod m), g = gcd(aMod, m).
+        // Extended Euclid: `aMod·s ≡ gcd(aMod, m) (mod m)`.
         var oldR = aMod
         var r = m
         var oldS = 1L
@@ -79,13 +64,9 @@ internal object DiophantineReduction {
         return root to mod
     }
 
-    /** One column confined to `x ≡ root (mod mod)` by an equality, with `mod > 1`. */
     private class Residue(val column: Int, val root: Long, val mod: Long)
 
-    /**
-     * Every residue class the integer equalities in [factors] confine a column to, in row order, or the
-     * column whose congruence has no solution at all. Reads coefficients alone, so both forms share it.
-     */
+    // The residue classes in row order, plus the first column whose congruence is unsolvable (or -1).
     private fun residues(factors: List<Factor>, cancellation: ExecutionControl): Pair<List<Residue>, Int> {
         val out = ArrayList<Residue>()
         if (cancellation()) return out to -1
@@ -128,12 +109,7 @@ internal object DiophantineReduction {
         return out to -1
     }
 
-    /**
-     * The source form: each closed side of a confined column moves inward to the nearest in-class value.
-     *
-     * A congruence with no solution refutes. Moving both sides past each other also refutes, which the
-     * caller reads off the crossed range rather than this pass checking it.
-     */
+    // Sides that cross refute; the caller reads that off the crossed range.
     fun reduceSource(problem: Problem, cancellation: ExecutionControl = ExecutionControl.Never): SourceDelta {
         val (found, unsolvable) = residues(problem.factors.asList(), cancellation)
         if (unsolvable >= 0) return SourceDelta(infeasible = true)
@@ -183,9 +159,7 @@ internal object DiophantineReduction {
             val mod = r.mod
             val v = r.column
             val dom = out?.get(v) ?: problem.rootIntDomain(v)
-            // Carve interior off-residue values — the reduction bound propagation cannot make (it
-            // keeps only intervals). Iterate the domain's live values (O(size), never O(span)) and
-            // gate on [SIZE_CAP] so a wide contiguous domain is skipped rather than enumerated.
+            // Interior holes are what bound propagation cannot make. Iterating live values keeps this O(size).
             val live = dom.spanOrNull(SIZE_CAP.toLong()) ?: continue
             if (!fitsHalfLong(dom.min) || !fitsHalfLong(dom.max)) continue
             val remove = LongArrayList()
@@ -207,7 +181,6 @@ internal object DiophantineReduction {
         return if (out == null) PassDelta() else PassDelta(domains = out)
     }
 
-    /** Two contradictory unit equalities on [v], which together make the problem unsatisfiable. */
     private fun contradiction(problem: BakedProblem, v: Int): PassDelta {
         val c = problem.rootIntDomain(v).min
         return PassDelta(

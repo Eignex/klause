@@ -33,7 +33,6 @@ private fun parseRationalParts(text: String): Pair<BigInt, BigInt> {
     return parseBigInt(match.groupValues[1]) to denominator
 }
 
-/** Arbitrary-width integer as a decimal string. */
 internal object BigIntSerializer : KSerializer<BigInt> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("com.eignex.klause.factor.codec.ExactInteger", PrimitiveKind.STRING)
@@ -43,7 +42,6 @@ internal object BigIntSerializer : KSerializer<BigInt> {
     override fun deserialize(decoder: Decoder): BigInt = parseExactInteger(decoder.decodeString())
 }
 
-/** Exact rational as `numerator` or `numerator/denominator`. */
 internal object BigFractionSerializer : KSerializer<BigFraction> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("com.eignex.klause.factor.codec.ExactRational", PrimitiveKind.STRING)
@@ -54,7 +52,6 @@ internal object BigFractionSerializer : KSerializer<BigFraction> {
         parseRationalParts(decoder.decodeString()).let { (num, den) -> BigFraction.of(num, den) }
 }
 
-/** Source-semantic rational, written like [BigFractionSerializer]. */
 internal object SemanticRationalSerializer : KSerializer<SemanticRational> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("com.eignex.klause.factor.codec.SemanticRational", PrimitiveKind.STRING)

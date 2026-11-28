@@ -16,15 +16,10 @@ import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.addExactOrNull
 import com.eignex.util.numbers.mulExactOrNull
 
-/**
- * Single-scan integer bounds from conjunctive relations mentioning one variable.
- * Missing sides remain null (infinite) in [PresolveDomain]. The scan is linear in
- * row width; multi-variable fixpoint tightening belongs to budgeted presolve.
- * These bounds justify finite auxiliary ranges without imposing bounds on open declarations.
- */
+// Single-variable conjunctive relations only; multi-variable fixpoint tightening belongs to budgeted presolve.
+// The bounds justify finite auxiliary ranges without imposing bounds on open declarations.
 internal fun Compiler.Builder.inferBounds() {
     if (intNames.isEmpty()) return
-    // null = unbounded on that side (-inf for lo, +inf for hi); no sentinel magnitude.
     val lo = Array<Long?>(nextInt) { v ->
         when (val domain = intDomains[v]) {
             is PresolveDomain.Finite -> domain.domain.min
@@ -47,7 +42,6 @@ internal fun Compiler.Builder.inferBounds() {
 
     for (r in relations) {
         if (r.op == LinearOp.NE) continue
-        // Single-term rows only. With no other term the rest-sum is 0, so the bound is the rhs itself.
         var only = -1
         var terms = 0
         for (i in r.vars.indices) {
@@ -69,7 +63,6 @@ internal fun Compiler.Builder.inferBounds() {
         if (strictBounds && (provLo == null || provHi == null)) {
             throw UnsupportedSmtException("no provable ${if (provLo == null) "lower" else "upper"} bound for '$name'")
         }
-        // A still-null side remains structurally open for pipeline selection.
         intDomains[v] = openOrFinite(provLo, provHi)
     }
 }
@@ -141,7 +134,6 @@ internal fun Compiler.Builder.closeProductBounds() {
     }
 }
 
-/** Snapshot the declared and inferred integer bounds without materializing an open side. */
 internal fun Compiler.Builder.modelIntBounds(): IntBounds {
     val lower = LongArray(nextInt)
     val upper = LongArray(nextInt)
@@ -165,7 +157,7 @@ internal fun Compiler.Builder.modelIntBounds(): IntBounds {
     return IntBounds.fromModelBounds(lower, upper, openLo, openHi)
 }
 
-// lo/hi are nullable (a null slot is ±infinity), so a primitive LongArray cannot represent them.
+// A null slot is ±infinity, which a primitive LongArray cannot represent.
 @Suppress("ArrayPrimitive")
 internal fun Compiler.Builder.applyCtBound(
     lo: Array<Long?>,
@@ -176,8 +168,6 @@ internal fun Compiler.Builder.applyCtBound(
     upper: Boolean,
 ): Boolean {
     if (rhs == null) return false
-    // ct>0 with an upper target (or ct<0 with a lower one) yields a floor bound on hi[tv]; the mirror
-    // case yields a ceil bound on lo[tv].
     return if ((ct > 0) == upper) {
         val b = floorDivLong(rhs, ct)
         val cur = hi[tv]
@@ -199,16 +189,13 @@ internal fun Compiler.Builder.applyCtBound(
     }
 }
 
-/** `acc + c·x`, or null if either the multiply or the add overflows (treated as an infinite bound).
- *  Shared with the aux-variable range arithmetic in `SmtLibEval.kt` — infinity is `null`, never a sentinel. */
+// Overflow yields null, read as an infinite bound.
 internal fun mulAdd(acc: Long, c: Long, x: Long): Long? {
     val product = mulExactOrNull(c, x) ?: return null
     return addExactOrNull(acc, product)
 }
 
 internal fun Compiler.Builder.collectConjunctiveRelations(top: SExpr, out: ArrayList<Rel>) {
-    // Walk the `and` conjunction with an explicit worklist (not recursion), so a degenerate
-    // conjunction can't overflow the stack during bound inference.
     val work = ArrayDeque<SExpr>()
     work.addLast(top)
     while (work.isNotEmpty()) {
@@ -228,17 +215,8 @@ internal fun Compiler.Builder.collectConjunctiveRelations(top: SExpr, out: Array
     }
 }
 
-/**
- * Emit the two bound rows a single-variable equality disjunction states, or nothing when [t] is not one.
- *
- * `(or (= x k₁) … (= x kₙ))` confines `x` to `{k₁ … kₙ}`, so the least and greatest constant bound it.
- * Only the endpoints are stated here — this pass yields intervals, and the holes between the constants
- * are left to the lowering, which still posts the disjunction itself.
- *
- * Every disjunct has to pin the *same* variable to a constant. One disjunct saying anything else — a
- * second variable, a coefficient, a wider relation — leaves the disjunction satisfiable outside the set,
- * and a bound read off the rest would not hold.
- */
+// `(or (= x k₁) … (= x kₙ))` bounds `x` by its least and greatest constant; the lowering still posts the
+// disjunction for the holes. One disjunct saying anything else leaves it satisfiable outside the set.
 private fun Compiler.Builder.equalityDisjunctionBounds(t: SExpr.SList, out: ArrayList<Rel>) {
     if (t.items.size < 2) return
     var v = -1
@@ -271,11 +249,8 @@ private fun Compiler.Builder.equalityDisjunctionBounds(t: SExpr.SList, out: Arra
     out.add(Rel(intArrayOf(v), longArrayOf(1L), LinearOp.LE, max))
 }
 
-/** Whether [t] contains a subterm whose lowering has side effects (fresh vars and clauses): `ite`,
- *  `abs`, `div`, `mod`, `to_int`, or a `define-fun` call (whose body may contain any of these). The
- *  read-only bound-inference pass must not descend into such a relation, since evaluating it would
- *  allocate variables its bound arrays aren't sized for. The scan is iterative (explicit stack) so
- *  a deep term can't overflow the call stack. */
+// Lowering such a subterm allocates variables, which the bound arrays of the read-only inference are not sized
+// for. A `define-fun` body may contain any of them.
 internal fun Compiler.Builder.hasSideEffectingTerm(t: SExpr): Boolean {
     val work = ArrayDeque<SExpr>()
     work.addLast(t)

@@ -21,14 +21,7 @@ import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
 
-/**
- * CP propagator for a wide [ReifiedLinear]: `auxBoolVar ↔ (Σ wideCoeffs·vars ⟨op⟩ bound)`, where the
- * coefficients or bound exceed the 64-bit range. Mirrors [ReifiedLinearPropagator]'s reification structure
- * but does every interval/feasibility computation in exact [BigInt] via
- * [com.eignex.klause.factor.arithmetic.internals.wideEnforceRow], so there is no overflow, degrade, or
- * `unknown` — the row is enforced exactly, including at a fully pinned leaf, and the wide value never
- * reaches the domains, the trail, or the LP.
- */
+// The exact BigInt counterpart of ReifiedLinearPropagator; the wide values never reach the domains, trail or LP.
 internal class WideReifiedLinearPropagator(
     val auxBoolVar: Int,
     val boolVars: IntArray,
@@ -67,11 +60,7 @@ internal class WideReifiedLinearPropagator(
         }
     }
 
-    /**
-     * The side of the activity range that settles the body: whether it holds ([holds]) or fails, read off the lower
-     * end (true) or the upper end (false); null when only both together settle it (an equality pinned on both
-     * ends, or a disequality).
-     */
+    // True for the lower end, false for the upper; null when only both ends together settle the body.
     private fun wideSettlingSide(op: LinearOp, sumLo: BigInt, sumHi: BigInt, bound: BigInt, holds: Boolean): Boolean? =
         when (op) {
             LinearOp.LE -> if (holds) false else true

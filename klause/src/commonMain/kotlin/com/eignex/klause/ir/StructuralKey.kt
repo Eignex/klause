@@ -14,9 +14,8 @@ class StructuralKey internal constructor(private val kind: FactorKind, private v
     override fun equals(other: Any?): Boolean =
         this === other || (other is StructuralKey && kind == other.kind && payload.contentEquals(other.payload))
 
-    // Immutable, so the content hash is computed once and memoised — these keys are hashed repeatedly
-    // as multiset and hash-bucket keys across presolve rounds. `0` is the not-yet-computed sentinel; a
-    // key that genuinely hashes to 0 simply recomputes (harmless).
+    // Memoised because keys are hashed repeatedly across presolve rounds. `0` means not yet computed; a
+    // key that genuinely hashes to 0 simply recomputes.
     private var cachedHash = 0
 
     override fun hashCode(): Int {
@@ -41,26 +40,17 @@ class StructuralKey internal constructor(private val kind: FactorKind, private v
     }
 
     internal companion object {
-        /**
-         * Assemble a key of [kind] from the payload appended in [block]. Every variable-length segment
-         * is length-prefixed, so distinct factors never collide; the builder methods choose positional
-         * ([StructuralKeyBuilder.ints]) versus set ([StructuralKeyBuilder.sortedInts]) semantics
-         * explicitly.
-         */
+        // Every variable-length segment is length-prefixed, so distinct factors never collide.
         fun of(kind: FactorKind, block: StructuralKeyBuilder.() -> Unit): StructuralKey =
             StructuralKeyBuilder().apply(block).build(kind)
 
-        /**
-         * Build a standalone payload fragment (no kind) for [StructuralKeyBuilder.words] to splice in.
-         * Lets a factor compute the variable-independent part of its key **once** and reuse it across
-         * the many remapped copies symmetry refinement keys — the expensive constant work (e.g. a
-         * table's sorted tuple set) is hoisted out of the per-round hot path.
-         */
+        // A kindless fragment for StructuralKeyBuilder.words, so a factor builds the variable-independent
+        // part of its key once instead of on every remapped copy symmetry refinement keys.
         fun words(block: StructuralKeyBuilder.() -> Unit): LongArray = StructuralKeyBuilder().apply(block).buildWords()
     }
 }
 
-/** The factor-type discriminator of a [StructuralKey]; two keys of different kinds never compare equal. */
+// The factor-type discriminator of a [StructuralKey]; two keys of different kinds never compare equal.
 internal enum class FactorKind {
     CLAUSE,
     CARDINALITY,
@@ -146,21 +136,18 @@ internal class StructuralKeyBuilder(expectedWords: Int = 0) {
 
     fun enum(value: Enum<*>) = append(value.ordinal.toLong())
 
-    /** A positional int array (order significant): length, then elements in order. */
     fun ints(xs: IntArray) {
         append(xs.size.toLong())
         reserve(xs.size)
         for (x in xs) buf[size++] = x.toLong()
     }
 
-    /** A positional long array (order significant): length, then elements in order. */
     fun longs(xs: LongArray) {
         append(xs.size.toLong())
         reserve(xs.size)
         for (x in xs) buf[size++] = x
     }
 
-    /** A set-semantics int array (order insignificant): length, then elements ascending. */
     fun sortedInts(xs: IntArray) {
         append(xs.size.toLong())
         val sorted = xs.copyOf()
@@ -169,8 +156,6 @@ internal class StructuralKeyBuilder(expectedWords: Int = 0) {
         for (x in sorted) buf[size++] = x.toLong()
     }
 
-    /** `(key, value)` pairs ordered by key ascending, where the value for the entry at original index
-     *  `i` is `valueOf(i)`: length, then `key, value` per pair. */
     fun pairsByKey(keys: IntArray, valueOf: (Int) -> Long) {
         append(keys.size.toLong())
         val order = if (keys.size <= INDEX_SORT_INSERTION_MAX) {
@@ -185,8 +170,6 @@ internal class StructuralKeyBuilder(expectedWords: Int = 0) {
         }
     }
 
-    /** Splice a fragment of already-built words verbatim (from [StructuralKey.words]) — the cached,
-     *  variable-independent part of a factor's key. */
     fun words(fragment: LongArray) {
         reserve(fragment.size)
         fragment.copyInto(buf, size)
@@ -206,13 +189,11 @@ internal class StructuralKeyBuilder(expectedWords: Int = 0) {
     }
 }
 
-/** Above this arity the index sort switches from in-place insertion sort to the O(n log n) packed
- *  sort; below it insertion sort's lack of allocation wins. A high-arity factor (a wide linear row or
- *  knapsack) has its [StructuralKey] rebuilt for every incident variable each refinement round, where a
- *  quadratic sort would dominate presolve. */
+// Above this arity the index sort switches from allocation-free insertion sort to the packed sort: a
+// high-arity factor's key is rebuilt for every incident variable each refinement round, where a quadratic
+// sort would dominate presolve.
 private const val INDEX_SORT_INSERTION_MAX = 32
 
-// Small factors avoid allocating packed sort keys.
 private fun sortIndicesByKey(order: IntArray, keys: IntArray) {
     for (i in 1 until order.size) {
         val cur = order[i]

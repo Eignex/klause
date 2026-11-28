@@ -11,7 +11,6 @@ import com.eignex.klause.ir.Lit
 import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.collections.IntArrayList
 
-/** Resolve a set expression to a [SetVarLayout]. */
 internal fun FlatZincCompiler.resolveSetVar(e: FznExpr): SetVarLayout = when (e) {
     is FznExpr.Ident -> setVarsByName[e.name] ?: run {
         val members = resolveSetLiteral(e)
@@ -63,7 +62,6 @@ internal fun FlatZincCompiler.resolveSetLiteral(e: FznExpr): IntArray = when (e)
     else -> failHere("expected a set literal, got ${e::class.simpleName}")
 }
 
-/** Emit `set_in` and `set_in_reif`. */
 internal fun FlatZincCompiler.emitSetIn(c: FznConstraint, reified: Boolean) {
     expectArity(c, if (reified) 3 else 2)
     val elem = c.args[0]
@@ -244,13 +242,13 @@ internal fun FlatZincCompiler.emitSetSubset(c: FznConstraint, reified: Boolean) 
     reifyAndOfLits(auxes.toIntArray(), r)
 }
 
-/** Emit `r ↔ ⋀ lits`. */
+// r ↔ ⋀ lits.
 internal fun FlatZincCompiler.reifyAndOfLits(lits: IntArray, r: Int) {
     factors.add(Clause(lits.map { Lit.negate(it) }.toIntArray() + intArrayOf(r)))
     for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(r), l)))
 }
 
-/** Emit `r ↔ ⋁ lits`. */
+// r ↔ ⋁ lits.
 internal fun FlatZincCompiler.reifyOrOfLits(lits: IntArray, r: Int) {
     factors.add(Clause(intArrayOf(Lit.negate(r)) + lits))
     for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(l), r)))
@@ -303,7 +301,6 @@ internal fun FlatZincCompiler.emitSetNe(c: FznConstraint, reified: Boolean) {
     emitSetEqChannel(s, t, eqLit)
 }
 
-/** Resolve an array expression to set layouts. */
 internal fun FlatZincCompiler.resolveSetVarArray(e: FznExpr): List<SetVarLayout> = when (e) {
     is FznExpr.Ident -> when (val a = arrays[e.name]) {
         is FlatZincArray.SetVars -> a.layouts
@@ -315,7 +312,6 @@ internal fun FlatZincCompiler.resolveSetVarArray(e: FznExpr): List<SetVarLayout>
     else -> failHere("expected an array of set vars, got ${e::class.simpleName}")
 }
 
-/** Emit `set_le` / `set_lt` and reified variants. */
 internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reified: Boolean) {
     expectArity(c, if (reified) 3 else 2)
     val s = resolveSetVar(c.args[0])

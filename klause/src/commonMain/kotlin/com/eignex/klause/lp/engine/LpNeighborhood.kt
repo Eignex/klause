@@ -8,48 +8,28 @@ import com.eignex.util.collections.IntHashSet
 import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.mulExact
 
-/**
- * A row-capped neighborhood restriction of an [LpModel]: the sub-model over the rows a breadth-first
- * walk of the column/row bipartite graph reaches from the seed columns before the row cap is hit,
- * with every structural column those rows touch. Only **whole rows** are dropped — an accepted row
- * keeps its full support, so the sub-model is a pure relaxation of the original: its feasible set
- * projects onto a superset of the original's, and any bound proved on it (a probe optimum, a dual
- * bound, a Farkas refutation of the sub-rows) is valid on the full model. That is the contract
- * callers lean on: optimization-based bound tightening probes a variable's local constraint
- * structure at a factorization cost bounded by the row cap instead of the full model's row count.
- *
- * [colMap] maps original structural columns to sub-model columns (`-1` when outside the
- * neighborhood) and [rows] lists the taken rows by original index (sub-model row `r` is original row
- * `rows(r)`); bounds, shifts, probe-clamp flags, tags, strictness, global validity, premises and the
- * double view all carry over per selected row/column.
- *
- * The same restriction ([LpModel.restrictTo]) also carves a **connected component** out of a
- * separable model — there the dropped rows share no columns with the kept ones, so the sub-model is
- * not merely a relaxation but exact, and per-component optima stitch back to the full optimum
- * ([ComponentLpSolver]).
- */
+// The rows a breadth-first walk of the column/row graph reaches from the seed columns before the row cap, plus every
+// structural column they touch. Only whole rows are dropped, so the sub-model is a relaxation: any bound proved on it
+// (probe optimum, dual bound, Farkas refutation) holds on the full model, at a factorization cost bounded by the cap.
+// Bounds, shifts, probe flags, tags, strictness, global validity, premises and the double view carry over. The same
+// [LpModel.restrictTo] carves connected components, where no dropped row shares a column with a kept one, so the
+// restriction is exact ([ComponentLpSolver]).
 internal class LpNeighborhood(
     val model: LpModel,
-    /** Old→new structural column map (`-1` outside), or null when the caller tracks columns via
-     *  [cols] alone — per-part full-length maps would cost `n × parts` on a decomposed model. */
+    // -1 outside; null when the caller tracks columns via [cols] alone, since full-length maps cost n × parts.
     val colMap: IntArray?,
-    /** Taken rows by original index: sub-model row `r` is original row `rows(r)`. */
+    // Original indices: sub-model row r is original row rows(r), and likewise for cols.
     val rows: IntArray,
-    /** Taken structural columns by original index: sub-model column `c` is original column `cols(c)`. */
     val cols: IntArray,
 ) {
-    /** Sub-model column of original column [j] (`-1` outside); requires the old→new map. */
     fun colOf(j: Int): Int = checkNotNull(colMap) { "this restriction tracks columns via cols only" }[j]
 }
 
-/** Row-major adjacency of a model's structural entries (`rows -> columns`), built once in `O(nnz)`
- *  and shared across many [columnNeighborhood] walks. Covers the exact state's nonzeros when present, else
- *  the union of the [Long] core's and the double view's sparsity — the two patterns may differ on mixed
- *  models (real coefficients live only in the view; differing zero-coalescing can go either way), and the
- *  walk's whole-row-support soundness needs every entry of either. */
+// Built once in O(nnz) and shared across [columnNeighborhood] walks. Covers the exact state's nonzeros when present,
+// else the union of the Long core's and the double view's sparsity: the patterns differ on mixed models, and the
+// walk's whole-row soundness needs every entry of either.
 internal class LpRowIndex(val rowPtr: IntArray, val colIdx: IntArray)
 
-/** Build the row-major union adjacency of this model's structural columns. */
 internal fun LpModel.rowIndex(projection: LpProjectionMeter? = null): LpRowIndex {
     // Deduplicate per column across the two patterns (rows ascending within each), then bucket by row.
     projection?.reserve(m.toLong() + 1L, (m.toLong() + 1L) * 4L, matrix = true)
@@ -73,7 +53,7 @@ internal fun LpModel.rowIndex(projection: LpProjectionMeter? = null): LpRowIndex
     return LpRowIndex(rowPtr, colIdx)
 }
 
-/** Iterate the union-sparsity rows of column [j] once each, ascending. */
+// Each union-sparsity row once, ascending.
 internal inline fun LpModel.forEachColumnRow(j: Int, action: (i: Int) -> Unit) {
     exactState?.let { state ->
         for (entry in state.model.columnEntries(j)) if (!entry.number.value.isZero) action(entry.row)
@@ -111,18 +91,13 @@ internal inline fun LpModel.forEachColumnRow(j: Int, action: (i: Int) -> Unit) {
     }
 }
 
-/** Iterate every `(column, row)` of the union sparsity once, columns outer. */
+// Each union entry once, columns outer.
 internal inline fun LpModel.forEachUnionEntry(action: (j: Int, i: Int) -> Unit) {
     for (j in 0 until n) forEachColumnRow(j) { i -> action(j, i) }
 }
 
-/**
- * Extract the [maxRows]-capped neighborhood of [seeds] (structural columns) as its own [LpModel];
- * see [LpNeighborhood] for the relaxation contract. The walk alternates column→rows (this model's
- * CSC) and row→columns ([rowIndex]); a row past the cap is dropped whole, never truncated. The
- * sub-model's costs are zero — a probing caller installs its objective via
- * [LpModel.withSingleColumnObjective] on the mapped columns.
- */
+// A row past the cap is dropped whole, never truncated. Costs are zero; a probing caller installs its objective via
+// [LpModel.withSingleColumnObjective].
 internal fun LpModel.columnNeighborhood(seeds: IntArray, maxRows: Int, rowIndex: LpRowIndex): LpNeighborhood {
     val colMap = IntArray(n) { -1 }
     val takenRows = IntArrayList()
@@ -156,22 +131,15 @@ internal fun LpModel.columnNeighborhood(seeds: IntArray, maxRows: Int, rowIndex:
     return restrictTo(takenCols, takenRows, colMap, copyCosts = false)
 }
 
-/**
- * Restrict this model to [takenCols] × [takenRows] (original indices; [colMap] is their prebuilt
- * old→new column map). The caller guarantees every taken row's whole support is inside [takenCols] —
- * the invariant both consumers establish by construction ([columnNeighborhood]'s BFS, the component
- * labeling). With [copyCosts] the objective restricts too (costs, shift constant, double view);
- * without it costs are zero for a probing caller to overwrite.
- */
+// The caller guarantees every taken row's whole support is inside [takenCols]. Without [copyCosts] costs are zero
+// for a probing caller to overwrite.
 internal fun LpModel.restrictTo(
     takenCols: IntArrayList,
     takenRows: IntArrayList,
     colMap: IntArray?,
     copyCosts: Boolean,
-    /** Scratch row-index map of length `m`, reusable across calls. A caller that restricts the same model
-     *  once per component pays `O(components × m)` in allocation alone otherwise, which on a model with
-     *  many small components dwarfs the restriction itself. Cleared for the rows it touches on the way
-     *  out, so the buffer comes back all `-1` and the next call cannot see this one's rows. */
+    // Reusable across calls, since per-component allocation alone costs O(components × m). The rows it touches are
+    // reset to -1 on the way out.
     rowMapScratch: IntArray? = null,
 ): LpNeighborhood {
     val subN = takenCols.size

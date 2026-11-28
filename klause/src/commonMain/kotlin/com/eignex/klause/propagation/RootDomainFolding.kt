@@ -5,7 +5,6 @@ import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.MutableIntObjectMap
 import com.eignex.util.collections.toSortedLongArray
 
-/** Fold successful root-propagation deductions into the finite domains this projection owns. */
 internal fun BakedProblem.foldRootDeductionsIntoDomains(result: PropagationResult) {
     if (result !is PropagationResult.Implied) return
     val domains = foldedIntDomains

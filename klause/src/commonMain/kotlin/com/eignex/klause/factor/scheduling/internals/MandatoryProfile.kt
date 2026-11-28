@@ -4,45 +4,23 @@ import com.eignex.util.arrays.emptyLongArray
 import kotlin.math.max
 import kotlin.math.min
 
-/**
- * Shared mandatory-profile (compulsory-part) machinery for the time-tabling propagators
- * `Cumulative` and `Disjunctive`.
- *
- * A present task with start domain `[s.min, s.max]` and fixed duration `d` has a
- * *compulsory part* `[lst, ect) = [s.max, s.min + d)` that it must occupy wherever it
- * starts; the part is non-empty iff `lst < ect`. Summing the compulsory parts of all
- * present tasks (each weighted by its resource demand) yields the mandatory profile: a
- * set of disjoint segments `[from, to)` each at a constant resource level. A level above
- * the capacity proves infeasibility, and a candidate placement that would push any
- * segment over capacity can be shaved. Time-tabling after Aggoun and Beldiceanu,
- * "Extending CHIP in order to solve complex scheduling and placement problems",
- * Math. Comput. Modelling 17(7), 1993, https://doi.org/10.1016/0895-7177(93)90068-A.
- *
- * Disjunctive is the capacity-1, unit-resource specialization (`build(cap = 1)`,
- * `overloadsAt(..., r = 1, cap = 1, ...)`).
- *
- * One instance covers a single profile (build once, then query); callers needing several
- * profiles (e.g. one per machine) allocate one instance each.
- */
+// Sums the compulsory parts `[lst, ect) = [s.max, s.min + d)` of present tasks into disjoint constant-level
+// segments; Disjunctive uses it with capacity 1 and unit demand. Time-tabling after Aggoun and Beldiceanu,
+// "Extending CHIP in order to solve complex scheduling and placement problems",
+// Math. Comput. Modelling 17(7), 1993, https://doi.org/10.1016/0895-7177(93)90068-A.
 internal class MandatoryProfile {
     private val events = ArrayList<LongArray>()
     private var segFromA = emptyLongArray()
     private var segToA = emptyLongArray()
     private var segLevelA = emptyLongArray()
 
-    /** Number of mandatory segments produced by the most recent [build]. */
     var segCount = 0
         private set
 
-    /** When the most recent [build] returned `false`, the start time of the overloaded
-     *  segment — the time point whose summed compulsory parts exceed the capacity. Lets the
-     *  caller reconstruct a pointwise conflict reason citing exactly the tasks covering it.
-     *  Undefined when [build] returned `true`. */
+    // Start of the overloaded segment after a failed build, so callers can cite exactly the covering tasks.
     var overloadTime = 0L
         private set
 
-    /** Record a task's compulsory part `[lst, ect)` with resource demand [resource];
-     *  a no-op when the part is empty (`lst >= ect`). */
     fun addTask(lst: Long, ect: Long, resource: Long) {
         if (lst < ect) {
             events.add(longArrayOf(lst, resource))
@@ -50,11 +28,7 @@ internal class MandatoryProfile {
         }
     }
 
-    /**
-     * Sweep the recorded events into mandatory-profile segments, capturing every maximal
-     * interval at a positive level. Returns false (stopping early) as soon as a segment
-     * level exceeds [cap] — an overload proving infeasibility.
-     */
+    // False as soon as a level exceeds cap.
     fun build(cap: Long): Boolean {
         // (time asc, delta desc): at equal time, additions (+r) precede subtractions (−r).
         events.sortWith(compareBy({ it[0] }, { -it[1] }))
@@ -86,8 +60,6 @@ internal class MandatoryProfile {
         return true
     }
 
-    /** The highest mandatory level over any segment intersecting `[from, to)`, or 0 if none — the
-     *  peak compulsory demand a task spanning that window must coexist with. */
     fun maxLevelOver(from: Long, to: Long): Long {
         if (from >= to) return 0
         var lo = 0
@@ -105,12 +77,7 @@ internal class MandatoryProfile {
         return best
     }
 
-    /**
-     * True iff placing a task occupying `[s, sPlusD)` with resource demand [r] would push
-     * some mandatory segment over [cap] — after discounting the task's own already-counted
-     * compulsory part on the overlapping range when [ownsMandatory] (its compulsory window
-     * is `[lstI, ectI)`).
-     */
+    // With ownsMandatory, the task's own compulsory part `[lstI, ectI)` is discounted where it overlaps.
     fun overloadsAt(
         s: Long,
         sPlusD: Long,

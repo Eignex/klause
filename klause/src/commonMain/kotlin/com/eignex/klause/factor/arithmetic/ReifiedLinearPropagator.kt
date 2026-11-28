@@ -67,14 +67,10 @@ internal class ReifiedLinearPropagator(
         }
     }
 
-    /** The side of the sum that settles the body and how far it may loosen; see [settlingSide]. */
     private class Side(val useLo: Boolean, val slack: Long)
 
-    /**
-     * The one side of the sum that makes the body always hold ([holds]) or never hold for [sumLo]..[sumHi], with
-     * the slack it has to spare, or null when the body is not settled that way or needs both sides (an equality
-     * always holding, a disequality never holding, or an overflowed range).
-     */
+    // Null when no single side settles the body: an equality always holding, a disequality never holding, or an
+    // overflowed range.
     private fun settlingSide(sumLo: Long, sumHi: Long, holds: Boolean): Side? {
         if (sumLo == Long.MIN_VALUE && sumHi == Long.MAX_VALUE) return null
         val b = bound

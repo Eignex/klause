@@ -6,8 +6,7 @@ import com.eignex.klause.solver.search.VarRef
 import com.eignex.util.collections.MutableIntIntMap
 import kotlin.random.Random
 
-/** Domains at or below this size use the eager shuffle; larger ones use the lazy Fisher-Yates so
- *  an unconsumed tail (the common case) costs nothing. */
+// Larger domains use the lazy Fisher-Yates so an unconsumed tail, the common case, costs nothing.
 private const val INDOMAIN_EAGER_MAX = 32
 
 /** Uniformly random shuffle of the domain (`indomain_random`). */
@@ -19,8 +18,7 @@ object IndomainRandom : ValueSelector {
 
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
-            // Ask only for as many values as the eager path would shuffle: a wider domain declines
-            // here and takes the bounds draw below, instead of being counted first and rejected.
+            // Bounded so a wide domain declines here instead of being counted first and rejected.
             val eager = d.spanOrNull(INDOMAIN_EAGER_MAX.toLong())
             val full = d.spanOrNull()
             val n = full?.size ?: 0
@@ -28,7 +26,6 @@ object IndomainRandom : ValueSelector {
                 d.isFixed -> sequenceOf(d.min)
 
                 eager != null -> {
-                    // Cheaper than the lazy coroutine + map for a handful of values.
                     val arr = LongArray(eager.size) { eager.valueAt(it) }
                     for (i in arr.size - 1 downTo 1) {
                         val j = rng.nextInt(i + 1)
@@ -40,17 +37,14 @@ object IndomainRandom : ValueSelector {
                 }
 
                 full == null -> sequence {
-                    // A positional shuffle cannot reach values past index 2^31 on a domain with more
-                    // values than an index addresses, so draw the head — the value a bound split
-                    // actually consumes — uniformly from the bounds.
+                    // A positional shuffle cannot index past 2^31 values, so draw the head, the value a
+                    // bound split consumes, uniformly from the bounds.
                     yield(d.randomValue(rng))
                 }
 
                 else -> sequence {
-                    // Lazy Fisher-Yates over domain indices: emit a uniform random permutation
-                    // doing O(consumed) work, not O(n). Branch nodes typically read only the first
-                    // value (splitIntAlternatives bound-splits around it), so eagerly shuffling a large
-                    // domain is almost pure waste. `swap` records only the touched index slots.
+                    // Lazy Fisher-Yates: O(consumed) work, since branch nodes typically read only the first
+                    // value. `swap` records only the touched index slots.
                     val swap = MutableIntIntMap()
                     for (k in 0 until n) {
                         val j = k + rng.nextInt(n - k)

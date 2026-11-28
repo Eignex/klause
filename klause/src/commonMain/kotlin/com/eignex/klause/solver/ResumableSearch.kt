@@ -10,31 +10,21 @@ import com.eignex.util.numbers.BigFraction
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * A pause/resume handle over an optimisation. Each [runSlice] advances the retained search
- * state and returns at a checkpoint. A later slice continues from that checkpoint, preserving
- * the incumbent, heuristics and engine-specific state. A scheduled
- * [com.eignex.klause.portfolio.Portfolio] uses this seam to retain work between segments.
- *
- * Backtrack retains its trail and local search retains its assignment, random state and restart policy.
- * The handle is **single-threaded and stateful**; drive it from one thread, one [runSlice] at a time.
+ * A pause/resume handle over an optimisation. Each [runSlice] advances the retained search state
+ * (incumbent, heuristics, engine state) and returns at a checkpoint the next slice continues from.
+ * Single-threaded and stateful: drive it from one thread, one [runSlice] at a time.
  *
  * Obtain one from a [ResumableOptimizer]. [close] releases per-search resources and is idempotent.
  * A closed pending handle rejects slices; a terminal verdict remains readable after close.
  */
 interface ResumableSearch : AutoCloseable {
     /**
-     * Advance the search for up to [sliceMillis] more wall-clock milliseconds, or until [global]
-     * fires, or the search completes — whichever comes first — resuming exactly where the previous
-     * call left off. Every **new** incumbent discovered during this slice is passed to [onIncumbent]
-     * as it lands (objective strictly improving on the best seen so far).
+     * Advance the search for up to [sliceMillis] more milliseconds, until [global] fires, or until it
+     * completes. Each strictly improving incumbent is passed to [onIncumbent] as it lands.
      *
-     * Returns the **terminal verdict** ([MinimizeResult.Optimal] / [MinimizeResult.Unbounded] /
-     * [MinimizeResult.Infeasible], or a [MinimizeResult.BestFound] / [MinimizeResult.Unknown] with
-     * [com.eignex.klause.solver.result.TerminationReason.SearchExhausted] when an external bound
-     * supplier makes the absolute proof unsound from this arm's vantage) if the search **completed**
-     * during this slice; otherwise `null` — the slice elapsed (or [global] fired) with search still
-     * pending, so call [runSlice] again to continue. Once a terminal verdict is returned, [isDone] is
-     * `true` and further calls return that same verdict without doing work.
+     * Returns the terminal verdict if the search completed during this slice, otherwise `null`. A search
+     * exhausted under an external bound reports [MinimizeResult.BestFound] or [MinimizeResult.Unknown] with
+     * [TerminationReason.SearchExhausted]. After a verdict, [isDone] is `true` and further calls return it.
      */
     fun runSlice(
         global: ExecutionControl,
@@ -44,17 +34,9 @@ interface ResumableSearch : AutoCloseable {
 
     /**
      * As [runSlice], but ending the slice after [sliceNodes] search nodes when [sliceNodes] is non-negative, or
-     * after [sliceMillis] if that comes first.
-     *
-     * A slice measured in nodes is reproducible: the same invocation pauses at the same point in the
-     * same tree, so the counters a run reports do not depend on how loaded the machine was. A slice
-     * measured in milliseconds cannot be: it lands somewhere different every time, and every statistic
-     * downstream of the search inherits that.
-     *
-     * So with a node budget armed, [sliceMillis] is only an outer bound: pass [Long.MAX_VALUE] for a slice that is
-     * reproducible whatever it costs, or a finite time for one that must not run long when its nodes turn out to
-     * be expensive. Either way the pause lands where a node budget would land it. [global] still carries the
-     * whole-solve deadline. ExecutionControl is cooperative; atomic engine work can overrun a slice.
+     * after [sliceMillis] if that comes first. A node budget makes the pause point reproducible; pass
+     * [Long.MAX_VALUE] for [sliceMillis] to rely on it alone. ExecutionControl is cooperative, so atomic engine
+     * work can overrun a slice.
      */
     fun runSlice(
         global: ExecutionControl,
@@ -67,12 +49,8 @@ interface ResumableSearch : AutoCloseable {
     val isDone: Boolean
 
     /**
-     * Counters accumulated so far, whether or not the search has finished.
-     *
-     * A paused slice still did the work it did, so a caller reporting a run its deadline cut short reads
-     * them here — the terminal verdict it would otherwise take them from is exactly what such a run never
-     * produces. Cumulative for this handle, so a caller folds each handle once rather than per slice.
-     * Remains readable after [close], including any counters finalized while closing.
+     * Counters accumulated so far, whether or not the search has finished. Cumulative for this handle,
+     * so fold each handle once rather than per slice. Readable after [close].
      */
     val stats: SolveStats
 
@@ -198,12 +176,7 @@ interface ResumableSolver<P : SolverParams> : Solver<P> {
     fun resumableSolve(params: P): ResumableSolve
 }
 
-/**
- * A reusable handle for solving a sequence of pinned sub-problems on one persistent search — the LNS
- * destroy/repair loop. Each [repair] re-seeds the same session and LP relaxation on a new
- * assumption set instead of rebuilding, so the learned-clause database and LP warm start carry across
- * fragments. Single-threaded and stateful; obtain one from a backtrack solver.
- */
+// One persistent search for the LNS repair loop: learned clauses and the LP warm start carry across fragments.
 internal interface RepairSearch : AutoCloseable {
     val stats: SolveStats get() = SolveStats.EMPTY
     val work: Long get() = stats.search.nodes.sum.toLong()
@@ -216,13 +189,8 @@ internal interface RepairSearch : AutoCloseable {
 
     fun runSlice(cancellation: ExecutionControl, millis: Long, work: Long): RepairSearchStep
 
-    /**
-     * Solve the fragment pinned by [assumptions] under a [decisionBudget] (decisions), pruning against
-     * [cutoff] and stopping when [cancellation] fires. The caller MUST keep [cutoff] monotone
-     * non-increasing across calls — the reused session retains permanent objective-bound clauses, so a
-     * monotone cutoff keeps every stale bound looser than the current one (never a wrong prune). Returns
-     * the best strictly-better completion found, or null.
-     */
+    // The cutoff must be non-increasing across calls: the reused session keeps permanent objective-bound
+    // clauses, which stay sound only while every stale bound is looser than the current one.
     fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff: Double,
         cancellation: ExecutionControl): Sample? = repairStep(assumptions, decisionBudget, cutoff, cancellation).sample
 

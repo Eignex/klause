@@ -16,13 +16,9 @@ import kotlin.random.Random
  * Each variable carries `Q(v) ← (1 − α)·Q(v) + α·r`, with
  * `r = multiplier / (conflicts − lastConflict(v) + 1)`.
  *
- * [onConflict] advances the conflict counter, decays α from [alphaStart] by [alphaStep] to
- * [alphaFloor], and rewards reason variables and the failed decision with [conflictReward].
- * [onPropagation] and [onCommit] use [assignReward], discounted by conflict recency.
- * [onRestart] retains scores.
- *
- * Picks the highest-scoring unpinned variable through [IndexedMaxHeap]; ties follow heap order.
- * Scores are convex combinations of rewards in `[0, 1]` and need no rescaling.
+ * Each conflict decays α from [alphaStart] by [alphaStep] to [alphaFloor] and rewards reason variables and
+ * the failed decision with [conflictReward]; assignments earn [assignReward], discounted by conflict
+ * recency. Scores survive restarts.
  */
 class Chb(
     private val alphaStart: Double = 0.4,
@@ -43,8 +39,7 @@ class Chb(
     private var alpha: Double = alphaStart
     private var conflicts: Long = 0
 
-    // Combined index space: 0..numBool-1 are bool ids; numBool..numBool+numInt-1 are int ids
-    // offset by numBool. Picks are O((1 + pinned-skip)·log n).
+    // Combined index space: bools first, then ints offset by numBool.
     private var heap: IndexedMaxHeap? = null
     private var lastConflict: LongArray = emptyLongArray()
     private var numBoolCached: Int = 0
@@ -127,16 +122,12 @@ class Chb(
     private fun idOfBool(v: Int): Int = if (v < numBoolCached) v else -1
     private fun idOfInt(v: Int): Int = if (v < numIntCached) numBoolCached + v else -1
 
-    /** Conflict-side reward: the variable just took part in a conflict, so its recency
-     *  denominator collapses to 1 and it earns the full [conflictReward]. */
     private fun bumpConflict(h: IndexedMaxHeap, id: Int) {
         if (id < 0) return
         lastConflict[id] = conflicts
         updateQ(h, id, conflictReward)
     }
 
-    /** Assignment-side reward: recency-discounted by how long ago the variable last appeared
-     *  in a conflict. Leaves `lastConflict` untouched. */
     private fun bumpAssign(h: IndexedMaxHeap, id: Int) {
         if (id < 0) return
         val recency = (conflicts - lastConflict[id] + 1).toDouble()

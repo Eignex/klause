@@ -18,27 +18,11 @@ import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.MutableIntIntMap
 import com.eignex.util.collections.MutableLongIntMap
 
-/**
- * Binary implication graph presolve. Harvests `lit -> lit` implications the way [Probing] pins a
- * literal — pin a free Boolean, run `Problem.propagate`, and read every *other* Boolean propagation
- * forces — then exploits the graph two ways:
- *
- *  - **Equivalent-literal substitution**: literals on a mutual-implication cycle are logically equal,
- *    so the variables they name are interchangeable. Each cycle collapses to a single representative
- *    and every other member is substituted away (a plain rename via `Factor.remap`,
- *    the same machinery affine aliasing uses), then rebuilt for the caller by the steps
- *    [asRebuilds] states.
- *  - **Transitive reduction**: a binary clause `a -> b` whose conclusion is already reachable from
- *    `a` through *other* binary clauses is entailed by that chain, so propagation still derives it and
- *    the clause can be dropped.
- */
+// Harvests `lit -> lit` implications by pinning free Booleans as [Probing] does, then collapses each
+// mutual-implication cycle to one representative by renaming (rebuilt by [asRebuilds]), and drops each
+// binary clause whose implication is already reachable through other binary clauses.
 internal object ImplicationGraph {
 
-    /**
-     * Run the pass on [problem], bounded to [maxCandidates] pinned Booleans (mirroring [Probing]'s
-     * per-invocation cap). Returns the reduced problem plus a lift that copies each merged variable's
-     * value from its representative; the round engine composes it with the other passes' reconstructs.
-     */
     fun reduce(
         problem: Problem,
         maxCandidates: Int,
@@ -56,14 +40,8 @@ internal object ImplicationGraph {
         ).also { it.rebuild = rebuild }
     }
 
-    /**
-     * [reduce] over a canonical source model, with the graph read off the binary clauses.
-     *
-     * Pinning runs propagation, which needs a finite domain for every column, so the source form harvests
-     * no implication a longer clause or another factor kind would yield: its graph is exactly the clean
-     * binary clauses. A cycle there is still an equivalence every solution honours, and the rename and the
-     * transitive reduction read nothing else, so both hold before a finite projection exists.
-     */
+    // Pinning needs finite domains, so the source graph is exactly the clean binary clauses. Its cycles are
+    // still equivalences every solution honours, and the rename and transitive reduction read nothing else.
     fun reduceSource(
         problem: Problem,
         cancellation: ExecutionControl,
@@ -76,8 +54,6 @@ internal object ImplicationGraph {
         return PresolveShared.sourceIdentityDelta(problem.factors, reduction.factors, reduction.merges.asRebuilds())
     }
 
-    /** The factors after collapsing the cycles of [implications] and dropping entailed binaries, or `null`
-     *  when neither changed anything. */
     private fun reduceOver(
         problem: Problem,
         implications: Adjacency,
@@ -99,7 +75,6 @@ internal object ImplicationGraph {
 
     private class Reduction(val factors: List<Factor>, val merges: List<BoolMerge>)
 
-    /** The implication edges the clean binary clauses among [factors] encode, both directions of each. */
     private fun binaryClauseImplications(
         problem: Problem,
         factors: List<Factor>,
@@ -119,19 +94,12 @@ internal object ImplicationGraph {
         return adj
     }
 
-    /** A two-literal clause over plain Booleans; an atom literal has no node in the literal graph. */
+    // An atom literal has no node in the literal graph.
     private fun isCleanBinary(f: Factor, numBoolVars: Int): Boolean =
         f is Clause && f.literals.size == 2 && f.allLiteralsBool(numBoolVars)
 
-    /**
-     * Implications discovered by probing-style pinning, as a directed graph over **literals**
-     * (`2·numBoolVars` nodes, literal `l` indexing node `l`). Pinning literal `p` and reading a forced
-     * `q` records the edge `p -> q`; soundness is exactly probing's — `propagate` is sound, so a forced
-     * `q` holds in every solution that sets `p`, which is what `p -> q` asserts. A pinned polarity that
-     * propagates Unsat is a failed literal; it is left to [Probing] and contributes no edges.
-     *
-     * Bounded by [maxCandidates] free Booleans (in id order); the round engine re-enters the pass.
-     */
+    // Pinning `p` and reading a forced `q` records `p -> q`, sound because propagation is. A failed literal
+    // contributes no edges; it is left to [Probing]. The round engine re-enters past [maxCandidates].
     private fun harvestImplications(problem: Problem, maxCandidates: Int, cancellation: ExecutionControl): Adjacency {
         val adj = Adjacency(2 * problem.numBoolVars)
         for (v in problem.freeBooleanProbeCandidates(maxCandidates, cancellation)) {
@@ -142,9 +110,7 @@ internal object ImplicationGraph {
         return adj
     }
 
-    /** The binary-implication graph of [problem] as a literal-indexed adjacency: `result[lit]` lists
-     *  every literal that pinning `lit` forces (edge `lit -> forced`), discovered by sound
-     *  probing-style pinning. Bounded to [maxCandidates] pinned Booleans. Consumers index by [Lit.make]. */
+    // `result(lit)` lists every literal pinning `lit` forces, indexed by `Lit.make`.
     @Suppress("MemberNameEqualsClassName") // the graph this object builds is the natural name for the builder
     fun implicationGraph(
         problem: Problem,
@@ -152,8 +118,6 @@ internal object ImplicationGraph {
         cancellation: ExecutionControl = ExecutionControl.Never,
     ): Array<IntArray> = problem.propagatedImplicationGraph(maxCandidates, cancellation)
 
-    /** Pin `v = [value]`, propagate, and record `pinned -> forced` for every other Boolean the
-     *  propagation forces. A self-edge (the pin itself) is never emitted. */
     private fun recordPolarity(problem: Problem, v: Int, value: Boolean, adj: Adjacency,
         cancellation: ExecutionControl) {
         if (cancellation()) return
@@ -168,23 +132,11 @@ internal object ImplicationGraph {
         }
     }
 
-    /**
-     * Same-polarity equivalent-variable merges: variable `w` merges into representative `r` when their
-     * positive literals lie on a mutual-implication cycle (`r+ ⇒ w+` and `w+ ⇒ r+`), proven by the
-     * harvested graph. Cycles are the strongly-connected components of the literal graph; the smallest
-     * variable id in a component is its representative.
-     *
-     * **Polarity scope.** Only same-polarity equivalence is merged. `Factor.remap` renames a variable id
-     * while preserving literal polarity and cannot express the polarity flip an anti-equivalence `r ⇔ ¬w`
-     * needs (a reification aux var is a raw id, not a literal, so there is no polarity to flip), so
-     * anti-equivalent literals are detected but deliberately left unmerged. A component that contains both
-     * polarities of one variable (`u+` and `u-` together) would assert `u ⇔ ¬u`, i.e. an inconsistency;
-     * that variable is skipped and left to [Probing]'s failed-literal handling.
-     *
-     * A variable the objective reads ([objectiveBoolVars]) is never merged in either direction: the
-     * presolved problem leaves a merged variable unconstrained, and an objective term over it must keep
-     * a constrained variable to read, so the objective set is left wholly intact.
-     */
+    // Merges `w` into representative `r` (the smallest id in its SCC) when `r+` and `w+` share a
+    // component. Only same polarity: `Factor.remap` renames ids and cannot flip polarity, since a
+    // reification aux var has no literal. A component holding both polarities of one variable is an
+    // inconsistency left to [Probing]. Objective variables never merge: a merged variable is left
+    // unconstrained, and the objective must keep reading a constrained one.
     private fun equivalentVariableMerges(
         numBoolVars: Int,
         adj: Adjacency,
@@ -200,7 +152,7 @@ internal object ImplicationGraph {
             if (vv in objectiveBoolVars) continue
             val pos = componentOf[Lit.make(vv, true)]
             val neg = componentOf[Lit.make(vv, false)]
-            if (pos == neg) continue // u+ and u- in one SCC ⇒ u ⇔ ¬u: skip (failed-literal territory)
+            if (pos == neg) continue // u ⇔ ¬u: failed-literal territory
             if (!repVarOfComponent.containsKey(pos) || vv < repVarOfComponent.getOrDefault(pos, 0)) {
                 repVarOfComponent.put(pos, vv)
             }
@@ -219,10 +171,8 @@ internal object ImplicationGraph {
         return merges
     }
 
-    /** Rewrite every factor with each merged variable renamed to its representative, dropping any
-     *  binary clause that the rename turns into a tautology (`r ⇒ r`). Bool variable count is
-     *  preserved; a merged variable simply stops appearing in any factor and is rebuilt on the way
-     *  back. */
+    // Drops clauses the rename makes tautological. The Boolean count is preserved; a merged variable stops
+    // appearing in any factor and is rebuilt on the way back.
     private fun applyMerges(problem: Problem, merges: List<BoolMerge>, work: GraphWork): List<Factor>? {
         val boolMap = IntArray(problem.numBoolVars)
         for (v in boolMap.indices) {
@@ -249,8 +199,8 @@ internal object ImplicationGraph {
         return if (work.check()) out else null
     }
 
-    /** [candidates] minus any merge that would rename a [ReifiedPseudoBoolean]'s auxiliary and one of its
-     *  body variables onto the same variable; both are kept as themselves instead. */
+    // Drops any merge that would rename a [ReifiedPseudoBoolean]'s auxiliary and a body variable onto one
+    // variable; both keep their own ids.
     private fun compatibleMerges(
         problem: Problem,
         candidates: List<BoolMerge>,
@@ -292,7 +242,6 @@ internal object ImplicationGraph {
         }
     }
 
-    /** A clause that holds in every assignment because some variable appears in both polarities. */
     private fun isTautology(clause: Clause, work: GraphWork): Boolean {
         val seen = IntHashSet(clause.literals.size)
         for (lit in clause.literals) {
@@ -303,21 +252,11 @@ internal object ImplicationGraph {
         return false
     }
 
-    /**
-     * Drop every binary clause whose implication is entailed by a longer chain of the *other* binary
-     * clauses. A binary clause `(¬a ∨ b)` is the implication `a -> b` (and its contrapositive
-     * `¬b -> ¬a`); both edges go into a graph built from the binary clauses **alone**. The clause is
-     * redundant exactly when `b` is reachable from `a` over the edges of the clauses still kept —
-     * propagation then still derives `b` from `a`, so satisfiability and the optimum are untouched.
-     *
-     * The clauses are settled one at a time and a dropped clause's edges leave the graph before the next
-     * is tested. Judging every clause against the whole graph would let the clauses of one cycle each
-     * vouch for the others and all drop together, losing the equivalence they jointly state. Edges are
-     * counted per clause, so a duplicate keeps exactly one copy.
-     *
-     * Non-binary factors and unit clauses are always kept; when nothing is dropped [factors] is returned
-     * unchanged (identity, the pass's no-op signal).
-     */
+    // A binary clause `a -> b` is redundant when `b` is reachable from `a` over the kept binary clauses.
+    // Clauses are settled one at a time, removing dropped edges before the next test; judging all against
+    // the whole graph would let the clauses of one cycle vouch for each other and all drop, losing the
+    // equivalence. Edges are counted per clause, so a duplicate keeps exactly one copy. Returns [factors]
+    // itself when nothing drops.
     private fun dropTransitivelyRedundantBinaries(
         problem: Problem,
         factors: List<Factor>,
@@ -366,14 +305,12 @@ internal object ImplicationGraph {
         return kept
     }
 
-    /** The two implication edges a binary clause `(p ∨ q)` encodes: `¬p -> q` and `¬q -> p`. */
     private fun implicationEdges(clause: Clause): Pair<Edge, Edge> {
         val p = clause.literals[0]
         val q = clause.literals[1]
         return Edge(Lit.negate(p), q) to Edge(Lit.negate(q), p)
     }
 
-    /** Whether [target] is reachable from [source] over the edges of [adj] some kept clause still holds. */
     private fun reachable(
         adj: Adjacency,
         live: MutableLongIntMap,
@@ -401,11 +338,8 @@ internal object ImplicationGraph {
         return false
     }
 
-    /** Strongly-connected components over the literal graph (R. Tarjan, "Depth-first search and linear graph
-     *  algorithms", SIAM J. Comput. 1972, https://doi.org/10.1137/0201010): `component(l)` is a stable
-     *  component id shared by exactly the literals on a mutual-implication cycle with `l`. A literal
-     *  with no edges is its own singleton component. Iterative (explicit stack) so a deep implication
-     *  chain cannot overflow the call stack on the native targets. */
+    // R. Tarjan, "Depth-first search and linear graph algorithms", SIAM J. Comput. 1972,
+    // https://doi.org/10.1137/0201010. Iterative so a deep implication chain cannot overflow the native stack.
     private fun stronglyConnectedComponents(adj: Adjacency, work: GraphWork): IntArray? {
         if (!work.check()) return null
         val n = adj.nodeCount
@@ -496,7 +430,6 @@ internal object ImplicationGraph {
         val key: Long get() = (first.toLong() shl Int.SIZE_BITS) or (second.toLong() and 0xFFFF_FFFFL)
     }
 
-    /** Adjacency list over literal nodes `0 until [nodeCount]`, built incrementally. */
     private class Adjacency(val nodeCount: Int) {
         private val out = arrayOfNulls<IntArrayList>(nodeCount)
         private val empty = IntArrayList()
@@ -510,16 +443,9 @@ internal object ImplicationGraph {
     }
 }
 
-/** A same-polarity equivalence merge recorded by [ImplicationGraph]: variable [from] is renamed to
- *  its representative [into], which holds the identical value in every solution. */
 internal class BoolMerge(val from: Int, val into: Int)
 
-/**
- * The equivalent-literal merges [ImplicationGraph.reduce] made, as the steps that rebuild them.
- *
- * A representative is never itself merged away (the smallest id in a component is the representative and
- * only larger ids merge into it), so the merges rebuild in the order they were found.
- */
+// A representative is never itself merged away, so the merges rebuild in the order they were found.
 internal fun List<BoolMerge>.asRebuilds(): SourceRebuilds =
     SourceRebuilds(map { RebuildStep.CopyLiteral(it.from, Lit.make(it.into, true)) })
 

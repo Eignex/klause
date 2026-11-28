@@ -7,16 +7,13 @@ import com.eignex.klause.lowering.LinComb
 import com.eignex.util.collections.LongHashSet
 import com.eignex.util.collections.MutableLongIntMap
 
-/** Fewest arms worth indexing directly by the source selector (see [IteChain]). */
 private const val MIN_CHAIN_DEPTH = 16
 
-/** Widest array the collapse will build — the propagator's per-value support walk stops above this. */
+// The propagator's per-value support walk stops above this span.
 private const val MAX_CHAIN_SPAN = 4096L
 
-/** Array positions allowed per arm; beyond this the constants are too sparse to be a table. */
 private const val SPAN_PER_ARM = 8L
 
-/** A reified `variable = value` atom, recorded so a chain condition can be read back off its literal. */
 internal class EqAtom(val variable: Int, val value: Long, val allowsElement: Boolean)
 
 internal class GuardEquality(val variable: Int, val value: Long, val equal: Boolean) {
@@ -24,50 +21,26 @@ internal class GuardEquality(val variable: Int, val value: Long, val equal: Bool
         if (this.variable == variable) (this.value == value) == equal else null
 }
 
-/**
- * One `ite`-on-equality chain being accumulated, defining `result` as
- * `if selector = keys(0) then arms(0) elif … else default`.
- *
- * A term `(ite (= i k0) v0 (ite (= i k1) v1 … d))` over a single selector `i` with distinct constants
- * `k` is a table lookup written as a decision list. Reading it back as the extensional relation
- * `result = arr(i)` is the case-analysis-to-`element` reformulation (Van Hentenryck and Carillon,
- * *Generality versus Specificity: an Experience with AI and OR Techniques*, AAAI 1988,
- * https://cdn.aaai.org/AAAI/1988/AAAI88-117.pdf): the chain
- * infers `result` from `i` only by traversing one reified equality per arm, where the extensional form
- * does it in a single propagation step.
- *
- * Both forms are functional *definitions* of a fresh quantity — neither is a reified constraint — so
- * the substitution is valid inside any surrounding boolean structure, and posting it is independent of
- * where the term occurred.
- *
- * Two properties make the collapse sound:
- *  - the arm constants are distinct, so the arms are mutually exclusive and their decision-list order
- *    carries no information;
- *  - [Element] additionally forces `i` into the array's index range, which the chain does not — so the
- *    array must span the selector's **whole** domain, not just the arm constants' range. Index values
- *    with no arm take the chain's default, written into those positions: a constant default directly,
- *    an identity default (`d` is the selector) as the position's own index value, which is exact
- *    because `idx = i` selects position `i`.
- *
- * Short or sparse chains use a private choice index over their arms and default, avoiding a dense
- * source-selector array. The span conditions keep direct selector arrays within [MAX_CHAIN_SPAN],
- * where the propagator can retain its per-value support walk.
- *
- * [result] is shared by every level of the chain: an interior level's value is consumed only by the
- * level that extends it, so re-using the variable (widening its domain per arm) leaves no undefined
- * interior variables behind, whichever lowering the chain ends up with.
- */
+// `(ite (= i k0) v0 (ite (= i k1) v1 … d))` with distinct constants is a table lookup written as a decision
+// list; reading it as `result = arr(i)` is the case-analysis-to-`element` reformulation (Van Hentenryck and
+// Carillon, *Generality versus Specificity: an Experience with AI and OR Techniques*, AAAI 1988,
+// https://cdn.aaai.org/AAAI/1988/AAAI88-117.pdf), which propagates in one step instead of one per arm.
+//
+// Both forms define a fresh quantity, so the substitution is valid under any Boolean structure. Distinct keys
+// make the arms exclusive. Element also forces `i` into the index range, so the array spans the selector's whole
+// domain and positions with no arm hold the default. [result] is shared by every level, since an interior
+// level's value is consumed only by the level extending it.
 internal class IteChain(val result: Int, val selector: Int, val default: LinComb) {
     val keys = ArrayList<Long>()
     val arms = ArrayList<LinComb>()
 
-    /** Positive-form condition literals, parallel to [keys]; `conds(i)` holds iff `selector = keys(i)`. */
+    // `conds(i)` holds iff `selector = keys(i)`.
     val conds = ArrayList<Int>()
     private val distinct = LongHashSet()
     var allowsElement = true
         private set
 
-    /** Append an arm, or decline when [key] repeats — a repeat would make the arms non-exclusive. */
+    // A repeated key would make the arms non-exclusive.
     fun addArm(key: Long, arm: LinComb, cond: Int, allowsElement: Boolean): Boolean {
         if (!distinct.add(key)) return false
         keys.add(key)
@@ -78,10 +51,7 @@ internal class IteChain(val result: Int, val selector: Int, val default: LinComb
     }
 }
 
-/**
- * The chains still open for extension, keyed by their result variable, plus the reified equality atoms
- * their conditions are read from. Insertion-ordered so lowering follows source order.
- */
+// Insertion-ordered so lowering follows source order.
 internal class IteChainTable {
     private val atoms = HashMap<Int, EqAtom>()
     private val chains = LinkedHashMap<Int, IteChain>()
@@ -115,17 +85,14 @@ internal class IteChainTable {
         }
     }
 
-    /** Remove and return the chain defining [variable], if any — it can no longer be extended. */
     fun close(variable: Int): IteChain? = chains.remove(variable)
 
-    /** Remove and return every chain still open. */
     fun drain(): List<IteChain> {
         val out = chains.values.toList()
         chains.clear()
         return out
     }
 
-    /** A variable pinned to [value], shared across every array that needs that constant as an entry. */
     fun fixedVar(value: Long, fresh: (Long) -> Int): Int {
         val existing = fixedVars.getOrDefault(value, -1)
         if (existing >= 0) return existing
@@ -135,10 +102,7 @@ internal class IteChainTable {
     }
 }
 
-/**
- * Fold `(ite cond thenTerm elseTerm)` into a chain, returning the chain's result term, or null when the
- * condition is not an equality on a finite-domain variable (the caller then lowers the `ite` directly).
- */
+// Null when the condition is not a recorded equality atom; the caller then lowers the `ite` directly.
 internal fun Compiler.Builder.chainIte(cond: Int, thenTerm: LinComb, elseTerm: LinComb): LinComb? {
     // `(ite (not (= i k)) A B)` is the positive chain step `(ite (= i k) B A)`.
     val negated = iteChains.atomOf(cond) == null
@@ -165,13 +129,10 @@ internal fun Compiler.Builder.chainIte(cond: Int, thenTerm: LinComb, elseTerm: L
     return LinComb(mapOf(chain.result to 1), 0)
 }
 
-/** Lower the chain defining [variable], if one is open — called once the value escapes into a binding,
- *  where a further arm can no longer reach it. */
 internal fun Compiler.Builder.closeIteChain(variable: Int) {
     iteChains.close(variable)?.let { lowerIteChain(it) }
 }
 
-/** Lower every chain that never escaped into a binding. */
 internal fun Compiler.Builder.lowerOpenIteChains() {
     for (chain in iteChains.drain()) lowerIteChain(chain)
 }
@@ -186,7 +147,6 @@ private fun Compiler.Builder.lowerIteChain(chain: IteChain) {
     )
 }
 
-/** Post the chain as one [Element] over the selector's whole domain, or decline. */
 private fun Compiler.Builder.collapseToElement(chain: IteChain): Boolean {
     if (!chain.allowsElement) return false
     if (chain.keys.size < MIN_CHAIN_DEPTH) return false
@@ -198,14 +158,13 @@ private fun Compiler.Builder.collapseToElement(chain: IteChain): Boolean {
     if (span > MAX_CHAIN_SPAN || span > SPAN_PER_ARM * chain.keys.size) return false
     val fill = chain.default.takeIf { it.coeffs.isEmpty() }?.constant
     if (fill == null && chain.default.asSimpleVar() != chain.selector) return false
-    // CP holds the whole global, not just the column it indexes, so every column the [Element] names has
-    // to be finite. With an open result or arm the chain stays as rows a theory can decide.
+    // CP holds the whole global, so every column it names must be finite; otherwise the chain stays as rows a
+    // theory can decide.
     if (intDomains[chain.result] is PresolveDomain.Open) return false
     if (chain.arms.any { arm -> arm.asSimpleVar()?.let { intDomains[it] is PresolveDomain.Open } == true }) {
         return false
     }
-    // A key outside the selector's domain names an unreachable position, so its arm is dropped rather
-    // than widening the array to hold a case that cannot occur.
+    // A key outside the selector's domain is unreachable, so its arm is dropped.
     val reachable = chain.keys.indices.filter { chain.keys[it] in lo..hi }
     val arrIsVars = reachable.any { chain.arms[it].coeffs.isNotEmpty() }
     val size = span.toInt()
@@ -221,11 +180,8 @@ private fun Compiler.Builder.collapseToElement(chain: IteChain): Boolean {
     return true
 }
 
-/** The variable holding a constant array entry — one per distinct value, shared across every chain. */
 private fun Compiler.Builder.entryVar(value: Long): Int = iteChains.fixedVar(value) { newInt(it, it) }
 
-/** The variable holding an arm's value: the term itself when it is a bare variable, a shared pinned
- *  variable when it is constant, else a fresh one equated to the term. */
 private fun Compiler.Builder.armVar(arm: LinComb): Int {
     arm.asSimpleVar()?.let { return it }
     if (arm.coeffs.isEmpty()) return entryVar(arm.constant)
@@ -235,7 +191,6 @@ private fun Compiler.Builder.armVar(arm: LinComb): Int {
     return v
 }
 
-/** Widen [variable]'s domain to also cover [term]'s range — the chain result takes every arm's value. */
 private fun Compiler.Builder.widenToInclude(variable: Int, term: LinComb) {
     val (termLo, termHi) = linCombRange(term)
     val curLo: Long?
@@ -254,8 +209,7 @@ private fun Compiler.Builder.widenToInclude(variable: Int, term: LinComb) {
     intDomains[variable] = openOrFinite(nullableMin(curLo, termLo), nullableMax(curHi, termHi))
 }
 
-/** Minimum of two bounds where null is infinity, so an open side stays open. */
+// Null is infinity, so an open side stays open.
 private fun nullableMin(a: Long?, b: Long?): Long? = if (a == null || b == null) null else minOf(a, b)
 
-/** Maximum of two bounds where null is infinity, so an open side stays open. */
 private fun nullableMax(a: Long?, b: Long?): Long? = if (a == null || b == null) null else maxOf(a, b)

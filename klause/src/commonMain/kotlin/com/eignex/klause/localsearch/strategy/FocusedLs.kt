@@ -13,24 +13,11 @@ import com.eignex.klause.localsearch.schedule.Schedule
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.localsearch.scoring.MoveScoring
 
-/**
- * The focused-LS family — WalkSAT, probSAT, simulated annealing — as [SourceDrivenStrategy] recipes.
- * Each step focuses on a single uniformly-random violated factor's repair suggestions
- * ([ViolatedRepairs] with `sampleCount = 1`, the WalkSAT/probSAT opener) and selects among them by
- * the shaped break score ([MoveScoring.Break]); what differs between the algorithms is the acceptance
- * rule (and, for the adaptive variants, the schedule axis's noise dimension):
- *
- *  - [WalkSat] — [AcceptanceRule.WalkSatNoise]; [WalkSat.adaptive] steers the noise off a noise
- *    schedule (adaptive WalkSAT, see [NoiseController]).
- *  - [ProbSat] — [AcceptanceRule.ProbSat]; [ProbSat.adaptive] / [ProbSat.bandit] steer the break
- *    exponent off a noise / bandit schedule.
- *  - [SimulatedAnnealing] — [AcceptanceRule.Metropolis] under a temperature schedule.
- *
- * Configuration checking is opt-in on every factory: it restricts candidates to variables whose
- * configuration changed since their last flip, falling back to the full set when all are CC-blocked
- * (S. Cai, K. Su, "Configuration checking with aspiration in local search for SAT", AAAI 2012,
- * https://doi.org/10.1609/aaai.v26i1.8133).
- */
+// The focused-LS family repairs one uniformly random violated factor per step and selects by break score; the
+// algorithms differ in acceptance rule and noise schedule. Configuration checking restricts candidates to
+// variables whose configuration changed since their last flip, falling back to all when every one is blocked
+// (S. Cai, K. Su, "Configuration checking with aspiration in local search for SAT", AAAI 2012,
+// https://doi.org/10.1609/aaai.v26i1.8133).
 private fun focusedSources() = listOf(ConfiguredSource(ViolatedRepairs.SINGLE))
 
 /**

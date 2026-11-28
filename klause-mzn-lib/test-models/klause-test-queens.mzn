@@ -4,7 +4,7 @@
 % - all_different over offsets (decomposed by MiniZinc's std lib into int_lin / int_ne)
 % - solve satisfy with a count
 %
-% Run: minizinc --solver com.eignex.klause queens.mzn -a -n 10
+% Run: minizinc --solver com.eignex.klause klause-test-queens.mzn -a -n 10
 
 include "globals.mzn";
 

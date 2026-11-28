@@ -15,31 +15,22 @@ import kotlin.time.TimeSource
 private const val LAZY_MARKER = -2
 private const val HEADER = 4
 
-/** Where a lazy reason's payload starts in the array [lazyReasonSlots] returns. */
 internal const val LAZY_PAYLOAD = HEADER
 
 // The factor slot of a lazy reason extended by literals ([extendReason]): no propagator builds it; it is its
 // base, embedded after the literals, plus those literals.
 private const val EXTENDED = -1
 
-/** Whether [reason] is a lazy marker rather than literals. */
 internal fun isLazyReason(reason: IntArray?): Boolean =
     reason != null && reason.isNotEmpty() && reason[0] == LAZY_MARKER
 
-/**
- * A lazy reason for a deduction factor [factorId] (by default the one propagating) makes, carrying [payload]
- * for its [Propagator.explain].
- */
 internal fun PropagationState.lazyReason(payload: IntArray, factorId: Int = currentFactor): IntArray {
     val out = lazyReasonSlots(payload.size, factorId)
     payload.copyInto(out, LAZY_PAYLOAD)
     return out
 }
 
-/**
- * [lazyReason] with [size] payload slots, from [LAZY_PAYLOAD], for the caller to fill in place: a deduction made on
- * every propagation then allocates its marker alone, not a payload copied into it.
- */
+// Filled in place by the caller, so a deduction made on every propagation allocates only its marker.
 internal fun PropagationState.lazyReasonSlots(size: Int, factorId: Int = currentFactor): IntArray {
     check(factorId >= 0) { "a lazy reason needs the factor that explains it" }
     val out = IntArray(HEADER + size)
@@ -51,10 +42,8 @@ internal fun PropagationState.lazyReasonSlots(size: Int, factorId: Int = current
     return out
 }
 
-/**
- * [base] with [extra] literals added. A lazy [base] stays unbuilt: the result is a lazy reason that embeds it,
- * so a bound move that crossed holes or cites its prior bound costs no reason-building on the propagation path.
- */
+// A lazy [base] stays unbuilt, so a bound move that crossed holes or cites its prior bound builds no reason on
+// the propagation path.
 internal fun extendReason(base: IntArray?, extra: IntArray): IntArray? {
     if (extra.isEmpty()) return base
     if (base == null) return extra
@@ -68,11 +57,7 @@ internal fun extendReason(base: IntArray?, extra: IntArray): IntArray? {
     return out
 }
 
-/**
- * The literals of [reason]: the array itself when it is eager, else the reason its propagator builds for the
- * deduction it recorded. Built once per lazy marker and kept in [PropagationState.lazyReasonMemo], since the
- * bounds it is built from stay as they were for as long as the deduction stands.
- */
+// Built once per marker and memoized: the bounds it reads stay as they were while the deduction stands.
 internal fun PropagationState.reasonOf(reason: IntArray?): IntArray? {
     if (!isLazyReason(reason)) return reason
     val marker = requireNotNull(reason)
@@ -132,11 +117,8 @@ private fun PropagationState.buildLazyReason(marker: IntArray): IntArray {
     }
 }
 
-/**
- * [v]'s domain at undo-log position [atTrail], up to interior carves made since: the snapshot the first of its
- * logged moves at or after that position saved, else its live domain. Only interior carves are journalled
- * without a snapshot, so the bounds are exact and a hole is the hole it was unless [carvedAt] places it later.
- */
+// Only interior carves are journalled without a snapshot, so the bounds are exact and a hole is the hole it was
+// unless [carvedAt] places it later.
 internal fun PropagationState.domainAt(v: Int, atTrail: Int): IntDomain {
     val moves = boundMoves[v] ?: return intDomains[v]
     var lo = 0
@@ -148,7 +130,6 @@ internal fun PropagationState.domainAt(v: Int, atTrail: Int): IntDomain {
     return if (lo < moves.size) requireNotNull(undo.domain[moves[lo]]) else intDomains[v]
 }
 
-/** [v]'s lower ([lower]) or upper bound as it stood at undo-log position [atTrail]. */
 internal fun PropagationState.boundAt(v: Int, lower: Boolean, atTrail: Int): Long {
     val moves = boundMoves[v] ?: return if (lower) intDomains[v].min else intDomains[v].max
     var lo = 0
@@ -163,16 +144,11 @@ internal fun PropagationState.boundAt(v: Int, lower: Boolean, atTrail: Int): Lon
     return requireNotNull(if (lower) boundMovePriorMin[v] else boundMovePriorMax[v])[lo]
 }
 
-/** Whether `k` was in [v]'s domain at undo-log position [atTrail]; [d] is that domain, for a caller that read it. */
 internal fun PropagationState.inDomainAt(v: Int, k: Long, atTrail: Int, d: IntDomain = domainAt(v, atTrail)): Boolean =
     k in d || (k in d.min..d.max && carvedAt(v, k) > atTrail)
 
-/**
- * The literal, false at undo-log position [atTrail], that says `k` was out of [v]'s domain then: the bound it lay
- * past, or its own carve. [Lit.NONE] when nothing on the path removed it: a root hole or a survivor restriction,
- * both unconditional. Only for a `k` that was out then (not [inDomainAt]); [d] is [v]'s domain then, for a caller
- * that already read it.
- */
+// A literal false at [atTrail] saying `k` was out of the domain then. [Lit.NONE] for a root hole or survivor
+// restriction, both unconditional. Only for a `k` that was out then.
 internal fun PropagationState.exclusionLiteral(
     v: Int,
     k: Long,
@@ -189,17 +165,12 @@ internal fun PropagationState.exclusionLiteral(
     }
 }
 
-/** Whether Boolean [v] was already pinned at undo-log position [atTrail]. */
 internal fun PropagationState.boolPinnedAt(v: Int, atTrail: Int): Boolean =
     boolValues[v] != null && (atTrail >= undo.size || boolPinPos[v] < atTrail)
 
-/**
- * The literal, false at undo-log position [atTrail], saying [v]'s lower ([lower]) or upper bound reached [need]:
- * [need] itself where the bound may be cited weaker than it stood, else the bound then. [Lit.NONE] when the root
- * domain already guarantees [need]. A bound established below [atLevel] lifts freely, since only the learned
- * clause ever cites it; one at [atLevel] lifts only when it is that level's decision, the one literal there with
- * no reason to resolve.
- */
+// [Lit.NONE] when the root domain guarantees [need]. A bound established below [atLevel] lifts to [need] freely,
+// since only the learned clause cites it; one at [atLevel] lifts only when it is that level's decision, the one
+// literal there with no reason to resolve.
 internal fun PropagationState.boundLiteral(v: Int, lower: Boolean, need: Long, atTrail: Int, atLevel: Int): Int {
     val root = rootDomains[v]
     if (if (lower) need <= root.min else need >= root.max) return Lit.NONE

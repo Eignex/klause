@@ -4,15 +4,12 @@ import com.eignex.klause.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.localsearch.movesource.MoveSourceCatalog
 
 /**
- * A parsed axis-edit token from a `--param <axis>=…` value: an optional arm-family [selector], an
- * [op], and the bare [value]. Edits transform a curated recipe set in place of building one from
- * scratch, so `-e ls` can race the curated pool with one axis rewritten (`sources=-violated`,
- * `scoring=cbls.break`).
+ * A parsed axis-edit token from a `--param <axis>=…` value, rewriting one axis of a curated recipe set
+ * (`sources=-violated`, `scoring=cbls.break`).
  *
- * Grammar (presolve-shaped): comma-separated tokens, each `[family.]±value`. A leading `family.`
- * scopes the token to arms whose label starts with `family` (`cbls` matches `cbls/fixed`,
- * `cbls-plateau/ils-basin`); no prefix applies to every arm. A leading `+`/`-` adds/removes a value
- * from a list axis; a bare value sets it (single-valued axes) or force-selects it (the sources list).
+ * Grammar: comma-separated tokens, each `[family.]±value`. A leading `family.` scopes the token to arms whose
+ * label starts with `family`; no prefix applies to every arm. A leading `+`/`-` adds/removes a value from a list
+ * axis; a bare value sets it (single-valued axes) or force-selects it (the sources list).
  */
 class AxisToken(
     /** Arm-family label prefix this token applies to; `null` applies to every arm. */

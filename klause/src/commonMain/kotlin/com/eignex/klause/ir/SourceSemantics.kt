@@ -271,11 +271,7 @@ class EffectiveSourceSemantics internal constructor(
     /** Whether caller policy changed any part of the source interpretation. */
     val hasOverrides: Boolean get() = declared != effective
 
-    /**
-     * Whether policy declares a positive feasibility tolerance. This flag establishes no witness validity,
-     * completeness,
-     * refutation authority or independently checked proof.
-     */
+    /** Whether policy declares a positive feasibility tolerance. */
     val relaxesFeasibility: Boolean
         get() = effective.feasibilityTolerance?.isExact == false
 

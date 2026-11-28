@@ -17,7 +17,7 @@ internal val IntegralConstants.wideCoefficients: List<BigInt>?
 
 internal val IntegralConstants.wideBound: BigInt? get() = (this as? WideConstants)?.bound
 
-/** Rebuild from whichever of the two constant groups a payload states; exactly one must be complete. */
+// Rebuild from whichever of the two constant groups a payload states; exactly one must be complete.
 internal inline fun <T> integralRow(
     coefficients: LongArray?,
     bound: Long?,
@@ -39,12 +39,12 @@ internal inline fun <T> integralRow(
     }
 }
 
-/** A finite double or `null` for the infinity on [side] (`-1` below, `1` above). */
+// A finite double or `null` for the infinity on [side] (`-1` below, `1` above).
 internal fun Double.finiteOrNull(side: Int): Double? {
     require(!isNaN() && (isFinite() || (side < 0) == (this < 0))) { "bound $this is not finite or open" }
     return takeIf { it.isFinite() }
 }
 
-/** The infinity on [side] when this side is open. */
+// The infinity on [side] when this side is open.
 internal fun Double?.orInfinity(side: Int): Double =
     this ?: if (side < 0) Double.NEGATIVE_INFINITY else Double.POSITIVE_INFINITY

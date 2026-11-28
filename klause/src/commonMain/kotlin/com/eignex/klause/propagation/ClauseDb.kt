@@ -17,12 +17,8 @@ import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.toLongExact
 
-/**
- * Invoke [action] with the *other* literal of every binary clause that contains [lit].
- * Binary clauses watch both their literals and never relocate a watch (there is
- * no third literal to move to), so [BoolWatcherIndex.byLit] reliably lists every binary clause
- * on [lit]. No-op for atom-literal [lit] (the bool watcher index only covers bool vars).
- */
+// Binary clauses never relocate a watch, so the watcher index lists every binary clause on [lit]. Atom
+// literals are not indexed.
 internal fun PropagationState.forEachBinaryPartner(lit: Int, action: (other: Int) -> Unit) {
     if (Lit.variable(lit) >= problem.numBoolVars) return
     nativeEngine?.let {
@@ -45,9 +41,7 @@ internal fun PropagationState.forEachBinaryPartner(lit: Int, action: (other: Int
     }
 }
 
-/** Unified factor accessor; routes static factor ids to `Problem.factors`, and tail ids
- *  (≥ `baseFactorCount`) to the mid-life presolve store in [PropagationState.incremental] mode
- *  (a tombstoned factor reads [NoPropagator]) or to [PropagationState.learnedClauses] otherwise. */
+// Tail ids resolve to the mid-life presolve store in incremental mode, to learned rows otherwise.
 internal fun PropagationState.factorAt(fid: Int): Propagator = when {
     incremental && !factorAliveAt(fid) -> NoPropagator
 
@@ -66,12 +60,7 @@ internal fun PropagationState.factorAt(fid: Int): Propagator = when {
     else -> learned.store[fid - baseFactorCount]
 }
 
-/**
- * Register a learned clause and return its assigned factor id: append it to [LearnedClauseDb.store] with its
- * policy metadata and mutable payload reference in one stable paged row, and install its initial watches.
- *
- * Does not propagate; [PropagationSession.addLearnedClause] does.
- */
+// Does not propagate; PropagationSession.addLearnedClause does.
 internal fun PropagationState.addLearnedClause(
     clause: ClausePropagator,
     lbd: Int,
@@ -110,13 +99,7 @@ internal fun PropagationState.addLearnedClause(
     return newFid
 }
 
-/**
- * Register a learned pseudo-Boolean constraint `Σ weightsᵢ·literalsᵢ ≥ degree` and return
- * its factor id. Stored in the same [LearnedClauseDb] as clauses (as a [LearnedPropagator]), with the
- * forgetting policy columns. Watches cover only the weighted covering set from
- * [PseudoBooleanPropagator.selectWatched], kept in the factor's `refPayload` slot; the constraint wakes when a
- * watched literal goes false.
- */
+// Watches cover only the weighted covering set from PseudoBooleanPropagator.selectWatched.
 internal fun PropagationState.addLearnedPb(
     weights: LongArray,
     literals: IntArray,
@@ -205,7 +188,6 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     return factor
 }
 
-/** Convenience overload that converts a structural [Clause] to its [ClausePropagator] before registering. */
 internal fun PropagationState.addLearnedClause(
     clause: Clause,
     lbd: Int,
@@ -220,25 +202,18 @@ internal fun PropagationState.addLearnedClause(
     return addLearnedClause(ClausePropagator(literals.litVars(), emptyIntArray(), literals), lbd, permanent, origin)
 }
 
-/** Read-only view of LBDs for tests / introspection. Parallel to [PropagationState.learnedClauses]. */
 internal fun PropagationState.learnedClauseLbd(learnedIndex: Int): Int =
     nativeEngine?.lbdOf(learnedIndex) ?: learned.store[learnedIndex, GeneralLearnedRows.LBD]
 
-/** True iff learned clause [learnedIndex] must survive every forgetting pass. */
 internal fun PropagationState.learnedClausePermanent(learnedIndex: Int): Boolean =
     nativeEngine?.permanentOf(learnedIndex) ?: (learned.store[learnedIndex, GeneralLearnedRows.PERMANENT] == 1)
 
-/** The arm learned clause [learnedIndex] was imported from, or [OWN_ORIGIN] for one learned here. */
 internal fun PropagationState.learnedClauseOrigin(learnedIndex: Int): Int =
     nativeEngine?.originOf(learnedIndex) ?: learned.store[learnedIndex, GeneralLearnedRows.ORIGIN]
 
-/** Three-tier DB tier of learned clause [learnedIndex] ([ClauseTier.UNSET] until the
- *  reduction policy classifies it). */
 internal fun PropagationState.learnedClauseTier(learnedIndex: Int): ClauseTier =
     nativeEngine?.tierOf(learnedIndex) ?: ClauseTier.entries[learned.store[learnedIndex, GeneralLearnedRows.TIER]]
 
-/** Set the three-tier DB tier of learned clause [learnedIndex] (promotion / demotion /
- *  initial classification by the reduction policy). */
 internal fun PropagationState.setLearnedClauseTier(learnedIndex: Int, tier: ClauseTier) {
     nativeEngine?.let {
         it.setTierOf(learnedIndex, tier)
@@ -248,13 +223,10 @@ internal fun PropagationState.setLearnedClauseTier(learnedIndex: Int, tier: Clau
     learned.store[learnedIndex, GeneralLearnedRows.TIER] = tier.ordinal
 }
 
-/** True iff learned clause [learnedIndex] was used (conflict or unit) since the last
- *  reduction. */
 internal fun PropagationState.learnedClauseUsedSinceReduction(learnedIndex: Int): Boolean =
     nativeEngine?.usedOf(learnedIndex) ?: learned.usedOf(learnedIndex)
 
-/** Clear the reuse flag for learned clause [learnedIndex] — called for survivors at the
- *  end of a reduction so the next window measures fresh activity. */
+// Survivors are cleared at the end of a reduction so the next window measures fresh activity.
 internal fun PropagationState.clearLearnedClauseUsed(learnedIndex: Int) {
     nativeEngine?.let {
         it.clearUsed(learnedIndex)
@@ -263,9 +235,7 @@ internal fun PropagationState.clearLearnedClauseUsed(learnedIndex: Int) {
     learned.clearUsed(learnedIndex)
 }
 
-/** Mark learned clause [fid] (a factor id; ignored when it isn't a learned clause) as
- *  used since the last reduction — it just detected a conflict or forced a unit. Drives
- *  three-tier promotion. */
+// Drives three-tier promotion.
 internal fun PropagationState.noteLearnedUse(fid: Int) {
     nativeEngine?.let {
         it.markUsed(fid)
@@ -279,19 +249,9 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
     learned.markUsed(idx)
 }
 
-/**
- * Prune the learned-clause database. The [keep] predicate decides per (learnedIndex,
- * lbd) whether to retain that clause; dropped clauses' factor ids vanish and the
- * remaining clauses are renumbered contiguously starting at `problem.numFactors`.
- * The [LearnedClauseDb] rows and their mutable payload references are compacted together;
- * the bool and atom watcher lists, propagation queues and per-variable
- * reason fields have their learned factor ids remapped through `oldFid → newFid` or dropped.
- *
- * Watchers' positions inside each clause's `refPayload[fid]` are watch *indices*
- * (into `clause.literals`), not factor ids — they survive the compaction unchanged.
- * A cancellable preflight must fund the complete atomic remap and its scratch before mutation.
- * An oversized or cancelled preparation returns false and preserves the generation.
- */
+// Survivors renumber contiguously from `problem.numFactors`, and every watcher list, queue and reason field is
+// remapped. A cancellable preflight funds the whole atomic remap and its scratch before mutation; an oversized
+// or cancelled preparation returns false and preserves the generation.
 internal fun PropagationState.forgetLearnedClauses(
     maxWork: Long = 65_536L,
     maxScratchBytes: Long = 1_048_576L,
@@ -397,8 +357,7 @@ internal fun PropagationState.forgetLearnedClauses(
         blockers.trim()
     }
 
-    // Atom-literal watcher lists carry learned fids too — a learned clause watching a
-    // bound atom registers here, not in the bool-var lists.
+    // A learned clause watching a bound atom registers in the atom lists.
     for (list in atoms.watchersByLit) {
         work++
         if (list == null) continue
@@ -429,10 +388,7 @@ internal fun PropagationState.forgetLearnedClauses(
         }
     }
 
-    // A conflict return leaves the propagation queues holding in-flight fids, and the
-    // engine forgets at the following restart — so the queues can still carry learned
-    // fids from before the compaction. Remap them like the watcher lists: a stale fid
-    // surviving here indexes past the compacted clause array on the next drain.
+    // The engine forgets at the restart after a conflict return, so the queues can still hold old fids.
     remapQueue(propQueue, remap, refBase)
     var pending = 0
     for (i in 0 until learned.pendingAttach.size) {
@@ -446,13 +402,8 @@ internal fun PropagationState.forgetLearnedClauses(
         work += intEvents.remapLearned(remap, refBase)
     }
 
-    // The per-variable reason fields record which factor forced each currently-implied
-    // value, learned-clause ids included. Level-0 facts — e.g. a permanent blocking nogood
-    // or a learned unit that propagated at the root — survive the restart's pop-to-root, so
-    // their reason fids outlive this renumber. Left unremapped, the next conflict's
-    // [extractConflictFactors] would dereference a stale learned fid through [factorAt] and
-    // index past the compacted clause array. Remap them like the watchers:
-    // a kept clause's reason rewrites to its new id, a dropped clause's reason clears to -1.
+    // Level-0 reasons survive the restart's pop-to-root and so outlive this renumber; a stale learned fid
+    // would index past the compacted store on the next conflict.
     remapReasons(boolReason, remap, refBase)
     remapReasons(intMinReason, remap, refBase)
     remapReasons(intMaxReason, remap, refBase)
@@ -496,8 +447,6 @@ internal fun PropagationState.noteLearnedBoolReason(factor: Int, delta: Int) {
     learned.store[index, GeneralLearnedRows.BOOL_REASONS] = count
 }
 
-/** Rewrite learned-clause factor ids stored in a per-variable reason array through [remap]
- *  (static fids `< refBase` pass through; dropped clauses' reasons clear to -1). */
 internal fun PropagationState.remapReasons(reasons: IntArray, remap: IntArray, refBase: Int) {
     for (i in reasons.indices) {
         work++
@@ -509,8 +458,6 @@ internal fun PropagationState.remapReasons(reasons: IntArray, remap: IntArray, r
     }
 }
 
-/** Rewrite every learned fid in `queue` through [remap] (static fids pass through;
- *  dropped clauses' fids are removed). Preserves order. */
 internal fun PropagationState.remapQueue(queue: IntArrayDeque, remap: IntArray, refBase: Int) {
     if (queue.isEmpty()) return
     val drained = IntArrayList(queue.size)

@@ -19,11 +19,8 @@ import kotlin.time.TimeSource
 
 /**
  * A `Problem` whose root deductions are established by propagation or presolve, and the only type that owns finite
- * search domains: [rootIntDomain] carries the root-propagation fold for every integer column, which is what
- * the finite engines, the model counter, sampling and the LP engine branch and propagate over. Produced
- * only by `Problem.bake` (or the presolve pipeline). A raw `Problem` is the supertype, so handing an
- * un-baked model to a solver is a compile error — the caller must `Problem.bake` it first, which is where
- * the parse-vs-solve boundary is enforced by the type system.
+ * search domains: [rootIntDomain] carries the root-propagation fold for every integer column. Produced only by
+ * `Problem.bake` or the presolve pipeline, so handing an un-baked model to a solver is a compile error.
  *
  * A finite domain here may be narrower than the column's `Problem.intBounds`, and its endpoints may have
  * been invented to close a side the source left open. Consumers reasoning about the model rather than
@@ -32,17 +29,10 @@ import kotlin.time.TimeSource
 class BakedProblem private constructor(
     numBoolVars: Int,
     numIntVars: Int,
-    /**
-     * The array the root fold writes into and every finite accessor reads: it also backs the source
-     * declarations below, so a narrowing the fold proves lands in one place rather than leaving the two
-     * readings of the same column disagreeing.
-     *
-     * Owned outright only when this projection ran its own fold. A caller handing over domains that
-     * already carry one keeps the array's identity — that is what lets a per-firing presolve view share
-     * the session's live domains — so nothing outside the fold may write through it.
-     */
+    // Also backs the source declarations, so a narrowing the fold proves lands in one place. A caller handing
+    // over already-folded domains keeps the array's identity, which lets a per-firing presolve view share the
+    // session's live domains, so nothing outside the fold may write through it.
     internal val foldedIntDomains: Array<IntDomain>,
-    /** Whether [foldedIntDomains] already carries this projection's root deductions, so no fold runs. */
     internal val alreadyFolded: Boolean,
     factors: Array<Factor>,
     seedDeductions: PropagationResult,
@@ -87,7 +77,6 @@ class BakedProblem private constructor(
         projectionSelection?.invoke(this) ?: projectionProviders?.prepare(this)
     }
 
-    /** Deductions established while constructing this propagation projection. */
     internal val rootDeductions: PropagationResult =
         trustedRootDeductions ?: rootBake(this, seedDeductions, cancellation)
 
@@ -121,14 +110,8 @@ class BakedProblem private constructor(
      */
     fun rootIntDomains(): Array<IntDomain> = foldedIntDomains.copyOf()
 
-    /**
-     * The array the fold writes into, for a consumer that only ever reads it.
-     *
-     * A model can declare millions of integer columns, so a per-firing presolve pass that indexes the
-     * domains — or a search state seeded once per probe — must not pay [rootIntDomains]' copy. Writing
-     * through this rewrites what every other consumer reads; a consumer that narrows the array takes
-     * the copy.
-     */
+    // Uncopied for readers only: a model can declare millions of columns, so per-firing presolve passes and
+    // per-probe search seeds must not pay the copy. A consumer that narrows the array takes the copy.
     internal val rootIntDomainsInPlace: Array<IntDomain> get() = foldedIntDomains
 
     internal constructor(

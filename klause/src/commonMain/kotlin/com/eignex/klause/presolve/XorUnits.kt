@@ -22,26 +22,16 @@ import com.eignex.util.numbers.rem
 
 internal object XorUnits {
 
-    /** Work budget for the one-shot GF(2) elimination, as `rows × pivots × words` (its asymptotic cost).
-     *  Past it the elimination is skipped; the parity rows still propagate normally, only their
-     *  globally implied root units go underived. */
+    // In `rows × pivots × words`. Past it only the globally implied root units go underived; the parity rows
+    // still propagate normally.
     private const val XOR_ELIMINATION_WORK_CAP = 100_000_000L
 
-    /**
-     * One-shot GF(2) elimination over the root parity system, emitting only its global consequences: a
-     * forced literal as a unit [Clause], a forced 0/1 integer column as a proved range, and a contradiction
-     * (`0 = 1`) as a refutation. The parity rows stay in place for normal propagation.
-     *
-     * The system holds every [Xor] factor and the parity every integer equality implies. In `Σ cᵢxᵢ = b`
-     * an even `cᵢ` contributes an even term whatever integer `xᵢ` takes, and an odd one contributes `xᵢ`'s
-     * own parity, so the row says `Σ_{cᵢ odd} xᵢ ≡ b (mod 2)`. That parity names a value only for a column
-     * confined to 0/1, so a row is read only when each of its odd-coefficient columns is a 0/1 or fixed
-     * column; the even-coefficient columns need no range at all, which keeps the derivation sound before
-     * any finite projection exists.
-     *
-     * Idempotent: a literal already forced and a column already fixed are not stated again, so the round
-     * engine reaches a fixpoint.
-     */
+    // One-shot GF(2) elimination over the root parity system (every [Xor] and the parity of every integer
+    // equality), emitting forced literals as units, forced 0/1 columns as ranges, and `0 = 1` as a refutation.
+    // An equality `Σ cᵢxᵢ = b` implies `Σ_{cᵢ odd} xᵢ ≡ b (mod 2)`, which names a value only for 0/1 columns,
+    // so a row is read only when every odd-coefficient column is 0/1 or fixed; even-coefficient columns need
+    // no range, which keeps this sound before any finite projection exists. Already-forced values are not
+    // restated, so the round engine reaches a fixpoint.
     fun deriveXorUnits(problem: Problem, cancellation: ExecutionControl = ExecutionControl.Never): SourceDelta {
         val work = ScanMeter(cancellation)
         if (!work.check()) return SourceDelta()
@@ -111,10 +101,7 @@ internal object XorUnits {
         return system.consequences(forced)
     }
 
-    /**
-     * The parity rows of one model over a shared column space, where Boolean `v` is column `2v` and integer
-     * `v` column `2v + 1`.
-     */
+    // Boolean `v` is column `2v` and integer `v` column `2v + 1`.
     private class ParitySystem(private val problem: Problem, private val work: ScanMeter) {
         val columns = LinkedHashSet<Long>()
         val rows = ArrayList<LongHashSet>()
@@ -187,7 +174,6 @@ internal object XorUnits {
             return true
         }
 
-        /** The forced values as the source lane's change: unit clauses and fixed integer ranges. */
         fun consequences(forced: Map<Long, Boolean>): SourceDelta {
             val added = ArrayList<Factor>()
             val tightening = bounds.tightening()

@@ -22,9 +22,7 @@ data object BoolSpec : VarSpec
 
 /**
  * Presence marker for an optional variable: a Boolean that gates the value variable named
- * [valueName]. Compiles to an ordinary Boolean var, but its dedicated type lets the optional
- * machinery (notably absent-value pinning) recognise the (presence, value) pairing by type
- * and the carried [valueName], never by name.
+ * [valueName]. The optional machinery recognises the pairing by this type, never by name.
  */
 @Serializable
 @SerialName("presence")
@@ -99,8 +97,7 @@ data class FloatSpec(
     val max: Double = Double.POSITIVE_INFINITY,
 ) : VarSpec
 
-/** Set variable over an integer universe. The universe is fixed at schema-construction
- *  time and need not be contiguous, though contiguous ranges are the common case. */
+/** Set variable over a fixed integer universe, encoded as one indicator Boolean per element. */
 @Serializable
 @SerialName("set")
 data class SetSpec(
@@ -112,9 +109,7 @@ data class SetSpec(
     }
 }
 
-/** Set variable over a nominal universe of [labels]. Internally lowers to an indicator
- *  bool per label, mirroring the encoding of [SetSpec] but typed against strings on the
- *  decoder side. */
+/** Set variable over a nominal universe of [labels], encoded like [SetSpec]. */
 @Serializable
 @SerialName("multiple")
 data class MultipleSpec(

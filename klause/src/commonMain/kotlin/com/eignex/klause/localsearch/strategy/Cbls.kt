@@ -46,7 +46,7 @@ fun Cbls(
     stallSteps: Int = 1,
     /** Per-bump weight increment for violated factors. */
     stallIncrement: Double = 1.0,
-    /** Probability of applying a smoothing pass after a stall bump. `0.0` (default) disables smoothing. */
+    /** Probability of applying a smoothing pass after a stall bump. `0.0` disables smoothing. */
     smoothProb: Double = 0.0,
     /** Smoothing pull strength toward the seeded baseline. Only consulted when [smoothProb] > 0. */
     smoothFactor: Double = 0.8,
@@ -61,19 +61,17 @@ fun Cbls(
     frontierAfterStall: Int = 40,
     /** Cap on frontier (neighbour-variable) moves injected per stalled pick. */
     frontierMoveCap: Int = 32,
-    /** Effective noise while stalled — a hotter random walk to step out of the basin. */
+    /** Effective noise while stalled, a hotter random walk to step out of the basin. */
     stallNoise: Double = 0.4,
     /** Generic score-only pair-swap candidates drawn per feasible pick (`0` = off): the coordinated
-     *  2-flip objective-descent fallback for packing/knapsack plateaus a single flip can't cross. */
+     *  2-flip objective descent for packing plateaus a single flip can't cross. */
     pairSwapCap: Int = 8,
-    /** Feasible-phase re-sample budget: consecutive picks with no sampled objective-improving move
-     *  tolerated before a restart. CBLS samples its sources, so a `null` pick is usually a draw that
-     *  missed an existing improving move, not a true local optimum — re-sampling this many times (while
-     *  the stall machinery engages) before restarting keeps an unlucky draw from discarding a good
-     *  partial solution. `0` restarts on the first miss; incomplete board passes report a feasible stall. */
+    /** Consecutive feasible-phase picks with no sampled objective-improving move tolerated before a restart.
+     *  CBLS samples its sources, so such a pick usually missed an improving move rather than hit a local
+     *  optimum. `0` restarts on the first miss. */
     feasibleResampleCap: Int = 32,
-    /** **Plateau-buster** (opt-in, `0` = off): cap on stall-gated, score-only same-domain pair-swap
-     *  moves — the coordinated exchange equal-coefficient-sum (bacp-style) plateaus need. */
+    /** Cap on stall-gated, score-only same-domain pair-swap moves (`0` = off), the coordinated exchange that
+     *  equal-coefficient-sum plateaus need. */
     stallSwapCap: Int = 0,
     /** **Ejection chains** (opt-in, `0` = off): cap on stall-gated, score-only directed repair-chain
      *  compounds per pick. */
@@ -169,12 +167,7 @@ fun Cbls(
     )
 }
 
-/**
- * The CBLS targeted kick as a driver perturbation hook: after [after] applied moves with no strict
- * cost drop, inject one bounded [StallKick] perturbation and restart the no-progress window. Stateful
- * (one per search); returns `null` while feasible, before the window elapses, or when no variable is
- * eligible.
- */
+// Stateful: one instance per search.
 internal class StallKickPerturbation(private val after: Int, stallKickVars: Int) : (LocalSearchState) -> Move? {
     init {
         require(after >= 1) { "after ≥ 1, got $after" }

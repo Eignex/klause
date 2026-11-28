@@ -21,25 +21,14 @@ import com.eignex.util.numbers.remainderOf
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.unaryMinus
 
-/**
- * Whether the constraint system is unsatisfiable over its **genuinely open** ranges, decided in exact
- * arithmetic.
- *
- * The LP refutation next door answers the same question, but it answers it in `Long` and `Double`: a
- * coefficient times an open bound is exactly the product that leaves 64 bits, and the build then throws
- * and the refutation is abandoned. That is the whole difficulty with an unbounded model — the values it
- * forces are large — so this pass runs first, in arithmetic that does not wrap.
- *
- * An equality that *defines* an otherwise unbounded variable is substituted away first, which collapses a
- * chain like `y = 4x, z = 4y, z ≤ x` into the single row `15x ≤ 0`; then each equality is checked for
- * integer divisibility, and interval propagation decides what is left. The order matters: on the chain
- * itself propagation diverges, multiplying the bound by 4 per link per round and never closing, while the
- * eliminated form is refuted at a glance.
- *
- * Only the refuting direction is usable: `false` means "no conclusion", never "satisfiable". Every give-up
- * — a spent budget, a work cap, a system that stays open — answers `false`, so this only ever forfeits a
- * refutation and never invents one.
- */
+// Exact-arithmetic refutation over open ranges. The LP refutation works in `Long`/`Double`, and a
+// coefficient times an open bound is exactly the product that overflows, so this runs first.
+//
+// Equalities defining an unbounded variable are substituted away first, collapsing `y = 4x, z = 4y, z ≤ x`
+// into `15x ≤ 0`; then divisibility, then interval propagation. On the uncollapsed chain propagation
+// diverges, multiplying the bound per link per round.
+//
+// `false` means "no conclusion", never "satisfiable": every give-up answers `false`.
 internal fun exactBoundsInfeasible(
     openBounds: Array<OpenIntBounds>,
     constraints: List<Linear>,
@@ -60,18 +49,9 @@ internal fun exactBoundsInfeasible(
     return propagateToEmpty(rows, lo, hi, cancellation)
 }
 
-/**
- * Whether an equality is unsatisfiable over the integers because its coefficients' common divisor does
- * not divide its right-hand side.
- *
- * This is the refutation that survives unbounded domains: `Σ cᵢxᵢ` is a multiple of `gcd(cᵢ)` whatever
- * the `xᵢ` are, so a right-hand side outside that lattice has no integer solution however large the
- * variables may grow. A relaxation cannot see it — such a system is usually feasible over the rationals —
- * and interval propagation cannot either, which leaves it to arithmetic on the coefficients themselves.
- *
- * Worth doing after substitution rather than before: eliminating a variable changes a row's coefficients,
- * so a contradiction can appear in a row that was clean in the original system.
- */
+// `Σ c(i)·x(i)` is a multiple of `gcd(c)` however large the variables grow, so this survives unbounded
+// domains where neither the rational relaxation nor interval propagation sees it. Run after substitution,
+// which can expose a contradiction in a row that was clean before.
 private fun divisibilityFails(row: Row): Boolean {
     if (!row.equality || row.coeffs.isEmpty()) return false
     var g = BIG_ZERO
@@ -80,10 +60,8 @@ private fun divisibilityFails(row: Row): Boolean {
     return !(row.bound.remainderOf(g)).isZero()
 }
 
-/** A row `Σ coeffs·vars ⟨op⟩ bound` in exact arithmetic, mutable so substitution can rewrite it. */
 private class Row(val coeffs: MutableMap<Int, BigInt>, var bound: BigInt, val equality: Boolean)
 
-/** The exact form of [f], or null when it is outside the fragment (a `≠` row constrains no interval). */
 private fun rowOf(f: Linear, n: Int): Row? {
     if (f.op != LinearOp.LE && f.op != LinearOp.EQ) return null
     val constants = f.integralConstants ?: return null
@@ -97,13 +75,8 @@ private fun rowOf(f: Linear, n: Int): Row? {
     return Row(coeffs, constants.exactBound, f.op == LinearOp.EQ)
 }
 
-/**
- * Substitute away each variable that an equality *defines* and that carries no bound of its own.
- *
- * Both conditions are needed. A unit coefficient makes the definition exact over the integers, and open
- * bounds on both sides mean the variable states nothing that substituting it would discard — the rewritten
- * system is then equisatisfiable, not merely a relaxation.
- */
+// A unit coefficient makes the definition exact over the integers, and an unbounded variable states
+// nothing substitution would discard, so the rewritten system is equisatisfiable.
 private fun eliminateOpenDefinitions(
     rows: MutableList<Row>,
     lo: Array<BigInt?>,
@@ -132,14 +105,10 @@ private fun eliminateOpenDefinitions(
     }
 }
 
-/**
- * Replace [target] everywhere by the value [definition] gives it. Returns false when the rewrite would
- * grow past the work cap, which abandons elimination with the rows already rewritten — still a sound
- * system, just a less reduced one.
- */
+// False past the width cap; the rows already rewritten remain a sound, less reduced system.
 private fun substitute(rows: MutableList<Row>, definition: Row, target: Int, cancellation: ExecutionControl): Boolean {
     val c = definition.coeffs.getValue(target)
-    // |c| = 1, so `target = (bound − rest) / c` is exact: scale by c itself rather than dividing.
+    // |c| = 1, so dividing by c is multiplying by c.
     val scale = if (c > BIG_ZERO) BIG_ONE else BIG_ONE.negate()
     val valueBound = definition.bound * scale
     val valueTerms = HashMap<Int, BigInt>(definition.coeffs.size)
@@ -161,7 +130,6 @@ private fun substitute(rows: MutableList<Row>, definition: Row, target: Int, can
     return true
 }
 
-/** Interval propagation to a fixpoint; true as soon as a domain comes out empty. */
 private fun propagateToEmpty(
     rows: List<Row>,
     lo: Array<BigInt?>,
@@ -179,7 +147,6 @@ private fun propagateToEmpty(
     return false
 }
 
-/** One row's tightening pass; returns true as soon as a domain comes out empty. */
 private inline fun tightenRow(
     row: Row,
     lo: Array<BigInt?>,
@@ -188,10 +155,8 @@ private inline fun tightenRow(
     onChange: () -> Unit,
 ): Boolean {
     for ((j, c) in row.coeffs) {
-        // Each term re-sums the rest of the row in big integers, so a wide row is quadratic and one row
-        // alone can outlast the whole budget. Polled per term, which caps the uninterruptible unit at a
-        // single pass over the row; the caller reads the early exit as "not refuted", the same answer an
-        // exhausted propagation gives.
+        // A wide row is quadratic in big integers and can outlast the whole budget alone, so poll per
+        // term; an early exit reads as "not refuted".
         if (cancellation()) return false
         cancellation.charge(EXACT_REFUTATION_WORK_WEIGHT * row.coeffs.size)
         var restMin: BigInt? = BIG_ZERO
@@ -228,15 +193,14 @@ private inline fun tightenRow(
     return false
 }
 
-// Work units per big-integer term this refutation touches, against one simplex op: median time per unit over
-// the calibration sample's routed models (60 MIPLIB 2017, 40 QF_LIA), ~4.3e-4 ms.
+// Work units per big-integer term touched, relative to one simplex op.
 private const val EXACT_REFUTATION_WORK_WEIGHT = 161L
 
-/** Enough sweeps for a long implication chain, few enough that a slowly-converging system still stops. */
+// Enough sweeps for a long implication chain, few enough that a slowly-converging system still stops.
 private const val MAX_ROUNDS = 64
 
-/** One definition per variable is the most that can be eliminated; the cap is a runaway backstop. */
+// A runaway backstop: at most one definition per variable can be eliminated.
 private const val MAX_ELIMINATIONS = 4096
 
-/** Substitution densifies rows; past this width the reduction costs more than the refutation is worth. */
+// Substitution densifies rows; past this width the reduction costs more than the refutation is worth.
 private const val MAX_ROW_TERMS = 512

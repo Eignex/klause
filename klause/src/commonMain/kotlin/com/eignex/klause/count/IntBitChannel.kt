@@ -11,36 +11,21 @@ import com.eignex.klause.propagation.bake
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.Bits
 
-/**
- * Channels integer variables to fresh Boolean bits so XOR-hash counting / sampling can range over
- * integer *values* without bit-blasting the whole problem to CNF.
- *
- * For an integer variable `x` with domain `[min, max]`, a binary encoding of width
- * `w = ceil(log2(max - min + 1))` is added: `w` fresh 0/1 integer vars `c(0..w-1)` plus a [Linear]
- * `x = min + Σ 2^i·c(i)`, and `w` fresh Boolean bits `b(i)` each tied to its `c(i)` by a
- * [ReifiedLinear] `b(i) ↔ (c(i) == 1)` — the same bool↔0/1-int bridge the FlatZinc front end uses
- * for `bool2int`. The hashes then range over the `b(i)`.
- *
- * The map value → bits is a bijection on the in-domain values (binary representation is unique, and
- * `x`'s own domain rules out any pattern that lands outside `[min, max]` or on a hole). So counting
- * distinct feasible bit patterns equals counting distinct integer values, while every original
- * constraint stays native.
- *
- * Only the requested `intVars` are channelled; all other variables and every factor are carried
- * through unchanged, so globals keep their own propagators.
- */
+// Channels integer variables to fresh Boolean bits so XOR-hash counting and sampling range over integer values
+// without bit-blasting the problem. For `x` in `[min, max]`, width `w = ceil(log2(max - min + 1))` adds 0/1
+// integers `c(i)` with a Linear `x = min + Σ 2^i·c(i)`, and bits `b(i) ↔ (c(i) == 1)` by ReifiedLinear; the hashes
+// range over the `b(i)`. The binary encoding is a bijection on in-domain values, since x's own domain rules out
+// patterns outside it, so distinct bit patterns count distinct values while every original factor stays native.
 internal object IntBitChannel {
 
-    /** Maximum encodable domain width. A wider projection has > 2^31 values — not countable. */
+    // A wider projection has more than 2^31 values, which is not countable.
     private const val MAX_WIDTH = 31
 
     class Result(
-        /** The augmented problem the solver enumerates: `base` plus the channel vars and factors. */
         val problem: BakedProblem,
-        /** For each requested int var (in input order), its fresh bit ids, least-significant first. */
+        // Per requested int var, in input order, its bit ids least-significant first.
         val bitsPerVar: List<IntArray>,
     ) {
-        /** All channel bits flattened — the Boolean hash domain over the channelled integers. */
         fun allBits(): IntArray {
             val total = bitsPerVar.sumOf { it.size }
             val out = IntArray(total)
@@ -50,7 +35,6 @@ internal object IntBitChannel {
         }
     }
 
-    /** Build the channel for `intVars` of `base`. With no int vars the base problem is returned as-is. */
     fun channel(base: BakedProblem, intVars: IntArray): Result {
         if (intVars.isEmpty()) return Result(base, emptyList())
 
@@ -90,7 +74,7 @@ internal object IntBitChannel {
                 val bit = nextBool++
                 val channelInt = nextInt++
                 extraDomains.add(IntDomain(0, 1))
-                // bit ↔ (channelInt == 1): the bool2int bridge (FlatZinc channelBoolsToInts).
+                // bit ↔ (channelInt == 1), the bool2int bridge.
                 extraFactors.add(
                     ReifiedLinear(
                         auxBoolVar = bit,
@@ -108,13 +92,11 @@ internal object IntBitChannel {
             bitsPerVar.add(bits)
         }
 
-        // Every requested column was a singleton, so the encoding added nothing: the base projection already
-        // is the augmented one, and rebuilding it would pay a second root bake for the same model.
+        // Every requested column was a singleton: rebuilding would pay a second root bake for the same model.
         if (extraFactors.isEmpty()) return Result(base, bitsPerVar)
 
-        // A base column is restated as the projection held it: the same box, and the same marks saying
-        // which of its endpoints were invented. The channel re-encodes that box rather than replacing it,
-        // so a side the source left open is still open here and no consumer reads the box as a declaration.
+        // The channel restates each base column's box with its invented-endpoint marks, so a side the source left
+        // open stays open and no consumer reads the box as a declaration.
         val problem = Problem(
             settings = base.settings,
             semantics = base.semantics,
@@ -133,7 +115,7 @@ internal object IntBitChannel {
         return Result(problem.bake(), bitsPerVar)
     }
 
-    /** [source] over [size] columns, the channel's appended ones left closed. */
+    // The channel's appended columns stay closed.
     private fun widened(source: Bits?, size: Int): Bits? {
         if (source == null) return null
         val out = Bits(size)
@@ -141,7 +123,6 @@ internal object IntBitChannel {
         return out
     }
 
-    /** Bits needed to represent values `0..span`; `0` for a singleton (`span == 0`). */
     private fun bitWidth(span: Long): Int {
         var width = 0
         var v = span

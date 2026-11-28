@@ -27,11 +27,8 @@ class SharedCut internal constructor(internal val source: SourceCut) {
 }
 
 /**
- * A worker's cut-sharing surface for a [CutExchange] — the cut analogue of the public
- * [com.eignex.klause.propagation.PropagationSession] methods a
- * [com.eignex.klause.propagation.ClauseExchange] uses. The engine owning the local cut pool and
- * relaxation implements it; the exchange only ever sees portable [SharedCut]s, never the internal pool
- * or relaxation.
+ * A worker's cut-sharing surface for a [CutExchange]. The exchange sees only portable [SharedCut]s, never
+ * the worker's pool or relaxation.
  */
 interface CutSharing {
     /** This worker's globally-valid cuts, in portable form. */
@@ -48,11 +45,8 @@ interface CutSharing {
 }
 
 /**
- * Exchanges globally-valid cuts between a worker and a cross-worker store via the worker's [CutSharing]
- * view: import the cuts other workers published and export this worker's own. The pooled implementation
- * is [com.eignex.klause.portfolio.PoolCutExchange]; the portfolio wiring decides when [exchange]
- * fires (the restart boundary). Importing only ever adds globally-valid cuts, so it is sound regardless
- * of the worker's current search node.
+ * Exchanges globally valid cuts between a worker and a cross-worker store through the worker's [CutSharing].
+ * Imported cuts are global, so importing is sound at any search node.
  */
 interface CutExchange {
     /** Import the peers' cuts into [sharing] and publish [sharing]'s exported cuts to the store. */

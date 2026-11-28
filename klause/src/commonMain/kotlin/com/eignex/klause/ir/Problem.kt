@@ -37,22 +37,16 @@ open class Problem internal constructor(
     /** The constraints over the variables. */
     val factors: Array<Factor>,
     /**
-     * Per-factor flag marking constraints the model declared as *implied* — MiniZinc's
-     * `redundant_constraint` / `symmetry_breaking_constraint` (surfaced via the klause MZN
-     * library's annotation) or XCSP3's `redundantConstraints` / `symmetryBreaking` classes.
-     * Indexed parallel to [factors]; `null` (the common case) means no factor is implied. Local
-     * search seeds these factors a lower initial violation weight so the bulk of redundant /
-     * symmetry rows don't dominate the weighted-violation landscape before the structural
-     * constraints are satisfied; every other consumer ignores it (the constraints are still posted
-     * and propagate normally).
+     * Per-factor flag marking constraints the model declared as redundant or symmetry-breaking, indexed
+     * parallel to [factors]; `null` means none. Local search gives these a lower initial violation weight
+     * so they don't dominate before the structural constraints are satisfied; they still propagate
+     * normally.
      */
     val impliedFactorMask: BooleanArray? = null,
     /**
-     * True when the model declared at least one `symmetry_breaking_constraint` or XCSP3
-     * `symmetryBreaking` constraint. Presolve uses it to skip its own symmetry breaking
-     * ([com.eignex.klause.presolve.PresolvePass.BREAK_SYMMETRIES]) by default — stacking klause's
-     * automorphism break on top of the model's hand-written one is redundant and the two can
-     * interact.
+     * True when the model declared at least one symmetry-breaking constraint. Presolve then skips its own
+     * symmetry breaking ([com.eignex.klause.presolve.PresolvePass.BREAK_SYMMETRIES]) by default, since
+     * stacking the two is redundant and they can interact.
      */
     val hasSymmetryBreaking: Boolean = false,
     /**
@@ -87,21 +81,11 @@ open class Problem internal constructor(
      */
     fun intDomainOrNull(v: Int): IntDomain? = declaredIntDomains.declaredOrNull(v)
 
-    /**
-     * Finite domain of [v] as this model states it: the declared value set, or the closed [intBounds]
-     * range materialized where none was declared. On a [com.eignex.klause.propagation.BakedProblem] the
-     * two readings coincide — its declarations are the array its root fold writes into.
-     *
-     * The model-side reading, taken where a projection may not exist yet: a span estimate, the
-     * materialization a bake is built from, a column a rebuild is about to box. A finite engine does not
-     * reach for it — it takes a `BakedProblem` and branches on `rootIntDomain`.
-     */
+    // The model-side reading, for use where a projection may not exist yet. A finite engine takes a
+    // `BakedProblem` and branches on `rootIntDomain` instead.
     internal fun finiteIntDomain(v: Int): IntDomain = declaredIntDomains.finiteDomain(v).withStorage(settings.storage)
 
-    /**
-     * Every [finiteIntDomain], in column order, copied so a caller may narrow the result in place — the
-     * materialization a bake or an explicitly boxed candidate model is built from.
-     */
+    // A fresh array, so a caller may narrow the result in place.
     internal fun finiteIntDomains(): Array<IntDomain> = Array(numIntVars) { finiteIntDomain(it) }
 
     init {
@@ -133,13 +117,7 @@ open class Problem internal constructor(
         }
     }
 
-    /**
-     * Build a canonical source model from its declared integer bounds.
-     *
-     * The columns admit their whole range: a model that also excludes interior values states them, and
-     * reaches this class through [declaredIntDomains] or the value-set constructors instead. The model
-     * adopts every array passed here: the internal builder transfers ownership.
-     */
+    // Columns admit their whole range. Adopts every array passed: the caller transfers ownership.
     internal constructor(
         numBoolVars: Int,
         intBounds: IntBounds,
@@ -165,14 +143,8 @@ open class Problem internal constructor(
         semantics = semantics,
     )
 
-    /**
-     * Build a source model whose integer columns declare explicit value sets.
-     *
-     * [openIntLo] / [openIntHi] (or their packed forms) mark the sides of [intDomains] whose endpoint was
-     * invented to close a genuinely open declaration, so model-level consumers keep reasoning over the
-     * true open range. [modelBounds] supplies those bounds directly when a rebuild retains them. The
-     * model adopts [factors], the mask, the real bounds and packed marks: the builder transfers ownership.
-     */
+    // The open marks flag sides whose endpoint was invented to close an open declaration, so model-level
+    // consumers keep reasoning over the true open range. Adopts the arrays: the caller transfers ownership.
     internal constructor(
         numBoolVars: Int,
         numIntVars: Int,
@@ -211,7 +183,6 @@ open class Problem internal constructor(
         semantics = semantics,
     )
 
-    /** Overload taking factors as a [List]; they are stored as an [Array] and the other arrays are adopted. */
     internal constructor(
         numBoolVars: Int,
         numIntVars: Int,
@@ -278,13 +249,10 @@ open class Problem internal constructor(
     )
 
     /**
-     * A copy declaring [newDomains] — used when deferred bounding narrows a wide column after parsing,
-     * before the problem flows into presolve. Every other structure (factors, real bounds,
-     * implied/symmetry flags) is shared. The result is a raw `Problem` whose root bake is still deferred.
+     * A copy declaring [newDomains], sharing every other structure.
      *
-     * [intBounds] is carried through rather than re-read off [newDomains]: an endpoint bounding invented
-     * to narrow a column is an artefact of the finite lane, so the model-level range stays what the
-     * source declared and the LP relaxation keeps reasoning over it.
+     * [intBounds] is carried through rather than re-read off [newDomains]: an endpoint invented to narrow
+     * a column is an artefact of the finite lane, so the model-level range stays what the source declared.
      */
     fun withIntDomains(newDomains: Array<IntDomain>): Problem = Problem(
         numBoolVars = numBoolVars,
@@ -302,19 +270,15 @@ open class Problem internal constructor(
     )
 
     /**
-     * This model over [newFactors], carrying its declared columns through unchanged.
+     * This model over [newFactors], carrying its declared columns through unchanged. Rebuilding from
+     * [intBounds] instead would widen a column that declares a value set into its hull.
      *
-     * The one spelling for a source rewrite that keeps the columns and changes the rows. Rebuilding from
-     * [intBounds] instead widens a column that declares a value set into its hull, which is a different
-     * model; a rewrite states which rows it keeps, not which values.
-     *
-     * [newImpliedFactorMask] is indexed by [newFactors], so a rewrite that reorders or drops rows states
-     * the mask it kept; `null` marks no row implied. Both are captured, so the caller keeps its own copies.
+     * [newImpliedFactorMask] is indexed by [newFactors]; `null` marks no row implied. Both are captured.
      */
     fun withFactors(newFactors: List<Factor>, newImpliedFactorMask: BooleanArray? = null): Problem =
         withFactors(newFactors.toTypedArray(), newImpliedFactorMask?.copyOf())
 
-    /** [withFactors] for an internal builder that transfers ownership of [newFactors] and its mask. */
+    // Adopts newFactors and its mask: the caller transfers ownership.
     internal fun withFactors(newFactors: Array<Factor>, newImpliedFactorMask: BooleanArray? = null): Problem = Problem(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
@@ -329,14 +293,8 @@ open class Problem internal constructor(
         semantics = semantics,
     )
 
-    /**
-     * This model over [newDomains], carrying every row and every other declaration through unchanged.
-     *
-     * Takes the rebounded declarations rather than a range, so the caller has already intersected its
-     * proved range with whatever value sets the columns declare — see [SourceIntDomains.rebounded]. That
-     * keeps the widening [withFactors] warns about out of this path: a range cannot arrive here and
-     * quietly replace a value set with its hull.
-     */
+    // Takes rebounded declarations rather than a range, so a range cannot quietly replace a declared value
+    // set with its hull.
     internal fun withDeclaredIntDomains(newDomains: SourceIntDomains): Problem = Problem(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,

@@ -24,9 +24,6 @@ import com.eignex.util.arrays.emptyLongArray
  *  - [Mode.Eq] (default): `n = |distinct(xs)|`.
  *  - [Mode.AtLeast]: `n ≤ |distinct(xs)|`.
  *  - [Mode.AtMost]:  `n ≥ |distinct(xs)|`.
- *
- * One factor with a mode flag so all three MiniZinc predicates (`fzn_nvalue`,
- * `fzn_atleast_nvalues`, `fzn_atmost_nvalues`) lower to the same factor type.
  */
 class NValue(
     /** Integer variable id holding the distinct-value count target. */
@@ -35,7 +32,7 @@ class NValue(
     val xs: IntArray,
     /** How [n] relates to the actual distinct-value count. */
     val mode: Mode = Mode.Eq,
-    /** Per-index presence literals; empty for the non-opt fast path. */
+    /** Per-index presence literals, or empty when every index is present. */
     override val presents: IntArray = emptyIntArray(),
     /** Values omitted from the distinct-value count. */
     val exceptSet: LongArray = emptyLongArray(),
@@ -66,9 +63,7 @@ class NValue(
     override fun remap(mapping: VarRemap): Factor =
         NValue(mapping.int(n), mapping.ints(xs), mode, mapping.lits(presents), exceptSet)
 
-    // A fixed distinct-count target degenerates the exact `nvalue` into a simpler global: `n = |xs|`
-    // forces all values distinct, and `n = 1` forces them all
-    // equal (a chain of equalities). Solution-set exact; only the non-optional `Eq` mode qualifies.
+    // A fixed target `n = |xs|` is all-different and `n = 1` is a chain of equalities.
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
         if (mode != Mode.Eq || presents.isNotEmpty() || exceptSet.isNotEmpty()) return Unchanged
         val nDom = domains[n]
@@ -85,9 +80,7 @@ class NValue(
         }
     }
 
-    // The distinct-value count ignores the order of [xs], so the counted vars are sorted, each paired with its
-    // presence literal; [n] and [mode] are positional. The allocating builder is used because the pair value is
-    // a remappable Boolean literal, which the KeySink constant-value pair methods cannot remap.
+    // The allocating builder, because KeySink pair methods cannot remap the presence-literal pair values.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.NVALUE) {
         enum(mode)
         longs(exceptSorted)

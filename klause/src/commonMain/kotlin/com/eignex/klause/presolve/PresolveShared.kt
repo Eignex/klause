@@ -11,7 +11,6 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
-/** Small math and problem-rebuild helpers shared across the presolve passes. */
 internal object PresolveShared {
 
     fun problemComplexity(factorCount: Int, domains: Array<IntDomain>): Long {
@@ -26,14 +25,8 @@ internal object PresolveShared {
         return complexity
     }
 
-    /**
-     * Apply [delta] while retaining the canonical source representation, or null when it refutes.
-     *
-     * A proved range intersects the column's declaration rather than replacing it, so a non-contiguous
-     * declaration does not widen back to its hull on the way through. Either half can refute, and this
-     * returns null for both: the range itself can cross, and the intersection can empty a column that
-     * neither endpoint crossed.
-     */
+    // Null when [delta] refutes. A proved range intersects the column's declaration rather than replacing
+    // it, so a non-contiguous declaration does not widen to its hull; the intersection can itself refute.
     fun Problem.withSourcePassDelta(delta: SourceDelta): Problem? {
         if (delta.infeasible) return null
         if (delta.isEmpty) return this
@@ -45,7 +38,6 @@ internal object PresolveShared {
         return spec.withFactorPassDelta(delta)
     }
 
-    /** [delta]'s factor rewrite alone, over this model's declarations. */
     private fun Problem.withFactorPassDelta(delta: SourceDelta): Problem {
         if (delta.droppedIndices.isEmpty() && delta.addedFactors.isEmpty()) return this
         val dropped = if (delta.droppedIndices.isEmpty()) {
@@ -69,13 +61,7 @@ internal object PresolveShared {
         return withFactors(kept.toTypedArray(), implied?.toBooleanArray())
     }
 
-    /**
-     * Materialize the problem that results from applying [delta] to [this] — the from-scratch counterpart
-     * of [PresolveSession.applyDelta]. The next factor list is [this]'s factors with [PassDelta.droppedIndices]
-     * removed (kept in order) followed by [PassDelta.addedFactors]; the domains are the delta's own
-     * ([PassDelta.domains]) or [this]'s root ones when it leaves them alone. Re-baked eagerly through
-     * [rebuildProblem], so its `baked` folds the delta's narrowings and any dependent tightenings.
-     */
+    // From-scratch counterpart of [PresolveSession.applyDelta], re-baked eagerly through [rebuildProblem].
     fun BakedProblem.withPassDelta(delta: PassDelta, bakeConfig: BakeConfig): BakedProblem {
         val kept = ArrayList<Factor>(factors.size - delta.droppedIndices.size + delta.addedFactors.size)
         val dropped = if (delta.droppedIndices.isEmpty()) {
@@ -88,13 +74,8 @@ internal object PresolveShared {
         return rebuildProblem(this, kept, delta.domains ?: rootIntDomains(), bakeConfig)
     }
 
-    /**
-     * The [PassDelta] taking [inputFactors] to [out] — a rewritten factor list where every survivor is
-     * identity-equal to an input factor (`Factor` uses reference equality, so a plain [HashMap] keys by
-     * identity). Adds every [out] factor absent from the input; drops every input index whose factor is
-     * not among [out]'s survivors. For passes that rebuild their whole factor list (variable renames,
-     * substitutions) rather than deciding keep/drop per input index.
-     */
+    // For passes that rebuild their whole factor list. Survivors are matched by identity (`Factor` uses
+    // reference equality), so a rewritten factor counts as dropped and added.
     fun identityDelta(
         inputFactors: Array<Factor>,
         out: List<Factor>,
@@ -114,7 +95,6 @@ internal object PresolveShared {
         return PassDelta(dropped.toIntArray(), added, domains, reconstruct)
     }
 
-    /** [identityDelta] in the source lane's change form, carrying [rebuild] as data rather than a lift. */
     fun sourceIdentityDelta(inputFactors: Array<Factor>, out: List<Factor>, rebuild: SourceRebuilds): SourceDelta {
         val delta = identityDelta(inputFactors, out)
         return SourceDelta(delta.droppedIndices, delta.addedFactors, rebuild = rebuild)
@@ -132,8 +112,8 @@ internal object PresolveShared {
         seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
         cancellation: ExecutionControl = problem.cancellation,
     ): BakedProblem {
-        // Inherit the pass-view mode: a pass fed a cheap already-folded input returns a cheap already-folded
-        // output (the session re-folds via incremental propagation); an eager input yields an eager rebuild.
+        // Inherit the pass-view mode: an already-folded input yields an already-folded output (the session
+        // re-folds via incremental propagation); an eager input yields an eager rebuild.
         val base = BakedProblem(
             settings = problem.settings,
             semantics = problem.semantics,
@@ -144,17 +124,14 @@ internal object PresolveShared {
             seedDeductions = seedDeductions,
             cancellation = cancellation,
             alreadyFolded = problem.alreadyFolded,
-            // The LP-only continuous columns are a separate namespace presolve never touches (real-bearing
-            // rows are guarded out of every pass, and int renumbering leaves real ids alone), so carry it
-            // through unchanged — else the solve loses the reals and the leaf verdict silently no-ops.
+            // Presolve never touches the LP-only real namespace; dropping it would lose the reals and silently
+            // disable the leaf verdict.
             numRealVars = problem.numRealVars,
             realLower = problem.realLower,
             realUpper = problem.realUpper,
-            // No pass renumbers the integer namespace, so the marks recording which sides the front-end
-            // invented still address the same columns. A side a pass has tightened only leaves the
-            // LP column wider than it need be — the relaxation stays a superset of the model, so every
-            // bound read off it is still sound. Dropping them instead would cost the LP its open-range
-            // reasoning and the search its objective-cutoff bound on exactly those columns.
+            // No pass renumbers the integer namespace, so the open-side marks still address the same columns.
+            // A side a pass tightened only leaves the LP column wider than needed, which stays sound;
+            // dropping the marks would cost the LP its open-range reasoning and the search its cutoff bound.
             packedOpenIntLo = problem.intBounds.openLowerBits,
             packedOpenIntHi = problem.intBounds.openUpperBits,
             projectionProviders = problem.projectionProviders,
@@ -162,10 +139,6 @@ internal object PresolveShared {
                 { view -> captured.forEngineView(view) }
             },
         )
-        // An already-folded pass view never bakes (nothing reads `Problem.baked`), so [RootBaker.reseed] leaves
-        // it untouched; with no probing tier enabled the plain base bake stands. Otherwise the reseed runs
-        // [RootBaker] against the base-baked problem and returns an eager problem whose `baked` carries
-        // the failed-literal / SAC deductions.
         return RootBaker.reseed(base, bakeConfig)
     }
 
@@ -178,8 +151,7 @@ internal object PresolveShared {
         return g
     }
 
-    /** The widest integer-variable domain span (`max − min`, saturating to [Long.MAX_VALUE] on overflow),
-     *  or 0 when there are no integer variables. Reads endpoints only, never enumerating values. */
+    // Saturates to [Long.MAX_VALUE] on overflow; reads endpoints only.
     fun maxIntSpan(problem: Problem): Long {
         var widest = 0L
         for (v in 0 until problem.numIntVars) {
@@ -203,8 +175,6 @@ internal object PresolveShared {
 
     fun divAll(xs: LongArray, g: Long): LongArray = LongArray(xs.size) { xs[it] / g }
 
-    /** Multiset of `Factor.structuralKey` over [factors] — the constraint set keyed for comparison
-     *  against a transform of itself. */
     fun structuralKeyMultiset(factors: List<Factor>): Map<StructuralKey, Int> {
         val base = HashMap<StructuralKey, Int>()
         for (f in factors) {
@@ -214,9 +184,7 @@ internal object PresolveShared {
         return base
     }
 
-    /** Whether applying [transform] to every factor in [factors] reproduces the [base] multiset of
-     *  structural keys — i.e. the transform is an automorphism of the constraint set. [transform]
-     *  returns `null` for a factor it cannot map (unkeyable / un-remappable), which fails the match. */
+    // Whether [transform] is an automorphism of the constraint set. A factor it cannot map (null) fails.
     fun matchesMultiset(factors: List<Factor>, base: Map<StructuralKey, Int>, transform: (Factor) -> Factor?): Boolean {
         val counts = HashMap<StructuralKey, Int>(base.size)
         for (f in factors) {

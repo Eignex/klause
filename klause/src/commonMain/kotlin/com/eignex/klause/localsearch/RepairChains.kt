@@ -8,31 +8,12 @@ import com.eignex.util.collections.LongArrayList
 
 private val EMPTY_INTS = emptyIntArray()
 
-/**
- * **Directed ejection-chain proposal** (after F. Glover, "Ejection chains, reference structures and
- * alternating path methods for traveling salesman problems", Discrete Applied Mathematics 65, 1996,
- * https://doi.org/10.1016/0166-218X(94)00037-E): grow a coordinated multi-variable move by chaining
- * repairs through the break structure. First moves are drawn from two pools with separate budgets:
- * [seedFactor]'s own repair proposals (repair-first) and primitives on neighbouring factors'
- * variables (ejection-first — see `neighbourPrimitives`). Each accepted step is applied (with
- * invariant propagation), the factor it *newly regressed* is identified, and that factor's
- * best-scoring repair — restricted to variables the chain hasn't already touched — becomes the next
- * step. The walk stops at the first strict cost improvement, at [maxDepth] steps, or when no
- * eligible repair exists; the state is then reverted exactly and the walk's best (minimum-cost)
- * ≥2-part prefix is emitted into [sink] as one atomic [Move.Compound].
- *
- * Unlike the stall-swap plateau buster, which hard-codes one coordinated shape (a same-domain value
- * exchange), the chain *derives* the coordinated shape from which constraints actually break — what
- * successor/path encodings need, where repairing a successor link requires re-linking predecessor,
- * position and chain tail in one move. Chains are **directed** (each step repairs the damage of the
- * previous one) and only ever compete **on score**.
- *
- * Variables touched once are pinned for the rest of the chain, so a chain never undoes itself and
- * always terminates. Cost is bounded by [maxDepth] × (apply + propose + probe); callers gate this
- * behind the stall detector.
- *
- * Returns the number of chains emitted into [sink].
- */
+// Directed ejection chains after F. Glover, "Ejection chains, reference structures and alternating path methods
+// for traveling salesman problems", Discrete Applied Mathematics 65, 1996,
+// https://doi.org/10.1016/0166-218X(94)00037-E.
+// Each step repairs the factor the previous step newly regressed, so the coordinated shape follows what actually
+// breaks. Touched variables stay pinned, so a chain never undoes itself; the state is reverted exactly and the best
+// prefix of at least two parts is emitted as one compound. Returns the number of chains emitted.
 internal fun LocalSearchState.proposeRepairChains(
     seedFactor: Int,
     maxDepth: Int,
@@ -53,18 +34,14 @@ internal fun LocalSearchState.proposeRepairChains(
     }
     factors[seedFactor].proposeRepairMoves(this, seedFactor, firsts)
     var emitted = sampleChainFirsts(firsts, firstMoveCap, maxDepth, propose, sink)
-    // Ejection firsts: primitives on the variables of factors neighbouring the seed (sharing a
-    // variable). Some cost-1 orbits are closed under violated-factor repairs — every escape must
-    // first perturb a satisfied neighbour (eject), then repair the cascade. Repair firsts keep their
-    // own budget above so they aren't crowded out.
+    // Some cost-1 orbits are closed under violated-factor repairs, so an escape must first perturb a satisfied
+    // neighbour. Repair firsts keep their own budget so they are not crowded out.
     firsts.clear()
     neighbourPrimitives(seedFactor, firsts)
     emitted += sampleChainFirsts(firsts, firstMoveCap, maxDepth, propose, sink)
     return emitted
 }
 
-/** Sample up to [cap] distinct first moves from [firsts] (uniform, without replacement)
- *  and emit each one's grown chain into [sink]; returns the number emitted. */
 internal fun LocalSearchState.sampleChainFirsts(
     firsts: MoveSink,
     cap: Int,
@@ -97,8 +74,6 @@ internal fun LocalSearchState.sampleChainFirsts(
     return emitted
 }
 
-/** Emit adjacent-value and endpoint int steps and bool flips on every variable of every factor
- *  adjacent to [fid] (sharing a variable) — the ejection-step vocabulary for chain firsts. */
 internal fun LocalSearchState.neighbourPrimitives(fid: Int, sink: MoveSink) {
     val f = problem.factors[fid]
     val seenFactors = IntHashSet()
@@ -106,10 +81,7 @@ internal fun LocalSearchState.neighbourPrimitives(fid: Int, sink: MoveSink) {
     for (v in f.boolVars) for (nf in projection.boolOccurrences[v]) emitFactorPrimitives(fid, nf, seenFactors, sink)
 }
 
-/** [neighbourPrimitives] helper: primitives for one adjacent factor, deduplicated. Ints get a step to
- *  each in-domain neighbour *and* the domain endpoints: on successor/path encodings the min endpoint is
- *  the semantic "remove from the structure" eject (`next(i)` → 0), letting a chain dismantle a
- *  parasitic successor fragment backwards — a neighbour step alone cannot express that jump. */
+// On successor encodings the min endpoint removes a node from the structure, a jump a neighbour step cannot express.
 internal fun LocalSearchState.emitFactorPrimitives(seed: Int, nf: Int, seenFactors: IntHashSet, sink: MoveSink) {
     if (nf == seed || !seenFactors.add(nf)) return
     val nfac = problem.factors[nf]
@@ -126,13 +98,8 @@ internal fun LocalSearchState.emitFactorPrimitives(seed: Int, nf: Int, seenFacto
     for (u in nfac.boolVars) sink.addBoolFlip(u)
 }
 
-/** Grow one chain from [first] (see [proposeRepairChains]), apply-evaluate-revert style. Returns the
- *  flattened primitive parts of the walk's minimum-cost prefix with ≥ 2 parts, else null (single-part
- *  walks are already in the normal repair pool). The prefix is emitted even when it ends above the
- *  start cost, letting the score race arbitrate; pre-filtering to improving-only walks would starve
- *  the pool on the trajectories that need coordinated escapes. The state is restored exactly
- *  (assignment, cost, step, lastTouched / touchCount on touched slots, conf-change flags, best-cost
- *  watermark). */
+// The best prefix is emitted even above the start cost so the score race arbitrates; keeping only improving walks
+// starves the pool where coordinated escapes are needed. Single-part walks are already in the repair pool.
 internal fun LocalSearchState.buildRepairChain(first: Move, maxDepth: Int, propose: MoveSink): List<Move>? {
     val startCost = cost
     val oldStep = tabu.step
@@ -223,9 +190,7 @@ private fun LocalSearchState.runRepairChain(
     }
 }
 
-/** Record into [base] the current degree of every factor [p] could affect — factors over
- *  [p]'s own variable plus factors over any defined variable in its invariant cone —
- *  keeping the *first* sighting (the chain-start baseline). */
+// Keeps each factor's first sighting, the chain-start baseline.
 internal fun LocalSearchState.recordBaseDegrees(p: Move, base: RepairChainDegrees) {
     when (p) {
         is Move.BoolFlip -> {
@@ -244,12 +209,10 @@ internal fun LocalSearchState.recordBaseDegrees(p: Move, base: RepairChainDegree
     }
 }
 
-/** Record [LocalSearchState.factorDegree] for [fid] on its first sighting only (mirrors `getOrPut`). */
 internal fun LocalSearchState.recordFirstDegree(base: RepairChainDegrees, fid: Int) {
     base.record(fid, factorDegree[fid])
 }
 
-/** [recordBaseDegrees] helper: factors over the invariant cone's output vars. */
 internal fun LocalSearchState.recordConeDegrees(intSeeds: IntArray, boolSeeds: IntArray, base: RepairChainDegrees) {
     val net = invariants ?: return
     for (idx in net.affectedNodes(intSeeds, boolSeeds)) {
@@ -259,14 +222,11 @@ internal fun LocalSearchState.recordConeDegrees(intSeeds: IntArray, boolSeeds: I
     }
 }
 
-/** The factor with the largest weighted degree increase over its chain-start baseline,
- *  or -1 when nothing regressed (the chain caused no new damage). */
+// -1 when nothing regressed.
 internal fun LocalSearchState.worstRegressedFactor(base: RepairChainDegrees): Int =
     base.worstRegressed(factorDegree, weights.factorWeights)
 
-/** Best repair proposal of [target] that avoids every pinned slot, by immediate
- *  cost delta (ties broken uniformly). Null when [target] proposes nothing
- *  eligible — the chain ends. */
+// Ties are broken uniformly; null ends the chain.
 internal fun LocalSearchState.pickChainRepair(target: Int, pinnedSlots: IntHashSet, propose: MoveSink): Move? {
     propose.clear()
     factors[target].proposeRepairMoves(this, target, propose)

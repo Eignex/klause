@@ -35,27 +35,16 @@ import com.eignex.klause.solver.objective.minimizeInt
  */
 class CompiledSchema internal constructor(
     problem: Problem,
-    /** Boolean variable id by schema name. */
     boolVarIdByName: Map<String, Int>,
-    /** Integer variable id by schema name. */
     intVarIdByName: Map<String, Int>,
-    /** Per-nominal one-hot indicator bool ids, by schema name. */
     nominalIndicators: Map<String, Map<String, Int>>,
-    /** Per-float declarations, by schema name. */
     floatDecoders: Map<String, FloatSpec>,
-    /** Default branching params derived from the schema's `search { … }` annotation, or `null` when
-     *  the schema declares none; [backtrackParams] falls back to [BacktrackPresets.conflictDriven]. */
+    /** Default branching params from the schema's `search { … }` annotation, or `null` when it declares none. */
     val defaultBacktrackParams: BacktrackParams? = null,
-    /** Per-set-var indicator layout: parallel `(universe[i], indicatorBoolId[i])`. Used by
-     *  the set decoders to read indicator bools back into a [Set]. Nominal-set vars stash
-     *  their label order in [setNominalLabels] alongside this. */
     internal val setLayouts: Map<String, SetLayout> = emptyMap(),
-    /** Label list (in universe-index order) for each nominal-set var. Empty map entry for
-     *  int-universe set vars. */
+    // Universe-index order per nominal-set var.
     setNominalLabels: Map<String, List<String>> = emptyMap(),
-    /** Real variable id by schema name. */
     realVarIdByName: Map<String, Int> = emptyMap(),
-    /** Per-component identity by source float name. */
     floatRepresentations: Map<String, FloatRepresentation> = emptyMap(),
     sourceBinding: CompiledSourceBinding? = null,
 ) {
@@ -160,16 +149,13 @@ class CompiledSchema internal constructor(
         return decode(handle.value, sample)
     }
 
-    /** Decodes an optional nominal: `null` when absent. The underlying one-hot indicators may
-     *  be unconstrained when the variable is absent, so we don't insist on exactly-one in
-     *  that case — but a present nominal still has its standard exactly-one invariant. */
+    /** Decodes an optional nominal: `null` when absent, whatever its unconstrained indicators hold. */
     fun decode(handle: OptNominalHandle, sample: Sample): String? {
         if (!decode(handle.present, sample)) return null
         return decode(handle.value, sample)
     }
 
-    /** Read a set var's indicators back into a `Set<Int>`. Universe elements whose
-     *  indicator bool is `true` in [sample] form the result; others are filtered out. */
+    /** Decode [handle]'s selected universe elements from [sample]. */
     fun decode(handle: IntSetHandle, sample: Sample): Set<Int> {
         sourceBinding.isOriginal(sample)
         val layout = setLayouts[handle.name]
@@ -181,8 +167,7 @@ class CompiledSchema internal constructor(
         return out
     }
 
-    /** Read a nominal-set var's indicators back into a `Set<String>` of currently-selected
-     *  labels. */
+    /** Decode [handle]'s selected labels from [sample]. */
     fun decode(handle: NominalSetHandle, sample: Sample): Set<String> {
         sourceBinding.isOriginal(sample)
         val layout = setLayouts[handle.name]
@@ -241,8 +226,7 @@ class CompiledSchema internal constructor(
         sourceBinding.realNames[handle.name] ?: error("No float variable named '${handle.name}'"), maximize = true,
     )
 
-    /** A single-real-column [LinearObjective] over LP-only continuous var [realId]; the always-minimising
-     *  frame negates the coefficient to maximise. */
+    // The objective frame always minimises, so maximising negates the coefficient.
     private fun realObjective(realId: Int, maximize: Boolean): LinearObjective {
         val coeffs = DoubleArray(problem.numRealVars)
         coeffs[realId] = if (maximize) -1.0 else 1.0

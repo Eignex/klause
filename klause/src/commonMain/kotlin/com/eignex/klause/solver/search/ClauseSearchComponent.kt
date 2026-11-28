@@ -4,12 +4,8 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.util.collections.IntArrayList
 
 /**
- * Boolean clauses hosted by the shared session rather than by a frontend-specific search loop.
- *
- * The clauses live in a [WatchedClauseStore], so a falsified literal wakes only the clauses
- * watching it. CP's watched-clause implementation remains
- * its specialised finite-domain mechanism; open and hybrid component sets use this one. Its clause is
- * both the propagation and the conflict explanation.
+ * Boolean clauses hosted by the shared session in a [WatchedClauseStore], used by open and hybrid
+ * component sets. Each clause is both its propagation reason and its conflict explanation.
  */
 class ClauseSearchComponent(clauses: Iterable<Clause>) :
     SearchComponent,
@@ -17,7 +13,7 @@ class ClauseSearchComponent(clauses: Iterable<Clause>) :
     private val store = WatchedClauseStore()
     private val sourceClauses = clauses.map(Clause::literals)
 
-    /** Literals whose falsification has not been propagated through the watch index yet. */
+    // Falsified literals not yet propagated through the watch index.
     private val pending = IntArrayList()
     private var active: SearchContext? = null
     private var unitsPending = false
@@ -69,16 +65,12 @@ class ClauseSearchComponent(clauses: Iterable<Clause>) :
         return value == (literal and 1 == 0)
     }
 
-    /**
-     * Watch preference among falsified literals is a level order, which this component cannot see.
-     * A constant is sound: it only costs a watch move that a level-aware choice would have avoided.
-     */
+    // This component cannot see levels. A constant is sound; it only costs extra watch moves.
     override fun levelOf(literal: Int): Int = 0
 
     override fun implied(clause: Int, literal: Int): ComponentResult {
         val result = session().imply(literal, store.explanationOf(clause))
-        // The session delivers an implication to every component except the one that made it, so this
-        // component queues its own consequences.
+        // The session does not deliver an implication back to the component that made it.
         if (result is ComponentResult.Consistent) pending.add(literal xor 1)
         return result
     }

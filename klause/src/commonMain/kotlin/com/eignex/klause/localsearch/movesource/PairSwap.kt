@@ -9,10 +9,6 @@ import com.eignex.klause.localsearch.MoveSink
  * breaks feasibility but a coordinated 2-flip preserves it (common in binary-decision optimization
  * like knapsack / packing). The pair set is Θ(n²), so candidates are drawn at random.
  *
- * The candidate construction — pick two variables, validate (distinct, unfrozen, value-compatible
- * domains), build the two-part [Move.Compound] — lives in [drawBoolSwap] / [drawIntSwap];
- * [generate] fills the sink with up to [cap] of each kind.
- *
  * [Phase.Feasible] / [Pool.ScoreOnly]: pair swaps are an objective-descent move over the feasible
  * region, selected by score, never by the noise draw.
  */
@@ -84,13 +80,10 @@ class PairSwap(
         }
 
         /**
-         * The value-exchange move for a chosen int-var pair `(u, w)` — the single construction point
-         * for an int pair-swap, called after the caller's own selection so the RNG sequence stays with
-         * the caller. Returns
-         * null (reject) when the pair is equal, either var is frozen, [checkOwner] and either is owned
-         * by an implicitly-solved global, [sameShape] and the domains differ in `[min, max]`, the
-         * values are equal, or a swapped value falls outside the other's domain. None of these draw
-         * RNG, so the gate order is behaviour-irrelevant.
+         * The value-exchange move for an already-selected int pair `(u, w)`, drawing no RNG. Null when the
+         * pair is equal, either var is frozen, [checkOwner] and either is owned by an implicitly-solved
+         * global, [sameShape] and the domains differ in `[min, max]`, the values are equal, or a swapped
+         * value falls outside the other's domain.
          */
         fun intSwapMove(
             state: LocalSearchState,

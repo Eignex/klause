@@ -14,14 +14,8 @@ import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.withSourceSemantics
 
 /**
- * Result of [satisfyUnderAssumptions]. Distinguishes a satisfying model, a hypothesis-level
- * contradiction (the assumption literals — alone or together with the hard constraints —
- * are jointly unsat), a budget cap, and a globally-unsat problem (independent of the
- * assumptions).
- *
- * Used by the core-guided MaxSAT loop ([com.eignex.klause.meta.coreguided.CoreGuidedOptimizer])
- * which drives a sequence of `satisfy(assumptions)` calls and refines its lower bound off
- * each [UnsatUnderAssumptions.core].
+ * Result of [satisfyUnderAssumptions]: a satisfying model, a contradiction among the assumptions and the
+ * hard constraints, an indeterminate stop, or a problem unsat independent of the assumptions.
  */
 sealed interface SatisfyResult {
     /** Effective source interpretation, with assumption restrictions retained separately. */
@@ -34,19 +28,15 @@ sealed interface SatisfyResult {
         override val semantics: EffectiveSourceSemantics? = sample.semantics,
     ) : SatisfyResult
 
-    /** Subset of the explicit and parameter assumptions that's jointly infeasible against the problem's
-     *  hard constraints. Sound (always unsat) but not necessarily minimal. For
-     *  backends that can't extract a sub-core (local-search) this is the full
-     *  input [Assumptions] verbatim. */
+    /** Subset of the explicit and parameter assumptions jointly infeasible with the hard constraints.
+     *  Sound but not necessarily minimal; the full input [Assumptions] when the backend extracts no sub-core. */
     data class UnsatUnderAssumptions(
         /** The assumption subset that caused infeasibility. */
         val core: Assumptions,
         override val semantics: EffectiveSourceSemantics? = null,
     ) : SatisfyResult
 
-    /** Problem is unsat even with the assumptions dropped — the assumption layer is
-     *  irrelevant. Distinct from [UnsatUnderAssumptions] so the MaxSAT loop can short-
-     *  circuit instead of relaxing a fictitious core. */
+    /** Problem is unsat even with the assumptions dropped. */
     data class GloballyUnsat(
         /** The unsat core, when one is available. */
         val core: UnsatCore? = null,
@@ -107,13 +97,8 @@ fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
     }.withSourceSemantics(problem.semantics)
 }
 
-/**
- * Backtrack-specific path: run the bake check + seed phase by hand so a seed-time
- * conflict retains the applied prefix of [assumptions], including the transitive premises
- * of propagated deductions. If the seed succeeds we fall through
- * to a normal `solve(withAssumptions)` for the DFS phase; an UNSAT verdict there returns the
- * engine's assumption core, or the full assumption set when it reports none.
- */
+// Runs the seed phase by hand so a seed-time conflict yields the applied prefix of [assumptions],
+// including the transitive premises of propagated deductions.
 private fun satisfyUnderAssumptionsBacktrack(
     solver: BacktrackSolver,
     assumptions: Assumptions,
@@ -164,22 +149,10 @@ private fun satisfyUnderAssumptionsBacktrack(
     }
 }
 
-/**
- * Deletion-based MUS minimisation: starting from [assumptions] (known unsat), try
- * dropping one literal at a time and re-solving. Literals whose removal still leaves
- * the problem unsat are not load-bearing — drop them; literals whose removal makes the
- * problem sat are kept. Result is a minimal unsat subset (any further deletion would
- * make it sat). Parameter pins are retained when the generic parameter contract cannot remove them;
- * inherited deductions disable generic minimization because deleting a pin can restore a shadowed restriction.
- *
- * O(|assumptions| × solve_cost) — opt-in via the `minimizeCore` flag on
- * [satisfyUnderAssumptions]. Recommended only when callers can tolerate the extra
- * solve calls in exchange for tighter cores (typically off-line MUS extraction; core-guided
- * MaxSAT loops should leave it off and rely on the seed-time projection alone).
- */
+// Deletion-based MUS minimization at one solve per pin: a pin whose removal keeps the problem unsat is
+// dropped. Frozen parameter pins stay. Callers skip it under inherited deductions, since deleting a pin
+// can restore a shadowed restriction.
 private fun <P : SolverParams> deletionMinimize(solver: Solver<P>, assumptions: Assumptions, params: P): Assumptions {
-    // Walk both bool and int pins. We iterate over snapshots of the key arrays so the
-    // working `current` can shrink as we discover removable pins.
     var current = assumptions
     val candidateBools = assumptions.boolKeys.copyOf()
     val candidateInts = assumptions.intKeys.copyOf()
@@ -188,13 +161,12 @@ private fun <P : SolverParams> deletionMinimize(solver: Solver<P>, assumptions: 
         if (params.assumptions.isFrozenBool(id)) continue
         if (current.boolValueOrNull(id) == null) continue // already dropped
         val trial = current.dropBool(id)
-        if (trial.isEmpty) continue // dropping it leaves nothing — last necessary pin
+        if (trial.isEmpty) continue
         val merged = params.withAssumptions(trial)
 
         @Suppress("UNCHECKED_CAST")
         val r = solver.solve(merged as P)
         if (r is SolveResult.Unsat) {
-            // Without this pin we're still unsat → it isn't load-bearing, drop it.
             current = trial
         }
     }
@@ -212,7 +184,6 @@ private fun <P : SolverParams> deletionMinimize(solver: Solver<P>, assumptions: 
     return current
 }
 
-/** Sorted-array deletion helper for [Assumptions.boolKeys]. */
 private fun Assumptions.dropBool(id: Int): Assumptions {
     val idx = boolKeys.toList().indexOf(id)
     if (idx < 0) return this
@@ -225,7 +196,6 @@ private fun Assumptions.dropBool(id: Int): Assumptions {
     return Assumptions(nk, nv, intKeys, intValues, deductions.withoutSetRestrictions())
 }
 
-/** Sorted-array deletion helper for [Assumptions.intKeys]. */
 private fun Assumptions.dropInt(id: Int): Assumptions {
     val idx = intKeys.toList().indexOf(id)
     if (idx < 0) return this
@@ -238,16 +208,8 @@ private fun Assumptions.dropInt(id: Int): Assumptions {
     return Assumptions(boolKeys, boolValues, nk, nv, deductions.withoutSetRestrictions())
 }
 
-/**
- * Map a refuted seed prefix in [PropagationResult.Unsat.conflictLevels] back
- * to the assumption literals that live at those levels. Seed iteration order is
- * bools-first (in [Assumptions.boolKeys] ascending order, each at its own level starting
- * at 1) then ints (same shape, continuing from `numBools + 1`).
- *
- * Levels strictly outside the seed range (e.g. propagator-induced internal-level
- * deductions that conflictLevels somehow surfaces) are dropped, matching the contract
- * that the returned [Assumptions] is a subset of the input.
- */
+// Seed order is bools first, one level each from 1 in [Assumptions.boolKeys] order, then ints from
+// `numBools + 1`. Levels outside the seed range are dropped so the result stays a subset of the input.
 internal fun projectSeedConflictToAssumptions(input: Assumptions, conflictLevels: IntArray): Assumptions {
     if (!input.deductions.isEmpty) return input
     val nb = input.boolKeys.size
@@ -267,8 +229,7 @@ internal fun projectSeedConflictToAssumptions(input: Assumptions, conflictLevels
     var ic = 0
     for (h in intHit) if (h) ic++
     if (bc == 0 && ic == 0) {
-        // Conflict surfaced but no level mapped back to a seed assumption — fall back
-        // to the full input so the caller still has a sound core to refine.
+        // No level maps to a seed assumption; the full input is still a sound core.
         return input
     }
     val bk = IntArray(bc)

@@ -3,5 +3,5 @@ package com.eignex.klause.factor.table.internals
 import com.eignex.klause.ir.IntDomain
 import com.eignex.util.collections.IntIntMap
 
-/** Cached domain refs for the variable-array Element unchanged-domains fast path. */
+// Domain refs for the variable-array Element unchanged-domains fast path.
 internal class ElementCache(val cachedDoms: Array<IntDomain?>, val posOf: IntIntMap)

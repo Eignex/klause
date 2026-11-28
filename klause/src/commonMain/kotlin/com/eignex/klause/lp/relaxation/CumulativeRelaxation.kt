@@ -64,39 +64,28 @@ import com.eignex.util.numbers.subExact
  */
 internal class CumulativeRelaxation(
     private val problem: Problem,
-    /** Project [Cumulative] factors into makespan plans. */
     private val includeCumulative: Boolean = true,
-    /** Also project each constant-size [Diffn] onto both axes as a cumulative: the
-     *  x-axis is `start = xs, dur = widths, res = heights, cap = the max y-extent`, and symmetrically
-     *  for the y-axis. A non-overlapping packing keeps the per-slice perpendicular demand within the
-     *  bounding-box extent, so the energetic row (whose `t1 = min-est` case is the area bound
-     *  `Σ wᵢ·hᵢ ≤ W·H`) lower-bounds a strip-length / extent variable. Using the *maximum* perpendicular
-     *  extent as capacity only loosens, so it stays sound; off by default. */
+    // Projects each constant-size Diffn onto both axes as a cumulative: the x-axis takes starts xs,
+    // durations widths, demands heights and the maximum y-extent as capacity, symmetrically for y. A
+    // non-overlapping packing keeps the perpendicular demand within that extent, so the row lower-bounds a
+    // strip-length variable; the maximum extent only loosens.
     private val includeDiffn: Boolean = false,
     deferred: Boolean = false,
 ) {
 
-    /**
-     * One emit plan: a verified makespan variable [makespanVar] (proven ≥ the end of every task in
-     * [startVars]) and that task set's energy data. Structural and node-independent, so the
-     * relaxation emits exactly one row per plan at every node — only its right-hand side moves with
-     * the live earliest-starts, so the row count stays stable for warm starting.
-     */
+    // makespanVar is proven ≥ the end of every task in startVars. Plans are node-independent: only the
+    // row's right-hand side moves with the live earliest starts.
     internal class AreaPlan(
         val makespanVar: Int,
-        /** Declared capacity upper bound (`> 0`); the energy ceiling per unit time. */
         val capacity: Long,
-        /** `capacity · M.rootMin`, the trivial right-hand side the row falls back to. Node-invariant, so
-         *  it is computed once — checked — while the plan is built rather than per node. */
+        // capacity · M.rootMin, the fallback right-hand side, checked once at plan build.
         val floor: Long,
         val startVars: IntArray,
-        /** Per-task constant duration (`> 0`). */
         val durations: LongArray,
-        /** Per-task minimum resource demand (`> 0`). */
+        // Per-task minimum demand.
         val resources: LongArray,
     )
 
-    /** The validated, live right-hand side of one [AreaPlan]'s row at a node. */
     internal class RowSpec(val rhs: Long, val global: Boolean, val premises: LpRowPremises?)
 
     var plans: List<AreaPlan> = emptyList()
@@ -114,12 +103,6 @@ internal class CumulativeRelaxation(
 
     val applicable: Boolean get() = plans.isNotEmpty()
 
-    /**
-     * The makespan row for [plan] under the live [domains]: `capacity·M ≥ rhs`. The `rhs` is the best
-     * energetic left edge over the live earliest-starts; on overflow it degrades to
-     * `capacity · M.rootMin`. The row is global iff every counted task's live earliest-start is
-     * still its declared one; otherwise the tightened starts it used are recorded as premises.
-     */
     fun rowSpec(plan: AreaPlan, domains: RelaxationDomains): RowSpec {
         val cap = plan.capacity
         val n = plan.startVars.size
@@ -140,7 +123,6 @@ internal class CumulativeRelaxation(
         return RowSpec(energetic, global = allDeclared, premises = premises)
     }
 
-    /** Records the tightened (live) earliest-starts the row leaned on as `startᵢ ≥ estLiveᵢ` atoms. */
     private fun livePremises(startVars: IntArray, estLive: LongArray, estDecl: LongArray): LpRowPremises {
         val pv = IntArrayList()
         val pt = LongArrayList()
@@ -154,8 +136,6 @@ internal class CumulativeRelaxation(
         return LpRowPremises(pv.toIntArray(), BooleanArray(count) { false }, pt.toLongArray())
     }
 
-    // Structural plan construction: once, at problem load.
-
     private suspend fun SequenceScope<Unit>.buildPlans(): List<AreaPlan> {
         val scheds = schedulingFactors()
         if (scheds.isEmpty()) return emptyList()
@@ -168,9 +148,8 @@ internal class CumulativeRelaxation(
         return out
     }
 
-    /** Plans for one scheduling factor: a makespan variable ≥ the end of every task it covers. */
     private suspend fun SequenceScope<Unit>.plansFor(s: Sched, links: MakespanLinks): List<AreaPlan> {
-        // makespanVar → covered task local-indices.
+        // makespanVar → covered task local indices.
         val cover = MutableIntObjectMap<IntArrayList>()
         for (i in s.starts.indices) {
             if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
@@ -185,7 +164,7 @@ internal class CumulativeRelaxation(
             }
         }
         if (cover.isEmpty()) return emptyList()
-        // Strongest coverage first; deterministic var-id tie-break. Keep at most MAX_MAKESPAN_VARS.
+        // Strongest coverage first, deterministic var-id tie-break.
         val ranked = ArrayList<Pair<Int, IntArrayList>>(MAX_MAKESPAN_VARS + 1)
         val order = compareByDescending<Pair<Int, IntArrayList>> { it.second.size }.thenBy { it.first }
         cover.forEach { m, idxs ->
@@ -217,7 +196,7 @@ internal class CumulativeRelaxation(
         }
     }
 
-    /** A scheduling factor normalized to constant per-task duration / minimum demand / max capacity. */
+    // Constant per-task durations, minimum demands, maximum capacity.
     private class Sched(val starts: IntArray, val dur: LongArray, val res: LongArray, val cap: Long)
 
     private suspend fun SequenceScope<Unit>.schedulingFactors(): List<Sched> {
@@ -231,9 +210,7 @@ internal class CumulativeRelaxation(
                     // the link is conditional on presence. Both are skipped (drops energy, sound).
                     if (f.durationVars.isNotEmpty() || f.presents.isNotEmpty()) continue
                     if (f.starts.size > MAX_TASKS) continue
-                    // The capacity ceiling and the per-task demand floor have to be the model's own;
-                    // [declaredCapacityOf] and [minimumResourcesOf] state why an invented endpoint
-                    // cannot stand in for either.
+                    // Capacity ceiling and demand floor must be the model's own, not search-box endpoints.
                     val cap = declaredCapacityOf(problem, f) ?: continue
                     val res = minimumResourcesOf(problem, f) ?: continue
                     out.add(Sched(f.starts, f.durations, res, cap))
@@ -247,9 +224,7 @@ internal class CumulativeRelaxation(
         return out
     }
 
-    /** Project a constant-size [Diffn] onto both axes (see [includeDiffn]): the x-axis cumulative has
-     *  capacity the maximum y-extent and vice versa. Variable-size diffn is skipped (a variable width
-     *  is not a constant duration); zero-extent axes contribute no resource room and are dropped. */
+    // A variable width is not a constant duration, so variable-size diffn is skipped.
     private fun addDiffnScheds(f: Diffn, out: ArrayList<Sched>) {
         if (f.widthVars != null || f.heightVars != null) return
         if (f.xs.size > MAX_TASKS) return
@@ -259,12 +234,9 @@ internal class CumulativeRelaxation(
         if (xExtent > 0L) out.add(Sched(f.ys, f.heights, f.widths.copyOf(), xExtent))
     }
 
-    /** Maximum extent of the bounding box along an axis: `max(coordᵢ.max + sizeᵢ) − min(coordᵢ.min)`.
-     *  An upper bound on the perpendicular resource room, so using it as the cumulative capacity only
-     *  loosens the energetic bound (sound). Zero — which drops the axis — when the model leaves a
-     *  coordinate open on either side, since the box's endpoint bounds the search rather than the
-     *  packing, and equally when the extent does not fit a [Long]: a wrapped extent can land *below*
-     *  the true room, which would tighten the energetic row instead of loosening it. */
+    // max(coordᵢ.max + sizeᵢ) − min(coordᵢ.min), an upper bound on the resource room. Zero drops the axis:
+    // when a coordinate is open, the box endpoint bounds the search rather than the packing, and on
+    // overflow a wrapped extent could land below the true room and tighten the row unsoundly.
     private fun perpendicularExtent(coords: IntArray, sizes: LongArray): Long {
         if (coords.isEmpty()) return 0L
         var hi = Long.MIN_VALUE
@@ -288,24 +260,19 @@ internal class CumulativeRelaxation(
     }
 
     internal companion object {
-        /** Per-factor task cap: above it the `O(n log n)` row build is skipped (sound loosening). */
         internal const val MAX_TASKS: Int = 1024
 
-        /** Minimum tasks a makespan variable must dominate before a row is worth emitting. */
+        // Tasks a makespan variable must dominate before its row is worth emitting.
         private const val MIN_COVER: Int = 2
 
-        /** Most rows emitted per scheduling factor (the highest-coverage makespan variables). */
+        // Rows per scheduling factor, for the highest-coverage makespan variables.
         internal const val MAX_MAKESPAN_VARS: Int = 4
     }
 }
 
-/**
- * `max over t1 of cap·t1 + Σ rᵢ·clamp(ectᵢ − t1, 0, durᵢ)`. The maximand is piecewise-linear in
- * `t1` with `+` → `−` slope changes only at the earliest-starts, so its maximum over the valid
- * range `t1 ≤ max ectᵢ` is attained at some `estᵢ` (or the right endpoint `max ectᵢ`). The sweep
- * visits the earliest-starts in ascending order, maintaining the full-energy / partial-energy
- * partition incrementally in `O(n log n)`. Throws [CheckedLongOverflowException] on any product overflow.
- */
+// max over t1 of cap·t1 + Σ rᵢ·clamp(ectᵢ − t1, 0, durᵢ). The maximand is piecewise-linear in t1 with
+// + → − slope changes only at the earliest starts, so the maximum over t1 ≤ max ectᵢ is at some estᵢ or
+// at max ectᵢ. The sweep keeps the energy partition incrementally in O(n log n); overflow throws.
 internal fun energeticRhs(cap: Long, est: LongArray, dur: LongArray, res: LongArray): Long {
     val n = est.size
     val ect = LongArray(n) { addExact(est[it], dur[it]) }

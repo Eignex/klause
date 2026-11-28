@@ -85,7 +85,7 @@ object PermutationGroup {
         }
         for (g in generators) if (!offer(g)) return out
         // Peel the base: at each level, add the Schreier generators of the current group's stabiliser
-        // of the base point, then descend into that stabiliser, carrying at most [cap] generators.
+        // of the base point, then descend into that stabiliser, carrying at most cap generators.
         var current: List<IntArray> = dedup(generators)
         for (b in base) {
             if (out.size >= cap || current.isEmpty()) break
@@ -96,9 +96,8 @@ object PermutationGroup {
         return out
     }
 
-    /** Schreier generators of the stabiliser of [point] in `<gens>` (Schreier's lemma): for a
-     *  transversal `u` of the orbit of [point], `u(s·γ)⁻¹ ∘ s ∘ u(γ)` over every generator `s` and
-     *  orbit point `γ`. Each fixes [point] and lies in `<gens>`. */
+    // Schreier's lemma: for a transversal u of the orbit of point, u(s·γ)⁻¹ ∘ s ∘ u(γ) over every generator s and
+    // orbit point γ. Each fixes point and lies in <gens>.
     private fun schreierGenerators(gens: List<IntArray>, point: Int, n: Int): List<IntArray> {
         val transversal = MutableIntObjectMap<IntArray>()
         transversal.put(point, IntArray(n) { it })

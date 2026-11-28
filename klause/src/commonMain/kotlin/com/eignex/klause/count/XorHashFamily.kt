@@ -9,19 +9,12 @@ import com.eignex.util.collections.IntArrayList
 import kotlin.random.Random
 
 /**
- * A family of random XOR (parity) hash constraints over a [samplingSet] of Boolean variables.
+ * A family of random XOR (parity) hash constraints over a [samplingSet] of Boolean variables. Drawing `m` hashes
+ * partitions the projected satisfying assignments into roughly `2^m` cells of near-equal expected size.
  *
- * Drawing `m` independent hashes partitions the satisfying assignments (projected onto the
- * sampling set) into roughly `2^m` cells of near-equal expected size — the core primitive
- * shared by ApproxMC counting ([ApproxMC]) and UniGen2 sampling ([UniGen]).
- *
- * Each hash is `XOR(subset) == parityBit` where every var in [samplingSet] is included with
- * probability ½ and `parityBit` is a fair coin: the 3-wise independent `H_xor` family of
- * S. Chakraborty, K. S. Meel, M. Y. Vardi, "A Scalable Approximate Model Counter", CP 2013,
- * https://doi.org/10.1007/978-3-642-40627-0_18. Hashes are [Xor] values that `withHashes` bundles
- * into one [GaussianXor] system.
- *
- * Construction is reproducible: the same [seed] (and the same `m` and draw order) yields the
+ * Each hash is `XOR(subset) == parityBit`, every variable included with probability ½ and `parityBit` a fair coin:
+ * the 3-wise independent `H_xor` family of S. Chakraborty, K. S. Meel, M. Y. Vardi, "A Scalable Approximate Model
+ * Counter", CP 2013, https://doi.org/10.1007/978-3-642-40627-0_18. The same [seed], `m` and draw order yield the
  * same hashes.
  */
 class XorHashFamily(
@@ -33,11 +26,9 @@ class XorHashFamily(
     private val rng = Random(seed)
 
     /**
-     * Draw [m] independent parity hashes over [samplingSet]. Returns an empty list when
-     * `m == 0` (the trivial single-cell partition). Each hash includes at least one variable:
-     * an all-excluded draw would degenerate to a constant `0 == parityBit` constraint, so one
-     * uniformly chosen sampling variable is force-included instead. This slightly over-weights
-     * singleton subsets relative to the ideal family.
+     * Draw [m] independent parity hashes over [samplingSet]; empty when `m == 0`. An all-excluded draw would be a
+     * constant constraint, so one uniformly chosen variable is force-included instead, slightly over-weighting
+     * singleton subsets.
      */
     fun draw(m: Int): List<Xor> {
         require(m >= 0) { "m must be non-negative, was $m" }
@@ -61,12 +52,8 @@ class XorHashFamily(
     }
 }
 
-/**
- * The `Problem` augmented with [hashes] as a single [GaussianXor] system. Variable counts and
- * domains are unchanged; only one constraint is appended. The parity constraints are propagated
- * jointly by Gauss-Jordan elimination, which is what makes enumerating a hashed cell tractable
- * (a per-hash [Xor] factor cannot — see [GaussianXor]).
- */
+// The hashes form one GaussianXor system: Gauss-Jordan propagation is what makes enumerating a hashed cell
+// tractable, which per-hash Xor factors are not.
 internal fun BakedProblem.withHashes(hashes: List<Xor>): Problem {
     if (hashes.isEmpty()) return this
     return withFactors(

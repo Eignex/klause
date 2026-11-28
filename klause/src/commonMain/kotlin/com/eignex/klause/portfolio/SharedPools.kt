@@ -17,22 +17,16 @@ import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.ExecutionControl
 
-/**
- * The cross-arm sharing channels handed to every arm of one portfolio: the learned-clause pool ([clauses],
- * present with multiple backtrack workers), the global-cut pool ([cuts], gated by [PortfolioScenario.shareCuts],
- * on by default), the objective lower-bound manager ([bounds]), the globally-valid level-0 variable-bound manager
- * ([varBounds]), and the verified-incumbent exchange ([solutions]). Only optimising arms feed the last three. Each
- * may be null when its sharing does not apply; an LS-only portfolio gets no [SharedPools] at all.
- */
+// The cross-arm sharing channels handed to every arm of one portfolio. Only optimising arms feed bounds,
+// varBounds and solutions; an LS-only portfolio gets no pools at all.
 internal class SharedPools(
     val clauses: SharedClausePool?,
     val cuts: SharedCutPool?,
     val bounds: SharedObjectiveBound? = null,
     val varBounds: SharedVarBounds? = null,
     val solutions: IncumbentExchange<Sample, Double>? = null,
-    /** How often the arms used each other's shared clauses, cuts and bounds. */
     val contributions: ContributionTally = ContributionTally(),
-    /** Shared clause arena and occurrence indices; native arms keep their watches and trail private. */
+    // Shared clause arena and occurrence indices; native arms keep their watches and trail private.
     val nativeProjection: PropagationProblem? = null,
     val localSearchProjection: LocalSearchPreparation? = null,
     val localSearchInvariants: InvariantNetworkPreparation? = null,

@@ -21,7 +21,6 @@ class CombinatorsTest {
         s.step()
         assertEquals(50.0, s.temperature, 1e-9)
         s.step()
-        // Budget of leg 0 spent: switch to leg 1, reset to its own start temperature.
         assertEquals(10.0, s.temperature, 1e-9)
         s.step()
         assertEquals(5.0, s.temperature, 1e-9)
@@ -32,11 +31,9 @@ class CombinatorsTest {
         val s = LoopSchedule(listOf(Segment(geo(100.0), 2), Segment(geo(10.0), 2)))
         s.step()
         s.step()
-        // Leg 0 spent: leg 1 at its start.
         assertEquals(10.0, s.temperature, 1e-9)
         s.step()
         s.step()
-        // Through leg 1, wrapped back to leg 0 reset to its start.
         assertEquals(100.0, s.temperature, 1e-9)
         s.step()
         assertEquals(50.0, s.temperature, 1e-9)
@@ -49,7 +46,6 @@ class CombinatorsTest {
         assertTrue(s.temperature < 100.0)
         s.reset()
         assertEquals(100.0, s.temperature, 1e-9)
-        // And leg 1 is fresh again on the next pass.
         s.step()
         s.step()
         assertEquals(10.0, s.temperature, 1e-9)

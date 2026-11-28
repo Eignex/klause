@@ -8,20 +8,14 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.nextUp
 
-/**
- * McCormick envelope of `result = intOperand · realOperand` over the integer operand's live bounds and
- * the real operand's declared ones.
- *
- * Every row here bakes an endpoint of the integer operand, so both of its sides have to be the model's
- * own: over a side the model leaves open the live box is the finite lane's invention, the column enters
- * the root LP genuinely open, and the envelope would cut off products the model admits. The real
- * operand is declined the same way, by its own infinite bounds.
- *
- * McCormick, "Computability of global solutions to factorable nonconvex programs: Part I — Convex
- * underestimating problems", Mathematical Programming 10 (1976), https://doi.org/10.1007/BF01580665.
- */
+// McCormick envelope over the integer operand's live bounds and the real operand's declared ones. Every row
+// bakes an integer-operand endpoint, so both sides must be stated by the model: an invented live box would
+// cut off products the model admits.
+//
+// McCormick, "Computability of global solutions to factorable nonconvex programs: Part I — Convex
+// underestimating problems", Mathematical Programming 10 (1976), https://doi.org/10.1007/BF01580665.
 internal fun RealProduct.emitLpRelaxation(builder: RelaxationBuilder) {
-    if (!builder.statesBothBounds(intOperand)) return // decline before a column is seated for a dead row
+    if (!builder.statesBothBounds(intOperand)) return
     val resCol = builder.realColumn(result)
     val opCol = builder.realColumn(realOperand)
     if (resCol < 0 || opCol < 0) return // builder has no real-column backing (e.g. a presolve fake)
@@ -32,15 +26,13 @@ internal fun RealProduct.emitLpRelaxation(builder: RelaxationBuilder) {
     val productMagnitude = (builder.realMagnitude(result) +
         (operandMagnitude * builder.realMagnitude(realOperand)).nextUp()).nextUp()
     if (lo == hi) {
-        // result = lo·realOperand exactly (the operand is a constant in this build).
         builder.derivedRealRow(intArrayOf(resCol, opCol), doubleArrayOf(1.0, -lo.toDouble()), LinearOp.EQ, 0.0,
             LpRowSlack(doubleArrayOf(1.0), doubleArrayOf(productMagnitude)))
         return
     }
     if (!realOperandLo.isFinite() || !realOperandHi.isFinite()) return
 
-    // McCormick envelope of `w = x·y` with `x = intOperand ∈ [lo, hi]`, `y = realOperand ∈ [yL, yH]`,
-    // `w = result`. Each row is `w + cy·y + cx·x ⟨op⟩ rhs` over columns `(result, realOperand, intOperand)`.
+    // `w = x·y` with `x = intOperand`, `y = realOperand`, `w = result`.
     val nCol = builder.intColumn(intOperand)
     val cols = intArrayOf(resCol, opCol, nCol)
     val xL = lo.toDouble()

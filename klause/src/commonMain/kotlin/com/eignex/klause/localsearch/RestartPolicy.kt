@@ -5,39 +5,25 @@ import com.eignex.klause.localsearch.schedule.RoundLog
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.LubyIterator
 
-/**
- * Pluggable restart logic for [LocalSearchSolver]. Decouples *when* to restart
- * ([shouldRestart]) from *how* ([restart]) so callers can swap a fixed cadence for
- * adaptive perturbation, Luby-sequence schedules, stagnation detection, etc., without
- * touching the engine.
- */
+/** Restart logic for [LocalSearchSolver]: when to restart ([shouldRestart]) and how ([restart]). */
 interface RestartPolicy {
-    /** Called once per accepted move with the count of moves applied since the last
-     *  restart. Return true to trigger a restart at the engine's next iteration. */
+    /** Called once per accepted move; true restarts at the engine's next iteration. */
     fun shouldRestart(stepsSinceLastRestart: Int): Boolean
 
-    /** Notification from the optimiser path: greedy descent reached a feasible local
-     *  optimum at `state.cost == 0` with the given objective value. Policies that want
-     *  to track an incumbent across restarts (ILS-style) implement this; the default
-     *  is a no-op. The optimiser calls it right before [restart]. */
+    /** Descent reached a feasible local optimum with [objective]; called right before [restart]. */
     fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) {}
 
     /** A feasible walk reached its restart boundary without establishing local optimality.
      *  Policies may retain this sample as a basin anchor; the notification grants no optimum credit. */
     fun onFeasibleStall(state: LocalSearchState, sample: Sample, objective: Double) {}
 
-    /** Carry out the restart. Default behaviour is a fresh random assignment via
-     *  [LocalSearchState.restart]; policies that anchor to good regions override using
-     *  `bestSoFar`. The optimiser path supplies the running best feasible sample;
-     *  satisfaction streams supply the best assignment since their last published sample,
-     *  including infeasible improvements. Initialization and post-publication restarts pass null. */
+    /** Performs the restart. Minimization supplies the best feasible sample as [bestSoFar], satisfaction the best
+     *  assignment since its last published sample; initialization and post-publication restarts pass null. */
     fun restart(state: LocalSearchState, bestSoFar: Sample?)
 
     /**
-     * Clears per-solve incumbents, perturbation strength and cadence position so state from another
-     * problem cannot affect the next solve. The engine calls this at solve start;
+     * Clears per-solve state so another problem's incumbents cannot affect the next solve; called at solve start.
      * [ScheduleBundle][com.eignex.klause.localsearch.schedule.ScheduleBundle] excludes it from adaptive-member resets.
-     * Stateless policies use the default no-op.
      */
     fun reset() {}
 }
@@ -51,24 +37,16 @@ class FixedCadenceRestart(
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) = state.restart()
 }
 
-/** Perturbation strategy used by [IteratedLocalSearchRestart] when kicking out of a
- *  local optimum. [Uniform] re-randomises random vars across the whole problem.
- *  [BasinHopping] kicks the scopes of randomly-picked factors — every Boolean of a picked
- *  factor is flipped and every int redrawn — producing a coordinated multi-variable jump more
- *  likely to land in a different basin than scattered single flips would. */
+/** How [IteratedLocalSearchRestart] kicks out of a local optimum. */
 enum class PerturbationKind {
     /** Re-randomise a uniform random subset of variables. */
     Uniform,
 
-    /** Apply a coordinated multi-variable jump to escape the current basin. */
+    /** Flip every Boolean and redraw every int of randomly picked factors, a coordinated jump more likely to land
+     *  in another basin than scattered single changes. */
     BasinHopping,
 }
 
-/**
- * Copy [anchor] into [state]'s assignment, apply [perturbationStrength] mutations
- * according to [kind], re-apply the assumption pins, then recompute the cost. Shared by
- * [AdaptivePerturbationRestart], [StagnationRestart] and [IteratedLocalSearchRestart].
- */
 internal fun anchorAndPerturb(
     state: LocalSearchState,
     anchor: Sample,
@@ -119,16 +97,10 @@ private fun kickRandomVar(state: LocalSearchState) {
 }
 
 /**
- * Restart from a perturbation of `bestSoFar` instead of randomising fully — keeps the
- * search anchored to good regions, helping `minimize` escape plateaus without throwing
- * away progress.
+ * Restarts from a perturbation of the best sample, or fully at random without one.
  *
- *  - [maxFlipsBeforeRestart] — cadence; identical knob to [FixedCadenceRestart].
- *  - [perturbationStrength] — how many random variables to flip / re-set when anchoring
- *    to `bestSoFar`. Higher values widen the search neighbourhood (closer to a full
- *    restart); lower values stay close to the anchor.
- *
- *  Falls back to a full random restart when `bestSoFar` is null.
+ *  - [maxFlipsBeforeRestart]: flips between restarts.
+ *  - [perturbationStrength]: variables changed when anchoring.
  */
 class AdaptivePerturbationRestart(val maxFlipsBeforeRestart: Int = 10_000, val perturbationStrength: Int = 5) :
     RestartPolicy {
@@ -140,18 +112,15 @@ class AdaptivePerturbationRestart(val maxFlipsBeforeRestart: Int = 10_000, val p
 }
 
 /**
- * Stagnation-driven restart on the shared per-round feedback channel ([AdaptivePolicy]): rather than
- * a fixed flip cadence, restart after [patience] consecutive rounds ([RoundLog]) with no strict
- * improvement in the best cost seen. A [maxFlipsBeforeRestart] ceiling still forces a restart if a
- * round never completes, so the policy can't wedge. Anchors to `bestSoFar` with a
- * [perturbationStrength] perturbation when one exists, else a full random restart.
+ * Restarts after [patience] consecutive rounds without a strict best-cost improvement, or at
+ * [maxFlipsBeforeRestart] if a round never completes. Anchors on the best sample when one exists.
  */
 class StagnationRestart(
     /** Consecutive no-improvement rounds before a restart fires. */
     val patience: Int = 8,
     /** Hard flip ceiling that forces a restart even if no round has completed. */
     val maxFlipsBeforeRestart: Int = 100_000,
-    /** Variables perturbed when anchoring to `bestSoFar` (see [anchorAndPerturb]). */
+    /** Variables perturbed when anchoring on the best sample. */
     val perturbationStrength: Int = 5,
 ) : RestartPolicy,
     AdaptivePolicy {
@@ -192,15 +161,9 @@ class StagnationRestart(
 }
 
 /**
- * Luby–Sinclair–Zuckerman restart schedule: cadence follows the Luby sequence
- * `1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8, …`, each term scaled by [unit] flips.
- * Within a logarithmic factor of the optimal restart schedule for a Las Vegas algorithm with
- * unknown runtime distribution — short bursts dominate, but occasional long runs let a hard
- * subproblem converge. M. Luby, A. Sinclair, D. Zuckerman, "Optimal speedup of Las Vegas algorithms",
- * Information Processing Letters 47, 1993, https://doi.org/10.1016/0020-0190(93)90029-9.
- *
- * Learnt `factorWeights` survive (`state.restart()` doesn't touch them); only the assignment,
- * the tabu clock and the configuration-checking flags reset.
+ * Restarts after `unit · luby(i)` flips, following the Luby sequence `1, 1, 2, 1, 1, 2, 4, …` scaled by [unit];
+ * learned factor weights survive restarts. M. Luby, A. Sinclair, D. Zuckerman, "Optimal speedup of Las Vegas
+ * algorithms", Information Processing Letters 47, 1993, https://doi.org/10.1016/0020-0190(93)90029-9.
  */
 class LubyRestart(val unit: Int = 100) : RestartPolicy {
     private val luby = LubyIterator()

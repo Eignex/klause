@@ -25,36 +25,28 @@ import kotlin.math.abs
 
 // Integer and Boolean definitions share a topological order and retain separate coordinate spaces.
 internal class FunctionalObjective internal constructor(
-    /** Int objective terms `Σ termCoeffs[k]·terms[k]`, "lower is better": each term is a cone var
-     *  (evaluated through [nodes]) or a bare int leaf. A single-variable objective is one term. */
+    // Each term is a cone var evaluated through nodes, or a bare int leaf.
     private val terms: IntArray,
     termCoeffs: LongArray,
     constant: Long,
     private val minimize: Boolean,
-    /** Int defining nodes in topological order — every node's inputs are leaves or earlier nodes. */
+    // Topological: every node's inputs are leaves or earlier nodes.
     nodes: List<Node>,
-    /** Int decision (leaf) variables the cone reads — the vars a local-search strategy should seed
-     *  candidate moves on to descend this objective. Empty when the cone has no int var leaves. */
+    // The decision vars local search should seed candidate moves on to descend this objective.
     val leafVars: IntArray,
-    /** Bool objective terms `Σ boolTermCoeffs[k]·[boolTerms[k] holds]`, added to the int terms. Each
-     *  is a bool cone var (evaluated through [boolNodes]) or a bare bool leaf; empty for a pure-int
-     *  objective (the FlatZinc/XCSP3 case), non-empty for a bool-weighted objective over AND/OR
-     *  indicators (OPB product terms, `array_bool_and`). */
+    // Bool cone vars or bare bool leaves, e.g. OPB product terms over AND/OR indicators.
     private val boolTerms: IntArray = emptyIntArray(),
     private val boolTermCoeffs: LongArray = emptyLongArray(),
-    /** Bool defining nodes (AND/OR folds) in topological order. */
     boolNodes: List<BoolFold> = emptyList(),
-    /** Bool decision (leaf) variables the bool cone reads. */
     val boolLeafVars: IntArray = emptyIntArray(),
     definitions: List<Definition> = emptyList(),
     internal val booleanCostSweep: DefinitionalSweep? = null,
 ) : IncrementalObjective {
 
-    /** Single-variable objective (the FlatZinc `defines_var` cone rooted at one variable). */
     internal constructor(objectiveVar: Int, minimize: Boolean, nodes: List<Node>, leafVars: IntArray) :
         this(intArrayOf(objectiveVar), longArrayOf(1L), 0L, minimize, nodes, leafVars)
 
-    /** A var reference (`varId ≥ 0`) or a literal constant (`varId < 0`, value in [const]). */
+    // A negative varId marks a literal constant.
     class Operand internal constructor(val varId: Int, val const: Long) {
         fun value(valOf: (Int) -> Long): Long = if (varId >= 0) valOf(varId) else const
         companion object {
@@ -63,7 +55,6 @@ internal class FunctionalObjective internal constructor(
         }
     }
 
-    /** One functional definition `out = f(inputs)`. */
     sealed interface Node {
         val out: Int
         fun compute(valOf: (Int) -> Long): Long
@@ -91,8 +82,7 @@ internal class FunctionalObjective internal constructor(
         override fun compute(valOf: (Int) -> Long): Long = a.value(valOf) + b.value(valOf)
     }
 
-    /** Linear definition `outCoeff·out + Σ coeffs[k]·ins[k] = c`  ⇒  `out = (c − Σ …)/outCoeff`.
-     *  The compiler guarantees integrality of the quotient (it's a real defines_var output). */
+    // `outCoeff·out + Σ coeffs(k)·ins(k) = c`; the compiler guarantees the quotient is integral.
     class Lin(override val out: Int, val outCoeff: Long, val coeffs: LongArray, val ins: Array<Operand>, val c: Long) :
         Node {
         override fun compute(valOf: (Int) -> Long): Long {
@@ -102,8 +92,7 @@ internal class FunctionalObjective internal constructor(
         }
     }
 
-    /** Bool definition `out ↔ ⋀ ins` (or `⋁ ins` when `!isAnd`) over bool *literals* ([ins] are
-     *  [Lit]-encoded, so a negated member is legal): the OPB product-term / `array_bool_and` shape. */
+    // `out ↔ ⋀ ins` (or `⋁` when not isAnd) over Lit-encoded literals, so a negated member is legal.
     class BoolFold(val out: Int, private val ins: IntArray, private val isAnd: Boolean) {
         fun compute(boolOf: (Int) -> Boolean): Boolean {
             var acc = isAnd
@@ -119,7 +108,6 @@ internal class FunctionalObjective internal constructor(
     internal class Definition(
         val out: Int,
         val outIsBool: Boolean,
-        /** The sweep node this definition evaluates, when it was read from a sweep. */
         val origin: DefinitionalSweep.SweepNode? = null,
         val keepsOutputOnNoWrite: Boolean = false,
         val compute: ((Int) -> Long, (Int) -> Boolean) -> Long,
@@ -133,12 +121,10 @@ internal class FunctionalObjective internal constructor(
         if (terms.isNotEmpty()) sequenceOf(PreparedBooleanObjectiveDelta(null)) else
             BooleanObjectiveDelta.preparation(coneMemo.ordered, boolTerms, boolTermCoeffs, minimize, numBooleans)
 
-    /** The objective as a "lower is better" linear form over its terms, or null when a combined
-     *  coefficient leaves the `Long` range. It agrees with the cones wherever every cone variable
-     *  holds its definition's value. */
+    // Agrees with the cones wherever every cone variable holds its definition's value; null when a combined
+    // coefficient leaves the Long range.
     internal val termForm: LinearObjective? = termForm(terms, termCoeffs, constant, boolTerms, boolTermCoeffs)
 
-    /** True iff every cone definition was read from a sweep node that [maintains] accepts. */
     internal fun conesMaintained(maintains: (DefinitionalSweep.SweepNode) -> Boolean): Boolean =
         coneMemo.ordered.all { definition -> definition.origin?.let(maintains) == true }
 
@@ -176,16 +162,13 @@ internal class FunctionalObjective internal constructor(
         }
     }
 
-    /** Evaluate the cones over base value-getters and return the "lower is better" objective. */
     private fun objValue(intBase: (Int) -> Long, boolBase: (Int) -> Boolean): BigInt {
         val v = coneMemo.evaluate(intBase, boolBase)
         return if (minimize) v else -v
     }
 
-    // Dense bottom-up evaluator: each node output owns a slot in a flat LongArray in topological order,
-    // avoiding a boxed per-evaluation map on the per-move path (deltaIfApplied evaluates the cone twice).
-    // The value array is allocated per evaluate, so one instance is safe to share across concurrent
-    // local-search workers.
+    // Flat slots in topological order avoid a boxed map on the per-move path. The value array is allocated
+    // per evaluate, so one instance is safe to share across concurrent local-search workers.
     private class ConeMemo(
         nodes: List<Node>,
         private val terms: IntArray,
@@ -267,8 +250,7 @@ internal class FunctionalObjective internal constructor(
         return (nxt - cur).toDouble()
     }
 
-    /** Gather a move's int overrides into [moved] and toggle each flipped bool var in [flipped]
-     *  (toggling nets out a var flipped an even number of times within a compound). */
+    // Toggling nets out a bool var flipped an even number of times within a compound move.
     private fun collectMoves(move: Move, moved: MutableIntLongMap, flipped: IntHashSet) {
         when (move) {
             is Move.IntSet -> moved.put(move.varId, move.newValue)

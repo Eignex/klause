@@ -22,40 +22,18 @@ import com.eignex.util.numbers.addExact
 internal object DominatedVariables {
 
     /**
-     * Dual fixing / dominated-variable reductions. A minimize objective `min Σ cⱼxⱼ` plus the
-     * constraint structure can pin a variable to a bound without changing the optimum:
-     *  - **down-safe**: lowering `xⱼ` never violates any constraint — it occurs only in `≤` rows with a
-     *    positive coefficient or `≥` rows with a negative one; if also `cⱼ ≥ 0` (lowering never raises
-     *    the objective), an optimum exists with `xⱼ` at its lower bound, so pin it there.
-     *  - **up-safe**: the mirror (`≤`/negative or `≥`/positive, and `cⱼ ≤ 0`) → pin to the upper bound.
+     * Dual fixing: for `min Σ cⱼxⱼ`, a variable that only occurs where lowering it is safe (`≤` rows with a
+     * positive or `≥` rows with a negative coefficient) and has `cⱼ ≥ 0` has an optimum at its lower bound;
+     * the mirror pins to the upper bound. Only monotone unconditional `≤`/`≥` rows from
+     * `Factor.impliedLinearRows` decide safety; an `=`/`≠` row, a reified row or an opaque global excludes
+     * its variables. Booleans use the same argument over clauses, [Cardinality] and [PseudoBoolean] rows and
+     * are pinned with unit clauses (already-pinned ones are skipped, keeping the pass idempotent).
      *
-     * Integers: a variable whose every occurrence is a monotone `≤`/`≥` row exposed by
-     * `Factor.impliedLinearRows` (an `=`/`≠` row, or a factor with no exact linear form, makes the safety
-     * undecidable, so it is excluded) is pinned by tightening its domain to a singleton.
-     * Booleans: the pure-literal mirror, extended past [Clause] to every
-     * *monotone* pseudo-Boolean row — a [Cardinality] `min ≤ Σ ≤ max` (each active side fixes a safe
-     * direction per literal) and a [PseudoBoolean] `≤`/`≥`. In all of these, flipping a literal moves
-     * the row's sum one known way, so one value of the variable is safe; an equality, a
-     * reified row, or a factor with no exact monotone declaration couples both directions and excludes the variable. A
-     * safe-direction bool is pinned with a unit clause (a bool already unit-pinned is skipped, keeping
-     * the pass idempotent). Coefficients come from [objectiveIntCoeffs] / [objectiveBoolCoeffs]
-     * (minimize sense, absent ⇒ 0).
+     * Solution-set altering, so it runs only for non-solution-set-sensitive queries. This finite form pins
+     * into root-propagated domains, reaching columns the declaration leaves too wide to fix.
      *
-     * The integer side reasons only over monotone `≤`/`≥` rows from `Factor.impliedLinearRows` — plain linear
-     * comparators and the increasing chain both qualify; reified rows are full biconditionals (their
-     * inner vars affect feasibility both ways) and other globals expose no exact linear rows, so they
-     * exclude their vars.
-     *
-     * No elimination, identity reconstruction. Solution-set altering (discards optimum-equivalent and
-     * feasible-but-suboptimal assignments), so the engine runs it only for non-solution-set-sensitive
-     * queries.
-     *
-     * This is the finite form: it pins into root-propagated domains, which are narrower than the model
-     * states, so it reaches columns the declaration alone leaves too wide to fix.
-     * [fixDominatedSourceVariables] is the same reduction over a source model.
-     *
-     * Dual fixing as in E. D. Andersen, K. D. Andersen, "Presolving in linear programming", Mathematical
-     * Programming 71, 1995, https://doi.org/10.1007/BF01586000.
+     * E. D. Andersen, K. D. Andersen, "Presolving in linear programming", Mathematical Programming 71, 1995,
+     * https://doi.org/10.1007/BF01586000.
      */
     fun fixDominatedVariables(
         problem: BakedProblem,
@@ -65,10 +43,8 @@ internal object DominatedVariables {
     ): PassDelta {
         if (cancellation()) return PassDelta()
         val safety = scanSafety(problem)
-        // Allocated on the first pin: the copy is one entry per column, and a round on a wide model far
-        // more often finds nothing to pin than something. Its nullness is also what carries the pinned
-        // domains only when a pin actually narrowed one, so a bool-only fixing yields a pure-add delta
-        // the fixpoint check reads correctly.
+        // Allocated on the first pin: most rounds on a wide model pin nothing, and staying null keeps a
+        // bool-only fixing a pure-add delta.
         var domains: Array<IntDomain>? = null
         fun pin(v: Int, value: Long) {
             val target = domains ?: problem.rootIntDomains().also { domains = it }
@@ -91,21 +67,10 @@ internal object DominatedVariables {
         return PassDelta(addedFactors = extra, domains = pinned)
     }
 
-    /**
-     * [fixDominatedVariables] over a canonical source model, before any finite projection exists.
-     *
-     * The safety argument is the same one and reads no domain at all — it is the rows a factor declares
-     * that decide a direction. Only the pin needs a value, and it needs exactly one: the bound it pins
-     * to. So a column open on the *other* side still pins, which is what makes this reduction worth
-     * having on a model the finite lane cannot represent.
-     *
-     * A column open on the side its safe direction points at is skipped. Pinning needs a bound to sit
-     * at, and the reduction proves only that moving that way never costs — not where the movement stops.
-     *
-     * The endpoint comes from the column's declared value set where it states one, and from its range
-     * otherwise: a declaration may sit strictly inside the model-level range, and a pin at the range's
-     * endpoint would then name a value the model excludes — which the rebuild reads as a refutation.
-     */
+    // The safety scan reads no domain, so a column open on the other side still pins. A column open on its
+    // safe side is skipped: the reduction proves moving that way never costs, not where it stops. The pin
+    // uses the declared value set's endpoint where one exists, since a range endpoint outside the
+    // declaration would name an excluded value and read as a refutation.
     fun fixDominatedSourceVariables(
         problem: Problem,
         objectiveIntCoeffs: Map<Int, Long>,
@@ -115,8 +80,7 @@ internal object DominatedVariables {
         if (cancellation()) return SourceDelta()
         val safety = scanSafety(problem)
         val bounds = problem.intBounds
-        // Allocated on the first pin: the copy is two arrays over every column, and a round on a wide
-        // model far more often finds nothing to pin than something.
+        // Allocated on the first pin: most rounds on a wide model pin nothing.
         var tightening: IntBounds.Tightening? = null
         fun pin(v: Int, value: Long) {
             val target = tightening ?: bounds.tightening().also { tightening = it }
@@ -128,10 +92,8 @@ internal object DominatedVariables {
             val declared = problem.intDomainOrNull(v)
             if (fixedColumn(bounds, declared, v)) continue
             val c = objectiveIntCoeffs[v] ?: 0L
-            // Each arm carries its own justification, so falling past an arm whose bound is open and
-            // pinning on the other is sound rather than a second-choice guess: reaching the lower arm
-            // needs `downSafe`, the upper one `upSafe`, and only `c == 0` satisfies both coefficient
-            // tests at once.
+            // Each arm carries its own justification, so falling past an arm whose bound is open to pin on
+            // the other is sound.
             when {
                 safety.downSafe[v] && c >= 0L && bounds.hasLower(v) -> pin(v, declared?.min ?: bounds.lower(v))
                 safety.upSafe[v] && c <= 0L && bounds.hasUpper(v) -> pin(v, declared?.max ?: bounds.upper(v))
@@ -144,43 +106,26 @@ internal object DominatedVariables {
         return SourceDelta(addedFactors = extra, bounds = proved)
     }
 
-    /** Whether [v] admits one value already, so a dual-fixing pin would restate what it declares. */
     private fun fixedColumn(bounds: IntBounds, declared: IntDomain?, v: Int): Boolean = if (declared != null) {
         declared.min == declared.max
     } else {
         bounds.hasLower(v) && bounds.hasUpper(v) && bounds.lower(v) == bounds.upper(v)
     }
 
-    /**
-     * What the monotone-occurrence scan proved about each column and each literal.
-     *
-     * Holds no domain and no range: every field is decided by the rows the factors declare, which is why
-     * both lanes run the identical scan and differ only in where a pin is written.
-     */
+    // Decided only by the rows factors declare, so both lanes run the identical scan.
     private class Safety(
-        /** Columns whose every occurrence makes lowering safe. */
         val downSafe: BooleanArray,
-        /** Columns whose every occurrence makes raising safe. */
         val upSafe: BooleanArray,
-        /** Columns no `=`/`≠` row and no opaque global mentions. */
         val intEligible: BooleanArray,
-        /** Columns some surviving factor reads. */
         val intSeen: BooleanArray,
-        /** Literals for which `true` never violates a row. */
         val trueSafe: BooleanArray,
-        /** Literals for which `false` never violates a row. */
         val falseSafe: BooleanArray,
-        /** Booleans no non-monotone factor mentions. */
         val boolEligible: BooleanArray,
-        /** Booleans some surviving factor reads. */
         val boolSeen: BooleanArray,
-        /** Booleans a unit clause already forces. */
         val alreadyPinned: IntHashSet,
     ) {
-        /** Whether column [v] admits a pin at all, before its bound or objective coefficient is read. */
         fun pinnable(v: Int): Boolean = intEligible[v] && intSeen[v]
 
-        /** The unit clauses pinning every safe-direction Boolean under [objectiveBoolCoeffs]. */
         fun boolPins(objectiveBoolCoeffs: Map<Int, Long>): List<Factor> {
             val extra = ArrayList<Factor>()
             for (b in boolEligible.indices) {
@@ -196,7 +141,6 @@ internal object DominatedVariables {
         }
     }
 
-    /** Read every factor's declared rows for the one direction each variable may safely move. */
     private fun scanSafety(problem: Problem): Safety {
         val n = problem.numIntVars
         val nb = problem.numBoolVars
@@ -204,13 +148,9 @@ internal object DominatedVariables {
             downSafe = BooleanArray(n) { true },
             upSafe = BooleanArray(n) { true },
             intEligible = BooleanArray(n) { true },
-            // A pin has to be earned by an occurrence the safety scan actually read. A variable no
-            // surviving factor mentions is not thereby free: an earlier pass may have folded its defining
-            // factor away — [ComparisonClauseFold] consumes a sole-use indicator's reified definition
-            // together with the clause using it, leaving the indicator referenced nowhere — while its
-            // value stays tied to an integer column through the bake. Pinning one of those asserts
-            // something the model never stated, and buys nothing: a variable nothing references prunes
-            // nothing. The same rule holds for an integer column, and for the same reason.
+            // A pin must be earned by an occurrence the scan read. An unreferenced variable is not free: a pass
+            // such as [ComparisonClauseFold] may have folded its definition away while the bake still ties its
+            // value to an integer column, and pinning it prunes nothing anyway.
             intSeen = BooleanArray(n),
             trueSafe = BooleanArray(nb) { true }, // b = true never violates a constraint
             falseSafe = BooleanArray(nb) { true }, // b = false never violates a constraint
@@ -300,10 +240,6 @@ internal object DominatedVariables {
         return if (upper) extreme <= bound else extreme >= bound
     }
 
-    /** Clear the unsafe pin direction(s) for the variable behind [lit] in a monotone row. [weight] is
-     *  the literal's coefficient (1 for clause/cardinality); the signed weight `w·polarity` is how the
-     *  row's sum changes when the variable flips false→true. [riseUnsafe] / [fallUnsafe] say whether a
-     *  rising / falling sum can violate the row, so the value that moves the sum that way is unsafe. */
     private fun markBoolMonotoneLiteral(
         lit: Int,
         weight: Long,

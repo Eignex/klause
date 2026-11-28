@@ -11,14 +11,11 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 
-/** Sentinel "variable id" marking the focal variable in a [refineColours] port signature; far
- *  above any colour id (colours are small dense counters) so it never collides with one. */
+// Marks the focal variable in a port signature; far above any dense colour id, so it never collides.
 private const val WL_FOCAL = 1_000_000_000
 
-// Colour-refinement signatures are [RefineKey]s (LongArray-backed, the non-string analog of
-// StructuralKey). The leading word is a *space* tag so an int and a bool variable never share a
-// colour; bool sorts below int, matching the "B" < "I" canonical order. The next word
-// discriminates the seed/signature shape so distinct logical signatures never collide.
+// The leading [RefineKey] word is a space tag so an int and a bool variable never share a colour (bool
+// sorts below int); the next word tags the seed or signature shape so distinct shapes never collide.
 internal const val SPACE_BOOL = 0L
 internal const val SPACE_INT = 1L
 private const val SEED_DOMAIN = 0L
@@ -34,20 +31,19 @@ private const val SEED_PARTITION = 8L
 internal fun partitionSeed(space: Long, colour: Int): RefineKey =
     RefineKey(longArrayOf(space, SEED_PARTITION, colour.toLong()))
 
-/** The values each integer column admits, as far as the lane running the search knows them. */
+// The values each integer column admits, as far as the lane running the search knows them.
 internal interface SymmetryColumns {
     fun active(v: Int): Boolean = true
 
-    /** The finite value set of column [v], or null when [v] has an open side. */
+    // Null when [v] has an open side.
     fun finite(v: Int): IntDomain?
 
-    /** Whether column [v] admits [value]. */
     fun contains(v: Int, value: Long): Boolean
 
-    /** A colour seed equal for two columns exactly when they admit the same values. */
+    // Equal for two columns exactly when they admit the same values.
     fun seed(v: Int): RefineKey
 
-    /** A colour seed equal for two Boolean columns exactly when they admit the same values. */
+    // Equal for two Boolean columns exactly when they admit the same values.
     fun boolSeed(v: Int): RefineKey
 }
 
@@ -97,12 +93,8 @@ private fun activeColumnsWithin(problem: Problem, columns: SymmetryColumns,
     return ActiveSymmetryColumns(columns, readInts, readBools)
 }
 
-/**
- * Root-propagated domains of a finite projection.
- *
- * A Boolean the root fixes is a value no factor need carry: a presolve view's factors may no longer
- * read it at all, so only its seed keeps it from being swapped with a free or oppositely fixed one.
- */
+// A root-fixed Boolean may no longer be read by any factor, so only its seed keeps it from being swapped
+// with a free or oppositely fixed one.
 internal class FiniteSymmetryColumns(private val problem: BakedProblem) : SymmetryColumns {
     private val root = problem.baked as? PropagationResult.Implied
 
@@ -119,10 +111,7 @@ internal class FiniteSymmetryColumns(private val problem: BakedProblem) : Symmet
     }
 }
 
-/**
- * A source model's declarations. A column with an open side declares a range and no value set, so it
- * admits every integer between its finite endpoints and is never read through the box it was stated in.
- */
+// A column with an open side declares only a range, never read through the box it was stated in.
 internal class SourceSymmetryColumns(problem: Problem) : SymmetryColumns {
     private val bounds = problem.intBounds
     private val closed = Array(problem.numIntVars) { v ->
@@ -157,12 +146,10 @@ internal class SourceSymmetryColumns(problem: Problem) : SymmetryColumns {
 
 private val FREE_BOOL_SEED = RefineKey(longArrayOf(SPACE_BOOL, SEED_BOOL))
 
-/** Domain signature so only variables with the *same* domain (bounds and holes) can group. */
+// Only variables with the same domain (bounds and holes) can group.
 private fun domainSeed(d: IntDomain): RefineKey {
-    // Fingerprint by whichever of the holes or the survivors is the smaller set, so a wide-but-sparse
-    // domain costs O(min(holes, survivors)) rather than O(span). The two forms carry distinct marker
-    // words so they never collide; within a form equal domains yield equal keys. A wide domain with no
-    // span to hand over takes the hole form.
+    // Fingerprint by the smaller of holes and survivors, so a wide sparse domain costs
+    // O(min(holes, survivors)) rather than O(span). Distinct marker words keep the two forms apart.
     val survivors = d.spanOrNull()
     if (survivors != null && survivors.size <= d.holeCount) {
         val words = LongArray(4 + survivors.size)
@@ -186,24 +173,14 @@ private fun domainSeed(d: IntDomain): RefineKey {
     return RefineKey(words)
 }
 
-/** A distinguished-fixpoint seed for objective variable [v] in [space] (each is its own colour). */
+// Each objective variable is its own colour.
 internal fun objectiveSeed(space: Long, v: Int): RefineKey =
     RefineKey(longArrayOf(space, SEED_OBJECTIVE, v.toLong()))
 
-/**
- * Colour refinement seeding verified-symmetry candidates. Two variables
- * can be interchangeable only if they share a colour (colour is an automorphism invariant),
- * so the colour classes are the candidate groups — finer than grouping ints by domain and all
- * bools together. Returns `(intColour, boolColour)`, parallel to the variable ids.
- *
- * Initial colour separates kinds, distinct domains, and each objective variable (a distinguished
- * fixed point). Each round refines a variable's colour by its current colour plus, for every
- * incident factor, that factor's `Factor.structuralKey` computed with the focal variable
- * remapped to [WL_FOCAL] and every other variable to its current colour — the refinement "edge"
- * signature, derived generically for any keyed factor with no per-type code. Iterated to a
- * fixpoint. Soundness never rests on this: every candidate is re-verified against the factors, so a
- * wrong colouring can only miss symmetries, never invent one.
- */
+// Colour refinement seeding symmetry candidates: interchangeable variables share a colour, so colour
+// classes are the candidate groups. Seeds separate kinds, domains and each objective variable. Soundness
+// never rests on this: every candidate is re-verified against the factors, so a wrong colouring can only
+// miss symmetries. Returns `(intColour, boolColour)`.
 internal fun refineColours(
     problem: Problem,
     columns: SymmetryColumns,
@@ -233,14 +210,9 @@ internal class SymmetryIncidence(val problem: Problem) {
     }
 }
 
-/**
- * Weisfeiler–Leman refinement to an equitable partition (the colour-refinement core shared by
- * candidate seeding and the individualization–refinement generator search). [seedInt] / [seedBool]
- * are the initial colour signatures per variable — a domain seed for plain refinement, an
- * individualized-vertex marker, or an objective fixpoint seed. Colours
- * are assigned in a canonical order (sorted by signature, bool space below int) so a discrete
- * partition's colour *is* a labeling comparable across individualization branches.
- */
+// Weisfeiler–Leman refinement to an equitable partition, shared by candidate seeding and the
+// individualization–refinement generator search. Colours are assigned in canonical order, so a discrete
+// partition's colouring is a labeling comparable across individualization branches.
 internal fun equitablePartition(
     problem: Problem,
     seedInt: Array<RefineKey>,
@@ -254,21 +226,17 @@ internal fun equitablePartition(
     val nBool = problem.numBoolVars
     val intInc = incidence.ints
     val boolInc = incidence.bools
-    // A round visits every variable–factor incidence once (one [portSignature] port per arc); that
-    // arc count is the deterministic work unit charged against the budget.
     val arcsPerRound = incidence.arcs
     val intColour = IntArray(nInt)
     val boolColour = IntArray(nBool)
     var numColours = assignColours(seedInt, seedBool, intColour, boolColour)
-    // Working colour maps reused across all port queries in a round (rebuilt each round).
     val intMap = IntArray(nInt)
     val boolMap = IntArray(nBool)
     // The remap reads these arrays, so loading a round's colours into them re-aims it in place.
     val mapping = VarRemap.borrowed(boolMap, intMap)
     repeat(nInt + nBool + 1) {
-        // Bail before a fresh round once the search's work budget is spent — returning the current
-        // (possibly not-yet-stable) partition. Callers treat a spent budget as "stop", so a partial
-        // colouring is never mistaken for a discrete one.
+        // Callers treat a spent budget as a stop, so the partial colouring returned here is never mistaken
+        // for a discrete one.
         if ((budget != null && budget[0] <= 0) || cancellation()) return intColour to boolColour
         for (v in 0 until nInt) intMap[v] = intColour[v]
         for (v in 0 until nBool) boolMap[v] = boolColour[v]
@@ -284,20 +252,17 @@ internal fun equitablePartition(
         if (budget != null) budget[0] -= arcsPerRound + nInt + nBool
         cancellation.charge(arcsPerRound.toLong() + nInt + nBool)
         val next = assignColours(sigInt, sigBool, intColour, boolColour)
-        if (next == numColours) return intColour to boolColour // partition stable
+        if (next == numColours) return intColour to boolColour
         numColours = next
     }
     return intColour to boolColour
 }
 
-/** WL signature of variable [v] this round: its [oldColour] plus the sorted multiset of incident
- *  factor-key *hashes*, each computed with [v] remapped to [WL_FOCAL] (the focal marker) and every
- *  other variable to its current colour (already loaded into [intMap]/[boolMap]).
- *
- *  Each port contributes a single hash word rather than its full [StructuralKey] words, since a factor
- *  with large constant data (a table's tuple set) has a large key. A hash collision merely merges two
- *  colours (a coarser partition); every candidate undergoes an automorphism check, so a collision
- *  can only cost extra verification, never admit a false symmetry. */
+/**
+ * [oldColour] plus the sorted incident factor-key hashes with [v] remapped to [WL_FOCAL]. One hash word per
+ * port rather than the full [StructuralKey] keeps large keys (a table's tuples) cheap; a collision only
+ * coarsens the partition, and every candidate is verified, so it never admits a false symmetry.
+ */
 private fun portSignature(
     problem: Problem,
     incident: IntArrayList,
@@ -333,12 +298,8 @@ private fun portSignature(
     return RefineKey(words)
 }
 
-/** Re-colour every variable by its signature, writing dense ids into [intColour]/[boolColour] and
- *  returning the number of distinct colours. Ids are assigned in **canonical** order — distinct
- *  signatures sorted, bool space ([SPACE_BOOL]) below int ([SPACE_INT]) via the leading signature
- *  word — so a discrete partition's colour is a labeling comparable across individualization
- *  branches (needed by the generator search), while plain refinement callers, which only read
- *  colour *classes*, are unaffected. */
+// Dense ids in canonical order (sorted signatures, bool below int), so a discrete partition is a labeling
+// comparable across individualization branches. Returns the number of distinct colours.
 private fun assignColours(
     sigInt: Array<RefineKey>,
     sigBool: Array<RefineKey>,
@@ -355,11 +316,7 @@ private fun assignColours(
     return ids.size
 }
 
-/**
- * A `LongArray`-backed colour-refinement signature, composed of integer words (variable colours and
- * folded-in factor key hashes). Structural [equals]/[hashCode] make it a hash key; [compareTo] gives the
- * canonical total order colour ids are assigned in.
- */
+// [compareTo] is the canonical order colour ids are assigned in.
 internal class RefineKey(private val words: LongArray) : Comparable<RefineKey> {
     fun withCoefficient(coefficient: Long?): RefineKey =
         if (coefficient == null) this else RefineKey(words + coefficient)

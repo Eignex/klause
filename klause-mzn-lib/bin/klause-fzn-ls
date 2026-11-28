@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # MiniZinc-facing wrapper for klause-cli, locked to the LocalSearch backend.
-# Mirrors klause-fzn but injects `-e ls` so the MSC for LS-mode dispatch is fixed.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

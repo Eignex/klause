@@ -1,14 +1,8 @@
 package com.eignex.klause.localsearch.schedule
 
 /**
- * Per-round move statistics — the signal an adaptive [Schedule] retunes against. A *round* is a
- * caller-defined batch of annealing steps (e.g. every N accepted moves). Immutable; build one with
- * a [RoundAccumulator].
- *
- * The fields are the round's raw scalar facts; cross-round judgements (e.g. "did this beat the
- * all-time best?") are left to each [AdaptivePolicy], which retains its own watermark. Per-factor
- * arrays (violated set, live weights) stay in the search state and are handed to the policies'
- * apply-methods, so the record stays immutable and shareable.
+ * Per-round move statistics an [AdaptivePolicy] retunes against. A round is a caller-defined batch of
+ * steps. Cross-round judgements are left to each policy, so the record stays immutable and shareable.
  *
  * @property proposed moves proposed this round
  * @property accepted moves accepted this round (improving or Metropolis-accepted)
@@ -45,8 +39,7 @@ data class RoundLog(
  * Mutable collector for one round's move statistics; [snapshot] freezes it to a [RoundLog]. Cost
  * mean/variance use Welford's online algorithm (B. P. Welford, "Note on a method for calculating
  * corrected sums of squares and products", Technometrics 4, 1962,
- * https://doi.org/10.1080/00401706.1962.10490022), so a long round stays numerically stable and needs
- * no second pass. [clear] resets the counters for the next round.
+ * https://doi.org/10.1080/00401706.1962.10490022).
  */
 class RoundAccumulator {
     /** Moves proposed so far this round. */
@@ -80,8 +73,7 @@ class RoundAccumulator {
         last = cost
     }
 
-    /** Freeze the round at [temperature] and engine [step]. Does not clear — call [clear] to start
-     *  the next round. */
+    /** Freeze the round at [temperature] and engine [step], without clearing. */
     fun snapshot(temperature: Double, step: Long = 0L): RoundLog {
         val bestCost = if (best.isFinite()) best else 0.0
         return RoundLog(

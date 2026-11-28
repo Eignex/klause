@@ -1,12 +1,5 @@
-% Klause solver library.
-%
-% Declares which FlatZinc predicates klause supports natively. Anything not
-% listed here falls back to MiniZinc's standard library, which decomposes
-% globals (cumulative, regular, circuit, bin_packing, table, element, lex,
-% gcc, nvalue, etc.) into combinations of the predicates below.
-%
-% The pattern is: bare declarations (no body) mean "native, emit straight to
-% FlatZinc". Klause's FlatZincCompiler reads the resulting FZN.
+% FlatZinc predicates klause supports natively. A bare declaration (no body) is emitted
+% straight to FlatZinc; anything not listed falls back to MiniZinc's standard decomposition.
 
 % Boolean primitives.
 predicate bool_clause(array[int] of var bool: as,
@@ -47,7 +40,7 @@ predicate bool_lin_eq(array[int] of int: as,
                       array[int] of var bool: bs,
                       int: c);
 
-% Float linear — klause buckets float vars into ints at FZN-load time.
+% Float linear.
 predicate float_lin_le(array[int] of float: as,
                        array[int] of var float: bs,
                        float: c);
@@ -80,13 +73,10 @@ predicate klause_int_pow_reif(var int: a, int: b, var int: c, var bool: r) =
     constraint klause_int_pow(a, b, value) :: defines_var(value);
   } in r <-> value = c;
 
-% int → float coercion. klause's FlatZincCompiler emits a Linear factor
-% binding x's int value to y's bucket index.
+% int → float coercion.
 predicate int2float(var int: x, var float: y);
 
-% Float scalar comparisons + min/max/times. All lowered inside klause via
-% bucket-index arithmetic (Linear / ReifiedLinear / Table factors); declared
-% native so MiniZinc skips its float decomposition.
+% Float comparisons and arithmetic, declared native so MiniZinc skips its float decomposition.
 predicate float_eq(var float: a, var float: b);
 predicate float_eq_reif(var float: a, var float: b, var bool: r);
 predicate float_le(var float: a, var float: b);
@@ -104,8 +94,7 @@ predicate float_times(var float: a, var float: b, var float: c);
 predicate float_pow(var float: a, var float: b, var float: c);
 predicate float_div(var float: a, var float: b, var float: c);
 
-% Globals — klause has native factors for these. MiniZinc routes them directly to
-% klause's FlatZinc compiler instead of decomposing in its standard library.
+% Globals with native factors.
 predicate all_different_int(array[int] of var int: x);
 predicate all_equal_int(array[int] of var int: x);
 predicate symmetric_all_different(array[int] of var int: x);
@@ -163,14 +152,10 @@ predicate diffn(array[int] of var int: x, array[int] of var int: y,
 predicate diffn_nonstrict(array[int] of var int: x, array[int] of var int: y,
                           array[int] of int: w, array[int] of int: h);
 
-% Extensional / regular: the 2D-flattening wrappers live in separate files
-% (fzn_table_int.mzn, fzn_regular.mzn) so they can override the same-named
-% std files. They forward to klause_table_int / klause_regular respectively.
+% Table and regular wrappers live in fzn_table_int.mzn and fzn_regular.mzn so they shadow the std files.
 
-% Set variables and predicates. Klause materialises each `var set of E: S` as one
-% indicator bool per universe element; the set predicates below dispatch to bool-level
-% Clause / PseudoBoolean / ReifiedLinear factors over those indicators. set_in supports
-% constant-int elements only; set_in_reif likewise.
+% Set variables. Each `var set of E: S` becomes one indicator bool per universe element, and the set
+% predicates lower to Boolean factors over those indicators.
 predicate set_in(var int: x, var set of int: S);
 predicate set_in_reif(var int: x, var set of int: S, var bool: r);
 predicate set_subset(var set of int: S, var set of int: T);
@@ -204,19 +189,11 @@ predicate klause_disjunctive_opt(array[int] of var bool: presents,
 % Var-arg cumulative / disjunctive[_strict] live in their own override files
 % (fzn_cumulative.mzn etc.) so MiniZinc shadows the std decomposing definitions.
 
-% Implied-constraint markers.
-%
-% MiniZinc's stdlib lowers `redundant_constraint(c)` / `symmetry_breaking_constraint(c)`
-% to a bare `c`, erasing the marker before it reaches FlatZinc. Klause wants to keep
-% the constraint (dropping it is unsound for symmetry over the objective, and we don't
-% want a separate ls/cp flatten) but knowing a constraint is *implied* lets the
-% local-search engine seed its violation weight lower so the bulk of redundant /
-% symmetry rows can't swamp the landscape before the structural constraints are met,
-% and lets presolve skip its own symmetry breaking when the model already breaks it.
-%
-% The typechecker rewrites the public predicates to these `mzn_*` builtins (declared
-% body-less in stdlib_internal.mzn); redefining them here to keep `b` and attach a
-% klause annotation makes the marker ride through to the constraint in the FZN.
+% Implied-constraint markers. The stdlib lowers `redundant_constraint(c)` and
+% `symmetry_breaking_constraint(c)` to a bare `c`, erasing the marker. Keeping it lets local search
+% seed implied rows at a lower violation weight and lets presolve skip its own symmetry breaking.
+% The typechecker rewrites the public predicates to these `mzn_*` builtins; redefining them keeps
+% `b` and attaches the annotation.
 annotation klause_redundant;
 annotation klause_symmetry;
 predicate mzn_redundant_constraint(var bool: b) = b :: klause_redundant;

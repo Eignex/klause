@@ -31,30 +31,13 @@ import com.eignex.util.numbers.subExact
 
 internal object Probing {
 
-    /**
-     * Probing as a fixpoint presolve pass. For each free Boolean candidate it tentatively pins the
-     * literal, runs the engine's own `Problem.propagate`, and harvests only deductions that hold in
-     * **every** solution, so the problem's satisfiability and optimum are untouched:
-     *  - **failed literal**: pinning `v = true` propagates to a conflict, so `v` is false in every
-     *    solution — emit the unit clause `!v` (mirror for the negative polarity). Soundness rests
-     *    entirely on the conflict: `propagate` is sound-but-incomplete, so an Unsat is a genuine
-     *    proof of infeasibility, never a false positive.
-     *  - **common bound**: a bound that propagation implies under *both* polarities holds
-     *    unconditionally (the variable is true or false in any solution, and both cases force it).
-     *    Every solution lies in one case or the other, so the valid deduction is their *union* —
-     *    `min` of the two implied lower bounds, `max` of the two implied upper bounds. Taking the
-     *    tighter bound of the pair instead would discard the solutions of the weaker case.
-     *
-     * Binary implications are dropped; this pass persists only units and unconditional bounds.
-     *
-     * Idempotent: an unused or root-fixed Boolean is not probed and a bound already at least
-     * as tight is not re-applied, so the round engine reaches a fixpoint instead of churning. Bounded by
-     * [maxCandidates] free Booleans per invocation (in id order); a later round re-enters with the units
-     * this one derived excluded from the free set.
-     *
-     * Savelsbergh, "Preprocessing and probing techniques for mixed integer programming problems",
-     * ORSA J. Computing 6(4), 1994, https://doi.org/10.1287/ijoc.6.4.445
-     */
+    // Pins each free Boolean both ways and keeps only deductions that hold in every solution: a failed
+    // literal (propagation is sound, so its conflict is a proof) forces the other polarity, and a bound
+    // implied under both polarities holds as their union. Taking the tighter of the pair would discard the
+    // weaker case's solutions. Binary implications are not kept. Unused and root-fixed Booleans are not
+    // probed and no bound is re-applied, so the round engine reaches a fixpoint.
+    // Savelsbergh, "Preprocessing and probing techniques for mixed integer programming problems",
+    // ORSA J. Computing 6(4), 1994, https://doi.org/10.1287/ijoc.6.4.445
     fun probe(problem: BakedProblem, maxCandidates: Int, cancellation: ExecutionControl): PassDelta {
         val candidates = problem.freeBooleanProbeCandidates(maxCandidates, cancellation)
         if (candidates.isEmpty()) return PassDelta()
@@ -86,24 +69,11 @@ internal object Probing {
         return PassDelta(addedFactors = units, domains = if (domainsChanged) domains else null)
     }
 
-    /**
-     * Probing over a source model, where a column may be open and no engine propagator exists yet.
-     *
-     * Propagation reads only the rows factors declare as individually implied ([impliedLinearRows]), each
-     * by interval reasoning over the declared ranges: a row with two unbounded terms implies nothing, so an
-     * open side is never given a value it does not have. A reified row propagates in both directions — a
-     * fixed activator asserts the row or its complement, and a row the ranges already rule out fixes the
-     * activator against it. A Boolean literal is a 0/1 column, so a clause is just another row. Ignoring
-     * the factors that declare no rows weakens propagation but never invents a conflict.
-     *
-     * The root fixpoint comes first; what it proves is kept. Probing then pins each free Boolean both
-     * ways on top of it, with the same harvest as [probe]: a failed literal forces the other polarity, a
-     * bound implied under both is the union of the two. Every deduction lands as a unit clause or a
-     * proved range, so the result is idempotent once re-read.
-     *
-     * Bounded by [maxCandidates] probes and metered through [cancellation]; stopping early keeps whatever
-     * was proved, since a partial propagation still only derives implied bounds.
-     */
+    // Propagates only the individually implied rows by interval reasoning over declared ranges, so an open
+    // side never gains a value it lacks; a reified row propagates both ways, and a Boolean is a 0/1 column.
+    // Ignoring factors that declare no rows weakens propagation but never invents a conflict. The root
+    // fixpoint is kept, then each free Boolean is probed with the same harvest as [probe]. Stopping early
+    // keeps whatever was proved.
     fun probeSource(problem: Problem, maxCandidates: Int, cancellation: ExecutionControl): SourceDelta {
         if (cancellation()) return SourceDelta()
         val probe = OpenRangeProbe(problem, cancellation)
@@ -112,9 +82,7 @@ internal object Probing {
         return probe.delta()
     }
 
-    /** Fold the bounds implied under both polarities into [domains]; return whether any domain was
-     *  strictly tightened. Every solution lies under `v = true` or `v = false`, so the union of the two
-     *  ranges (the smaller lower bound, the larger upper bound) is globally valid. */
+    // Every solution lies under `v = true` or `v = false`, so the union of the two ranges is valid.
     private fun harvestCommonBounds(
         whenTrue: PropagationResult.Implied,
         whenFalse: PropagationResult.Implied,
@@ -146,12 +114,9 @@ internal object Probing {
         return changed
     }
 
-    /** Lower bound `propagate` implied for int [i] — a singleton pin counts as a lower bound at the
-     *  pinned value — or `null` when this polarity implied nothing about [i]'s lower bound. */
     private fun impliedMin(implied: PropagationResult.Implied, i: Int): Long? =
         implied.intValueOrNull(i) ?: implied.intMinOrNullCompat(i)
 
-    /** Upper bound `propagate` implied for int [i]; mirror of [impliedMin]. */
     private fun impliedMax(implied: PropagationResult.Implied, i: Int): Long? =
         implied.intValueOrNull(i) ?: implied.intMaxOrNullCompat(i)
 }

@@ -5,10 +5,8 @@ import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 
 /**
- * Value closest to the **mean of the current bounds** first, then alternating outward
- * (`indomain_middle`: "the value in the domain closest to the mean of its bounds"). The mean
- * may fall in a hole, so [centeredDomainValues] starts at the nearest present value. Distinct
- * from [IndomainMedian] (middle *by position*) on skewed or holey domains.
+ * Value closest to the mean of the current bounds first, then alternating outward (`indomain_middle`).
+ * Distinct from [IndomainMedian] (middle by position) on skewed or holey domains.
  */
 object IndomainMiddle : ValueSelector {
     override fun fresh() = this

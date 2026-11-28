@@ -7,10 +7,8 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 
 /**
- * Why a solver / optimiser returned without a definitive verdict. Lets callers tell
- * "ran out of decisions" apart from "wall-clock timeout" apart from "the embedding
- * application cancelled the call", which a `null` return or a bare `Unknown` conflates.
- * Backends that don't distinguish these pick the closest fit.
+ * Why a solver or optimizer returned without a definitive verdict. Backends that don't distinguish
+ * these pick the closest fit.
  */
 enum class TerminationReason {
     /** Solver-specific budget (maxFlips, maxDecisions, maxAttempts) hit. */
@@ -31,20 +29,15 @@ enum class TerminationReason {
     RepresentationDeclined,
 
     /**
-     * Complete-backend search space fully explored — no further work to do — but the
-     * verdict can't be expressed as Sat / Unsat / Optimal / Infeasible because some
-     * stronger context (external bound sharing in a parallel portfolio, an opaque
-     * pruning predicate) made the absolute proof unsound from this worker's vantage
-     * point. The caller (typically a portfolio reducer) combines this with peer
-     * results to decide the global verdict.
+     * Complete-backend search space fully explored, but external context (bound sharing in a parallel
+     * portfolio, an opaque pruning predicate) makes an absolute verdict unsound from this worker. The
+     * caller combines it with peer results to decide the global verdict.
      */
     SearchExhausted,
 }
 
 /**
- * Result of [com.eignex.klause.solver.Solver.sample]. An explicit three-way distinction, so a
- * `null`-style return can't conflate "no feasible assignment exists" (provable Unsat) with
- * "budget exhausted before any was found."
+ * Result of [com.eignex.klause.solver.Solver.sample].
  *
  *  - [Found] — a satisfying assignment.
  *  - [Infeasible] — the backend proved no satisfying assignment exists, including
@@ -56,9 +49,7 @@ sealed interface SampleResult {
     /** Effective source interpretation, or null for an unbound result. */
     val semantics: EffectiveSourceSemantics?
 
-    /** Underlying assignment if [Found], else `null`. Convenience for callers that
-     *  don't care about the termination reason; prefer pattern-matching on the
-     *  sealed type when the distinction matters. */
+    /** Underlying assignment if [Found], else `null`. */
     val assignment: Sample?
 
     /** A feasible solution was found. */
@@ -111,9 +102,8 @@ sealed interface MinimizeResult {
     /** Underlying assignment if Optimal / BestFound, else `null`. */
     val assignment: Sample?
 
-    /** Solver-side counters for the run; populated on TERMINAL verdicts by backends that
-     *  opt in ([SolveStats.EMPTY] otherwise, including on streamed intermediate
-     *  incumbents — totals belong to the verdict that ends the run). */
+    /** Solver-side counters, populated on terminal verdicts by backends that opt in; [SolveStats.EMPTY]
+     *  otherwise, including on streamed intermediate incumbents. */
     val stats: SolveStats
 
     /** Optional original-source claims and derivations; null when capture was not requested. */

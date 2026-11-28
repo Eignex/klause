@@ -10,21 +10,8 @@ import com.eignex.util.numbers.saturatedMul
 import com.eignex.util.numbers.saturatedSub
 import kotlin.random.Random
 
-/**
- * Max-regret variable selection for optimisation. The *regret* of a variable is the
- * difference between the best-case and worst-case contribution that branching choices on
- * it can make to the objective:
- *  - bool var `b` with weight `w`: regret = |w|.
- *  - int var `v` with coefficient `c` and domain `[lo..hi]`: regret = |c| · (hi - lo).
- *
- * Picks the unpinned variable with the maximum regret. Branching where the objective is
- * most sensitive lets the engine drive the upper bound down (or lower bound up) fastest —
- * a standard default for `minimize`. When every remaining variable has
- * regret 0 (singleton or zero coefficient), delegates to [base] so the search makes
- * progress on feasibility too.
- *
- * Pair with [IndomainBest] for a complete objective-aware (var, value) strategy.
- */
+// Regret is the spread of a variable's objective contribution: `|w|` for a bool, `|c|·(hi − lo)` for an
+// int. When every remaining regret is 0, [base] decides.
 internal class MaxRegret(private val objective: LinearObjective, private val base: VariableSelector = SmallestDomain) :
     VariableSelector {
 

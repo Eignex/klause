@@ -27,8 +27,7 @@ import com.eignex.klause.util.ExecutionControl
  * [BakedProblem] and reads them through `BakedProblem.rootIntDomain`, while one that reads only what
  * the model declares takes the canonical [Problem] and runs before any finite projection exists.
  *
- * The passes live in focused per-technique units in this package; this object is the stable
- * entry surface the presolve pipeline and tests call.
+ * The passes live in per-technique units; this object is their entry surface.
  */
 object Presolve {
 
@@ -46,8 +45,7 @@ object Presolve {
             ColumnRanges.of(problem.rootIntDomainsInPlace),
         )
 
-    /** Coefficient strengthening over what a source model states: the GCD reduction on every row, and the
-     *  bounded-integer lift on the rows whose columns the model bounds on both sides. */
+    // The GCD reduction on every row; the bounded-integer lift only where every column is closed.
     internal fun strengthenSourceCoefficients(problem: Problem, cancellation: ExecutionControl): SourceDelta =
         CoefficientStrengthening.strengthenCoefficients(
             problem,
@@ -65,7 +63,6 @@ object Presolve {
     fun deriveXorUnits(problem: BakedProblem): PassDelta =
         XorUnits.deriveXorUnits(problem).asPassDelta(problem.rootIntDomainsInPlace)
 
-    /** [deriveXorUnits] in the source lane's change form. */
     internal fun deriveSourceXorUnits(problem: Problem, cancellation: ExecutionControl): SourceDelta =
         XorUnits.deriveXorUnits(problem, cancellation)
 
@@ -74,7 +71,7 @@ object Presolve {
     fun reduceDiophantine(problem: BakedProblem, cancellation: ExecutionControl = ExecutionControl.Never): PassDelta =
         DiophantineReduction.reduce(problem, cancellation)
 
-    /** The Diophantine residue reduction over declared ranges, moving closed sides only. */
+    // Moves closed sides only.
     internal fun reduceSourceDiophantine(problem: Problem, cancellation: ExecutionControl): SourceDelta =
         DiophantineReduction.reduceSource(problem, cancellation)
 
@@ -100,8 +97,6 @@ object Presolve {
         objective = objective,
     )
 
-    /** Affine elimination over a canonical source model. See
-     *  [AffineSingletons.eliminateSourceAffineSingletons]. */
     internal fun eliminateSourceAffineSingletons(
         problem: Problem,
         objectiveIntVars: Set<Int>,
@@ -120,11 +115,10 @@ object Presolve {
     fun removeRedundantConstraints(problem: BakedProblem): PassDelta =
         RedundantConstraints.removeRedundantConstraints(problem, ColumnRanges.of(problem.rootIntDomainsInPlace))
 
-    /** Subsumption over what a source model states. See [RedundantConstraints]. */
     internal fun removeRedundantSourceConstraints(problem: Problem, cancellation: ExecutionControl): SourceDelta =
         RedundantConstraints.removeRedundantSourceConstraints(problem, cancellation)
 
-    /** Drop equalities the other equalities imply, or refute an inconsistent block. See [DependentEqualities]. */
+    // Or refutes an inconsistent block.
     internal fun dropSourceDependentEqualities(problem: Problem, cancellation: ExecutionControl): SourceDelta =
         DependentEqualities.dropImplied(problem, cancellation)
 
@@ -132,7 +126,6 @@ object Presolve {
      *  cross). See [LinearBoundFusion]. */
     fun fuseLinearBounds(problem: Problem): PassDelta = LinearBoundFusion.fuseLinearBounds(problem)
 
-    /** [fuseLinearBounds] in the source lane's change form. */
     internal fun fuseSourceLinearBounds(problem: Problem, cancellation: ExecutionControl): SourceDelta =
         LinearBoundFusion.fuseLinearBounds(problem, cancellation).asSourceDelta()
 
@@ -140,7 +133,6 @@ object Presolve {
      *  the rows that contain it. See [LinearSubSumAggregation]. */
     fun aggregateSubSums(problem: Problem): PassDelta = LinearSubSumAggregation.aggregateSubSums(problem)
 
-    /** [aggregateSubSums] in the source lane's change form. */
     internal fun aggregateSourceSubSums(problem: Problem, cancellation: ExecutionControl): SourceDelta =
         LinearSubSumAggregation.aggregateSubSums(problem, cancellation).asSourceDelta()
 
@@ -158,7 +150,7 @@ object Presolve {
         cancellation: ExecutionControl,
     ): PassDelta = SingletonInequalityProjection.project(problem, objectiveIntVars, cancellation)
 
-    /** Singleton Fourier-Motzkin over declared ranges, dropping the row outright for a free column. */
+    // Drops the row outright for a free column.
     internal fun projectSourceSingletonInequalities(
         problem: Problem,
         objectiveIntVars: Set<Int>,
@@ -172,7 +164,7 @@ object Presolve {
     internal fun reduceStructural(problem: BakedProblem, cancellation: ExecutionControl): PassDelta =
         StructuralReduction.reduce(problem, cancellation)
 
-    /** Per-factor structural self-reduction over declared domains, for factors over closed columns. */
+    // Only factors over closed columns.
     internal fun reduceSourceStructural(problem: Problem, cancellation: ExecutionControl): SourceDelta =
         StructuralReduction.reduceSource(problem, cancellation)
 
@@ -180,9 +172,8 @@ object Presolve {
      *  indicators) into one [com.eignex.klause.factor.arithmetic.ComparisonClause]. See [ComparisonClauseFold]. */
     fun foldComparisonClauses(problem: BakedProblem): PassDelta = ComparisonClauseFold.fold(problem)
 
-    /** [foldComparisonClauses] keeping every indicator in [objectiveBoolVars], which the objective prices,
-     *  and with [keepBinary] every clause comparing a `{0, 1}` column that binary-column substitution would
-     *  turn into a literal, which [objectiveIntVars] never are. */
+    // Keeps every indicator the objective prices and, with [keepBinary], every clause comparing a `{0, 1}`
+    // column binary-column substitution would turn into a literal.
     internal fun foldComparisonClauses(
         problem: BakedProblem,
         objectiveBoolVars: Set<Int>,
@@ -191,7 +182,6 @@ object Presolve {
         objectiveIntVars: Set<Int>,
     ): PassDelta = ComparisonClauseFold.fold(problem, objectiveBoolVars, cancellation, keepBinary, objectiveIntVars)
 
-    /** [foldComparisonClauses] over declared ranges, before a finite projection exists. */
     internal fun foldSourceComparisonClauses(
         problem: Problem,
         objectiveBoolVars: Set<Int>,
@@ -230,7 +220,7 @@ object Presolve {
             problem, objectiveIntVars, sharedIntOcc, incrementalTouchedVars, cancellation,
         )
 
-    /** Duplicate-column aggregation over declared ranges, into a representative the aggregate fits. */
+    // Only into a representative the aggregate fits.
     internal fun mergeSourceDuplicateColumns(
         problem: Problem,
         objectiveIntVars: Set<Int>,
@@ -245,7 +235,6 @@ object Presolve {
         cancellation: ExecutionControl = ExecutionControl.Never,
     ): PassDelta = SymmetryBreaking.breakSymmetries(problem, objectiveIntVars, objectiveBoolVars, cancellation)
 
-    /** Symmetry breaking over a source model. See [SymmetryBreaking.breakSourceSymmetries]. */
     internal fun breakSourceSymmetries(
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
@@ -279,7 +268,6 @@ object Presolve {
         problem, objectiveIntCoeffs, objectiveBoolCoeffs, cancellation,
     )
 
-    /** Dual fixing over a canonical source model. See [DominatedVariables.fixDominatedSourceVariables]. */
     internal fun fixDominatedSourceVariables(
         problem: Problem,
         objectiveIntCoeffs: Map<Int, Long>,
@@ -294,7 +282,6 @@ object Presolve {
         ExecutionControl.Never): PassDelta =
         Probing.probe(problem, maxCandidates, cancellation)
 
-    /** Failed-literal and common-bound probing over a canonical source model. See [Probing.probeSource]. */
     internal fun probeSource(problem: Problem, maxCandidates: Int, cancellation: ExecutionControl): SourceDelta =
         Probing.probeSource(problem, maxCandidates, cancellation)
 
@@ -307,7 +294,6 @@ object Presolve {
         objectiveBoolVars: Set<Int> = emptySet(),
     ): PassDelta = ImplicationGraph.reduce(problem, maxCandidates, cancellation, objectiveBoolVars)
 
-    /** Binary implication graph presolve over a canonical source model. See [ImplicationGraph.reduceSource]. */
     internal fun reduceSourceImplicationGraph(
         problem: Problem,
         cancellation: ExecutionControl,
@@ -329,7 +315,6 @@ object Presolve {
         cancellation: ExecutionControl = ExecutionControl.Never,
     ): PassDelta = BoundedVariableElimination.eliminate(problem, objectiveBoolVars, cancellation)
 
-    /** Bounded variable elimination over a canonical source model. See [BoundedVariableElimination]. */
     internal fun eliminateSourceBoolVars(
         problem: Problem,
         objectiveBoolVars: Set<Int>,
@@ -343,7 +328,6 @@ object Presolve {
         cancellation: ExecutionControl = ExecutionControl.Never,
     ): PassDelta = BlockedClauseElimination.eliminate(problem, objectiveBoolVars, cancellation)
 
-    /** Blocked-clause elimination over a canonical source model. See [BlockedClauseElimination]. */
     internal fun eliminateSourceBlockedClauses(
         problem: Problem,
         objectiveBoolVars: Set<Int>,

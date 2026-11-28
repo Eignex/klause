@@ -18,10 +18,6 @@ import com.eignex.klause.ir.materializeKey
 /**
  * `result = max(xs)` or `result = min(xs)` — covers the FlatZinc `array_int_maximum(result,
  * xs)` / `array_int_minimum(result, xs)` builtins. Mode selected by [max].
- *
- * Propagation tightens [result] against the bound of [xs] and pushes back from [result]
- * to every `xs(i)` (for max: every `xs(i).max <= result.max`; for min the dual). LS keeps
- * the current extremum in an [ArrayMinMaxState] payload, recomputed by a full scan on each move.
  */
 class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor {
 

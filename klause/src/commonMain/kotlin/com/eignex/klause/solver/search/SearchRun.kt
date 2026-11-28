@@ -67,13 +67,7 @@ class SearchRun internal constructor(
     private var pendingRetryBlock: AssembledSearchModel? = null
     internal val hasUnresolvedModels: Boolean get() = unresolvedModel || leafRetries?.unresolvedModels == true
 
-    /**
-     * Poll the cancellation token on a fixed cadence rather than a time-adaptive one.
-     *
-     * A run stops where it polls, so an adaptive cadence makes the stopping point of a *counted* budget
-     * depend on machine speed. A caller pausing this run on a node budget sets this so the pause lands
-     * on the same node every time. See [SearchCancellationPoller.fixedCadence].
-     */
+    /** Poll on a fixed cadence so a node budget always pauses at the same node. */
     var fixedCancellationCadence: Boolean
         get() = cancellationPoller.fixedCadence
         set(value) {
@@ -530,8 +524,7 @@ class SearchRun internal constructor(
                     }
                     if (outcome == LearnedOutcome.RESUMED) return Advance.Expanded
                     if (session.decisionLevel < level) return Advance.Exhausted
-                    // An abandoned learned conflict has already run its course; only an unapplied one leaves the
-                    // original conflict for the chronological resolvers.
+                    // Only an unapplied learned conflict leaves the original conflict for chronological resolvers.
                     val unapplied = outcome == LearnedOutcome.UNAPPLIED
                     if (unapplied) retainExplanation(result.explanation)
                     session.popTo(level)
@@ -581,14 +574,8 @@ class SearchRun internal constructor(
         return false
     }
 
-    /*
-     * Retain a conflict explanation the shared database does not already own elsewhere.
-     *
-     * A component with its own conflict analyzer keeps the clause in its own database and propagates it
-     * there, so copying it here would give one clause two watch indexes and two reduction policies while
-     * deducing nothing new. The shared analyzer still reaches that component's reasoning, through
-     * [SearchComponent.reasonFor].
-     */
+    // A component that keeps its explanations in its own database already propagates them; a second copy
+    // here would deduce nothing new.
     private fun retainExplanation(explanation: SearchExplanation?) {
         if (session.explanationIsOwnedElsewhere) return
         session.learn(explanation)
@@ -620,10 +607,9 @@ class SearchRun internal constructor(
         }
     }
 
-    // Whether a learned conflict left the search to resume from its backjump level. By the time it returns, the
-    // backjump has already dropped the frames above that level, so a caller that is not resumed backtracks below it.
-    // That is sound when the asserted consequence was refuted, but an indeterminate propagation refuted nothing: the
-    // region it covered goes unsearched, so the run cannot claim to have exhausted the space.
+    // The backjump has already dropped the frames above its level, so a caller that is not resumed backtracks
+    // below it. An indeterminate propagation refuted nothing, so its region goes unsearched and the run cannot
+    // claim exhaustion.
     private fun resumed(result: SearchLearnedConflictResult): Boolean = when (result) {
         SearchLearnedConflictResult.Resume -> true
 
@@ -871,12 +857,7 @@ interface SearchRunObserver {
     /** A node policy supplied an asserting learned consequence. */
     fun onLearnedNodeBackjump() {}
 
-    /**
-     * A component produced a learned consequence before the runner retracts to its asserting level.
-     *
-     * The observer may retain analysis metadata for mode-specific reporting, such as projecting an
-     * assumption core. Restart feedback remains owned by [SearchRun].
-     */
+    /** A component produced a learned consequence, before the runner retracts to its asserting level. */
     fun onLearnedConflict(conflict: SearchLearnedConflict) {}
 
     /** The runner returned the session to root after [decisions] decisions in the completed run. */
@@ -889,7 +870,7 @@ interface SearchRunObserver {
     data object None : SearchRunObserver
 }
 
-/** Opt-in attempt observation, separate from existing lifecycle observers. */
+/** Opt-in observation of branch attempts. */
 interface SearchBranchAttemptObserver : SearchRunObserver {
     /** A tightening alternative is entering its assertion, including alternatives that conflict immediately. */
     fun onAttempt(decision: SearchDecision, context: SearchContext)

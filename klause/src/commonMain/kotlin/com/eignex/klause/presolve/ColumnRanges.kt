@@ -3,60 +3,38 @@ package com.eignex.klause.presolve
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 
-/**
- * How wide each integer column is, for a reduction whose argument charges a column its whole range.
- *
- * An activity argument — a knapsack lift, a maximal-activity domination, a disjointness test — needs both
- * of a column's sides. A reduction that states one bound needs only that side, which [hasLower] and
- * [hasUpper] answer separately. A column the model leaves open has no width to charge, so [isClosed] answers false
- * for it and [min] / [max] say nothing. A caller reads every column its row mentions and declines the row
- * when any of them is open, which is what lets a row over closed columns reduce on a model that is open
- * somewhere else.
- *
- * Deliberately primitive: a column's range is read once per term per row, and [IntDomain] is a real object
- * with several representations, so handing one back per access would allocate down the hot path.
- */
+// How wide each integer column is, for a reduction whose argument charges a column its whole range.
+// An activity argument needs both sides; a one-sided reduction reads [hasLower] or [hasUpper]. An open
+// column has no width, so a caller declines any row that mentions one, which lets rows over closed columns
+// reduce on a model that is open elsewhere.
+// Primitive on purpose: ranges are read once per term per row, and returning an [IntDomain] per access
+// would allocate on the hot path.
 internal interface ColumnRanges {
 
-    /** Whether column [v] is bounded on both sides, so [min] and [max] give it a width. */
     fun isClosed(v: Int): Boolean
 
-    /** Whether column [v] is bounded below, so [min] answers for it. */
     fun hasLower(v: Int): Boolean = isClosed(v)
 
-    /** Whether column [v] is bounded above, so [max] answers for it. */
     fun hasUpper(v: Int): Boolean = isClosed(v)
 
-    /** Lower end of column [v]. Defined only where [hasLower]. */
+    // Defined only where [hasLower].
     fun min(v: Int): Long
 
-    /** Upper end of column [v]. Defined only where [hasUpper]. */
+    // Defined only where [hasUpper].
     fun max(v: Int): Long
 
-    /**
-     * Whether column [v] admits exactly `{0, 1}`, so it is one
-     * [com.eignex.klause.presolve.PresolvePass.SUBSTITUTE_BINARY_COLUMNS] turns into a literal.
-     *
-     * A source reduction that eliminates one of these takes it out of that substitution's reach, and a
-     * model that would have become pure pseudo-Boolean is left a hybrid instead — which costs it the
-     * lane rather than a reduction.
-     */
+    // A source reduction that eliminates a binary column takes it from binary-column substitution, leaving
+    // a would-be pseudo-Boolean model hybrid, which costs it the lane.
     fun isBinary(v: Int): Boolean = isClosed(v) && min(v) == 0L && max(v) == 1L
 
-    /** Whether every column in [vars] has a width, so a row over them may be charged. */
     fun allClosed(vars: IntArray): Boolean {
         for (v in vars) if (!isClosed(v)) return false
         return true
     }
 
-    /** The two readings a lane has of its columns. */
     companion object {
-        /**
-         * The root-propagated domains a finite projection folded.
-         *
-         * Every column answers: a finite projection has no open side. These are narrower than the model
-         * states — root propagation proved them — so the finite lane's reductions are the stronger ones.
-         */
+        // Root-propagated domains of a finite projection: every column is closed, and narrower than the
+        // model states.
         fun of(domains: Array<IntDomain>): ColumnRanges = object : ColumnRanges {
             override fun isClosed(v: Int): Boolean = true
             override fun min(v: Int): Long = domains[v].min
@@ -64,12 +42,8 @@ internal interface ColumnRanges {
             override fun allClosed(vars: IntArray): Boolean = true
         }
 
-        /**
-         * The ranges a source model states, before any finite projection exists.
-         *
-         * A column with an open side has no width here, whatever fallback box a lane may later materialize
-         * for it: charging an invented endpoint would justify a reduction the model does not.
-         */
+        // A column with an open side has no width here, whatever fallback box a lane later materializes for
+        // it: charging an invented endpoint would justify a reduction the model does not.
         fun of(bounds: IntBounds): ColumnRanges = object : ColumnRanges {
             override fun isClosed(v: Int): Boolean = bounds.hasLower(v) && bounds.hasUpper(v)
             override fun hasLower(v: Int): Boolean = bounds.hasLower(v)

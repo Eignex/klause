@@ -28,7 +28,7 @@ internal data class LpBoundSlack(val absolute: Double, val relative: Double) {
     }
 }
 
-/** Construction-time pricing and basis resource policy. Nonzero objectives ignore [zeroObjective]. */
+// Nonzero objectives ignore [zeroObjective].
 internal data class LpPricingOptions(
     val zeroObjective: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     val tieSeed: Long = 0L,
@@ -36,10 +36,7 @@ internal data class LpPricingOptions(
     val basisWorkLimit: Long = Long.MAX_VALUE,
 )
 
-/**
- * Immutable construction seam for standalone and persistent solves. Each `workLimit` bounds one solve in
- * [LpWork] operations, 0 leaving it unbounded.
- */
+// Each `workLimit` bounds one solve in [LpWork] operations; 0 leaves it unbounded.
 internal interface LpEngineFactory {
     fun newGeneralSolver(
         model: LpModel,
@@ -84,7 +81,7 @@ internal interface LpEngineFactory {
 
 internal object ProductionLpEngineFactory : LpEngineFactory by ScalingLpEngineFactory(LpScalingOptions())
 
-/** Explicit rollback factory for callers comparing or recovering with the unscaled float view. */
+// For callers comparing against or recovering with the unscaled float view.
 internal object UnscaledLpEngineFactory : LpEngineFactory by ScalingLpEngineFactory(LpScalingOptions(enabled = false))
 
 private class ScalingLpEngineFactory(private val scalingOptions: LpScalingOptions) : LpEngineFactory {
@@ -148,7 +145,7 @@ private class ScalingLpEngineFactory(private val scalingOptions: LpScalingOption
     )
 }
 
-/** Per-solve or per-consumer-instance LP dependencies. Production callers share no mutable override. */
+// Per-solve or per-consumer LP dependencies. Production callers share no mutable override.
 internal data class LpSolveContext(
     val engineFactory: LpEngineFactory = ProductionLpEngineFactory,
     val certificationPolicy: LpCertificationPolicy = ProductionLpCertificationPolicy,
@@ -157,18 +154,12 @@ internal data class LpSolveContext(
     val startArbitraryPrecision: Boolean = false,
     val preserveOverflowCheckpoint: Boolean = true,
     val onQuery: ((LpQueryObservation) -> Unit)? = null,
-    /**
-     * Finite-lane LP deductions consume float results within tolerances instead of exact certificates. Only the
-     * finite pipeline selects it from source semantics. Leaf completion opts in for tolerance requests;
-     * open theories and source LP optimization keep exact certification.
-     */
+    // Deductions consume float results within tolerances instead of exact certificates. Only the finite pipeline
+    // selects it from source semantics; open theories and source LP optimization keep exact certification.
     val numericalDeductions: Boolean = false,
-    /** How far each side of a relaxation moves in the region the caller decides; numerical bounds hold over it. */
+    // How far each relaxation side moves in the region the caller decides; numerical bounds hold over it.
     val boundSlack: LpBoundSlack = LpBoundSlack.NONE,
-    /**
-     * How far each side of a relaxation moves in the region the caller decides points in; a numerical refutation
-     * holds over it, so it refutes only a model infeasible by more than this slack.
-     */
+    // A numerical refutation holds over this side movement, so it refutes only a model infeasible by more than it.
     val refutationSlack: LpBoundSlack = LpBoundSlack.NONE,
     val refinementLimits: LpRefinementLimits = LpRefinementLimits(),
     val exactContinuationLimits: ExactContinuationLimits? = null,
@@ -183,7 +174,6 @@ internal data class LpSolveContext(
     companion object {
         val Production = LpSolveContext()
 
-        /** The finite-lane context, with [numerical] deductions or exact certification. */
         fun finite(numerical: Boolean): LpSolveContext =
             if (numerical) LpSolveContext(numericalDeductions = true) else Production
     }

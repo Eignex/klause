@@ -21,62 +21,25 @@ import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 
-/**
- * A variable's integer bounds for [tightenOpenIntBounds]: a `null` side is genuinely ±∞ (open), a `Long`
- * side is a finite bound. A fully-bounded variable has both sides set.
- */
+// A `null` side is genuinely open (±∞).
 internal class OpenIntBounds(val lo: Long?, val hi: Long?)
 
-/**
- * What [tightenOpenIntBounds] derived: the tightened [bounds], and whether the tightening refuted the
- * system instead of bounding it.
- *
- * [bounds] never carries a crossed pair. A variable whose two sides meet is reported through [refuted] and
- * its own pair left at the singleton where they met, so every consumer still reads a valid domain.
- */
+// `bounds` never carries a crossed pair: a crossing is reported through `refuted` and the pair left at the
+// singleton where the sides met, so every consumer still reads a valid domain.
 internal class TightenedIntBounds(val bounds: Array<OpenIntBounds>, val refuted: Boolean = false)
 
 /**
- * Optimization-based bound tightening (OBBT): close open (±∞) integer-variable sides to sound finite
- * bounds from the LP relaxation of [constraints]. A variable open above takes the relaxation's maximum
- * of itself as a valid upper bound — the relaxation contains every integer solution — and open below
- * takes its minimum. A side the LP leaves unbounded (its optimum only reaches the free-column frontier)
- * stays open (`null`) for the caller to clamp.
+ * Optimization-based bound tightening: closes open integer sides from the LP relaxation's extremes. A side
+ * the LP leaves unbounded stays `null` for the caller to clamp.
  *
- * The tightening is sound over genuine ±∞ because an open side enters the LP genuinely open — open
- * above as a probe-flagged free upper ([LpBuilder.addFreeVar]), open below as the zero-shift split
- * `x = x⁺ − x⁻` — so a derived bound holds over the true unbounded region, not a pre-clamped box.
- * This is why it must run before a `Problem`'s finite `IntDomain`s are committed — once a side is clamped
- * the "genuinely infinite" information is gone. Only [LinearOp.LE]/[LinearOp.GE]/[LinearOp.EQ]
- * constraints enter; any other relation is skipped (dropping a constraint only loosens the relaxation).
- *
- * A cheap [feasibility-based prefilter][fbbtTightenOpenIntBounds] runs first: interval bound propagation
- * closes every side a single row already implies (`O(nnz)` per pass, no LP), so those cost no LP solve
- * and the LP-solving pass only handles the sides that genuinely need the global relaxation.
- *
- * That LP relaxation is built **once** and every remaining open side is a re-solve of that one model with
- * a single ±1 cost swapped onto its column ([LpModel.withSingleColumnObjective]) — the matrix, rows and
- * bounds never change, so the previous optimal basis stays primal-feasible and each retained numerical
- * owner reuses its factorization across objectives. Each side's LP bound is derived over the prefiltered
- * bounds only, never sharpened by an earlier LP bound; every bound is individually sound (the relaxation
- * contains every solution), only potentially looser.
+ * Sound over genuine ±∞ because open sides enter the LP open (a probe-flagged free upper via
+ * [LpBuilder.addFreeVar], an open lower as the split `x = x⁺ − x⁻`), so this must run before finite
+ * domains are committed. An interval prefilter closes the sides a single row implies first. The LP is built
+ * once and each remaining side re-solves it with a single ±1 cost, so the basis stays primal-feasible and
+ * factorizations are reused. Each LP bound is derived over the prefiltered bounds only.
  *
  * Gleixner, Berthold, Müller and Weltge, "Three enhancements for optimization-based bound tightening",
  * J. Global Optimization 67 (2017), https://doi.org/10.1007/s10898-016-0450-4.
- *
- * @param bounds current per-variable bounds, indexed by variable id.
- * @param constraints the linear constraints over those variable ids (an objective is not a constraint;
- *   the caller excludes it).
- * @param cancellation polled between variables so a long presolve can bail early — also threaded into each
- *   solve, so a single overlong LP re-solve is cut off too.
- * @param realConstraints mixed integer/real rows joined through LP-only continuous columns, so a
- *   variable defined only through a real row (a floor definition, a `to_real` bridge) is still
- *   boundable; strict rows enter non-strict (a relaxation — every derived bound stays sound).
- * @param realLower per-real-variable declared lower bounds (`-inf` for open); indexed by real id.
- * @param realUpper per-real-variable declared upper bounds (`+inf` for open); indexed by real id.
- * @param observer optional sink for the probe's float and exact-bound certification attempts.
- * @param context solver construction and proof-acceptance dependencies for this probe pass.
- * @return fresh bounds with every provable open side closed, or the prefilter's refutation of the system.
  */
 internal fun tightenOpenIntBounds(
     bounds: Array<OpenIntBounds>,
@@ -89,17 +52,16 @@ internal fun tightenOpenIntBounds(
     context: LpSolveContext = LpSolveContext.Production,
 ): TightenedIntBounds {
     val n = bounds.size
-    // Working real-variable bounds the prefilter tightens alongside the integers (outward-rounded, so
-    // always sound); the LP pass then starts from the tighter real boxes too.
+    // The prefilter tightens these real boxes in place, outward-rounded; the LP pass starts from them.
     var maxReal = realLower.size
     for (f in realConstraints) for (rv in f.realVars) if (rv + 1 > maxReal) maxReal = rv + 1
     val rLo = DoubleArray(maxReal) { realLower.getOrNull(it) ?: Double.NEGATIVE_INFINITY }
     val rUp = DoubleArray(maxReal) { realUpper.getOrNull(it) ?: Double.POSITIVE_INFINITY }
     val prefiltered = fbbtTightenOpenIntBounds(bounds, constraints, cancellation, realConstraints, rLo, rUp)
-    if (prefiltered.refuted) return prefiltered // the system has no solution; there is nothing to bound
+    if (prefiltered.refuted) return prefiltered
     val work = prefiltered.bounds
-    if (work.none { it.lo == null || it.hi == null }) return prefiltered // nothing open left for the LP pass
-    if (cancellation()) return prefiltered // the prefilter consumed the budget; don't start a factorization
+    if (work.none { it.lo == null || it.hi == null }) return prefiltered
+    if (cancellation()) return prefiltered
 
     val rx = openRelaxation(work, constraints, realConstraints, rLo, rUp)
     val builder = rx.builder
@@ -108,14 +70,11 @@ internal fun tightenOpenIntBounds(
     val base = try {
         builder.build(Sense.MINIMIZE)
     } catch (_: CheckedLongOverflowException) {
-        return prefiltered // cannot relax; leave every open side to the caller's clamp
+        return prefiltered
     }
 
-    // Past the full-model row cap, each probe restricts to the row-capped neighborhood of its
-    // column pair instead: the initial factorization of the full basis is one uninterruptible call
-    // whose cost grows superlinearly with the row count, while a whole-row subset is a pure relaxation
-    // — every neighborhood bound is valid on the full model, so large instances keep their locally
-    // derivable finite bounds instead of falling to the clamp.
+    // The full basis factorization is one uninterruptible call, superlinear in rows. A whole-row subset is
+    // a pure relaxation, so neighborhood bounds stay valid on the full model.
     if (base.m > OBBT_MAX_LP_ROWS) {
         return TightenedIntBounds(
             tightenByNeighborhoodProbes(base, work, posCol, negCol, cancellation, observer, context),
@@ -130,7 +89,6 @@ internal fun tightenOpenIntBounds(
             if (cur.lo != null && cur.hi != null) continue
             var newHi = cur.hi
             var newLo = cur.lo
-            // maximize x_v bounds the open upper side; minimize bounds the open lower side.
             for (maximize in booleanArrayOf(true, false)) {
                 if (if (maximize) cur.hi != null else cur.lo != null) continue
                 solves++
@@ -138,8 +96,7 @@ internal fun tightenOpenIntBounds(
                 val probe = probes.probe(posCol[v], maximize, negCol[v])
                 if (probe != null) {
                     val (model, result) = probe
-                    // The open direction's probe: the upper probe of x⁺ when maximizing, of x⁻ (whose growth
-                    // is x's descent) when minimizing an open-below variable.
+                    // Minimizing an open-below variable probes the growth of x⁻.
                     val probeCol = if (maximize || negCol[v] < 0) posCol[v] else negCol[v]
                     val bound = model.certifiedTightVariableBound(
                         result,
@@ -158,14 +115,7 @@ internal fun tightenOpenIntBounds(
     return TightenedIntBounds(work)
 }
 
-/**
- * The oversized-model LP pass: per open side, extract the [OBBT_NEIGHBORHOOD_ROWS]-capped
- * [columnNeighborhood] of the variable's column pair from [base] and probe on that sub-model. Each
- * probe's factorization is bounded by the neighborhood cap regardless of the full model's size, and
- * [cancellation] is honoured between probes. Bounds transfer soundly because the neighborhood drops
- * whole rows only (see [LpNeighborhood]); a bound the neighborhood leaves at the probe frontier stays
- * open, exactly as on the full model.
- */
+/** Bounds transfer soundly because a neighborhood drops whole rows only (see [LpNeighborhood]). */
 private fun tightenByNeighborhoodProbes(
     base: LpModel,
     work: Array<OpenIntBounds>,
@@ -213,14 +163,8 @@ private fun tightenByNeighborhoodProbes(
     return work
 }
 
-/**
- * [cur]'s sides updated with the probe results [newLo]/[newHi], dropping a probed bound that crosses the
- * variable's other side.
- *
- * A crossed pair states an empty domain, which is a refutation of the whole system — and a bound read off
- * an LP probe is not the evidence to assert one. Discarding it leaves the side open for the caller's clamp,
- * which is merely weaker, never wrong.
- */
+// A crossed pair would assert a refutation, and an LP probe is not the evidence for one, so a crossing
+// probe bound is dropped and its side left open.
 private fun probedBounds(cur: OpenIntBounds, newLo: Long?, newHi: Long?): OpenIntBounds =
     if (newLo == null || newHi == null || newLo <= newHi) {
         OpenIntBounds(newLo, newHi)
@@ -228,53 +172,25 @@ private fun probedBounds(cur: OpenIntBounds, newLo: Long?, newHi: Long?): OpenIn
         OpenIntBounds(if (cur.lo != null) newLo else null, if (cur.hi != null) newHi else null)
     }
 
-/** Cap on the LP-solving pass's per-side solves: presolve-time OBBT runs with no deadline, and each
- *  re-solve refactorizes on a large model — sides past the cap stay open for the caller's clamp. */
+// Presolve-time OBBT may run with no deadline, and each re-solve refactorizes on a large model.
 private const val OBBT_MAX_SIDE_SOLVES = 128
 
-/** Row cap for the full-model LP pass: above this the initial factorization alone is an
- *  uninterruptible multi-minute call, so the pass switches to per-probe neighborhood sub-models
- *  ([tightenByNeighborhoodProbes]) instead of paying it. */
+// Above this the initial factorization alone is an uninterruptible multi-minute call.
 private const val OBBT_MAX_LP_ROWS = 5_000
 
-/** Row cap of each neighborhood probe on the oversized path: small enough that a probe's from-scratch
- *  factorization is effectively instant, large enough to span the local bounding structure a
- *  variable's bound usually rides on. */
+// Small enough for an instant factorization, large enough to span a variable's local bounding structure.
 private const val OBBT_NEIGHBORHOOD_ROWS = 512
 
-/** Upper bound on the number of full propagation passes; bounds only ever tighten, so the loop reaches a
- *  fixpoint in finite steps, but a long dependency chain could take many passes — cap it and leave any
- *  residual to the LP pass. */
+// A long dependency chain could take many passes; the residual is left to the LP pass.
 private const val FBBT_MAX_PASSES = 16
 
-/** Rows between cancellation polls inside one FBBT pass — often enough to bound the overrun on a wide
- *  model, rare enough that the poll never shows up next to the O(width) row work. */
+// Bounds the overrun on a wide model without the poll showing up next to the row work.
 private const val FBBT_CANCEL_POLL = 64
 
-/**
- * Feasibility-based bound tightening (FBBT): propagate [constraints] as interval bounds to a fixpoint,
- * closing open sides a single row already implies — the cheap `O(nnz)`-per-pass prefilter for
- * [tightenOpenIntBounds], so a side bounded by simple propagation needs no LP solve. For a row
- * `Σ aⱼ·xⱼ ≤ b` the extreme of the other terms is isolated against each coefficient: with the row's
- * minimum activity `A = Σ min(aⱼ·xⱼ)`, variable `k` satisfies `aₖ·xₖ ≤ b − (A − min(aₖ·xₖ))`, giving an
- * upper bound when `aₖ > 0` and a lower bound when `aₖ < 0`; an equality also propagates its `≥ b`
- * direction (the row negated). A term whose relevant side is open makes that side of the activity `−∞`:
- * with two or more such terms the row implies nothing, with exactly one only that term can be bounded.
- * Every derived bound holds at every solution (it is implied by the row), so a closed side is sound — a
- * genuine bound, never a clamp. Integer variables floor an upper / ceil a lower candidate. Any overflow
- * in the interval arithmetic skips that tightening. Iterated to a fixpoint up to [FBBT_MAX_PASSES].
- *
- * Mixed [realRows] propagate jointly through the same fixpoint in outward-rounded double intervals
- * ([propagateRealRow]), tightening the working real boxes [rLo]/[rUp] in place alongside the integer
- * bounds — so a chain like `r = 5/2, n ≤ r < n + 1` closes `n` exactly with no LP at all. Strict rows
- * propagate non-strict (a relaxation, sound).
- *
- * Where a tightening crosses a variable's opposite bound the rows imply an empty domain, so the system has
- * no solution: propagation stops and the result is [TightenedIntBounds.refuted]. That verdict is claimed
- * only for a pure-integer system, where every step was exact — the real rows' outward rounding is a margin
- * generous enough to keep a derived bound implied, but it is not the evidence to assert `unsat`, so a
- * crossing reached through one only collapses the pair and leaves the caller to search it.
- */
+// Feasibility-based bound tightening: interval propagation to a fixpoint, the prefilter that spares the LP
+// pass every side a single row implies. Mixed real rows propagate in outward-rounded double intervals,
+// tightening `rLo`/`rUp` in place. A crossing is claimed as a refutation only for a pure-integer system:
+// outward rounding keeps a derived bound implied but is not the evidence to assert `unsat`.
 private fun fbbtTightenOpenIntBounds(
     bounds: Array<OpenIntBounds>,
     constraints: List<Linear>,
@@ -289,11 +205,11 @@ private fun fbbtTightenOpenIntBounds(
         bounds[i].lo?.let { b.setLo(i, it) }
         bounds[i].hi?.let { b.setHi(i, it) }
     }
-    // Only LE/EQ rows propagate — [Linear] canonicalises GE to LE, and NE is not an interval bound.
+    // [Linear] canonicalises GE to LE, and NE is not an interval bound.
     val rows = constraints.filter { it.op == LinearOp.LE || it.op == LinearOp.EQ }
     val mixed = realRows.filter { it.op == LinearOp.LE || it.op == LinearOp.GE || it.op == LinearOp.EQ }
 
-    // Only a wholly exact propagation may assert the refutation; see the doc comment.
+    // Only a wholly exact propagation may assert the refutation.
     fun result() = TightenedIntBounds(
         Array(n) { OpenIntBounds(b.loOrNull(it), b.hiOrNull(it)) },
         refuted = b.crossed && mixed.isEmpty(),
@@ -302,9 +218,8 @@ private fun fbbtTightenOpenIntBounds(
 
     var pass = 0
     var changed = true
-    // A pass is O(Σ row width), so on a wide model a single one outruns the budget and a per-pass poll
-    // never gets to fire; the stride below bounds the overrun by a row batch instead. Stopping
-    // early keeps the tightenings made so far — sound, since a looser bound removes no solution.
+    // One pass can outrun the budget on a wide model, so poll per row batch. Stopping early keeps the
+    // tightenings made so far, which is sound.
     var polled = 0
     var spent = false
     fun budgetSpent(): Boolean {
@@ -321,7 +236,6 @@ private fun fbbtTightenOpenIntBounds(
             val row = f.integerConstants ?: continue
             val coeffs = row.coeffs // materialising accessor: read once per row, never per direction
             if (propagateRow(coeffs, f.vars, row.bound, sign = 1L, b = b)) changed = true
-            // An equality also bounds from below: `Σ aⱼ·xⱼ ≥ b`, i.e. `−Σ aⱼ·xⱼ ≤ −b`.
             if (f.op == LinearOp.EQ && propagateRow(coeffs, f.vars, row.bound, sign = -1L, b = b)) changed = true
         }
         for (f in mixed) {
@@ -334,11 +248,7 @@ private fun fbbtTightenOpenIntBounds(
     return result()
 }
 
-/**
- * Per-column interval bounds that [propagateRow] reads and narrows: a side is open (`±∞`) when its `*Open`
- * flag is set, else its value is in `*Val`. A setter that moves a side past the opposite one records the
- * emptiness in [crossed] instead of storing a crossed pair, and propagation stops at it.
- */
+// A setter that moves a side past the opposite one records [crossed] instead of storing a crossed pair.
 internal interface IntervalBounds {
     val crossed: Boolean
     fun loOpen(i: Int): Boolean
@@ -349,16 +259,14 @@ internal interface IntervalBounds {
     fun setHi(i: Int, v: Long)
 }
 
-/** Working per-variable bounds for [fbbtTightenOpenIntBounds] in primitive arrays (no `Long?` boxing). */
 private class MutableIntBounds(n: Int) : IntervalBounds {
     private val loVal = LongArray(n)
     private val hiVal = LongArray(n)
     private val loOpen = BooleanArray(n) { true }
     private val hiOpen = BooleanArray(n) { true }
 
-    // Whether a bound was ever set past the variable's opposite side — the rows imply an empty domain. The
-    // pair itself is collapsed to the point where the two sides met rather than stored crossed, so a
-    // consumer that reads the bounds regardless still gets a domain it can build a column over.
+    // A crossed pair is collapsed to the point where the sides met, so a consumer still gets a domain it
+    // can build a column over.
     private var isCrossed = false
     override val crossed: Boolean get() = isCrossed
 
@@ -384,8 +292,7 @@ private class MutableIntBounds(n: Int) : IntervalBounds {
     }
 }
 
-/** Propagate the row `Σ (sign·coeffs(k))·vars(k) ≤ sign·bound` into [b], returning whether any bound
- *  tightened. Overflow in the exact activity arithmetic aborts this row (returns `false`). */
+// Propagates `Σ (sign·coeffs(k))·vars(k) ≤ sign·bound`; overflow aborts the row.
 @Suppress("ReturnCount", "LoopWithTooManyJumpStatements")
 internal fun propagateRow(
     coeffs: LongArray,
@@ -397,7 +304,6 @@ internal fun propagateRow(
 ): Boolean =
     try {
         val effBound = mulExact(sign, bound)
-        // Minimum activity Σ min(aⱼ·xⱼ) over finite terms, plus how many terms are −∞ (open on the min side).
         var minActivity = 0L
         var numInf = 0
         var infIdx = -1
@@ -409,7 +315,7 @@ internal fun propagateRow(
             if (if (a > 0L) b.loOpen(v) else b.hiOpen(v)) {
                 numInf++
                 infIdx = idx
-                if (numInf > 1) return false // ≥2 unbounded terms ⇒ the row implies nothing
+                if (numInf > 1) return false
             } else {
                 minActivity = addExact(minActivity, mulExact(a, if (a > 0L) b.loVal(v) else b.hiVal(v)))
             }
@@ -425,9 +331,9 @@ internal fun propagateRow(
             val restMin = when {
                 numInf == 0 -> subExact(minActivity, mulExact(a, if (a > 0L) b.loVal(v) else b.hiVal(v)))
 
-                infIdx == idx -> minActivity // this term was the sole −∞; the rest is finite
+                infIdx == idx -> minActivity
 
-                else -> continue // the sole −∞ is a different term ⇒ no bound for this one
+                else -> continue
             }
             val num = subExact(effBound, restMin)
             if (a > 0L) {
@@ -449,11 +355,7 @@ internal fun propagateRow(
         false
     }
 
-/**
- * Whether [b] already rules out the row `Σ (sign·coeffs(k))·vars(k) ≤ sign·bound`: every term is bounded on
- * the side that minimises it and that minimum exceeds the bound. An unbounded term, or activity past 64
- * bits, leaves the row possible.
- */
+// An unbounded term, or activity past 64 bits, leaves the row possible.
 @Suppress("ReturnCount")
 internal fun rowRefuted(
     coeffs: LongArray,
@@ -477,22 +379,14 @@ internal fun rowRefuted(
     false
 }
 
-/** Conservative per-term relative rounding bound for the real-row interval arithmetic; generous next to
- *  the `2⁻⁵³` unit roundoff so it also covers the `Long`→`Double` conversion of wide integer bounds. */
+// Generous next to the `2⁻⁵³` unit roundoff so it also covers the `Long`→`Double` conversion of wide bounds.
 private const val REAL_EPS = 1e-15
 
-/** Magnitude cap on a derived candidate bound: beyond this a double no longer resolves integers and the
- *  bound is worthless next to the search box anyway. */
+// Beyond this a double no longer resolves integers.
 private const val REAL_CAND_MAX = 4.0e18
 
-/**
- * Propagate the mixed row `sign·(Σ aₖ·xₖ + Σ cⱼ·rⱼ) ≤ sign·bound` into the integer bounds [b] and the
- * real boxes [rLo]/[rUp], returning whether anything tightened. The double interval arithmetic rounds
- * **outward** — every candidate is widened by a conservative relative margin ([REAL_EPS]-scaled to the
- * accumulated magnitude) before it is committed, so a derived bound is always implied by the row: an
- * integer upper is the floor of an overestimate, an integer lower the ceil of an underestimate, and the
- * real boxes take the widened candidate itself. Mirrors [propagateRow]'s single-open-term rule.
- */
+// Every candidate is widened outward by a margin scaled to the accumulated magnitude before it is
+// committed, so a derived bound is always implied by the row.
 @Suppress("ReturnCount", "LoopWithTooManyJumpStatements", "CyclomaticComplexMethod", "LongMethod")
 private fun propagateRealRow(
     f: Linear,
@@ -505,7 +399,6 @@ private fun propagateRealRow(
     val effBound = sign * row.bound
     if (!effBound.isFinite()) return false
     val terms = f.vars.size + f.realVars.size
-    // Minimum activity over the finite terms, its magnitude for the rounding margin, and the open count.
     var act = 0.0
     var mag = 0.0
     var numInf = 0
@@ -545,7 +438,6 @@ private fun propagateRealRow(
     val margin = REAL_EPS * (mag + abs(effBound)) * (terms + 4)
     var changed = false
     for (k in f.vars.indices) {
-        // A collapsed pair is tighter than the rows imply, so nothing may be derived off it.
         if (b.crossed) break
         val a = sign * row.intCoefficients.at(k)
         if (a == 0.0) continue
@@ -553,7 +445,7 @@ private fun propagateRealRow(
         val own = if (numInf == 0) {
             a * (if (a > 0.0) b.loVal(v) else b.hiVal(v)).toDouble()
         } else {
-            if (infInt != k) continue // the sole −∞ is a different term ⇒ no bound for this one
+            if (infInt != k) continue
             0.0
         }
         val cand = widen(effBound - (act - own), margin) / a
@@ -602,27 +494,20 @@ private fun propagateRealRow(
     return changed
 }
 
-/** Widen the residual upward by [margin] plus its own relative slack — the outward rounding step that
- *  keeps every derived candidate an overestimate of the true residual. */
 private fun widen(residual: Double, margin: Double): Double = residual + margin + REAL_EPS * abs(residual)
 
-/** `⌊a / b⌋`, or null on the one non-representable case (`Long.MIN_VALUE / −1`). */
 private fun floorDivSafe(a: Long, b: Long): Long? = if (a == Long.MIN_VALUE && b == -1L) null else a.floorDiv(b)
 
-/** `⌈a / b⌉` = `⌊a / b⌋ + (a not divisible by b ? 1 : 0)`, or null on overflow. */
 private fun ceilDivSafe(a: Long, b: Long): Long? {
     if (a == Long.MIN_VALUE && b == -1L) return null
     val q = a.floorDiv(b)
     return if (a % b != 0L) (if (q == Long.MAX_VALUE) null else q + 1L) else q
 }
 
-/** The size of one certified probe of [model]: its nonzeros, rows and columns. */
 internal fun certifyUnits(model: LpModel): Long = model.csc.colPtr[model.n].toLong() + model.m + model.n
 
-// Work units per entry of a probe certified exactly, against one simplex op: routing time per unit over the
-// calibration sample's routed models (60 MIPLIB 2017, 40 QF_LIA), ~4.9e-4 ms beside the simplex work.
+// Work units per entry of an exactly certified probe, relative to one simplex op.
 internal const val LP_CERTIFY_WORK_WEIGHT = 183L
 
-// Work units per term propagated by the interval prefilter, against one simplex op. Its time hides inside the
-// probes' in the calibration sample, so it takes the weight the other per-term passes measured.
+// Work units per term propagated by the interval prefilter, relative to one simplex op.
 private const val FBBT_WORK_WEIGHT = 10L

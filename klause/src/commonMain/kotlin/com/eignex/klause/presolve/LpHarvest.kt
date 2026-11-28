@@ -26,32 +26,20 @@ import com.eignex.klause.solver.validation.readingSourceSlack
 import com.eignex.klause.util.ExecutionControl
 
 /**
- * Fold the LP relaxation's proven reductions into [problem] permanently. The harvests share one root-LP
- * build:
+ * Fold the LP relaxation's proven reductions into [problem] permanently, sharing one root-LP build:
  *  - a certified-infeasible root relaxation turns [problem] into a proven contradiction;
- *  - [LpEngine.shaveVariableBounds] proves, by LP + propagation infeasibility, that some integer
- *    variables cannot reach their declared bounds; their proven bounds intersect into the domains;
- *  - [LpEngine.shaveObjectiveLb] proves a lower bound on a single ascending (minimised) objective
- *    variable; it intersects into that variable's domain;
+ *  - [LpEngine.shaveVariableBounds] proves integer bounds tighter than declared;
+ *  - [LpEngine.shaveObjectiveLb] proves a lower bound on a single ascending objective variable;
  *  - [LpEngine.redundantConstraints] are dropped and [LpEngine.impliedEqualities] are appended.
  *
- * Unlike the backtrack search's root shave — which raises bounds only on its own search session — this
- * is a `Problem -> Problem` transform run during presolve, so the tightened domains reach **every**
- * backend (local search included) and feed any later presolve pass. Sound: every shaved bound is backed
- * by an infeasibility proof, so intersecting it removes only values no solution can take.
+ * As a `Problem -> Problem` transform, the tightened domains reach every backend and later presolve passes.
+ * Every shaved bound is backed by an infeasibility proof, so only values no solution can take are removed.
  *
- * Reduced-cost fixing (`applySparseReducedCostFixing`) is deliberately *not* harvested here. It is
- * incumbent-relative — a fixing is valid only for solutions strictly better than a known incumbent, so
- * it needs a finite incumbent (which presolve has not yet found) and it removes feasible-but-non-optimal
- * assignments rather than infeasible ones. A `Problem -> Problem` transform has no channel to retain the
- * incumbent as the answer, so folding such fixings in could discard the optimum itself (when the
- * incumbent is optimal, the fixing bound `objective <= incumbent - 1` makes the problem infeasible). It
- * stays in the search loop, where branch-and-bound keeps the incumbent separately.
+ * Reduced-cost fixing is not harvested: it is valid only relative to an incumbent, and a transform has no
+ * channel to retain that incumbent, so folding it in could discard the optimum itself.
  *
- * Gated to the LP relaxation actually being built; the probes beyond root infeasibility additionally need
- * variable or objective shaving enabled and a relaxation within `LP_HARVEST_MAX_RELAXATION_COST`. When
- * nothing applies, [problem] is returned unchanged. Each shave is internally bounded by `SHAVE_MAX_ITERS`,
- * and [cancellation] caps it further.
+ * Probes beyond root infeasibility need variable or objective shaving enabled and a relaxation within
+ * `LP_HARVEST_MAX_RELAXATION_COST`; otherwise [problem] is returned unchanged.
  */
 fun lpHarvest(
     problem: BakedProblem,
@@ -71,10 +59,10 @@ class LpHarvestResult(
     val stats: LpStats = LpStats(),
 )
 
-/** Whether the root LP relaxation is Farkas-certifiably infeasible over [problem]'s declared domains,
- *  built without the [com.eignex.klause.propagation.PropagationSession] bake fixpoint (O(domain span) on
- *  wide integer domains). A true result proves [problem] infeasible over its domains — the pre-bake
- *  short-circuit a presolve pipeline uses to skip the O(span) root bake on a wide, infeasible model. */
+/**
+ * Whether the root LP relaxation is Farkas-certifiably infeasible over [problem]'s declared domains, built
+ * without the O(domain span) bake fixpoint, so a wide infeasible model can skip the root bake.
+ */
 fun lpRootInfeasible(
     problem: Problem,
     objective: LinearObjective,
@@ -120,11 +108,11 @@ internal fun lpRootInfeasibleReporting(
     return LpRootInfeasibleResult(infeasible, sink.snapshot().lp)
 }
 
-/** [problem] with each integer variable's domain tightened by the no-bake root-LP OBBT
- *  ([LpEngine.rootLpBoundsNoBake]): the pre-bake bound-tightening a presolve pipeline runs on a wide model
- *  so the O(span) root bake starts from collapsed domains instead of grinding them down one step per round.
- *  Returns [problem] unchanged when the LP tightens nothing. Solution-set-preserving — only values the LP
- *  proves no integer solution can take are removed. */
+/**
+ * [problem] with integer domains tightened by the no-bake root-LP OBBT ([LpEngine.rootLpBoundsNoBake]), so
+ * the O(span) root bake of a wide model starts from collapsed domains. Solution-set preserving; returns
+ * [problem] unchanged when the LP tightens nothing.
+ */
 fun lpRootBounds(
     problem: Problem,
     objective: LinearObjective,
@@ -188,9 +176,7 @@ internal fun lpRootBoundsReporting(
     )
 }
 
-/** [lpHarvest] returning, alongside the transformed problem, a breakdown of the LP harvest's own effect
- *  (root infeasibility, bounds shaved, objective floor, constraints removed, equalities added) so a
- *  caller can isolate it from the surrounding combinatorial passes. */
+/** [lpHarvest] with a breakdown of the harvest's own effect, isolated from the surrounding passes. */
 fun lpHarvestReporting(
     problem: BakedProblem,
     objective: LinearObjective,
@@ -201,9 +187,8 @@ fun lpHarvestReporting(
     randomSeed: Long? = null,
     numericalLp: Boolean = false,
 ): LpHarvestResult {
-    // The token must reach the simplex itself, not just the probe loops below: one primal phase-1 on a
-    // large relaxation runs far past the presolve budget, and the engine polls only the `cancellation`
-    // that `LpParams` hands it — every `LpSolver` entry point defaults to `ExecutionControl.Never`.
+    // The token must reach the simplex itself, not just the probe loops: one phase-1 on a large relaxation
+    // runs far past the presolve budget, and the engine polls only the cancellation `LpParams` hands it.
     val sink = SolveStatsSink(backend = "lp-harvest", lpProbeRoute = LpRoute.ROOT)
     val engine = LpEngine(
         problem,
@@ -236,10 +221,8 @@ fun lpHarvestReporting(
         )
     }
 
-    // Self-limit on the built relaxation's size. The shave / redundancy / equality probes each rebuild and
-    // re-solve the relaxation (up to SHAVE_MAX_ITERS of each), so on a large relaxation that per-candidate
-    // cost dominates the time budget the search needs. Measure the root relaxation once (cols / rows / nnz)
-    // and, above the budget, skip the probe work.
+    // Each probe re-solves the relaxation, so on a large one the per-candidate cost would eat the search's
+    // time budget.
     val size = engine.rootRelaxationSize()
     if (size != null && size.cost > LP_HARVEST_MAX_RELAXATION_COST) {
         val report = LpHarvestReport(
@@ -285,8 +268,7 @@ fun lpHarvestReporting(
     // The proven LB never exceeds any feasible objective value, so raising the variable's min to it
     // cannot empty the domain.
     objLb?.let { (varId, lb) -> domains[varId] = domains[varId].withMinAtLeast(lb) }
-    // Dropping redundant rows and appending proven equalities both keep the variable space (the affine
-    // pass that consumes an equality runs later and carries its own reconstruct), so none is needed here.
+    // Both keep the variable space, so no reconstruction is needed here.
     val factors = if (redundant.isEmpty() && equalities.isEmpty()) {
         problem.factors
     } else {

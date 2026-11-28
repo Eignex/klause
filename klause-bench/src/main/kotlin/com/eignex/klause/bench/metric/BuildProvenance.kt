@@ -26,7 +26,7 @@ internal data class BuildProvenance(
 }
 
 internal object InstalledBuild {
-    // A campaign's installed distribution and runtime stay fixed after setup.
+    // The installed distribution and runtime stay fixed for the process.
     val current: BuildProvenance by lazy {
         val launcher = SolverInvocation.klauseCliBin()
         val environment = System.getenv()

@@ -19,8 +19,7 @@ internal class MddInvariant(
     private val cost: Int,
 ) : SteppedIntInvariant {
 
-    /** Positions in [seq] each variable occupies — usually one, so a single-symbol move recombines a
-     *  single DP layer. A variable repeated across positions falls back to a full recompute. */
+    // A variable repeated across positions falls back to a full DP recompute.
     private val positionsByVar: MutableIntObjectMap<IntArray> = run {
         val tmp = MutableIntObjectMap<IntArrayList>()
         for (i in seq.indices) tmp.getOrPut(seq[i]) { IntArrayList() }.add(i)
@@ -229,11 +228,8 @@ internal class MddInvariant(
         state.violationSoftCap,
     )
 
-    /**
-     * How far the cost variable sits from the weight of the word's accepted path, with [intVar] set to [newValue]
-     * (-1 for the current assignment); zero without a cost, or while the word is not accepted, which the accept
-     * distance already charges.
-     */
+    // Distance of the cost variable from the accepted path's weight; [intVar] -1 means the current assignment.
+    // Zero while the word is not accepted, which the accept distance already charges.
     private fun costGap(state: LocalSearchState, intVar: Int, newValue: Long): Long {
         if (cost < 0) return 0L
         val weight = acceptedWeight(state::checkScoringWork) { i ->
@@ -288,8 +284,6 @@ internal class MddInvariant(
         return MddLsState(forward, backward, distance).also { it.weight = currentWeight(state, distance) }
     }
 
-    /** Accept distance with [intVar] set to [newValue]. A single-position variable recombines its DP
-     *  layer in O(Q·Σ); a repeated variable falls back to a full recompute. */
     private fun distanceWith(state: LocalSearchState, st: MddLsState, intVar: Int, newValue: Long): Int {
         val positions = positionsByVar[intVar]
         if (positions == null || positions.size != 1) {
@@ -400,8 +394,7 @@ internal class MddInvariant(
 
     override fun proposeExtendedRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (seq.isEmpty() || !isViolated(state, factorId)) return
-        // DP-optimal repair: a minimum-change in-domain accepting layer path. Each differing position
-        // is a move that strictly reduces the accept distance.
+        // Each position differing from the minimum-change accepting path strictly reduces the accept distance.
         val target = mddRepairPath(
             state,
             seq,
@@ -540,7 +533,6 @@ internal class MddInvariant(
 private const val MDD_STRUCTURED_MOVE_CAP: Int = 4
 private const val MDD_MOVE_ATTEMPT_STRIDE: Int = 6
 
-/** Destination state of the transition from [from] on [symbol] at layer [i], or -1 if none. */
 internal fun mddStep(
     layerStarts: IntArray,
     transitions: LongArray,
@@ -560,7 +552,6 @@ internal fun mddStep(
     return -1
 }
 
-/** Weight of the transition from [from] on [symbol] at layer [i] (0 for a plain MDD). */
 internal fun mddRecordWeight(
     layerStarts: IntArray,
     transitions: LongArray,
@@ -581,7 +572,6 @@ internal fun mddRecordWeight(
     return 0L
 }
 
-/** Symbol [s] is usable at layer [i]. */
 internal fun mddSymbolAllowed(state: LocalSearchState, seq: IntArray, i: Int, s: Long): Boolean {
     val v = seq[i]
     return if (state.assumptions.isFrozenInt(v)) {
@@ -591,7 +581,6 @@ internal fun mddSymbolAllowed(state: LocalSearchState, seq: IntArray, i: Int, s:
     }
 }
 
-/** Min symbol changes for a layer-by-layer path to an accepting state, where [getSym] is layer i's current symbol. */
 internal fun mddAcceptDistance(
     seq: IntArray,
     numStatesPerLayer: IntArray,
@@ -629,12 +618,6 @@ internal fun mddAcceptDistance(
     return best
 }
 
-/**
- * A minimum-change in-domain accepting layer path, as the symbol per layer, or null when none is
- * reachable within the domains. The domain-aware, traceback-carrying counterpart of
- * [mddAcceptDistance]: forward DP over allowed transitions with parent pointers, then a backtrack
- * from the cheapest accepting state.
- */
 internal fun mddRepairPath(
     state: LocalSearchState,
     seq: IntArray,
@@ -694,16 +677,13 @@ internal fun mddRepairPath(
     return out
 }
 
-/** Maintained accept-distance DP for an MDD factor: forward and backward layers over the current
- *  assignment plus the resulting accept distance, so a single-symbol move recombines one layer in
- *  O(Q·Σ) instead of resweeping the whole DP. */
+// Kept so a single-symbol move recombines one layer in O(Q·Σ) instead of resweeping the DP.
 internal class MddLsState(val forward: Array<IntArray>, val backward: Array<IntArray>, var distance: Int) {
     val scratch = IntArray(forward.maxOf { it.size })
     var weight: Long? = null
 }
 
-/** `forward(i)(q)` = min symbol changes over layers `0 until i` to reach state `q` from [initial],
- *  where [getSym] is layer i's current symbol. */
+// `forward(i)(q)`: min symbol changes over layers `0 until i` to reach `q` from [initial].
 internal fun mddForwardLayers(
     n: Int,
     numStatesPerLayer: IntArray,
@@ -734,8 +714,7 @@ internal fun mddForwardLayers(
     return fwd
 }
 
-/** `backward(i)(q)` = min symbol changes over layers `i until n` to drive state `q` to an accepting
- *  state, where [getSym] is layer i's current symbol. */
+// `backward(i)(q)`: min symbol changes over layers `i until n` to drive `q` to an accepting state.
 internal fun mddBackwardLayers(
     n: Int,
     numStatesPerLayer: IntArray,
