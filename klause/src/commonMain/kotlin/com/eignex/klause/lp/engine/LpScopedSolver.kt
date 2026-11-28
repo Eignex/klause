@@ -622,7 +622,8 @@ internal class LpScopedSolver(
         val scopeToken = cancellation or token
         val child = LpScopedSolver(
             working.state, scopeToken, context, refactorUpdateLimit, childIterations, childWork,
-            trackDegeneracy, maxRetainedRows, pricing, componentSplit, componentAdmission, childMonolithicPreparationWork,
+            trackDegeneracy, maxRetainedRows, pricing, componentSplit, componentAdmission,
+            childMonolithicPreparationWork,
         )
         val scope = LpWorkingScope(working, child, scopeToken)
         workingActive = true
