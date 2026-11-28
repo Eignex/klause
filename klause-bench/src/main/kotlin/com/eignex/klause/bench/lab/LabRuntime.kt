@@ -60,13 +60,9 @@ internal object LabRuntime {
         val tree = requireNotNull(context.worktree)
         val archive = context.outputDirectory.resolve("klause.aot")
         val launcher = tree.resolve("klause-cli/build/install/klause-cli-jvm/bin/klause-cli")
-        val input = tree.resolve("klause-bench/smoke-corpus/dimacs/php4.cnf")
         val sharedOptions = listOf("-XX:-AOTClassLinking")
         val trainingOptions = argumentFile("aot-training.args", runtime + sharedOptions + "-XX:AOTCacheOutput=$archive")
-        val training = ProcessBuilder(
-            launcher.toString(), "--exact", "-p", "1", "-r", "1", "-t", "30000",
-            "--param", "node-limit=100000", input.toString(),
-        ).directory(tree.toFile()).redirectErrorStream(true)
+        val training = ProcessBuilder(launcher.toString(), "--help").directory(tree.toFile()).redirectErrorStream(true)
             .redirectOutput(context.outputDirectory.resolve("aot-training.log").toFile()).apply {
                 environment()["JAVA_HOME"] = javaHome
                 environment()["JAVA_OPTS"] = ""
