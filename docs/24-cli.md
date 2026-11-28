@@ -19,21 +19,20 @@ the optimizing tier for long runs.
 
 ### JVM startup cache
 
-For repeated short JVM invocations, train a HotSpot ahead-of-time cache on a representative
-model and reuse the cached class data across processes. These POSIX shell commands use the
+For repeated short JVM invocations, train a HotSpot ahead-of-time cache with `--help` and
+reuse the cached startup classes across processes. These POSIX shell commands use the
 installed launcher on `PATH`.
 
 ```sh
 aot_options="-XX:-AOTClassLinking"
-KLAUSE_CLI_OPTS="$aot_options -XX:AOTCacheOutput=klause.aot" klause-cli training.cnf
+KLAUSE_CLI_OPTS="$aot_options -XX:AOTCacheOutput=klause.aot" klause-cli --help > /dev/null
 KLAUSE_CLI_OPTS="$aot_options -XX:AOTCache=klause.aot -Xlog:aot*=off:stdout -Xlog:aot*=warning:stderr" \
   klause-cli input.cnf
 ```
 
-Training runs the model and prints JVM diagnostics while building the cache at exit. Run it
-separately from consumers of solver output. Keep the cache outside the installation and use the
-same installed distribution, JDK build, platform and JVM runtime settings for training and reuse.
-Rebuild the cache when any of those change.
+HotSpot builds the cache when the help command exits. Keep the cache outside the installation and
+use the same installed distribution, JDK build, platform and JVM runtime settings for training
+and reuse. Rebuild the cache when any of those change.
 
 The reuse command sends AOT diagnostics to stderr. HotSpot can fall back to a normal run if the
 cache is missing or incompatible. For troubleshooting, add `-XX:AOTMode=on` to fail if the JVM
