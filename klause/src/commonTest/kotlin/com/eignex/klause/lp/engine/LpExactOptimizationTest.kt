@@ -77,9 +77,8 @@ class LpExactOptimizationTest {
         val limit = total - 1
         var spent = 0L
 
-        val result = immediateLpSolve { optimize(source, ExactContinuationLimits(maxWork = limit), observe = {
-            spent += it
-        }) }
+        val limits = ExactContinuationLimits(maxWork = limit)
+        val result = immediateLpSolve { optimize(source, limits, observe = { spent += it }) }
 
         assertEquals(ContinuationDecline.WORK, assertIs<LpExactOptimization.Declined>(result).reason)
         assertTrue(spent in 1..limit)
