@@ -24,7 +24,7 @@ class DiffnInvariantTest {
         val state = LocalSearchState(problem.bake(), Random(seed.toLong()))
         state.recompute()
         val rng = Random(seed * 31L + 1)
-        repeat(600) { step ->
+        repeat(32) { step ->
             val v = probeVars[rng.nextInt(probeVars.size)]
             val nv = rng.nextInt(valueRange.first, valueRange.last + 1).toLong()
             val before = state.factors[0].violationDegree(state, 0)

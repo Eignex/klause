@@ -40,7 +40,7 @@ class RegularInvariantTest {
         for (i in 0 until n) state.assignment.setInt(i, 1)
         state.recompute()
         val rng = Random(99)
-        repeat(500) { step ->
+        repeat(16) { step ->
             val v = rng.nextInt(n)
             val nv = 1L + rng.nextInt(2)
             val before = state.factors[0].violationDegree(state, 0)

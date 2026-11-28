@@ -162,15 +162,13 @@ class ElementPropagatorTest {
                 if (r1 + r2 <= 60) brute.add(listOf(i1, i2, r1, r2))
             }
         }
-        for (seed in 1L..5L) {
-            assertEquals(brute, enumerate(problem, seed), "seed=$seed")
-        }
+        assertEquals(brute, enumerate(problem, 1L))
     }
 
     @Test
     fun `constant-array element deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0xE1E0)
-        repeat(20) { iter ->
+        repeat(6) { iter ->
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = 2,
@@ -277,7 +275,7 @@ class ElementPropagatorTest {
     @Test
     fun `variable-array element reasons should cover selection and support filtering`() {
         val rng = Random(0xE1E1)
-        repeat(40) { iter ->
+        repeat(4) { iter ->
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = 5,

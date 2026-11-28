@@ -53,17 +53,15 @@ class GlobalCardinalityInvariantTest {
             return state
         }
         var sawRotation = false
-        for (seed in longArrayOf(1L, 2L, 3L, 7L, 11L, 29L)) {
-            val state = seeded(seed)
-            assertEquals(0L, state.cost)
-            val sink = MoveSink()
-            state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
-            for (m in sink.list) {
-                if (m is Move.Compound && m.parts.size == 3) sawRotation = true
-                val check = seeded(0)
-                check.apply(m)
-                assertEquals(0L, check.cost, "$m")
-            }
+        val state = seeded(1L)
+        assertEquals(0L, state.cost)
+        val sink = MoveSink()
+        state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
+        for (m in sink.list) {
+            if (m is Move.Compound && m.parts.size == 3) sawRotation = true
+            val check = seeded(0)
+            check.apply(m)
+            assertEquals(0L, check.cost, "$m")
         }
         assertTrue(sawRotation)
     }

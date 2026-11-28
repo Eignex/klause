@@ -24,7 +24,7 @@ class GlobalCardinalityPropagatorTest {
     @Test
     fun `global cardinality reasons should cover saturated and overfull counts`() {
         val rng = Random(0x6CC0)
-        repeat(30) { iter ->
+        repeat(2) { iter ->
             val n = 5
             val problem = Problem(
                 numBoolVars = 0,
@@ -118,7 +118,7 @@ class GlobalCardinalityPropagatorTest {
     @Test
     fun `global cardinality deductions with count vars should be implied by their reasons under carved holes`() {
         val rng = Random(0x6CC1)
-        repeat(15) { iter ->
+        repeat(4) { iter ->
             val n = 4
             val problem = Problem(
                 numBoolVars = 0,

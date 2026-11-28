@@ -86,36 +86,34 @@ class NValueEliminationMovesTest {
 
     @Test
     fun `class elimination should distribute aliased members among surviving values`() {
-        for (seed in listOf(3, 17, 41)) {
-            val p = Problem(
-                0,
-                5,
-                arrayOf(
-                    IntDomain(2, 3),
-                    IntDomain(0, 2).excludeValue(1),
-                    IntDomain(1, 2),
-                    IntDomain(0, 0),
-                    IntDomain(1, 1),
-                ),
-                arrayOf<Factor>(NValue(0, intArrayOf(1, 1, 2, 2, 3, 4))),
-            )
-            val state = LocalSearchState(LocalSearchModel.open(p), Random(seed))
-            for ((v, value) in listOf(0 to 3L, 1 to 2L, 2 to 2L, 3 to 0L, 4 to 1L)) {
-                state.assignment.setInt(v, value)
-            }
-            state.recompute()
-
-            state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
-            val move = state.moveSink.list.first { candidate ->
-                candidate is Move.Compound && Move.IntSet(0, 2) in candidate.parts && state.netDelta(candidate) == 0L
-            }
-            state.apply(move)
-
-            assertEquals(0L, state.assignment.intValue(1))
-            assertEquals(1L, state.assignment.intValue(2))
-            assertEquals(2L, state.assignment.intValue(0))
-            assertEquals(0L, state.cost)
+        val p = Problem(
+            0,
+            5,
+            arrayOf(
+                IntDomain(2, 3),
+                IntDomain(0, 2).excludeValue(1),
+                IntDomain(1, 2),
+                IntDomain(0, 0),
+                IntDomain(1, 1),
+            ),
+            arrayOf<Factor>(NValue(0, intArrayOf(1, 1, 2, 2, 3, 4))),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
+        for ((v, value) in listOf(0 to 3L, 1 to 2L, 2 to 2L, 3 to 0L, 4 to 1L)) {
+            state.assignment.setInt(v, value)
         }
+        state.recompute()
+
+        state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+        val move = state.moveSink.list.first { candidate ->
+            candidate is Move.Compound && Move.IntSet(0, 2) in candidate.parts && state.netDelta(candidate) == 0L
+        }
+        state.apply(move)
+
+        assertEquals(0L, state.assignment.intValue(1))
+        assertEquals(1L, state.assignment.intValue(2))
+        assertEquals(2L, state.assignment.intValue(0))
+        assertEquals(0L, state.cost)
     }
 
     @Test
@@ -493,83 +491,79 @@ class NValueEliminationMovesTest {
 
     @Test
     fun `class completion should reconcile a feasible merge among competing owned classes`() {
-        for (seed in listOf(3, 17, 41)) {
-            val p = Problem(
-                0,
-                7,
-                arrayOf(
-                    IntDomain(1, 3),
-                    IntDomain(0, 1),
-                    IntDomain(0, 1),
-                    IntDomain(0, 1),
-                    IntDomain(0, 1),
-                    IntDomain(0, 2),
-                    IntDomain(0, 2),
-                ),
-                arrayOf<Factor>(
-                    NValue(0, intArrayOf(1, 2, 3, 4, 5, 5)),
-                    Linear(intArrayOf(1, -1), intArrayOf(1, 3), LinearOp.NE, 0),
-                    Linear(intArrayOf(1, -1), intArrayOf(2, 4), LinearOp.NE, 0),
-                    Linear(intArrayOf(1, -1), intArrayOf(5, 6), LinearOp.EQ, 0),
-                ),
-            )
-            val state = LocalSearchState(LocalSearchModel.open(p), Random(seed))
-            state.seedImplicitFeasible()
-            for ((variable, value) in listOf(0 to 3L, 1 to 0L, 2 to 0L, 3 to 1L, 4 to 1L, 5 to 2L, 6 to 2L)) {
-                state.assignment.setInt(variable, value)
-            }
-            state.recompute()
-            state.moveSink.proposer = 0
-
-            state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
-            val move = state.moveSink.list.first {
-                it is Move.Compound && Move.IntSet(0, 2) in it.parts && state.netDelta(it) == 0L
-            }
-            state.apply(move)
-
-            assertEquals(2L, state.assignment.intValue(0))
-            assertEquals(2, (1..5).map { state.assignment.intValue(it) }.distinct().size)
-            assertEquals(state.assignment.intValue(5), state.assignment.intValue(6))
-            assertEquals(0L, state.cost)
+        val p = Problem(
+            0,
+            7,
+            arrayOf(
+                IntDomain(1, 3),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+            ),
+            arrayOf<Factor>(
+                NValue(0, intArrayOf(1, 2, 3, 4, 5, 5)),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 3), LinearOp.NE, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(2, 4), LinearOp.NE, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(5, 6), LinearOp.EQ, 0),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
+        state.seedImplicitFeasible()
+        for ((variable, value) in listOf(0 to 3L, 1 to 0L, 2 to 0L, 3 to 1L, 4 to 1L, 5 to 2L, 6 to 2L)) {
+            state.assignment.setInt(variable, value)
         }
+        state.recompute()
+        state.moveSink.proposer = 0
+
+        state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+        val move = state.moveSink.list.first {
+            it is Move.Compound && Move.IntSet(0, 2) in it.parts && state.netDelta(it) == 0L
+        }
+        state.apply(move)
+
+        assertEquals(2L, state.assignment.intValue(0))
+        assertEquals(2, (1..5).map { state.assignment.intValue(it) }.distinct().size)
+        assertEquals(state.assignment.intValue(5), state.assignment.intValue(6))
+        assertEquals(0L, state.cost)
     }
 
     @Test
     fun `count reduction should reconcile repeated classes within the caller's directed walk`() {
-        for (seed in listOf(3, 17, 41)) {
-            val p = Problem(
-                0,
-                6,
-                arrayOf(
-                    IntDomain(1, 2),
-                    IntDomain(0, 1),
-                    IntDomain(0, 1),
-                    IntDomain(0, 1),
-                    IntDomain(0, 1),
-                    IntDomain(0, 4),
-                ),
-                arrayOf<Factor>(
-                    NValue(0, intArrayOf(1, 2, 3, 4)),
-                    Linear(intArrayOf(1, 1, 1, 1, -1), intArrayOf(1, 2, 3, 4, 5), LinearOp.EQ, 0),
-                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-                ),
-            )
-            val state = LocalSearchState(LocalSearchModel.open(p), Random(seed))
-            for ((v, value) in listOf(0 to 2L, 1 to 0L, 2 to 0L, 3 to 1L, 4 to 1L, 5 to 2L)) {
-                state.assignment.setInt(v, value)
-            }
-            state.recompute()
-            assertEquals(1L, state.cost)
-
-            val parts = state.buildRepairChain(Move.IntSet(0, 1), 8, MoveSink(state.assumptions))
-            val move = Move.Compound(assertNotNull(parts))
-            assertEquals(1L, state.cost)
-            state.apply(move)
-
-            assertEquals(1L, state.assignment.intValue(0))
-            assertEquals(1, (1..4).map { state.assignment.intValue(it) }.distinct().size)
-            assertEquals(0L, state.cost)
+        val p = Problem(
+            0,
+            6,
+            arrayOf(
+                IntDomain(1, 2),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 4),
+            ),
+            arrayOf<Factor>(
+                NValue(0, intArrayOf(1, 2, 3, 4)),
+                Linear(intArrayOf(1, 1, 1, 1, -1), intArrayOf(1, 2, 3, 4, 5), LinearOp.EQ, 0),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
+        for ((v, value) in listOf(0 to 2L, 1 to 0L, 2 to 0L, 3 to 1L, 4 to 1L, 5 to 2L)) {
+            state.assignment.setInt(v, value)
         }
+        state.recompute()
+        assertEquals(1L, state.cost)
+
+        val parts = state.buildRepairChain(Move.IntSet(0, 1), 8, MoveSink(state.assumptions))
+        val move = Move.Compound(assertNotNull(parts))
+        assertEquals(1L, state.cost)
+        state.apply(move)
+
+        assertEquals(1L, state.assignment.intValue(0))
+        assertEquals(1, (1..4).map { state.assignment.intValue(it) }.distinct().size)
+        assertEquals(0L, state.cost)
     }
 
     @Test

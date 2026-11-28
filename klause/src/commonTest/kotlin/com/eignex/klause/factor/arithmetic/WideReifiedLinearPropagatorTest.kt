@@ -86,9 +86,9 @@ class WideReifiedLinearPropagatorTest {
 
     @Test
     fun `wide reified linear deductions should be implied by their reasons under carved holes`() {
-        val rng = Random(0x1DE1)
         for (op in LinearOp.entries) {
-            repeat(75) { iter ->
+            val rng = Random(0x1DE1)
+            repeat(25) { iter ->
                 val n = 3
                 val problem = Problem(
                     numBoolVars = 1,

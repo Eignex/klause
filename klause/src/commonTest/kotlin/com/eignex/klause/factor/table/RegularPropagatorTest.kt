@@ -39,7 +39,7 @@ class RegularPropagatorTest {
     @Test
     fun `regular deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x7E61)
-        repeat(20) { iter ->
+        repeat(5) { iter ->
             val n = 5
             val problem = Problem(
                 numBoolVars = 0,

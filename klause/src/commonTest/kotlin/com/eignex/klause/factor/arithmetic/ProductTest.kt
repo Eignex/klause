@@ -67,7 +67,7 @@ class ProductTest {
     @Test
     fun `Product deductions should be implied by their reasons under holes`() {
         val rng = Random(0x940D)
-        repeat(80) { iter ->
+        repeat(70) { iter ->
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = 3,

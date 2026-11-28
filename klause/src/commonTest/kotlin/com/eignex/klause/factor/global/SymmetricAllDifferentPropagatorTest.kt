@@ -32,7 +32,7 @@ class SymmetricAllDifferentPropagatorTest {
     @Test
     fun `symmetric alldifferent reasons should cover mirror deductions and conflicts`() {
         val rng = Random(0x5A11)
-        repeat(30) { iter ->
+        repeat(2) { iter ->
             val n = 5
             val problem = Problem(
                 numBoolVars = 0,

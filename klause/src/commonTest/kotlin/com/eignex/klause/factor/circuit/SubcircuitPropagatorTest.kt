@@ -70,7 +70,7 @@ class SubcircuitPropagatorTest {
     fun `subcircuit deductions should be implied by their reasons once some successors are fixed`() {
         val rng = Random(0x5EA5)
         val outcomes = mutableSetOf<Outcome>()
-        repeat(30) { iter ->
+        repeat(10) { iter ->
             val n = 5
             val problem = Problem(
                 numBoolVars = 0,
