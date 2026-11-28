@@ -8,14 +8,10 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.util.io.openTextFile
 import com.eignex.util.io.useSource
 
-internal object Xcsp3Mode : CliMode {
-    override val names = listOf("xcsp3", "xcsp")
-    override val extensions = listOf("xml", "xcsp", "xcsp3")
-    override fun newSession(): ModeSession = Session()
+internal object Xcsp3Mode {
+    fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
-        override fun flags(): List<FlagSpec> = emptyList()
-
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(xcsp3Semantics)
             // Parsing only reads; the base bake runs as presolve step 0, bounded by the presolve deadline.

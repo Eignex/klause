@@ -27,10 +27,8 @@ import com.eignex.util.numbers.BigFraction
 import com.eignex.util.process.flushStandardOutput
 import kotlin.time.TimeSource
 
-internal object MiniZincMode : CliMode {
-    override val names = listOf("minizinc", "fzn", "flatzinc")
-    override val extensions = listOf("fzn")
-    override fun newSession(): ModeSession = Session()
+internal object MiniZincMode {
+    fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
         private var oznPath: String? = null

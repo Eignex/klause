@@ -9,14 +9,10 @@ import com.eignex.util.io.openTextFile
 import com.eignex.util.io.useSource
 
 // The objective is always a minimization. Satisfaction emits its `v` line after the final status.
-internal object OpbMode : CliMode {
-    override val names = listOf("opb", "pb", "wbo")
-    override val extensions = listOf("opb", "wbo")
-    override fun newSession(): ModeSession = Session()
+internal object OpbMode {
+    fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
-        override fun flags(): List<FlagSpec> = emptyList()
-
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(opbSemantics)
             val parsed = openTextFile(path).useSource { Opb.parse(it) }.toProblem(

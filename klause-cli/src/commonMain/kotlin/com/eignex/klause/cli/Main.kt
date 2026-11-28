@@ -11,10 +11,6 @@ import com.eignex.util.process.printErrorLine
 import com.eignex.util.process.processProperty
 import com.eignex.util.runtime.diagnostics.startHeapPeakSampler
 
-// Matched in order by `--format` name or file extension. MiniZinc is the fallback because MiniZinc
-// invokes this binary with `.fzn` files and standard flags.
-internal val MODES: List<CliMode> = listOf(MiniZincMode, Xcsp3Mode, SmtLibMode, DimacsMode, OpbMode, WcnfMode, MpsMode)
-
 /** Solves one instance; the front-end is chosen by `--format`, else by file extension, else MiniZinc. */
 fun main(args: Array<String>) {
     val code = runCli(args)
@@ -59,8 +55,8 @@ private fun run(args: Array<String>) {
     val common = CommonOptions()
     // One parse over every mode's flags, each mutating its own session, so mode flag names must be unique
     // across modes.
-    val sessions = MODES.associateWith { it.newSession() }
-    val specs = commonFlagSpecs(common) + sessions.values.flatMap { it.flags() }
+    val flagSessions = CliMode.withFlags.associateWith { it.newSession() }
+    val specs = commonFlagSpecs(common) + flagSessions.values.flatMap { it.flags() }
     parseArgs(args, specs) { positional ->
         if (common.inputPath != null) usageError("multiple input paths: ${common.inputPath}, $positional")
         common.inputPath = positional
@@ -83,11 +79,11 @@ private fun run(args: Array<String>) {
     } catch (error: IllegalArgumentException) {
         usageError(error.message.orEmpty())
     }
+    val mode = pickMode(common, path)
+    val session = flagSessions[mode] ?: mode.newSession()
     // Anchored before parsing so the bake and the solve share one deadline.
     common.deadlineAtMs = common.timeLimitMs?.let { nowMillis() + it }
     common.startDebugStatistics(processProperty("klause.debug") == "true")
-    val mode = pickMode(common, path)
-    val session = sessions.getValue(mode)
     // The sampler cannot see backwards, so it starts before the parse; only for the dry-run diagnostic.
     if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) startHeapPeakSampler()
     common.resetInvocationStatistics()
@@ -96,8 +92,8 @@ private fun run(args: Array<String>) {
     val solvable = session.load(path, common)
     common.loadElapsedMs = nowMillis() - loadStart
     val comment = when (mode) {
-        MiniZincMode -> "%"
-        SmtLibMode -> ";"
+        CliMode.MINIZINC -> "%"
+        CliMode.SMTLIB -> ";"
         else -> "c"
     }
     SolveCore.solve(solvable, common, session.output(common).sourceQualified(common.sourceSemantics, comment))
@@ -108,7 +104,7 @@ private const val USAGE =
         "Try 'klause-cli --help' for the full option list."
 
 private fun helpText(specs: List<FlagSpec>): String {
-    val byExtension = MODES.joinToString(", ") { m -> ".${m.extensions.first()} → ${m.names.first()}" }
+    val byExtension = CliMode.entries.joinToString(", ") { m -> ".${m.extensions.first()} → ${m.names.first()}" }
     return """
         |${BuildInfo.versionLine()} — SMT-flavored finite-domain constraint solver
         |
@@ -151,8 +147,8 @@ private fun renderOptionRow(spec: FlagSpec): String {
 private fun pickMode(common: CommonOptions, path: String): CliMode {
     common.formatOverride?.let { fmt ->
         val f = fmt.lowercase()
-        return MODES.firstOrNull { f in it.names } ?: usageError("unknown format `$fmt`")
+        return CliMode.entries.firstOrNull { f in it.names } ?: usageError("unknown format `$fmt`")
     }
     val ext = fileExtension(path).lowercase()
-    return MODES.firstOrNull { ext in it.extensions } ?: MiniZincMode
+    return CliMode.entries.firstOrNull { ext in it.extensions } ?: CliMode.MINIZINC
 }

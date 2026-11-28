@@ -10,14 +10,10 @@ import com.eignex.util.io.useSource
 
 // Soft clauses are relaxed with a fresh indicator; both `h`-style and `p wcnf … <top>` headers are read.
 // The `v` line omits relaxation variables.
-internal object WcnfMode : CliMode {
-    override val names = listOf("wcnf", "maxsat")
-    override val extensions = listOf("wcnf")
-    override fun newSession(): ModeSession = Session()
+internal object WcnfMode {
+    fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
-        override fun flags(): List<FlagSpec> = emptyList()
-
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(wcnfSemantics)
             val parsed = openTextFile(path).useSource { Dimacs.parseWcnf(it) }.toProblem(
