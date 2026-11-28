@@ -302,6 +302,19 @@ class SolveEvidenceTest {
     }
 
     @Test
+    fun `MiniZinc mapping can keep a compact witness from a larger assignment frame`() {
+        val assignments = listOf("x = [", "  1, 2, 3, 4, 5, 6", "];")
+        val raw = SolverOutput.Text(assignments.joinToString("\n") + "\n----------\n")
+
+        val witness = SolveEvidence.finalWitness(Format.MINIZINC, raw, maxChars = 10) { lines, _ ->
+            assertEquals(assignments, lines.toList())
+            "y = 1;"
+        }
+
+        assertEquals("y = 1;", witness)
+    }
+
+    @Test
     fun `an exact coordinate only MiniZinc solution should not reach the model output mapping`() {
         val raw = "% klause-exact: x = 1/3;\n----------\n"
 
@@ -341,5 +354,13 @@ class SolveEvidenceTest {
         val witness = SolveEvidence.finalWitness(Format.XCSP3, raw)
 
         assertEquals("v $model", witness)
+    }
+
+    @Test
+    fun `an oversized final XCSP3 instantiation cannot expose an older witness`() {
+        val raw = "v <instantiation></instantiation>\n" +
+            "v <instantiation>\nv <list> x y </list>\nv <values> 1 2 </values>\nv </instantiation>\n"
+
+        assertNull(SolveEvidence.finalWitness(Format.XCSP3, raw, maxChars = 40))
     }
 }

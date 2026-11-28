@@ -169,7 +169,7 @@ class SolveMetricFailureTest {
     fun `ordinary outcomes should not acquire caught exception diagnostics`(outcome: String) {
         val result = SolverInvocation.Result(
             feasible = if (outcome == "success") true else null,
-            objective = null, timeToBestMs = null, proven = false, stats = emptyMap(), rawOutput = "",
+            objective = null, timeToBestMs = null, proven = false, stats = emptyMap(), stdout = SolverOutput.Text(""),
             command = "cli", buildProvenance = build,
         )
         val (record, _) = SolveMetric.solve(

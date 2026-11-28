@@ -4,13 +4,16 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
+import java.io.BufferedReader
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.nio.CharBuffer
 import java.security.MessageDigest
 import java.util.Locale
 
 // The solver's own report, unchecked by the bench.
 internal const val REPORTED_RESULT_POLICY = "reported-result-v1"
+internal const val MINIZINC_SOLUTION_SEPARATOR = "----------"
 
 internal object SolveEvidence {
     private const val MAX_WITNESS_CHARS = 8 * 1024 * 1024
@@ -77,82 +80,193 @@ internal object SolveEvidence {
         raw: String,
         maxChars: Int = MAX_WITNESS_CHARS,
         modelOutput: ((String) -> String)? = null,
+    ): String? = finalWitness(format, SolverOutput.Text(raw), maxChars, modelOutput?.let { map ->
+        { lines, _ -> map(lines.joinToString("\n")) }
+    })
+
+    fun finalWitness(
+        format: Format,
+        raw: SolverOutput,
+        maxChars: Int = MAX_WITNESS_CHARS,
+        modelOutput: ((Sequence<String>, Int) -> String?)? = null,
     ): String? {
         val witness = when (format) {
-            Format.MINIZINC -> miniZincWitness(raw, modelOutput)
+            Format.MINIZINC -> miniZincWitness(raw, maxChars, modelOutput)
 
             Format.SMTLIB -> finalSmtModel(raw, maxChars)
 
-            Format.XCSP3 -> xcspInstantiation(raw)?.let { "v $it" }
+            Format.XCSP3 -> raw.reader().useLines { xcspInstantiation(it, maxChars - 2) }?.let { "v $it" }
 
             Format.OPB, Format.DIMACS, Format.WCNF, Format.MPS ->
-                raw.lineSequence().lastOrNull { it == "v" || it.startsWith("v ") }
+                raw.reader().useLines { lines -> lines.lastOrNull { it == "v" || it.startsWith("v ") } }
 
             else -> null
         }
         return witness?.takeIf { it.length <= maxChars }
     }
 
-    fun miniZincSolution(raw: String): String? {
-        val complete = raw.split("----------").dropLast(1).lastOrNull() ?: return null
-        val lines = complete.lineSequence().filter { line ->
-            val trimmed = line.trim()
-            trimmed.isNotEmpty() && !trimmed.startsWith('%') && !trimmed.startsWith("=====")
-        }.toList()
-        val start = lines.indexOfFirst { ASSIGNMENT.containsMatchIn(it) }
-        return if (start < 0) null else lines.drop(start).joinToString("\n")
+    fun mappedMiniZincSolution(raw: SolverOutput, maxChars: Int): String? {
+        val frame = checkNotNull(miniZincFrame(raw)) { "minizinc --ozn-file printed no complete solution" }
+        return raw.reader().useLines { lines ->
+            val assignments = miniZincAssignments(frame.select(lines)).iterator()
+            check(assignments.hasNext()) { "minizinc --ozn-file printed no assignments" }
+            boundedLines(assignments.asSequence(), maxChars)
+        }
     }
 
-    // Appends the solution's `% klause-exact:`, `% klause-coordinate:` and `% klause-float-` lines; an
-    // exact-coordinate-only solution keeps those lines alone.
-    private fun miniZincWitness(raw: String, modelOutput: ((String) -> String)?): String? = (
-        miniZincSolution(raw)?.let { modelOutput?.invoke(it) ?: it }
-            ?: if (exactCoordinates(raw) != null) "" else null
-        )?.let { candidate ->
-        val comments = raw.split("----------").dropLast(1).lastOrNull()
-            ?.lineSequence()?.filter {
-                it.startsWith("% klause-exact: ") || it.startsWith("% klause-coordinate: ") ||
-                    it.startsWith("% klause-float-") || it.startsWith("% klause-assignment")
-            }?.joinToString("\n").orEmpty()
-        if (comments.isEmpty()) candidate else candidate + "\n" + comments
+    private data class MiniZincFrame(val start: Long, val end: Long) {
+        fun select(lines: Sequence<String>): Sequence<String> = sequence {
+            var position = 0L
+            for (line in lines) {
+                if (position >= end) break
+                if (position++ >= start) yield(line)
+            }
+        }
     }
 
-    private fun exactCoordinates(raw: String): String? = raw.split("----------").dropLast(1).lastOrNull()
-        ?.lineSequence()?.filter { it.startsWith("% klause-exact: ") || it.startsWith("% klause-coordinate: ") }
-        ?.map { it.substringAfter(": ") }?.toList()?.takeIf { it.isNotEmpty() }?.joinToString("\n")
+    private fun miniZincFrame(raw: SolverOutput): MiniZincFrame? {
+        // Retain the line range of the last complete frame, even if the writer stopped inside the next one.
+        var frameStart = 0L
+        var frameEnd = -1L
+        var nextStart = 0L
+        raw.reader().useLines { lines ->
+            var position = 0L
+            for (line in lines) {
+                if (line.trim() == MINIZINC_SOLUTION_SEPARATOR) {
+                    frameStart = nextStart
+                    frameEnd = position
+                    nextStart = position + 1
+                }
+                position++
+            }
+        }
+        return if (frameEnd < 0) null else MiniZincFrame(frameStart, frameEnd)
+    }
 
-    private fun xcspInstantiation(raw: String): String? {
-        var candidate: StringBuilder? = null
+    private fun miniZincAssignments(lines: Sequence<String>): Sequence<String> = lines.filter { line ->
+        val trimmed = line.trim()
+        trimmed.isNotEmpty() && !trimmed.startsWith('%') && !trimmed.startsWith("=====")
+    }.dropWhile { !ASSIGNMENT.containsMatchIn(it) }
+
+    // Append exact coordinates and complete-assignment comments from the same solution as the mapped DZN.
+    private fun miniZincWitness(
+        raw: SolverOutput,
+        maxChars: Int,
+        modelOutput: ((Sequence<String>, Int) -> String?)?,
+    ): String? {
+        val frame = miniZincFrame(raw) ?: return null
+        return raw.reader().useLines { lines ->
+            val comments = BoundedWitness(maxChars)
+            var exactCoordinates = false
+            val solution = miniZincAssignments(frame.select(lines).onEach { line ->
+                val exact = line.startsWith("% klause-exact: ") || line.startsWith("% klause-coordinate: ")
+                if (exact || line.startsWith("% klause-float-") || line.startsWith("% klause-assignment")) {
+                    comments.append(line)
+                    exactCoordinates = exactCoordinates || exact
+                }
+            }).iterator()
+            val candidate = when {
+                solution.hasNext() -> if (modelOutput == null) {
+                    boundedLines(solution.asSequence(), maxChars)
+                } else {
+                    modelOutput(solution.asSequence(), maxChars)
+                }
+                exactCoordinates -> ""
+                else -> null
+            } ?: return@useLines null
+            while (solution.hasNext()) solution.next()
+            val evidence = comments.text() ?: return@useLines null
+            when {
+                evidence.isEmpty() -> candidate
+                candidate.length < maxChars - evidence.length -> candidate + "\n" + evidence
+                else -> null
+            }
+        }
+    }
+
+    private fun xcspInstantiation(lines: Sequence<String>, maxChars: Int): String? {
+        var candidate: BoundedWitness? = null
         var witness: String? = null
-        for (line in raw.lineSequence().filter { it.startsWith("v ") }.map { it.removePrefix("v ") }) {
-            if (line.trimStart().startsWith("<instantiation")) candidate = StringBuilder()
+        for (line in lines.filter { it.startsWith("v ") }.map { it.removePrefix("v ") }) {
+            val start = line.trimStart().startsWith("<instantiation")
+            val end = line.trimEnd().endsWith("</instantiation>")
+            if (start) candidate = BoundedWitness(maxChars)
             val current = candidate ?: continue
-            if (current.isNotEmpty()) current.append('\n')
-            current.append(line)
-            if (line.trimEnd().endsWith("</instantiation>")) {
-                witness = current.toString().trim()
+            val content = if (start) line.trimStart() else line
+            current.append(if (end) content.trimEnd() else content)
+            if (end) {
+                witness = current.text()
                 candidate = null
             }
         }
         return witness
     }
 
-    private fun finalSmtModel(raw: String, maxChars: Int): String? {
-        var witnessStart = -1
-        var witnessEnd = 0
+    private fun boundedLines(lines: Sequence<String>, maxChars: Int): String? {
+        val witness = BoundedWitness(maxChars)
+        for (line in lines) if (!witness.append(line)) return null
+        return witness.text()
+    }
+
+    private class BoundedWitness(private val maxChars: Int) {
+        private val content = StringBuilder()
+        private var exceeded = false
+
+        fun append(line: String): Boolean {
+            if (exceeded) return false
+            val separator = if (content.isEmpty()) 0 else 1
+            if (line.length > maxChars - content.length - separator) {
+                exceeded = true
+                return false
+            }
+            if (separator > 0) content.append('\n')
+            content.append(line)
+            return true
+        }
+
+        fun text(): String? = if (exceeded) null else content.toString()
+    }
+
+    private fun finalSmtModel(raw: SolverOutput, maxChars: Int): String? {
+        var witnessStart = -1L
+        var witnessEnd = 0L
         var sat = false
         val scanner = SmtResponseScanner(status = { status ->
             sat = status == "sat"
-            witnessStart = -1
+            witnessStart = -1L
         }, model = { start, end ->
             if (sat) {
-                witnessStart = if (end - start <= maxChars) start else -1
+                witnessStart = if (end - start <= maxChars) start else -1L
                 witnessEnd = end
             }
         })
-        scanner.feed(raw)
+        val buffer = CharArray(8192)
+        raw.reader().use { reader ->
+            while (true) {
+                val count = reader.read(buffer)
+                if (count < 0) break
+                scanner.feed(CharBuffer.wrap(buffer, 0, count))
+            }
+        }
         scanner.finish()
         if (witnessStart < 0) return null
-        return raw.substring(witnessStart, witnessEnd)
+        return raw.reader().use { reader -> reader.readRange(witnessStart, (witnessEnd - witnessStart).toInt()) }
+    }
+
+    private fun BufferedReader.readRange(start: Long, length: Int): String? {
+        var remaining = start
+        while (remaining > 0) {
+            val skipped = skip(remaining)
+            if (skipped == 0L) return null
+            remaining -= skipped
+        }
+        val chars = CharArray(length)
+        var offset = 0
+        while (offset < length) {
+            val count = read(chars, offset, length - offset)
+            if (count < 0) return null
+            offset += count
+        }
+        return chars.concatToString()
     }
 }

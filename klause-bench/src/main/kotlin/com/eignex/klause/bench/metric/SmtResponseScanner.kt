@@ -2,11 +2,11 @@ package com.eignex.klause.bench.metric
 
 internal class SmtResponseScanner(
     private val status: (String) -> Unit = {},
-    private val model: (Int, Int) -> Unit = { _, _ -> },
+    private val model: (Long, Long) -> Unit = { _, _ -> },
 ) {
-    private var offset = 0
+    private var offset = 0L
     private var depth = 0
-    private var start = 0
+    private var start = 0L
     private var quote = ' '
     private var closingString = false
     private var comment = false
@@ -20,7 +20,7 @@ internal class SmtResponseScanner(
 
     val atTopLevel: Boolean get() = depth == 0 && quote == ' ' && !comment && tokenDepth < 0
 
-    fun feed(text: String) {
+    fun feed(text: CharSequence) {
         for (char in text) {
             consume(char)
             offset++

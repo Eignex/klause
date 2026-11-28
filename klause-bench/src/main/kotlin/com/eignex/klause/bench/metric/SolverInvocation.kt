@@ -38,6 +38,7 @@ internal object SolverInvocation {
         val sourceStaging: SourceStaging = SourceStaging.CACHE,
         val observeSourceHarness: Boolean = false,
         val verbose: Boolean? = null,
+        val stdoutFile: File? = captureDirectory?.resolve("cli.stdout"),
     )
 
     internal data class Result(
@@ -48,7 +49,7 @@ internal object SolverInvocation {
         val proven: Boolean,
         val stats: Map<String, String>,
         val attribution: List<Attribution> = emptyList(),
-        val rawOutput: String,
+        val stdout: SolverOutput,
         val command: String,
         val buildProvenance: BuildProvenance? = null,
         // Includes launch and output consumption.
@@ -93,6 +94,7 @@ internal object SolverInvocation {
                     hardTimeoutMs = remaining.timeoutMillis * 2 + 20_000,
                     captureDirectory = settings.captureDirectory,
                     measureResources = settings.measureResources,
+                    stdoutFile = settings.stdoutFile,
                 ).copy(compiledInputHashes = compiled)
             } catch (failure: Failure) {
                 throw Failure(failure.result.copy(compiledInputHashes = compiled), failure.message.orEmpty(), failure)
@@ -120,7 +122,7 @@ internal object SolverInvocation {
         var cleanupNanos = 0L
         var cliNanos = 0L
         var result = Result(null, null, null, proven = false, stats = emptyMap(),
-            rawOutput = "", command = "SOURCE_PREPARATION")
+            stdout = SolverOutput.Text(""), command = "SOURCE_PREPARATION")
         fun checkActive() = checkSourceActive(nanoTime() - start, budget)
         val failure = runCatching {
             SourcePreparationCapture.span("source-preparation").use { preparation ->
@@ -306,6 +308,7 @@ internal object SolverInvocation {
         measureResources: Boolean = false,
         startProcess: (List<String>) -> Process = { ProcessBuilder(it).redirectErrorStream(false).start() },
         stderrDrainWaitMs: Long = STDERR_DRAIN_WAIT_MS,
+        stdoutFile: File? = captureDirectory?.resolve("cli.stdout"),
     ): Result {
         val startNanos = System.nanoTime()
         captureDirectory?.mkdirs()
@@ -324,7 +327,7 @@ internal object SolverInvocation {
         captureDirectory?.resolve("cli-command.json")?.writeText(Reports.json.encodeToString(measured))
         val process = startProcess(measured)
         var outputFailure: Throwable? = null
-        val stdoutCapture = runCatching { captureDirectory?.resolve("cli.stdout")?.bufferedWriter() }
+        val stdoutCapture = runCatching { stdoutFile?.bufferedWriter() }
             .onFailure { outputFailure = it }.getOrNull()
         // The read loop blocks until stdout closes; killing a runaway closes it and the partial output is scored.
         val killed = AtomicReference<String?>(null)
@@ -347,11 +350,12 @@ internal object SolverInvocation {
             }
         ).start()
 
-        val raw = StringBuilder()
+        val raw = if (stdoutFile == null) StringBuilder() else null
         val stats = LinkedHashMap<String, String>()
         val attribution = ArrayList<Attribution>()
         var objective: Double? = null
         var exactObjective: String? = null
+        var pendingMiniZincObjective: ExactObjective? = null
         var timeToBestMs: Long? = null
         var timeToFirstFeasibleMs: Long? = null
         var proven = false
@@ -402,7 +406,7 @@ internal object SolverInvocation {
                     append(ending)
                     flush()
                 }
-                raw.append(rawLine).append(ending)
+                raw?.append(rawLine)?.append(ending)
                 val line = rawLine.trim()
                 val smtTopLevel = smtScanner.atTopLevel
                 if (dialect == Dialect.SMT_LIB) {
@@ -411,7 +415,12 @@ internal object SolverInvocation {
                 }
                 when (dialect) {
                     Dialect.MINIZINC -> when (line) {
-                        SOLUTION_SEPARATOR -> markIncumbent()
+                        MINIZINC_SOLUTION_SEPARATOR -> {
+                            objective = pendingMiniZincObjective?.approximate()
+                            exactObjective = pendingMiniZincObjective?.toString()
+                            pendingMiniZincObjective = null
+                            markIncumbent()
+                        }
 
                         SEARCH_COMPLETE -> proven = true
 
@@ -438,11 +447,13 @@ internal object SolverInvocation {
                                 LINEAR_RESULT_KEYS -> recordStat(line.removePrefix(RESULT_COMMENT_PREFIX).trim())
 
                             line.startsWith("% klause-exact: _objective = ") ||
-                                line.startsWith("% klause-coordinate: _objective = ") ->
-                                recordObjective(line.substringAfter('=').trim().removeSuffix(";").trim())
-
-                            line.startsWith(OBJECTIVE_KEY) || line.startsWith(MODEL_OBJECTIVE_KEY) ->
-                                recordObjective(line.substringAfter('=').trim().removeSuffix(";").trim())
+                                line.startsWith("% klause-coordinate: _objective = ") ||
+                                line.startsWith(OBJECTIVE_KEY) || line.startsWith(MODEL_OBJECTIVE_KEY) -> {
+                                val value = ExactObjective.parse(
+                                    line.substringAfter('=').trim().removeSuffix(";").trim(),
+                                )
+                                if (value != null) pendingMiniZincObjective = value
+                            }
                         }
                     }
 
@@ -551,7 +562,11 @@ internal object SolverInvocation {
             },
             stats = stats,
             attribution = attribution,
-            rawOutput = raw.toString(),
+            stdout = if (stdoutCapture != null) {
+                SolverOutput.Spool(requireNotNull(stdoutFile))
+            } else {
+                SolverOutput.Text(raw?.toString().orEmpty())
+            },
             command = cmd.joinToString(" "),
             stderr = diagnostics.text,
             stderrComplete = diagnostics.complete,
@@ -626,7 +641,6 @@ internal object SolverInvocation {
     const val KLAUSE = "klause"
     const val DEFAULT_SEED = 3L
     private const val KLAUSE_CLI_BIN = "klause-cli/build/install/klause-cli-jvm/bin/klause-cli"
-    private const val SOLUTION_SEPARATOR = "----------"
     private const val SEARCH_COMPLETE = "=========="
     private const val UNSATISFIABLE = "=====UNSATISFIABLE====="
     private const val UNKNOWN = "=====UNKNOWN====="
