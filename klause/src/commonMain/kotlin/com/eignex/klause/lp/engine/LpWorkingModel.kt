@@ -110,12 +110,18 @@ internal class LpWorkingScope internal constructor(
         }
     }
 
-    fun solveFloat(warm: Basis? = null, allowance: LpFloatAllowance? = null): Pair<LpSolver, FloatLpResult?>? {
+    fun solveFloat(warm: Basis? = null, allowance: LpFloatAllowance? = null): Pair<LpSolver, FloatLpResult?>? =
+        floatAttempt { owner.solveFloat(warm, cancellation, allowance) }
+
+    fun solveRefinementFloat(warm: Basis?, allowance: LpFloatAllowance): Pair<LpSolver, FloatLpResult?>? =
+        floatAttempt { owner.solveRefinementFloat(warm, cancellation, allowance) }
+
+    private inline fun floatAttempt(solve: () -> Pair<LpSolver, FloatLpResult?>?): Pair<LpSolver, FloatLpResult?>? {
         check(!closed) { "working scope is closed" }
         owner.requireAvailable()
         attempts++
         return try {
-            owner.solveFloat(warm, cancellation, allowance)
+            solve()
         } finally {
             solves += owner.lastMetrics
         }
