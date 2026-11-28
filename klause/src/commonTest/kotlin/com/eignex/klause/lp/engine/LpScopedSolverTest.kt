@@ -19,6 +19,46 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `a retired component owner should rebuild on retry against the same exact state`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        var adoptionsUntilDecline = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: ExecutionControl,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val child = ProductionLpEngineFactory.newPersistentSolver(model, cancellation, refactorUpdateLimit,
+                    iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by child {
+                    override fun adopt(state: LpExactState, token: ExecutionControl): Boolean {
+                        if (adoptionsUntilDecline > 0 && --adoptionsUntilDecline == 0) return false
+                        return child.adopt(state, token)
+                    }
+                }
+            }
+        }
+        LpScopedSolver(state, context = LpSolveContext(factory), componentSplit = true).use { owner ->
+            assertTrue(owner.prepare())
+            adoptionsUntilDecline = 2
+            assertFalse(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(4L)), 0L))
+
+            val result = assertNotNull(owner.solve())
+
+            assertEquals(BigFraction.ofLong(2L), result.lowerBound)
+        }
+    }
+
+    @Test
     fun `cancellation after exact conflict certification should withhold the result`() {
         var cancelled = false
         val observer = object : LpCertificationObserver {
