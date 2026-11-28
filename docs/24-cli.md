@@ -17,6 +17,23 @@ seconds ends before optimized code repays its compilation, which shares the solv
 `JAVA_OPTS` or `KLAUSE_CLI_OPTS` follow the launcher defaults, so `-XX:TieredStopAtLevel=4` there restores
 the optimizing tier for long runs.
 
+### JVM startup cache
+
+For repeated short JVM invocations, train a HotSpot ahead-of-time cache on a representative
+model and reuse it across processes. These POSIX shell commands use the installed launcher on
+`PATH`.
+
+```sh
+KLAUSE_CLI_OPTS="-XX:AOTCacheOutput=klause.aot" klause-cli training.cnf
+KLAUSE_CLI_OPTS="-XX:AOTCache=klause.aot" klause-cli input.cnf
+```
+
+Training runs the model and builds the cache when the JVM exits. Keep the cache outside the
+installation and use the same installed distribution, JDK build, platform and JVM options for
+training and reuse. Rebuild the cache when any of those change. For troubleshooting, add
+`-XX:AOTMode=on` to the reuse command to fail if the JVM cannot load the cache.
+See the [Java launcher reference](https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html#ahead-of-time-cache).
+
 ## Formats and dispatch
 
 | Format name | Extensions | Output |
