@@ -133,7 +133,8 @@ internal class ForrestTomlinFactors private constructor(
     private fun prepareAndPublishUpdate(pivot: Int, spike: BasisWorkspace, tolerance: Double): Boolean {
         scatterSpike(spike)
         val rows = rowsWithSpike(pivot)
-        row.load(rows[pivot])
+        val pivotRow = rows[pivot]
+        row.load(pivotRow)
         val order = upper.order
         val position = order.indexOf(pivot)
         eliminateSpikeRow(rows, order, position)
@@ -143,10 +144,14 @@ internal class ForrestTomlinFactors private constructor(
         rows[pivot] = BasisSlice(intArrayOf(pivot), doubleArrayOf(diagonal))
         copiedEntries++
         column.set(pivot, diagonal)
-        val columns = columnsWithSpike(pivot)
+        val columns = upper.columns.copyOf()
+        val spikeColumn = compact(column)
+        columns[pivot] = spikeColumn
+        copiedEntries += spikeColumn.count
+        val clearedEntries = clearPivotRow(columns, pivotRow, pivot)
+        val entries = upperEntries - upper.columns[pivot].count - clearedEntries + spikeColumn.count
         val nextOrder = pivotMovedLast(order, position, pivot)
         val transform = ForrestTomlinRow(pivot, compact(multipliers))
-        val entries = columns.sumOf { it.count }
         val report = ForrestTomlinWork(
             columnProducts,
             rowProducts,
@@ -180,9 +185,19 @@ internal class ForrestTomlinFactors private constructor(
     // The row view with [pivot]'s entry in every row replaced by the spike's.
     private fun rowsWithSpike(pivot: Int): Array<BasisSlice> {
         val rows = transpose.columns.copyOf()
-        for (i in 0 until n) {
-            if (rows[i][pivot] != column.values[i]) {
-                rows[i] = replace(rows[i], pivot, column.values[i])
+        val previous = upper.columns[pivot]
+        for (k in previous.offset until previous.offset + previous.count) {
+            val i = previous.indices[k]
+            if (previous.values[k] != 0.0 && column.values[i] == 0.0) {
+                rows[i] = replace(rows[i], pivot, 0.0)
+                copiedEntries += rows[i].count
+            }
+        }
+        for (k in 0 until column.count) {
+            val i = column.indices[k]
+            val value = column.values[i]
+            if (value != 0.0 && previous[i] != value) {
+                rows[i] = replace(rows[i], pivot, value)
                 copiedEntries += rows[i].count
             }
         }
@@ -204,19 +219,17 @@ internal class ForrestTomlinFactors private constructor(
         }
     }
 
-    // The column view with [pivot]'s column replaced by the spike and its row cleared elsewhere.
-    private fun columnsWithSpike(pivot: Int): Array<BasisSlice> {
-        val columns = upper.columns.copyOf()
-        for (j in 0 until n) {
-            if (j == pivot) {
-                columns[j] = compact(column)
-                copiedEntries += columns[j].count
-            } else if (columns[j][pivot] != 0.0) {
+    private fun clearPivotRow(columns: Array<BasisSlice>, pivotRow: BasisSlice, pivot: Int): Int {
+        var cleared = 0
+        for (k in pivotRow.offset until pivotRow.offset + pivotRow.count) {
+            val j = pivotRow.indices[k]
+            if (j != pivot && pivotRow.values[k] != 0.0) {
                 columns[j] = replace(columns[j], pivot, 0.0)
                 copiedEntries += columns[j].count
+                cleared++
             }
         }
-        return columns
+        return cleared
     }
 
     private fun pivotMovedLast(order: IntArray, position: Int, pivot: Int): IntArray {

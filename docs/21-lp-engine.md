@@ -80,7 +80,9 @@ copy; an artificial box never authorizes a source proof, ray or bound.
 [simplex.basis](../klause/src/commonMain/kotlin/com/eignex/klause/simplex/basis)
 owns sparse and small dense elimination, DFS reach, Forrest-Tomlin updates, logical
 repair, indexed forward/transpose solves and rational factors. Each owner has fixed
-dimension, both permutations and three-valued update results. Mutable coefficient
+dimension, both permutations and three-valued update results. Forrest-Tomlin
+updates use the old and new spike supports and the displaced row to replace
+affected slices in both triangular views and maintain the entry count. Mutable coefficient
 inputs are captured defensively before use. Dense partial-pivot LU is selected only
 for dimensions 2–6 with at least 50% density in the selected basis and a pivot policy
 without entry or work limits; it produces the
