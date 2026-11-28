@@ -67,7 +67,7 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
             emptyMap(),
         )
 
-        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params(), engine)
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params().copy(maximumWork = 2_000), engine)
 
         if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
             assertIs<OpenTheoryResult.Unknown>(execution.result)

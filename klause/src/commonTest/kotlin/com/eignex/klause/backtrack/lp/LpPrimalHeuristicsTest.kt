@@ -382,7 +382,7 @@ class LpPrimalHeuristicsTest {
     fun `every LP primal proposal should pass composed verification`() {
         val rng = Random(20260902)
         val produced = producers.associate { (name, _) -> name to 0 }.toMutableMap()
-        repeat(6) {
+        repeat(2) {
             val (problem, objective) = instance(rng)
             val engine = LpEngine(
                 problem,

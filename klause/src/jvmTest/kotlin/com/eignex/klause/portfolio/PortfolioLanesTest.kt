@@ -30,6 +30,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.MinimizeResult.WithSample
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.util.ExecutionControl
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
@@ -504,12 +505,13 @@ class PortfolioLanesTest {
                 withInstructionBudget = { p, limit -> p.copy(maxInstructions = limit) },
             )
         }
-        val stop = TimeSource.Monotonic.markNow() + Duration.parse("100ms")
-
-        val r = Portfolio.thompson(arms, lanes = 2).use {
-            it.minimize(cancellation =
-                ExecutionControl { stop.hasPassedNow() })
+        val polls = ConcurrentHashMap<Thread, Int>()
+        val bothArmsPolled = ExecutionControl {
+            polls.merge(Thread.currentThread(), 1, Int::plus)
+            polls.values.count { it >= 500 } >= 2 || polls.values.any { it >= 100_000 }
         }
+
+        val r = Portfolio.thompson(arms, lanes = 2).use { it.minimize(cancellation = bothArmsPolled) }
 
         assertEquals(listOf(1L, 1L), r.stats.portfolio.arms.map { it.segments })
     }

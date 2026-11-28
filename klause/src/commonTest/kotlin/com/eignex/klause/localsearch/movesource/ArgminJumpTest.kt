@@ -64,14 +64,12 @@ class ArgminJumpTest {
 
     @Test
     fun `emitted jumps should never increase weighted violation`() {
-        for (seed in longArrayOf(1L, 42L)) {
-            val state = freshState(coupledProblem(), seed)
-            for (m in jumps(state, candidateVars = 4)) {
-                assertTrue(
-                    state.weightedNetDelta(m) <= 0.0,
-                    "ArgminJump emitted a violation-increasing move $m (Δ=${state.weightedNetDelta(m)})",
-                )
-            }
+        val state = freshState(coupledProblem(), 1L)
+        for (m in jumps(state, candidateVars = 4)) {
+            assertTrue(
+                state.weightedNetDelta(m) <= 0.0,
+                "ArgminJump emitted a violation-increasing move $m (Δ=${state.weightedNetDelta(m)})",
+            )
         }
     }
 

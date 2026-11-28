@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
@@ -17,7 +18,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 class OpenPortfolioTest {
@@ -193,7 +193,7 @@ class OpenPortfolioTest {
             Product(0, 1, 2),
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 1))
-        val params = TheoryParams(cancellation = ExecutionControl.after(100.milliseconds))
+        val params = TheoryParams(nodeBudget = NodeBudget(2_000))
 
         val result = optimum(OpenTheoryPipeline.searchWithoutTheory(model, params, objective))
 

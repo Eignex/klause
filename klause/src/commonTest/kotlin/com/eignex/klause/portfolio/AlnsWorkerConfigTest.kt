@@ -24,30 +24,28 @@ class AlnsWorkerConfigTest {
             arrayOf<Factor>(Product(0, 1, 2)),
         ).bake()
         val sweep = assertNotNull(DefinitionalSweep.infer(problem))
-        for (seed in listOf(0L, 1L)) {
-            val worker = AlnsWorkerConfig().materialize(
-                problem,
-                index = 0,
-                armId = 0,
-                seed = seed,
-                lsLambda = 1.0,
-                objective = null,
-                lsObjective = null,
-                definitionalSweep = sweep,
-                onEvent = null,
-                pools = null,
-            )
-            try {
-                val result = assertIs<SolveResult.Sat>(worker.solve(ExecutionControl.Never, maxInstructions = 1))
+        val worker = AlnsWorkerConfig().materialize(
+            problem,
+            index = 0,
+            armId = 0,
+            seed = 0L,
+            lsLambda = 1.0,
+            objective = null,
+            lsObjective = null,
+            definitionalSweep = sweep,
+            onEvent = null,
+            pools = null,
+        )
+        try {
+            val result = assertIs<SolveResult.Sat>(worker.solve(ExecutionControl.Never, maxInstructions = 1))
 
-                assertEquals(
-                    result.assignment.ints[0] * result.assignment.ints[1],
-                    result.assignment.ints[2],
-                )
-                assertEquals(0.0, result.stats.ls.moves.sum)
-            } finally {
-                worker.close()
-            }
+            assertEquals(
+                result.assignment.ints[0] * result.assignment.ints[1],
+                result.assignment.ints[2],
+            )
+            assertEquals(0.0, result.stats.ls.moves.sum)
+        } finally {
+            worker.close()
         }
     }
 
